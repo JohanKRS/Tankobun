@@ -153,27 +153,44 @@ class TachiyomiSourceHost(
                 sourceInstance.getPageList(sourceChapter)
             }
             pages.map { page ->
-                val imageUrl = page.imageUrl
+                if (page.imageUrl == null && page.uri == null && sourceInstance is HttpSource) {
+                    page.imageUrl = runCatching {
+                        sourceInstance.getImageUrl(page)
+                    }.onFailure { error ->
+                        logSourceFailure(
+                            action = "imageUrl",
+                            packageName = source.packageName,
+                            source = sourceInstance,
+                            error = error,
+                        )
+                    }.getOrNull()
+                }
+                val imageRequest = if (sourceInstance is HttpSource) {
+                    runCatching {
+                        sourceInstance.imageRequest(page)
+                    }.onFailure { error ->
+                        logSourceFailure(
+                            action = "imageRequest",
+                            packageName = source.packageName,
+                            source = sourceInstance,
+                            error = error,
+                        )
+                    }.getOrNull()
+                } else {
+                    null
+                }
+                val imageUrl = imageRequest?.url?.toString()
+                    ?: page.imageUrl
                     ?: page.uri?.toString()
-                    ?: if (sourceInstance is HttpSource) {
-                        runCatching {
-                            sourceInstance.getImageUrl(page)
-                        }.onFailure { error ->
-                            logSourceFailure(
-                                action = "imageUrl",
-                                packageName = source.packageName,
-                                source = sourceInstance,
-                                error = error,
-                            )
-                        }.getOrNull()
-                    } else {
-                        null
-                    }
                     ?: page.url
+                val headers = imageRequest?.headers?.names()
+                    ?.associateWith { name -> imageRequest.headers[name].orEmpty() }
+                    .orEmpty()
                 ReaderPage(
                     index = page.index,
                     imageUrl = imageUrl,
                     cachedFilePath = null,
+                    headers = headers,
                 )
             }
         }

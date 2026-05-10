@@ -2,6 +2,7 @@ package com.tankobun.app
 
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -82,7 +83,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
+import coil3.request.ImageRequest
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.SourceChapter
 import kotlinx.coroutines.launch
@@ -765,7 +770,7 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
             ) {
                 itemsIndexed(state.readerPages, key = { _, page -> "${page.index}:${page.imageUrl}" }) { _, page ->
                     AsyncImage(
-                        model = page.imageUrl,
+                        model = readerImageRequest(page),
                         contentDescription = chapter.name,
                         modifier = Modifier.fillMaxWidth(),
                         contentScale = ContentScale.FillWidth,
@@ -773,8 +778,9 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                 }
             }
         } else {
+            val page = state.readerPages[state.currentPageIndex]
             AsyncImage(
-                model = state.readerPages[state.currentPageIndex].imageUrl,
+                model = readerImageRequest(page),
                 contentDescription = chapter.name,
                 modifier = Modifier
                     .fillMaxSize()
@@ -846,6 +852,34 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun readerImageRequest(page: ReaderPage): ImageRequest {
+    val context = LocalContext.current
+    return remember(page.imageUrl, page.headers) {
+        val headers = NetworkHeaders.Builder().apply {
+            page.headers.forEach { (name, value) ->
+                if (name.isNotBlank() && value.isNotBlank()) {
+                    set(name, value)
+                }
+            }
+        }.build()
+
+        ImageRequest.Builder(context)
+            .data(page.imageUrl)
+            .httpHeaders(headers)
+            .listener(
+                onError = { _, result ->
+                    Log.w(
+                        "TankobunMain",
+                        "Reader image failed index=${page.index} host=${Uri.parse(page.imageUrl).host} headers=${page.headers.keys}",
+                        result.throwable,
+                    )
+                },
+            )
+            .build()
     }
 }
 
