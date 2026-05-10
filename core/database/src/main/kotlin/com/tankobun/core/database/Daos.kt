@@ -98,6 +98,12 @@ interface ProgressDao {
     @Query("SELECT * FROM reader_progress WHERE mediaId = :mediaId ORDER BY updatedAtEpochMillis DESC LIMIT 1")
     fun observeLatestProgress(mediaId: Int): Flow<ReadingProgressEntity?>
 
+    @Query("SELECT * FROM reader_progress WHERE mediaId = :mediaId ORDER BY updatedAtEpochMillis DESC LIMIT 1")
+    suspend fun latestProgress(mediaId: Int): ReadingProgressEntity?
+
+    @Query("SELECT * FROM reader_progress WHERE mediaId = :mediaId AND chapterUrl = :chapterUrl")
+    suspend fun progressForChapter(mediaId: Int, chapterUrl: String): ReadingProgressEntity?
+
     @Upsert
     suspend fun upsertProgress(progress: ReadingProgressEntity)
 }

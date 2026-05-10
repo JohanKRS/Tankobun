@@ -12,6 +12,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -48,6 +49,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -58,11 +60,14 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -73,6 +78,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -81,6 +87,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
@@ -90,6 +98,7 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.SourceChapter
+import com.tankobun.core.model.SourceSearchResult
 import kotlinx.coroutines.launch
 
 private enum class SettingsRoute {
@@ -534,160 +543,317 @@ private fun MediaRow(media: AnilistMedia, onClick: () -> Unit) {
 
 @Composable
 private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        item {
-            Spacer(Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                CoverImage(
-                    url = media.coverImage,
-                    title = media.title.userPreferred,
-                    modifier = Modifier
-                        .width(190.dp)
-                        .aspectRatio(2f / 3f),
-                )
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(if (state.sourcePickerOpen) 8.dp else 0.dp)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
-                    Text(media.title.userPreferred, style = MaterialTheme.typography.headlineMedium)
-                    Text(
-                        listOfNotNull(media.status, media.chapters?.let { "$it chapters" }, media.volumes?.let { "$it volumes" })
-                            .joinToString(" / "),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    CoverImage(
+                        url = media.coverImage,
+                        title = media.title.userPreferred,
+                        modifier = Modifier
+                            .width(190.dp)
+                            .aspectRatio(2f / 3f),
                     )
-                    Text(
-                        media.description?.replace(Regex("<[^>]*>"), "").orEmpty(),
-                        maxLines = 12,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (media.genres.isNotEmpty()) {
-                        FlowRowCompat {
-                            media.genres.take(8).forEach { genre ->
-                                AssistChip(onClick = {}, label = { Text(genre) })
-                            }
-                        }
-                    }
-                    media.siteUrl?.let { site ->
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(media.title.userPreferred, style = MaterialTheme.typography.headlineMedium)
                         Text(
-                            site,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.secondary,
-                            maxLines = 1,
+                            listOfNotNull(media.status, media.chapters?.let { "$it chapters" }, media.volumes?.let { "$it volumes" })
+                                .joinToString(" / "),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            media.description?.replace(Regex("<[^>]*>"), "").orEmpty(),
+                            maxLines = 12,
                             overflow = TextOverflow.Ellipsis,
                         )
-                    }
-                }
-            }
-        }
-
-        item {
-            state.message?.let {
-                Text(it, color = MaterialTheme.colorScheme.secondary)
-            }
-        }
-
-        item {
-            Text("Sources", style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(8.dp))
-            if (state.installedSources.isEmpty()) {
-                Text("Install Tachiyomi-compatible source extensions, then refresh sources.")
-            } else {
-                FlowRowCompat {
-                    state.installedSources.forEach { source ->
-                        FilterChip(
-                            selected = state.selectedSourceId == source.id,
-                            onClick = { viewModel.selectSource(source.id) },
-                            label = { Text("${source.name} (${source.lang})", maxLines = 1) },
-                        )
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = viewModel::bindSelectedSource) {
-                        Icon(Icons.Default.Link, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("Use selected source")
-                    }
-                    Button(onClick = viewModel::findSourceMatches) {
-                        Icon(Icons.Default.Search, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("Find matches")
-                    }
-                }
-            }
-        }
-
-        if (state.sourceMatches.isNotEmpty()) {
-            item {
-                Text("Matches", style = MaterialTheme.typography.titleMedium)
-            }
-            itemsIndexed(
-                state.sourceMatches.take(12),
-                key = { index, match -> "${match.source.id}:${match.manga.url}:$index" },
-            ) { _, match ->
-                ElevatedCard(onClick = { viewModel.bindSourceMatch(match) }) {
-                    ListItem(
-                        headlineContent = { Text(match.manga.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = {
+                        if (media.genres.isNotEmpty()) {
+                            FlowRowCompat {
+                                media.genres.take(8).forEach { genre ->
+                                    AssistChip(onClick = {}, label = { Text(genre) })
+                                }
+                            }
+                        }
+                        media.siteUrl?.let { site ->
                             Text(
-                                "${match.source.name} / ${(match.score * 100).toInt()}%",
+                                site,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                        },
-                        leadingContent = {
-                            CoverImage(
-                                url = match.manga.thumbnailUrl ?: media.coverImage,
-                                title = match.manga.title,
-                                modifier = Modifier.size(width = 44.dp, height = 62.dp),
-                            )
-                        },
+                        }
+                    }
+                }
+            }
+
+            item {
+                state.message?.let {
+                    Text(it, color = MaterialTheme.colorScheme.secondary)
+                }
+            }
+
+            item {
+                SourceSummarySection(state, viewModel, media)
+            }
+
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Chapters", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    FilterChip(
+                        selected = state.readerMode == ReaderMode.PAGED,
+                        onClick = { viewModel.setReaderMode(ReaderMode.PAGED) },
+                        label = { Text("Paged") },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
                     )
+                    FilterChip(
+                        selected = state.readerMode == ReaderMode.WEBTOON,
+                        onClick = { viewModel.setReaderMode(ReaderMode.WEBTOON) },
+                        label = { Text("Webtoon") },
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                if (state.selectedSourceManga == null) {
+                    Text("Choose a source first.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Button(onClick = viewModel::loadChaptersForCurrentMatch) {
+                        Text(if (state.sourceChapters.isEmpty()) "Load chapters" else "Refresh chapters")
+                    }
+                }
+            }
+
+            if (state.sourceChapters.isEmpty()) {
+                item {
+                    Text("No chapters loaded yet.")
+                }
+            } else {
+                items(state.sourceChapters, key = { "${it.sourceId}:${it.url}" }) { chapter ->
+                    ChapterRow(chapter, viewModel)
                 }
             }
         }
 
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Chapters", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                FilterChip(
-                    selected = state.readerMode == ReaderMode.PAGED,
-                    onClick = { viewModel.setReaderMode(ReaderMode.PAGED) },
-                    label = { Text("Paged") },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
-                )
-                FilterChip(
-                    selected = state.readerMode == ReaderMode.WEBTOON,
-                    onClick = { viewModel.setReaderMode(ReaderMode.WEBTOON) },
-                    label = { Text("Webtoon") },
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Button(onClick = viewModel::loadChaptersForCurrentMatch) {
-                Text("Load chapters")
-            }
+        if (state.sourcePickerOpen) {
+            SourcePickerDialog(state, viewModel, media)
         }
+    }
+}
 
-        if (state.sourceChapters.isEmpty()) {
-            item {
-                Text("No chapters loaded yet.")
+@Composable
+private fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
+    val selectedManga = state.selectedSourceManga
+    val selectedSource = state.selectedSource
+    val latestProgress = state.latestProgress
+    val resumeChapter = latestProgress?.let { progress ->
+        state.sourceChapters.firstOrNull { it.url == progress.chapterUrl }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Source", style = MaterialTheme.typography.titleLarge)
+        if (selectedManga == null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = viewModel::openSourcePicker) {
+                    Icon(Icons.Default.Search, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text("Find source")
+                }
+                Text(
+                    if (state.allInstalledSources.isEmpty()) "Install source extensions in Settings." else "No source selected.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         } else {
-            items(state.sourceChapters, key = { "${it.sourceId}:${it.url}" }) { chapter ->
-                ChapterRow(chapter, viewModel)
+            ElevatedCard {
+                ListItem(
+                    headlineContent = {
+                        Text(selectedManga.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
+                    supportingContent = {
+                        Column {
+                            Text(
+                                listOfNotNull(
+                                    selectedSource?.let { "${it.name} (${it.lang})" },
+                                    state.sourceChapters.takeIf { it.isNotEmpty() }?.let { "${it.size} chapters" },
+                                ).joinToString(" / "),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (latestProgress != null) {
+                                Text(
+                                    "Last read: chapter ${latestProgress.chapterNumber.takeIf { it > 0 } ?: "?"}, page ${latestProgress.pageIndex + 1}",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    },
+                    leadingContent = {
+                        CoverImage(
+                            url = selectedManga.thumbnailUrl ?: media.coverImage,
+                            title = selectedManga.title,
+                            modifier = Modifier.size(width = 50.dp, height = 70.dp),
+                        )
+                    },
+                    trailingContent = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (resumeChapter != null) {
+                                OutlinedButton(onClick = { viewModel.openChapter(resumeChapter) }) {
+                                    Text("Resume")
+                                }
+                            }
+                            Button(onClick = viewModel::openSourcePicker) {
+                                Text("Change")
+                            }
+                        }
+                    },
+                )
             }
         }
     }
 }
+
+@Composable
+private fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
+    val matches = state.sourceMatches.filter { match ->
+        state.sourceMatchChapterCounts[sourceMatchKey(match.source.id, match.manga.url)] != null
+    }
+
+    Dialog(
+        onDismissRequest = viewModel::closeSourcePicker,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .fillMaxHeight(0.82f),
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Find source", style = MaterialTheme.typography.headlineSmall)
+                        Text(
+                            media.title.userPreferred,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    TextButton(onClick = viewModel::closeSourcePicker) {
+                        Text("Close")
+                    }
+                }
+
+                if (state.sourcePickerLoading) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+
+                if (matches.isEmpty() && !state.sourcePickerLoading) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("No readable matches yet.", style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(onClick = { viewModel.findSourceMatches(forceRefresh = true) }) {
+                                Icon(Icons.Default.Search, contentDescription = null)
+                                Spacer(Modifier.size(8.dp))
+                                Text("Search again")
+                            }
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        items(matches, key = { "${it.source.id}:${it.manga.url}" }) { match ->
+                            val count = state.sourceMatchChapterCounts[sourceMatchKey(match.source.id, match.manga.url)] ?: 0
+                            SourceMatchRow(
+                                match = match,
+                                chapterCount = count,
+                                current = state.selectedSourceId == match.source.id &&
+                                    state.selectedSourceManga?.url == match.manga.url,
+                                mediaCover = media.coverImage,
+                                onClick = { viewModel.bindSourceMatch(match) },
+                            )
+                        }
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(onClick = { viewModel.findSourceMatches(forceRefresh = true) }) {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                        Spacer(Modifier.size(8.dp))
+                        Text("Refresh")
+                    }
+                    if (state.sourcePickerLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    }
+                    Text(
+                        "${matches.size} sources",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceMatchRow(
+    match: SourceSearchResult,
+    chapterCount: Int,
+    current: Boolean,
+    mediaCover: String?,
+    onClick: () -> Unit,
+) {
+    ElevatedCard(onClick = onClick) {
+        ListItem(
+            headlineContent = { Text(match.manga.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            supportingContent = {
+                Text(
+                    "${match.source.name} (${match.source.lang}) / $chapterCount chapters / ${(match.score * 100).toInt()}% match",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            leadingContent = {
+                CoverImage(
+                    url = match.manga.thumbnailUrl ?: mediaCover,
+                    title = match.manga.title,
+                    modifier = Modifier.size(width = 48.dp, height = 68.dp),
+                )
+            },
+            trailingContent = {
+                if (current) {
+                    Text("Current", color = MaterialTheme.colorScheme.secondary)
+                }
+            },
+        )
+    }
+}
+
+private fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
+    "$sourceId:$mangaUrl"
 
 @Composable
 private fun CoverImage(url: String?, title: String, modifier: Modifier = Modifier) {

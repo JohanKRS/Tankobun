@@ -14,9 +14,11 @@ import com.tankobun.core.reader.ReaderProgressCalculator
 import com.tankobun.core.reader.ReaderSession
 import com.tankobun.core.sync.SyncMutationFactory
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.CachePolicy
 import com.tankobun.core.model.DownloadJob
 import com.tankobun.core.model.DownloadState
 import com.tankobun.core.model.MediaStatus
+import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.SourceBinding
@@ -28,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import java.util.UUID
 
@@ -50,8 +53,12 @@ data class TankobunUiState(
     val extensionRepositoryUrl: String = "",
     val availableExtensions: List<ExtensionIndexEntry> = emptyList(),
     val sourceMatches: List<SourceSearchResult> = emptyList(),
+    val sourceMatchChapterCounts: Map<String, Int> = emptyMap(),
+    val sourcePickerOpen: Boolean = false,
+    val sourcePickerLoading: Boolean = false,
     val selectedSourceManga: SourceManga? = null,
     val sourceChapters: List<SourceChapter> = emptyList(),
+    val latestProgress: ReadingProgress? = null,
     val activeChapter: SourceChapter? = null,
     val readerPages: List<ReaderPage> = emptyList(),
     val currentPageIndex: Int = 0,
@@ -63,6 +70,7 @@ data class TankobunUiState(
 ) {
     val selectedSource: SourceDescriptor?
         get() = installedSources.firstOrNull { it.id == selectedSourceId }
+            ?: allInstalledSources.firstOrNull { it.id == selectedSourceId }
 
     val librarySections: List<LibrarySection>
         get() = libraryItems.toLibrarySections()
@@ -79,11 +87,17 @@ data class LibrarySection(
     val items: List<LibraryItem>,
 )
 
+private data class VerifiedSourceMatches(
+    val matches: List<SourceSearchResult>,
+    val chapterCounts: Map<String, Int>,
+)
+
 class MainViewModel(
     private val container: AppContainer,
 ) : ViewModel() {
     private val progressCalculator = ReaderProgressCalculator()
     private val syncMutationFactory = SyncMutationFactory()
+    private val cachePolicy = CachePolicy()
     private val _state = MutableStateFlow(
         TankobunUiState(
             loggedIn = container.tokenStore.accessToken() != null,
@@ -328,8 +342,12 @@ class MainViewModel(
             it.copy(
                 selectedMedia = media,
                 sourceMatches = emptyList(),
+                sourceMatchChapterCounts = emptyMap(),
+                sourcePickerOpen = false,
+                sourcePickerLoading = false,
                 selectedSourceManga = null,
                 sourceChapters = emptyList(),
+                latestProgress = null,
                 activeChapter = null,
                 readerPages = emptyList(),
                 currentPageIndex = 0,
@@ -361,8 +379,12 @@ class MainViewModel(
             it.copy(
                 selectedMedia = null,
                 sourceMatches = emptyList(),
+                sourceMatchChapterCounts = emptyMap(),
+                sourcePickerOpen = false,
+                sourcePickerLoading = false,
                 selectedSourceManga = null,
                 sourceChapters = emptyList(),
+                latestProgress = null,
                 activeChapter = null,
                 readerPages = emptyList(),
                 currentPageIndex = 0,
@@ -380,7 +402,7 @@ class MainViewModel(
             val binding = container.database.sourceBindingDao().bindingForMedia(mediaId)
             val cachedResults = container.database.sourceSearchDao().cachedSearchResults(mediaId)
             val sources = _state.value.allInstalledSources.ifEmpty { _state.value.installedSources }
-            val matches = cachedResults.mapNotNull { result ->
+            val cachedMatches = cachedResults.mapNotNull { result ->
                 val source = sources.firstOrNull { it.id == result.sourceId || it.packageName == result.sourcePackageName }
                     ?: SourceDescriptor(
                         id = result.sourceId,
@@ -410,6 +432,16 @@ class MainViewModel(
                     searchedAtEpochMillis = result.searchedAtEpochMillis,
                 )
             }.distinctBy { "${it.source.id}:${it.manga.url}:${it.manga.title}" }
+            val chapterCounts = mutableMapOf<String, Int>()
+            val matches = buildList {
+                cachedMatches.forEach { match ->
+                    val chapters = container.database.chapterDao().cachedChapters(match.source.id, match.manga.url)
+                    if (chapters.isNotEmpty()) {
+                        chapterCounts[match.sourceMatchKey()] = chapters.size
+                        add(match)
+                    }
+                }
+            }
 
             val boundSource = binding?.let { cached ->
                 sources.firstOrNull { it.id == cached.sourceId || it.packageName == cached.sourcePackageName }
@@ -433,20 +465,55 @@ class MainViewModel(
             } else {
                 emptyList()
             }
+            val latestProgress = container.database.progressDao().latestProgress(mediaId)?.toModel()
+            val visibleMatches = matches.toMutableList()
+            if (boundSource != null && boundManga != null && chapters.isNotEmpty()) {
+                val selectedMatch = SourceSearchResult(
+                    mediaId = mediaId,
+                    source = boundSource,
+                    manga = boundManga,
+                    score = 1.0,
+                    reasons = listOf("selected source"),
+                    searchedAtEpochMillis = binding.selectedAtEpochMillis,
+                )
+                if (visibleMatches.none { it.source.id == selectedMatch.source.id && it.manga.url == selectedMatch.manga.url }) {
+                    visibleMatches.add(0, selectedMatch)
+                }
+                chapterCounts[selectedMatch.sourceMatchKey()] = chapters.size
+            }
 
             _state.update {
                 if (it.selectedMedia?.id != mediaId) {
                     it
                 } else {
                     it.copy(
-                        sourceMatches = matches,
-                        selectedSourceId = boundSource?.id ?: matches.firstOrNull()?.source?.id ?: it.selectedSourceId,
-                        selectedSourceManga = boundManga ?: matches.firstOrNull()?.manga,
+                        sourceMatches = visibleMatches,
+                        sourceMatchChapterCounts = chapterCounts,
+                        selectedSourceId = boundSource?.id ?: it.selectedSourceId,
+                        selectedSourceManga = boundManga,
                         sourceChapters = chapters,
+                        latestProgress = latestProgress,
                     )
                 }
             }
         }
+    }
+
+    fun openSourcePicker() {
+        _state.value.selectedMedia ?: return
+        val sources = sourcePickerSources()
+        _state.update { it.copy(sourcePickerOpen = true, message = null) }
+        if (sources.isEmpty()) {
+            _state.update { it.copy(message = "Install a source extension first") }
+            return
+        }
+        if (!_state.value.sourcePickerLoading) {
+            findSourceMatches()
+        }
+    }
+
+    fun closeSourcePicker() {
+        _state.update { it.copy(sourcePickerOpen = false, sourcePickerLoading = false) }
     }
 
     fun bindSelectedSource() {
@@ -544,55 +611,210 @@ class MainViewModel(
             .take(8)
         }
 
-    fun findSourceMatches() {
+    fun findSourceMatches(forceRefresh: Boolean = false) {
         val media = _state.value.selectedMedia ?: return
-        val sources = _state.value.installedSources
+        val sources = sourcePickerSources()
         if (sources.isEmpty()) {
             _state.update { it.copy(message = "Install a source extension first") }
             return
         }
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
+            _state.update { it.copy(busy = true, sourcePickerLoading = true, message = null) }
             runCatching {
                 val now = System.currentTimeMillis()
-                sources.flatMap { source ->
-                    runCatching {
-                        searchSourceMatches(media, source, now)
-                    }.onFailure { error ->
-                        Log.w(TAG, "Source search failed for ${source.name}", error)
-                    }.getOrDefault(emptyList())
-                }.sortedByDescending { it.score }
-            }.onSuccess { matches ->
-                container.database.sourceSearchDao().clearForMedia(media.id)
-                container.database.sourceSearchDao().upsertResults(matches.map { it.toEntity() })
+                cachedVerifiedMatches(media.id, sources, now)
+                    .takeIf { !forceRefresh && it.matches.isNotEmpty() }
+                    ?: searchVerifiedMatches(media, sources, now).also { verified ->
+                        container.database.sourceSearchDao().clearForMedia(media.id)
+                        container.database.sourceSearchDao().upsertResults(verified.matches.map { it.toEntity() })
+                    }
+            }.onSuccess { verified ->
                 _state.update {
+                    val selectedMatches = it.sourceMatches.filter { match ->
+                        it.selectedSourceId == match.source.id &&
+                            it.selectedSourceManga?.url == match.manga.url
+                    }
+                    val nextMatches = (selectedMatches + verified.matches)
+                        .distinctBy { match -> "${match.source.id}:${match.manga.url}" }
+                        .sortedByDescending { match -> match.score }
                     it.copy(
-                        sourceMatches = matches,
-                        selectedSourceId = matches.firstOrNull()?.source?.id ?: it.selectedSourceId,
-                        selectedSourceManga = matches.firstOrNull()?.manga ?: it.selectedSourceManga,
+                        sourceMatches = nextMatches,
+                        sourceMatchChapterCounts = it.sourceMatchChapterCounts + verified.chapterCounts,
                         busy = false,
-                        message = if (matches.isEmpty()) "No source matches found" else "Found ${matches.size} matches",
+                        sourcePickerLoading = false,
+                        message = if (nextMatches.isEmpty()) {
+                            "No sources with chapters found"
+                        } else {
+                            "Found ${nextMatches.size} readable sources"
+                        },
                     )
                 }
             }.onFailure { error ->
-                _state.update { it.copy(busy = false, message = error.message ?: "Source search failed") }
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        sourcePickerLoading = false,
+                        message = error.message ?: "Source search failed",
+                    )
+                }
             }
         }
     }
 
-    fun bindSourceMatch(match: SourceSearchResult) {
-        viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
-            val resolved = match.withResolvedManga()
-            saveSourceBinding(resolved)
-            _state.update {
+    private fun sourcePickerSources(): List<SourceDescriptor> =
+        _state.value.allInstalledSources
+            .ifEmpty { _state.value.installedSources }
+            .distinctBy { "${it.packageName}:${it.id}" }
+
+    private suspend fun cachedVerifiedMatches(
+        mediaId: Int,
+        sources: List<SourceDescriptor>,
+        now: Long,
+    ): VerifiedSourceMatches {
+        val cachedResults = container.database.sourceSearchDao().cachedSearchResults(mediaId)
+            .filter { now - it.searchedAtEpochMillis <= cachePolicy.sourceSearchTtlMillis }
+        val matches = mutableListOf<SourceSearchResult>()
+        val counts = mutableMapOf<String, Int>()
+
+        cachedResults.forEach { result ->
+            val source = sources.firstOrNull { it.id == result.sourceId || it.packageName == result.sourcePackageName }
+                ?: return@forEach
+            val match = SourceSearchResult(
+                mediaId = result.mediaId,
+                source = source,
+                manga = SourceManga(
+                    sourceId = result.sourceId,
+                    url = result.mangaUrl,
+                    title = result.mangaTitle,
+                    thumbnailUrl = result.mangaThumbnailUrl,
+                    description = null,
+                    author = null,
+                    artist = null,
+                    status = null,
+                ),
+                score = result.score,
+                reasons = result.reasons,
+                searchedAtEpochMillis = result.searchedAtEpochMillis,
+            )
+            val chapters = cachedChapters(source, match.manga, now, requireFresh = true)
+            if (chapters != null && chapters.isNotEmpty()) {
+                matches += match
+                counts[match.sourceMatchKey()] = chapters.size
+            }
+        }
+
+        return VerifiedSourceMatches(
+            matches = matches.distinctBy { "${it.source.id}:${it.manga.url}" }.sortedByDescending { it.score },
+            chapterCounts = counts,
+        )
+    }
+
+    private suspend fun searchVerifiedMatches(
+        media: AnilistMedia,
+        sources: List<SourceDescriptor>,
+        now: Long,
+    ): VerifiedSourceMatches {
+        val matches = mutableListOf<SourceSearchResult>()
+        val counts = mutableMapOf<String, Int>()
+
+        sources.forEach { source ->
+            val candidates = runCatching {
+                withTimeoutOrNull(SOURCE_MATCH_TIMEOUT_MILLIS) {
+                    searchSourceMatches(media, source, now).take(4)
+                }.orEmpty()
+            }.onFailure { error ->
+                Log.w(TAG, "Source search failed for ${source.name}", error)
+            }.getOrDefault(emptyList())
+
+            for (candidate in candidates) {
+                val resolved = candidate.withResolvedManga()
+                val chapters = withTimeoutOrNull(SOURCE_MATCH_TIMEOUT_MILLIS) {
+                    cachedChapters(source, resolved.manga, now, requireFresh = true)
+                        ?: fetchAndCacheChapters(source, resolved.manga, now)
+                }.orEmpty()
+                if (chapters.isNotEmpty()) {
+                    matches += resolved
+                    counts[resolved.sourceMatchKey()] = chapters.size
+                    publishSourcePickerMatch(media.id, resolved, chapters.size)
+                    break
+                }
+            }
+        }
+
+        return VerifiedSourceMatches(
+            matches = matches.distinctBy { "${it.source.id}:${it.manga.url}" }.sortedByDescending { it.score },
+            chapterCounts = counts,
+        )
+    }
+
+    private fun publishSourcePickerMatch(mediaId: Int, match: SourceSearchResult, chapterCount: Int) {
+        _state.update {
+            if (it.selectedMedia?.id != mediaId) {
+                it
+            } else {
+                val nextMatches = (it.sourceMatches + match)
+                    .distinctBy { result -> "${result.source.id}:${result.manga.url}" }
+                    .sortedByDescending { result -> result.score }
                 it.copy(
-                    selectedSourceId = resolved.source.id,
-                    selectedSourceManga = resolved.manga,
-                    message = "Source selected for ${resolved.manga.title}",
+                    sourceMatches = nextMatches,
+                    sourceMatchChapterCounts = it.sourceMatchChapterCounts + (match.sourceMatchKey() to chapterCount),
+                    message = "Found ${nextMatches.size} readable sources",
                 )
             }
-            loadChapters(resolved.source, resolved.manga)
+        }
+    }
+
+    private suspend fun cachedChapters(
+        source: SourceDescriptor,
+        manga: SourceManga,
+        now: Long,
+        requireFresh: Boolean,
+    ): List<SourceChapter>? {
+        val cached = container.database.chapterDao().cachedChapters(source.id, manga.url)
+        if (cached.isEmpty()) return null
+        val freshest = cached.maxOf { it.fetchedAtEpochMillis }
+        if (requireFresh && now - freshest > cachePolicy.sourceChapterTtlMillis) return null
+        return cached.map { it.toModel() }
+    }
+
+    private suspend fun fetchAndCacheChapters(
+        source: SourceDescriptor,
+        manga: SourceManga,
+        now: Long,
+    ): List<SourceChapter> {
+        val chapters = container.sourceHost.chapters(source, manga)
+        container.database.chapterDao().upsertChapters(chapters.map { it.toEntity(now) })
+        return chapters
+    }
+
+    fun bindSourceMatch(match: SourceSearchResult) {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, sourcePickerLoading = true, message = null) }
+            runCatching {
+                val resolved = match.withResolvedManga()
+                saveSourceBinding(resolved)
+                resolved
+            }.onSuccess { resolved ->
+                _state.update {
+                    it.copy(
+                        selectedSourceId = resolved.source.id,
+                        selectedSourceManga = resolved.manga,
+                        sourcePickerOpen = false,
+                        sourcePickerLoading = false,
+                        message = "Source selected for ${resolved.manga.title}",
+                    )
+                }
+                loadChapters(resolved.source, resolved.manga)
+            }.onFailure { error ->
+                Log.w(TAG, "Source binding failed for ${match.source.name}/${match.manga.title}", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        sourcePickerLoading = false,
+                        message = error.message ?: "Source selection failed",
+                    )
+                }
+            }
         }
     }
 
@@ -653,14 +875,14 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
+                val now = System.currentTimeMillis()
                 val detailedManga = runCatching {
                     container.sourceHost.mangaDetails(source, manga)
                 }.onFailure { error ->
                     Log.w(TAG, "Chapter details prefetch failed for ${source.name}/${manga.title}", error)
                 }.getOrNull() ?: manga
-                val chapters = container.sourceHost.chapters(source, detailedManga)
-                val now = System.currentTimeMillis()
-                container.database.chapterDao().upsertChapters(chapters.map { it.toEntity(now) })
+                val chapters = cachedChapters(source, detailedManga, now, requireFresh = false)
+                    ?: fetchAndCacheChapters(source, detailedManga, now)
                 detailedManga to chapters
             }.onSuccess { (detailedManga, chapters) ->
                 Log.i(TAG, "Chapter load ${source.name}/${detailedManga.title}: chapters=${chapters.size}")
@@ -669,6 +891,7 @@ class MainViewModel(
                         selectedSourceManga = detailedManga,
                         sourceChapters = chapters,
                         busy = false,
+                        sourceMatchChapterCounts = it.sourceMatchChapterCounts + (sourceMatchKey(source.id, detailedManga.url) to chapters.size),
                         message = if (chapters.isEmpty()) "No chapters found" else "Loaded ${chapters.size} chapters",
                     )
                 }
@@ -681,6 +904,7 @@ class MainViewModel(
 
     fun openChapter(chapter: SourceChapter) {
         val state = _state.value
+        val media = state.selectedMedia ?: return
         val source = state.installedSources.firstOrNull { it.id == chapter.sourceId }
             ?: state.allInstalledSources.firstOrNull { it.id == chapter.sourceId }
             ?: state.selectedSource?.takeIf { it.id == chapter.sourceId }
@@ -693,12 +917,15 @@ class MainViewModel(
             runCatching {
                 container.sourceHost.pages(source, chapter)
             }.onSuccess { pages ->
+                val savedProgress = container.database.progressDao().progressForChapter(media.id, chapter.url)
+                val startPageIndex = savedProgress?.pageIndex?.coerceIn(0, pages.lastIndex.coerceAtLeast(0)) ?: 0
                 Log.i(TAG, "Page load ${source.name}/${chapter.name}: pages=${pages.size}")
                 _state.update {
                     it.copy(
                         activeChapter = chapter,
                         readerPages = pages,
-                        currentPageIndex = 0,
+                        currentPageIndex = startPageIndex,
+                        readerMode = savedProgress?.readerMode ?: it.readerMode,
                         busy = false,
                         message = if (pages.isEmpty()) "No pages found" else "Opened ${chapter.name}",
                     )
@@ -712,6 +939,7 @@ class MainViewModel(
     }
 
     fun closeReader() {
+        saveReaderProgress()
         _state.update {
             it.copy(
                 activeChapter = null,
@@ -768,6 +996,9 @@ class MainViewModel(
         val progress = progressCalculator.progressFor(session, System.currentTimeMillis())
         viewModelScope.launch {
             container.database.progressDao().upsertProgress(progress.toEntity())
+            _state.update {
+                if (it.selectedMedia?.id == media.id) it.copy(latestProgress = progress) else it
+            }
             if (progress.completed && chapter.chapterNumber > 0) {
                 val mutation = syncMutationFactory.saveMediaListEntry(
                     mediaId = media.id,
@@ -790,6 +1021,7 @@ class MainViewModel(
 
     companion object {
         private const val TAG = "TankobunMain"
+        private const val SOURCE_MATCH_TIMEOUT_MILLIS = 20_000L
     }
 }
 
@@ -802,6 +1034,12 @@ private fun Throwable.userMessage(fallback: String): String = when (this) {
     }
     else -> message ?: fallback
 }
+
+private fun SourceSearchResult.sourceMatchKey(): String =
+    sourceMatchKey(source.id, manga.url)
+
+private fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
+    "$sourceId:$mangaUrl"
 
 private fun List<LibraryItem>.toLibrarySections(): List<LibrarySection> {
     val statusSections = listOf(
