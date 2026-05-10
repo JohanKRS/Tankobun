@@ -1,0 +1,31 @@
+package com.tankobun.core.database
+
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
+
+@Database(
+    entities = [
+        AnilistMediaEntity::class,
+        AnilistListEntryEntity::class,
+        SourceBindingEntity::class,
+        SourceSearchResultEntity::class,
+        SourceChapterEntity::class,
+        ReadingProgressEntity::class,
+        DownloadJobEntity::class,
+        SyncMutationEntity::class,
+    ],
+    version = 1,
+    exportSchema = true,
+)
+@TypeConverters(TankobunTypeConverters::class)
+abstract class TankobunDatabase : RoomDatabase() {
+    abstract fun mediaDao(): MediaDao
+    abstract fun listEntryDao(): ListEntryDao
+    abstract fun sourceBindingDao(): SourceBindingDao
+    abstract fun sourceSearchDao(): SourceSearchDao
+    abstract fun chapterDao(): ChapterDao
+    abstract fun progressDao(): ProgressDao
+    abstract fun downloadDao(): DownloadDao
+    abstract fun syncMutationDao(): SyncMutationDao
+}

@@ -1,0 +1,104 @@
+package com.tankobun.app
+
+import android.content.Context
+import java.util.Locale
+
+class SettingsStore(context: Context) {
+    private val preferences = context.getSharedPreferences("tankobun_settings", Context.MODE_PRIVATE)
+
+    fun extensionRepositoryUrl(): String =
+        preferences.getString(KEY_EXTENSION_REPOSITORY_URL, "").orEmpty()
+
+    fun saveExtensionRepositoryUrl(url: String) {
+        preferences.edit().putString(KEY_EXTENSION_REPOSITORY_URL, url).apply()
+    }
+
+    fun themeMode(): TankobunThemeMode =
+        preferences.getString(KEY_THEME_MODE, null)
+            ?.let { stored -> runCatching { TankobunThemeMode.valueOf(stored) }.getOrNull() }
+            ?: TankobunThemeMode.SYSTEM
+
+    fun saveThemeMode(mode: TankobunThemeMode) {
+        preferences.edit().putString(KEY_THEME_MODE, mode.name).apply()
+    }
+
+    fun libraryViewMode(): MediaViewMode =
+        preferences.getString(KEY_LIBRARY_VIEW_MODE, null)
+            ?.let { stored -> runCatching { MediaViewMode.valueOf(stored) }.getOrNull() }
+            ?: MediaViewMode.COVER_GRID
+
+    fun saveLibraryViewMode(mode: MediaViewMode) {
+        preferences.edit().putString(KEY_LIBRARY_VIEW_MODE, mode.name).apply()
+    }
+
+    fun browseViewMode(): MediaViewMode =
+        preferences.getString(KEY_BROWSE_VIEW_MODE, null)
+            ?.let { stored -> runCatching { MediaViewMode.valueOf(stored) }.getOrNull() }
+            ?: MediaViewMode.COVER_GRID
+
+    fun saveBrowseViewMode(mode: MediaViewMode) {
+        preferences.edit().putString(KEY_BROWSE_VIEW_MODE, mode.name).apply()
+    }
+
+    fun sourceLanguages(): Set<String> =
+        preferences.getStringSet(KEY_SOURCE_LANGUAGES, null)
+            ?.map { it.trim().lowercase().replace('_', '-') }
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?: defaultSourceLanguages()
+
+    fun saveSourceLanguages(languages: Set<String>) {
+        preferences.edit()
+            .putStringSet(KEY_SOURCE_LANGUAGES, languages.map { it.trim().lowercase().replace('_', '-') }.toSet())
+            .apply()
+    }
+
+    fun viewerName(): String? =
+        preferences.getString(KEY_VIEWER_NAME, null)
+
+    fun saveViewerName(name: String?) {
+        preferences.edit().putString(KEY_VIEWER_NAME, name).apply()
+    }
+
+    fun librarySyncedAtEpochMillis(): Long =
+        preferences.getLong(KEY_LIBRARY_SYNCED_AT, 0L)
+
+    fun saveLibrarySyncedAtEpochMillis(value: Long) {
+        preferences.edit().putLong(KEY_LIBRARY_SYNCED_AT, value).apply()
+    }
+
+    private companion object {
+        const val KEY_EXTENSION_REPOSITORY_URL = "extension.repository.url"
+        const val KEY_THEME_MODE = "theme.mode"
+        const val KEY_LIBRARY_VIEW_MODE = "library.view.mode"
+        const val KEY_BROWSE_VIEW_MODE = "browse.view.mode"
+        const val KEY_SOURCE_LANGUAGES = "source.languages"
+        const val KEY_VIEWER_NAME = "anilist.viewer.name"
+        const val KEY_LIBRARY_SYNCED_AT = "anilist.library.synced.at"
+    }
+}
+
+enum class TankobunThemeMode {
+    SYSTEM,
+    LIGHT,
+    DARK,
+}
+
+enum class MediaViewMode {
+    COVER_GRID,
+    COVER_WITH_INFO,
+    MASONRY,
+    JUSTIFIED,
+    LIST,
+}
+
+fun defaultSourceLanguages(): Set<String> =
+    buildSet {
+        add("en")
+        add("all")
+        val locale = Locale.getDefault()
+        val language = locale.language.lowercase(Locale.ROOT)
+        val tag = locale.toLanguageTag().lowercase(Locale.ROOT)
+        if (language.isNotBlank()) add(language)
+        if (tag.isNotBlank()) add(tag)
+    }

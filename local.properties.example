@@ -1,0 +1,3 @@
+# Copy this file to local.properties for local personal builds.
+# Obtain a client id from https://anilist.co/settings/developer.
+anilistClientId=
