@@ -38,10 +38,10 @@ object AnilistQueries {
         }
     """
 
-    const val PopularMangaPage = """
-        query PopularMangaPage(${'$'}page: Int!) {
+    const val SearchFallbackMangaPage = """
+        query SearchFallbackMangaPage(${'$'}page: Int!, ${'$'}sort: [MediaSort]) {
           Page(page: ${'$'}page, perPage: 50) {
-            media(type: MANGA, sort: FAVOURITES_DESC) {
+            media(type: MANGA, sort: ${'$'}sort) {
               id
               idMal
               title { romaji english native userPreferred }

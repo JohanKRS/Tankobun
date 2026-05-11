@@ -4,7 +4,6 @@ import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.MediaStatus
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -30,6 +29,11 @@ class AnilistRepository(
     }
 
     suspend fun searchManga(query: String, page: Int = 1): List<AnilistMedia> {
+        query.extractAniListMangaId()?.let { mediaId ->
+            return runCatching { listOf(mediaDetailsWithEntry(mediaId, accessToken = null).first) }
+                .getOrDefault(emptyList())
+        }
+
         val data = graphQlClient.execute(
             query = AnilistQueries.SearchManga,
             variables = buildJsonObject {
@@ -47,14 +51,26 @@ class AnilistRepository(
         val normalizedQuery = query.normalizedSearchTokens()
         if (normalizedQuery.isEmpty()) return emptyList()
 
-        return (1..3)
-            .flatMap { page ->
-                val data = graphQlClient.execute(
-                    query = AnilistQueries.PopularMangaPage,
-                    variables = buildJsonObject { put("page", page) },
+        val candidates = mutableListOf<AnilistMedia>()
+        SEARCH_FALLBACK_SORTS.forEach { sort ->
+            for (page in 1..SEARCH_FALLBACK_MAX_PAGES_PER_SORT) {
+                candidates += AnilistJsonMapper.searchPage(
+                    graphQlClient.execute(
+                        query = AnilistQueries.SearchFallbackMangaPage,
+                        variables = buildJsonObject {
+                            put("page", page)
+                            put("sort", buildJsonArray { add(sort) })
+                        },
+                    ),
                 )
-                AnilistJsonMapper.searchPage(data)
+                val rankedCount = candidates
+                    .distinctBy { it.id }
+                    .count { it.searchFallbackScore(normalizedQuery) > 0 }
+                if (rankedCount >= SEARCH_FALLBACK_TARGET_RESULTS) break
             }
+        }
+
+        return candidates
             .distinctBy { it.id }
             .mapNotNull { media ->
                 val score = media.searchFallbackScore(normalizedQuery)
@@ -117,21 +133,38 @@ class AnilistRepository(
             query = AnilistQueries.SaveMediaListEntry,
             variables = buildJsonObject {
                 put("mediaId", mediaId)
-                if (status != null) put("status", status.name) else put("status", JsonNull)
-                if (progress != null) put("progress", progress) else put("progress", JsonNull)
-                if (score != null) put("score", score) else put("score", JsonNull)
-                if (notes != null) put("notes", notes) else put("notes", JsonNull)
-                if (private != null) put("private", private) else put("private", JsonNull)
-                if (customLists != null) {
+                if (status != null) put("status", status.name)
+                if (progress != null) put("progress", progress)
+                if (score != null) put("score", score)
+                if (notes != null) put("notes", notes)
+                if (private != null) put("private", private)
+                if (!customLists.isNullOrEmpty()) {
                     put("customLists", buildJsonArray { customLists.forEach { add(it) } })
-                } else {
-                    put("customLists", JsonNull)
                 }
             },
             accessToken = accessToken,
         )
         return AnilistJsonMapper.listEntry(requireNotNull(data["SaveMediaListEntry"]))
     }
+}
+
+private val SEARCH_FALLBACK_SORTS = listOf(
+    "FAVOURITES_DESC",
+    "POPULARITY_DESC",
+    "TRENDING_DESC",
+    "UPDATED_AT_DESC",
+)
+
+private const val SEARCH_FALLBACK_MAX_PAGES_PER_SORT = 10
+private const val SEARCH_FALLBACK_TARGET_RESULTS = 20
+
+private fun String.extractAniListMangaId(): Int? {
+    trim().toIntOrNull()?.let { return it }
+    return Regex("""anilist\.co/manga/(\d+)""", RegexOption.IGNORE_CASE)
+        .find(this)
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.toIntOrNull()
 }
 
 private fun String.normalizedSearchTokens(): List<String> =
