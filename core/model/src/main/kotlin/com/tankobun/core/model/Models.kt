@@ -64,6 +64,11 @@ data class AnilistListEntry(
     val updatedAtEpochSeconds: Long?,
 )
 
+data class AnilistRecommendation(
+    val media: AnilistMedia,
+    val rating: Int?,
+)
+
 data class SourceDescriptor(
     val id: Long,
     val name: String,

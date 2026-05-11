@@ -8,6 +8,8 @@ import androidx.room.TypeConverters
     entities = [
         AnilistMediaEntity::class,
         AnilistListEntryEntity::class,
+        AnilistRecommendationEntity::class,
+        AnilistSearchResultEntity::class,
         SourceBindingEntity::class,
         SourceSearchResultEntity::class,
         SourceChapterEntity::class,
@@ -15,13 +17,15 @@ import androidx.room.TypeConverters
         DownloadJobEntity::class,
         SyncMutationEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(TankobunTypeConverters::class)
 abstract class TankobunDatabase : RoomDatabase() {
     abstract fun mediaDao(): MediaDao
     abstract fun listEntryDao(): ListEntryDao
+    abstract fun recommendationDao(): RecommendationDao
+    abstract fun searchResultDao(): SearchResultDao
     abstract fun sourceBindingDao(): SourceBindingDao
     abstract fun sourceSearchDao(): SourceSearchDao
     abstract fun chapterDao(): ChapterDao

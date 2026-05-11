@@ -65,6 +65,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -82,8 +83,12 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -95,6 +100,8 @@ import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.AnilistRecommendation
+import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.SourceChapter
@@ -365,6 +372,8 @@ private fun BrowseScreen(state: TankobunUiState, viewModel: MainViewModel) {
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 label = { Text("Search AniList manga") },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { viewModel.searchAniList() }),
             )
             IconButton(onClick = viewModel::searchAniList) {
                 Icon(Icons.Default.Search, contentDescription = "Search")
@@ -381,6 +390,11 @@ private fun BrowseScreen(state: TankobunUiState, viewModel: MainViewModel) {
             viewMode = state.browseViewMode,
             modifier = Modifier.weight(1f),
             onSelectMedia = viewModel::selectMedia,
+            emptyMessage = if (state.browseSearched) {
+                "No AniList manga found for this search."
+            } else {
+                "Search AniList to discover manga."
+            },
         )
     }
 }
@@ -421,10 +435,11 @@ private fun MediaCollection(
     viewMode: MediaViewMode,
     onSelectMedia: (AnilistMedia) -> Unit,
     modifier: Modifier = Modifier,
+    emptyMessage: String = "No manga here yet.",
 ) {
     if (media.isEmpty()) {
         Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.TopStart) {
-            Text("No manga here yet.")
+            Text(emptyMessage)
         }
         return
     }
@@ -607,6 +622,10 @@ private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, 
             }
 
             item {
+                AniListTrackingSection(state, viewModel, media)
+            }
+
+            item {
                 SourceSummarySection(state, viewModel, media)
             }
 
@@ -644,10 +663,124 @@ private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, 
                     ChapterRow(chapter, viewModel)
                 }
             }
+
+            if (state.selectedRecommendations.isNotEmpty()) {
+                item {
+                    RecommendationsSection(
+                        recommendations = state.selectedRecommendations,
+                        onSelectMedia = viewModel::selectMedia,
+                    )
+                }
+            }
         }
 
         if (state.sourcePickerOpen) {
             SourcePickerDialog(state, viewModel, media)
+        }
+    }
+}
+
+@Composable
+private fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("AniList", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            AssistChip(
+                onClick = {},
+                label = {
+                    Text(state.selectedListEntry?.status?.displayName() ?: "Not tracked")
+                },
+            )
+        }
+
+        FlowRowCompat {
+            trackingStatuses().forEach { status ->
+                FilterChip(
+                    selected = state.trackingStatus == status,
+                    onClick = { viewModel.setTrackingStatus(status) },
+                    label = { Text(status.displayName()) },
+                )
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = state.trackingProgress,
+                onValueChange = viewModel::setTrackingProgress,
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                label = { Text("Progress") },
+                suffix = { Text("/ ${media.chapters ?: "?"}") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+            OutlinedTextField(
+                value = state.trackingScore,
+                onValueChange = viewModel::setTrackingScore,
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                label = { Text("Score") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            )
+        }
+
+        OutlinedTextField(
+            value = state.trackingNotes,
+            onValueChange = viewModel::setTrackingNotes,
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2,
+            maxLines = 4,
+            label = { Text("Notes") },
+        )
+
+        OutlinedTextField(
+            value = state.trackingCustomLists,
+            onValueChange = viewModel::setTrackingCustomLists,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Custom lists") },
+            placeholder = { Text("Favorites, To buy") },
+        )
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Private", style = MaterialTheme.typography.bodyMedium)
+            Switch(checked = state.trackingPrivate, onCheckedChange = viewModel::setTrackingPrivate)
+            Spacer(Modifier.weight(1f))
+            Button(onClick = viewModel::saveTracking, enabled = state.loggedIn) {
+                Text(if (state.selectedListEntry == null) "Track manga" else "Save AniList")
+            }
+        }
+        if (!state.loggedIn) {
+            Text(
+                "Connect AniList to track, rate, and organize this manga.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecommendationsSection(
+    recommendations: List<AnilistRecommendation>,
+    onSelectMedia: (AnilistMedia) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Recommendations", style = MaterialTheme.typography.titleLarge)
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(4),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(260.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            gridItems(recommendations, key = { it.media.id }) { recommendation ->
+                MediaCoverTile(
+                    media = recommendation.media,
+                    viewMode = MediaViewMode.COVER_WITH_INFO,
+                    onClick = { onSelectMedia(recommendation.media) },
+                )
+            }
         }
     }
 }
@@ -854,6 +987,25 @@ private fun SourceMatchRow(
 
 private fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
     "$sourceId:$mangaUrl"
+
+private fun trackingStatuses(): List<MediaStatus> = listOf(
+    MediaStatus.CURRENT,
+    MediaStatus.PLANNING,
+    MediaStatus.COMPLETED,
+    MediaStatus.PAUSED,
+    MediaStatus.DROPPED,
+    MediaStatus.REPEATING,
+)
+
+private fun MediaStatus.displayName(): String = when (this) {
+    MediaStatus.CURRENT -> "Reading"
+    MediaStatus.PLANNING -> "Plan"
+    MediaStatus.COMPLETED -> "Completed"
+    MediaStatus.PAUSED -> "Paused"
+    MediaStatus.DROPPED -> "Dropped"
+    MediaStatus.REPEATING -> "Rereading"
+    MediaStatus.UNKNOWN -> "Unknown"
+}
 
 @Composable
 private fun CoverImage(url: String?, title: String, modifier: Modifier = Modifier) {

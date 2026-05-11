@@ -47,6 +47,30 @@ data class AnilistListEntryEntity(
     val fetchedAtEpochMillis: Long,
 )
 
+@Entity(
+    tableName = "anilist_recommendations",
+    primaryKeys = ["mediaId", "recommendationMediaId"],
+    indices = [Index("mediaId"), Index("recommendationMediaId")],
+)
+data class AnilistRecommendationEntity(
+    val mediaId: Int,
+    val recommendationMediaId: Int,
+    val rating: Int?,
+    val fetchedAtEpochMillis: Long,
+)
+
+@Entity(
+    tableName = "anilist_search_results",
+    primaryKeys = ["query", "mediaId"],
+    indices = [Index("query"), Index("mediaId")],
+)
+data class AnilistSearchResultEntity(
+    val query: String,
+    val mediaId: Int,
+    val orderIndex: Int,
+    val fetchedAtEpochMillis: Long,
+)
+
 @Entity(tableName = "source_bindings")
 data class SourceBindingEntity(
     @PrimaryKey val mediaId: Int,

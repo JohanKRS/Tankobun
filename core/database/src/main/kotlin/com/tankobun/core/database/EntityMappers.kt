@@ -2,6 +2,7 @@ package com.tankobun.core.database
 
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistTitle
 import com.tankobun.core.model.DownloadJob
 import com.tankobun.core.model.ReadingProgress
@@ -75,6 +76,14 @@ fun AnilistListEntryEntity.toModel(): AnilistListEntry =
         private = private,
         customLists = customLists,
         updatedAtEpochSeconds = updatedAtEpochSeconds,
+    )
+
+fun AnilistRecommendation.toEntity(mediaId: Int, fetchedAtEpochMillis: Long): AnilistRecommendationEntity =
+    AnilistRecommendationEntity(
+        mediaId = mediaId,
+        recommendationMediaId = media.id,
+        rating = rating,
+        fetchedAtEpochMillis = fetchedAtEpochMillis,
     )
 
 fun SourceBinding.toEntity(): SourceBindingEntity =

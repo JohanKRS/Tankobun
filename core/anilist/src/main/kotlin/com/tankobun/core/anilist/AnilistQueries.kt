@@ -38,6 +38,29 @@ object AnilistQueries {
         }
     """
 
+    const val PopularMangaPage = """
+        query PopularMangaPage(${'$'}page: Int!) {
+          Page(page: ${'$'}page, perPage: 50) {
+            media(type: MANGA, sort: FAVOURITES_DESC) {
+              id
+              idMal
+              title { romaji english native userPreferred }
+              description(asHtml: false)
+              coverImage { extraLarge large color }
+              bannerImage
+              chapters
+              volumes
+              status
+              siteUrl
+              genres
+              synonyms
+              isAdult
+              updatedAt
+            }
+          }
+        }
+    """
+
     const val MediaDetails = """
         query MediaDetails(${'$'}id: Int!) {
           Media(id: ${'$'}id, type: MANGA) {
@@ -65,6 +88,27 @@ object AnilistQueries {
               private
               customLists(asArray: true)
               updatedAt
+            }
+            recommendations(sort: RATING_DESC, perPage: 12) {
+              nodes {
+                rating
+                mediaRecommendation {
+                  id
+                  idMal
+                  title { romaji english native userPreferred }
+                  description(asHtml: false)
+                  coverImage { extraLarge large color }
+                  bannerImage
+                  chapters
+                  volumes
+                  status
+                  siteUrl
+                  genres
+                  synonyms
+                  isAdult
+                  updatedAt
+                }
+              }
             }
           }
         }

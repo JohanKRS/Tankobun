@@ -8,8 +8,10 @@ import androidx.lifecycle.viewModelScope
 import com.tankobun.core.anilist.AnilistOAuth
 import com.tankobun.core.database.toEntity
 import com.tankobun.core.database.toModel
+import com.tankobun.core.database.AnilistSearchResultEntity
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
+import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.reader.ReaderProgressCalculator
 import com.tankobun.core.reader.ReaderSession
 import com.tankobun.core.sync.SyncMutationFactory
@@ -46,7 +48,16 @@ data class TankobunUiState(
     val browseViewMode: MediaViewMode = MediaViewMode.COVER_GRID,
     val searchQuery: String = "",
     val searchResults: List<AnilistMedia> = emptyList(),
+    val browseSearched: Boolean = false,
     val selectedMedia: AnilistMedia? = null,
+    val selectedListEntry: AnilistListEntry? = null,
+    val selectedRecommendations: List<AnilistRecommendation> = emptyList(),
+    val trackingStatus: MediaStatus = MediaStatus.PLANNING,
+    val trackingProgress: String = "0",
+    val trackingScore: String = "",
+    val trackingNotes: String = "",
+    val trackingPrivate: Boolean = false,
+    val trackingCustomLists: String = "",
     val allInstalledSources: List<SourceDescriptor> = emptyList(),
     val installedSources: List<SourceDescriptor> = emptyList(),
     val sourceLanguages: Set<String> = defaultSourceLanguages(),
@@ -324,20 +335,47 @@ class MainViewModel(
 
     fun searchAniList() {
         val query = _state.value.searchQuery.trim()
-        if (query.isBlank()) return
+        if (query.isBlank()) {
+            _state.update { it.copy(message = "Type a manga title to search AniList") }
+            return
+        }
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
+            _state.update { it.copy(busy = true, browseSearched = true, message = null) }
             runCatching {
+                val now = System.currentTimeMillis()
+                val cacheKey = query.normalizedSearchKey()
+                val cachedRows = container.database.searchResultDao().cachedSearchRows(cacheKey)
+                val cachedIsFresh = cachedRows.isNotEmpty() &&
+                    cachedRows.all { now - it.fetchedAtEpochMillis <= cachePolicy.anilistSearchTtlMillis }
+                if (cachedIsFresh) {
+                    return@runCatching container.database.searchResultDao().cachedSearchMedia(cacheKey).map { it.toModel() }
+                }
                 container.anilistRepository.searchManga(query)
             }.onSuccess { results ->
+                val now = System.currentTimeMillis()
+                val cacheKey = query.normalizedSearchKey()
+                container.database.mediaDao().upsertMedia(results.map { it.toEntity(now) })
+                container.database.searchResultDao().deleteForQuery(cacheKey)
+                container.database.searchResultDao().upsertResults(
+                    results.mapIndexed { index, media ->
+                        AnilistSearchResultEntity(
+                            query = cacheKey,
+                            mediaId = media.id,
+                            orderIndex = index,
+                            fetchedAtEpochMillis = now,
+                        )
+                    },
+                )
                 _state.update { it.copy(searchResults = results, busy = false) }
             }.onFailure { error ->
-                _state.update { it.copy(busy = false, message = error.message ?: "Search failed") }
+                Log.e(TAG, "AniList search failed for $query", error)
+                _state.update { it.copy(busy = false, message = error.userMessage("Search failed")) }
             }
         }
     }
 
     fun selectMedia(media: AnilistMedia) {
+        val existingEntry = _state.value.libraryItems.firstOrNull { item -> item.media.id == media.id }?.entry
         _state.update {
             it.copy(
                 selectedMedia = media,
@@ -345,6 +383,14 @@ class MainViewModel(
                 sourceMatchChapterCounts = emptyMap(),
                 sourcePickerOpen = false,
                 sourcePickerLoading = false,
+                selectedListEntry = existingEntry,
+                selectedRecommendations = emptyList(),
+                trackingStatus = existingEntry?.status ?: MediaStatus.PLANNING,
+                trackingProgress = (existingEntry?.progress ?: 0).toString(),
+                trackingScore = existingEntry?.score?.toString().orEmpty(),
+                trackingNotes = existingEntry?.notes.orEmpty(),
+                trackingPrivate = existingEntry?.private ?: false,
+                trackingCustomLists = existingEntry?.customLists?.joinToString(", ").orEmpty(),
                 selectedSourceManga = null,
                 sourceChapters = emptyList(),
                 latestProgress = null,
@@ -354,6 +400,7 @@ class MainViewModel(
                 message = null,
             )
         }
+        loadAnilistDetails(media.id)
         loadCachedSourceState(media.id)
     }
 
@@ -382,6 +429,8 @@ class MainViewModel(
                 sourceMatchChapterCounts = emptyMap(),
                 sourcePickerOpen = false,
                 sourcePickerLoading = false,
+                selectedListEntry = null,
+                selectedRecommendations = emptyList(),
                 selectedSourceManga = null,
                 sourceChapters = emptyList(),
                 latestProgress = null,
@@ -395,6 +444,184 @@ class MainViewModel(
 
     fun setReaderMode(mode: ReaderMode) {
         _state.update { it.copy(readerMode = mode) }
+    }
+
+    fun setTrackingStatus(status: MediaStatus) {
+        _state.update { it.copy(trackingStatus = status) }
+    }
+
+    fun setTrackingProgress(progress: String) {
+        _state.update { it.copy(trackingProgress = progress.filter { char -> char.isDigit() }.take(5)) }
+    }
+
+    fun setTrackingScore(score: String) {
+        _state.update { it.copy(trackingScore = score.filter { char -> char.isDigit() || char == '.' }.take(5)) }
+    }
+
+    fun setTrackingNotes(notes: String) {
+        _state.update { it.copy(trackingNotes = notes) }
+    }
+
+    fun setTrackingPrivate(private: Boolean) {
+        _state.update { it.copy(trackingPrivate = private) }
+    }
+
+    fun setTrackingCustomLists(customLists: String) {
+        _state.update { it.copy(trackingCustomLists = customLists) }
+    }
+
+    fun saveTracking() {
+        val media = _state.value.selectedMedia ?: return
+        val token = container.tokenStore.accessToken()
+        if (token == null) {
+            _state.update { it.copy(message = "Connect AniList to track this manga") }
+            return
+        }
+
+        val snapshot = _state.value
+        val progress = snapshot.trackingProgress.toIntOrNull()?.coerceAtLeast(0)
+        val score = snapshot.trackingScore.toDoubleOrNull()?.coerceIn(0.0, 100.0)
+        val notes = snapshot.trackingNotes.trim().ifBlank { null }
+        val customLists = snapshot.trackingCustomLists
+            .split(',', '\n')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                val entry = container.anilistRepository.saveListEntry(
+                    accessToken = token,
+                    mediaId = media.id,
+                    status = snapshot.trackingStatus,
+                    progress = progress,
+                    score = score,
+                    notes = notes,
+                    private = snapshot.trackingPrivate,
+                    customLists = customLists,
+                )
+                val now = System.currentTimeMillis()
+                container.database.mediaDao().upsertMedia(media.toEntity(now))
+                container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+                entry
+            }.onSuccess { entry ->
+                _state.update {
+                    val nextItem = LibraryItem(media, entry)
+                    val nextItems = (it.libraryItems.filterNot { item -> item.media.id == media.id } + nextItem)
+                        .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
+                    it.copy(
+                        library = nextItems.map { item -> item.media },
+                        libraryItems = nextItems,
+                        selectedListEntry = entry,
+                        trackingStatus = entry.status,
+                        trackingProgress = entry.progress.toString(),
+                        trackingScore = entry.score?.toString().orEmpty(),
+                        trackingNotes = entry.notes.orEmpty(),
+                        trackingPrivate = entry.private,
+                        trackingCustomLists = entry.customLists.joinToString(", "),
+                        busy = false,
+                        message = "AniList tracking saved",
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "AniList tracking save failed for ${media.id}", error)
+                _state.update { it.copy(busy = false, message = error.userMessage("Tracking save failed")) }
+            }
+        }
+    }
+
+    private fun loadAnilistDetails(mediaId: Int) {
+        viewModelScope.launch {
+            val token = container.tokenStore.accessToken()
+            val now = System.currentTimeMillis()
+            val cachedMedia = container.database.mediaDao().cachedMedia(mediaId)
+            val cachedEntry = container.database.listEntryDao().cachedEntry(mediaId)?.toModel()
+            val cachedRecommendations = cachedRecommendations(mediaId)
+            if (cachedMedia != null || cachedEntry != null || cachedRecommendations.isNotEmpty()) {
+                _state.update {
+                    if (it.selectedMedia?.id != mediaId) {
+                        it
+                    } else {
+                        it.copy(
+                            selectedMedia = cachedMedia?.toModel() ?: it.selectedMedia,
+                            selectedListEntry = cachedEntry,
+                            selectedRecommendations = cachedRecommendations,
+                            trackingStatus = cachedEntry?.status ?: it.trackingStatus,
+                            trackingProgress = cachedEntry?.progress?.toString() ?: it.trackingProgress,
+                            trackingScore = cachedEntry?.score?.toString() ?: it.trackingScore,
+                            trackingNotes = cachedEntry?.notes ?: it.trackingNotes,
+                            trackingPrivate = cachedEntry?.private ?: it.trackingPrivate,
+                            trackingCustomLists = cachedEntry?.customLists?.joinToString(", ") ?: it.trackingCustomLists,
+                        )
+                    }
+                }
+            }
+
+            val cachedMediaIsFresh = cachedMedia != null && now - cachedMedia.fetchedAtEpochMillis <= cachePolicy.mediaDetailsTtlMillis
+            val cachedRecommendationsAreFresh = container.database.recommendationDao()
+                .cachedRecommendations(mediaId)
+                .firstOrNull()
+                ?.let { now - it.fetchedAtEpochMillis <= cachePolicy.mediaDetailsTtlMillis }
+                ?: false
+            if (cachedMediaIsFresh && cachedRecommendationsAreFresh) {
+                return@launch
+            }
+
+            runCatching {
+                container.anilistRepository.mediaDetailsWithEntry(mediaId, token)
+            }.onSuccess { (details, entry, recommendations) ->
+                container.database.mediaDao().upsertMedia(details.toEntity(now))
+                container.database.mediaDao().upsertMedia(recommendations.map { it.media.toEntity(now) })
+                container.database.recommendationDao().deleteForMedia(mediaId)
+                container.database.recommendationDao().upsertRecommendations(
+                    recommendations.map { it.toEntity(mediaId, now) },
+                )
+                if (entry != null) {
+                    container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+                }
+                _state.update {
+                    if (it.selectedMedia?.id != mediaId) {
+                        it
+                    } else {
+                        val effectiveEntry = entry ?: cachedEntry
+                        val nextItems = if (effectiveEntry == null) {
+                            it.libraryItems
+                        } else {
+                            (it.libraryItems.filterNot { item -> item.media.id == mediaId } + LibraryItem(details, effectiveEntry))
+                                .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
+                        }
+                        it.copy(
+                            selectedMedia = details,
+                            selectedListEntry = effectiveEntry,
+                            selectedRecommendations = recommendations,
+                            library = nextItems.map { item -> item.media },
+                            libraryItems = nextItems,
+                            trackingStatus = effectiveEntry?.status ?: it.trackingStatus,
+                            trackingProgress = effectiveEntry?.progress?.toString() ?: it.trackingProgress,
+                            trackingScore = effectiveEntry?.score?.toString() ?: it.trackingScore,
+                            trackingNotes = effectiveEntry?.notes ?: it.trackingNotes,
+                            trackingPrivate = effectiveEntry?.private ?: it.trackingPrivate,
+                            trackingCustomLists = effectiveEntry?.customLists?.joinToString(", ") ?: it.trackingCustomLists,
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                Log.w(TAG, "AniList details failed for $mediaId", error)
+            }
+        }
+    }
+
+    private suspend fun cachedRecommendations(mediaId: Int): List<AnilistRecommendation> {
+        val recommendationEntities = container.database.recommendationDao().cachedRecommendations(mediaId)
+        if (recommendationEntities.isEmpty()) return emptyList()
+        val mediaById = container.database.recommendationDao()
+            .cachedRecommendationMedia(mediaId)
+            .associateBy { it.id }
+        return recommendationEntities.mapNotNull { recommendation ->
+            mediaById[recommendation.recommendationMediaId]?.toModel()?.let { media ->
+                AnilistRecommendation(media = media, rating = recommendation.rating)
+            }
+        }
     }
 
     private fun loadCachedSourceState(mediaId: Int) {
@@ -1040,6 +1267,9 @@ private fun SourceSearchResult.sourceMatchKey(): String =
 
 private fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
     "$sourceId:$mangaUrl"
+
+private fun String.normalizedSearchKey(): String =
+    trim().lowercase(Locale.ROOT)
 
 private fun List<LibraryItem>.toLibrarySections(): List<LibrarySection> {
     val statusSections = listOf(

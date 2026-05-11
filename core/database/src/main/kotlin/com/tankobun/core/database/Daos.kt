@@ -14,6 +14,9 @@ interface MediaDao {
     @Query("SELECT * FROM anilist_media WHERE id = :mediaId")
     fun observeMedia(mediaId: Int): Flow<AnilistMediaEntity?>
 
+    @Query("SELECT * FROM anilist_media WHERE id = :mediaId")
+    suspend fun cachedMedia(mediaId: Int): AnilistMediaEntity?
+
     @Query("SELECT * FROM anilist_media ORDER BY titleUserPreferred COLLATE NOCASE")
     suspend fun cachedMedia(): List<AnilistMediaEntity>
 
@@ -35,6 +38,9 @@ interface ListEntryDao {
     @Query("SELECT * FROM anilist_list_entries ORDER BY fetchedAtEpochMillis DESC")
     suspend fun cachedEntries(): List<AnilistListEntryEntity>
 
+    @Query("SELECT * FROM anilist_list_entries WHERE mediaId = :mediaId")
+    suspend fun cachedEntry(mediaId: Int): AnilistListEntryEntity?
+
     @Upsert
     suspend fun upsertEntries(entries: List<AnilistListEntryEntity>)
 
@@ -46,6 +52,50 @@ interface ListEntryDao {
 
     @Query("DELETE FROM anilist_list_entries")
     suspend fun deleteAllEntries()
+}
+
+@Dao
+interface RecommendationDao {
+    @Query(
+        """
+        SELECT media.* FROM anilist_recommendations AS rec
+        INNER JOIN anilist_media AS media ON media.id = rec.recommendationMediaId
+        WHERE rec.mediaId = :mediaId
+        ORDER BY COALESCE(rec.rating, 0) DESC
+        """,
+    )
+    suspend fun cachedRecommendationMedia(mediaId: Int): List<AnilistMediaEntity>
+
+    @Query("SELECT * FROM anilist_recommendations WHERE mediaId = :mediaId ORDER BY COALESCE(rating, 0) DESC")
+    suspend fun cachedRecommendations(mediaId: Int): List<AnilistRecommendationEntity>
+
+    @Query("DELETE FROM anilist_recommendations WHERE mediaId = :mediaId")
+    suspend fun deleteForMedia(mediaId: Int)
+
+    @Upsert
+    suspend fun upsertRecommendations(recommendations: List<AnilistRecommendationEntity>)
+}
+
+@Dao
+interface SearchResultDao {
+    @Query(
+        """
+        SELECT media.* FROM anilist_search_results AS result
+        INNER JOIN anilist_media AS media ON media.id = result.mediaId
+        WHERE result.query = :query
+        ORDER BY result.orderIndex ASC
+        """,
+    )
+    suspend fun cachedSearchMedia(query: String): List<AnilistMediaEntity>
+
+    @Query("SELECT * FROM anilist_search_results WHERE query = :query ORDER BY orderIndex ASC")
+    suspend fun cachedSearchRows(query: String): List<AnilistSearchResultEntity>
+
+    @Query("DELETE FROM anilist_search_results WHERE query = :query")
+    suspend fun deleteForQuery(query: String)
+
+    @Upsert
+    suspend fun upsertResults(results: List<AnilistSearchResultEntity>)
 }
 
 @Dao

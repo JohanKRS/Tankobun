@@ -2,6 +2,7 @@ package com.tankobun.core.anilist
 
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistTitle
 import com.tankobun.core.model.MediaStatus
 import kotlinx.serialization.json.JsonArray
@@ -61,6 +62,15 @@ object AnilistJsonMapper {
         )
     }
 
+    fun mediaDetails(data: JsonObject): Triple<AnilistMedia, AnilistListEntry?, List<AnilistRecommendation>> {
+        val mediaElement = requireNotNull(data["Media"])
+        val mediaObj = mediaElement.jsonObject
+        val entry = mediaObj["mediaListEntry"]
+            ?.takeUnless { it is JsonNull }
+            ?.let(::listEntry)
+        return Triple(media(mediaElement), entry, recommendations(mediaObj))
+    }
+
     fun listCollection(data: JsonObject): List<Pair<AnilistMedia, AnilistListEntry>> {
         val lists = data["MediaListCollection"]
             ?.jsonObject
@@ -84,6 +94,24 @@ object AnilistJsonMapper {
             ?.jsonArray
             .orEmpty()
             .map(::media)
+    }
+
+    private fun recommendations(mediaObj: JsonObject): List<AnilistRecommendation> {
+        return mediaObj["recommendations"]
+            ?.jsonObject
+            ?.get("nodes")
+            ?.jsonArray
+            .orEmpty()
+            .mapNotNull { node ->
+                val obj = node.jsonObject
+                val mediaRecommendation = obj["mediaRecommendation"]
+                    ?.takeUnless { it is JsonNull }
+                    ?: return@mapNotNull null
+                AnilistRecommendation(
+                    media = media(mediaRecommendation),
+                    rating = obj.intOrNull("rating"),
+                )
+            }
     }
 
     private fun String?.toMediaStatus(): MediaStatus = when (this) {
