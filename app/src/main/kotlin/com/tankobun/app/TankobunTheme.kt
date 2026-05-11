@@ -4,8 +4,41 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.Color
+
+@Immutable
+data class TankobunThemeTokens(
+    val appBackdrop: Color,
+    val elevatedSurface: Color,
+    val softAccent: Color,
+    val readerOverlay: Color,
+    val drawerHandle: Color,
+    val coverScrim: Color,
+)
+
+private val TankobunLightTokens = TankobunThemeTokens(
+    appBackdrop = Color(0xFFFFF7F0),
+    elevatedSurface = Color(0xFFFFFFFF),
+    softAccent = Color(0xFFFFECE0),
+    readerOverlay = Color(0xCC080609),
+    drawerHandle = Color(0x33B82235),
+    coverScrim = Color(0x22000000),
+)
+
+private val TankobunDarkTokens = TankobunThemeTokens(
+    appBackdrop = Color(0xFF130D10),
+    elevatedSurface = Color(0xFF21171A),
+    softAccent = Color(0xFF331E21),
+    readerOverlay = Color(0xDD000000),
+    drawerHandle = Color(0x55FF7A88),
+    coverScrim = Color(0x44000000),
+)
+
+val LocalTankobunTokens = staticCompositionLocalOf { TankobunLightTokens }
 
 private val TankobunLightColors = lightColorScheme(
     primary = Color(0xFFB82235),
@@ -59,6 +92,10 @@ fun TankobunTheme(
     MaterialTheme(
         colorScheme = if (dark) TankobunDarkColors else TankobunLightColors,
         typography = MaterialTheme.typography,
-        content = content,
-    )
+    ) {
+        CompositionLocalProvider(
+            LocalTankobunTokens provides if (dark) TankobunDarkTokens else TankobunLightTokens,
+            content = content,
+        )
+    }
 }

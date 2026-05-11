@@ -1,7 +1,11 @@
 package com.tankobun.app
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.view.WindowInsets
+import android.view.WindowInsetsController
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -17,6 +21,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             TankobunApp(viewModel)
         }
+        window.decorView.post { hideStatusBar() }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -24,8 +29,28 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        hideStatusBar()
+    }
+
     private fun handleIntent(intent: Intent?) {
         val data = intent?.data ?: return
         viewModel.handleOAuthRedirect(data.toString())
+    }
+
+    private fun hideStatusBar() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.decorView.windowInsetsController?.let { controller ->
+                controller.hide(WindowInsets.Type.statusBars())
+                controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.setFlags(
+                WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN,
+            )
+        }
     }
 }
