@@ -1530,6 +1530,7 @@ private fun MediaCoverTile(
     media: AnilistMedia,
     viewMode: MediaViewMode,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -1549,7 +1550,7 @@ private fun MediaCoverTile(
         )
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -1832,20 +1833,22 @@ private fun RecommendationsSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Recommendations", style = MaterialTheme.typography.titleLarge)
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(260.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            gridItems(recommendations, key = { it.media.id }) { recommendation ->
-                MediaCoverTile(
-                    media = recommendation.media,
-                    viewMode = MediaViewMode.COVER_WITH_INFO,
-                    onClick = { onSelectMedia(recommendation.media) },
-                )
+        recommendations.chunked(4).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                row.forEach { recommendation ->
+                    MediaCoverTile(
+                        media = recommendation.media,
+                        viewMode = MediaViewMode.COVER_WITH_INFO,
+                        onClick = { onSelectMedia(recommendation.media) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                repeat(4 - row.size) {
+                    Spacer(Modifier.weight(1f))
+                }
             }
         }
     }
@@ -2050,7 +2053,6 @@ private fun SourceMatchRow(
         )
     }
 }
-
 private fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
     "$sourceId:$mangaUrl"
 
