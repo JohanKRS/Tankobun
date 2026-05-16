@@ -2095,20 +2095,7 @@ private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, 
             }
 
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Chapters", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    FilterChip(
-                        selected = state.readerMode == ReaderMode.PAGED,
-                        onClick = { viewModel.setReaderMode(ReaderMode.PAGED) },
-                        label = { Text("Paged") },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
-                    )
-                    FilterChip(
-                        selected = state.readerMode == ReaderMode.WEBTOON,
-                        onClick = { viewModel.setReaderMode(ReaderMode.WEBTOON) },
-                        label = { Text("Webtoon") },
-                    )
-                }
+                Text("Chapters", style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(8.dp))
                 if (state.selectedSourceManga == null) {
                     Text("Choose a source first.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2623,15 +2610,13 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     val chapter = state.activeChapter ?: return
     if (state.readerPages.isEmpty()) return
     var controlsVisible by remember(chapter.url) { mutableStateOf(false) }
-    var pageGapLevel by remember(chapter.url) { mutableIntStateOf(0) }
-    var fitWidth by remember(chapter.url) { mutableStateOf(false) }
     val transformKey = "${chapter.url}:${state.readerMode}:${if (state.readerMode == ReaderMode.PAGED) state.currentPageIndex else "webtoon"}"
     var readerScale by remember(transformKey) { mutableStateOf(1f) }
     var readerOffset by remember(transformKey) { mutableStateOf(Offset.Zero) }
     val coroutineScope = rememberCoroutineScope()
     var flingJob by remember(transformKey) { mutableStateOf<Job?>(null) }
     var zoomAnimationJob by remember(transformKey) { mutableStateOf<Job?>(null) }
-    val pageGap = readerPageGap(pageGapLevel)
+    val pageGap = readerPageGap(state.readerPageGapLevel)
     val webtoonListState = rememberLazyListState()
     val zoomPercent = (readerScale * 100).toInt()
     fun cancelFling() {
@@ -2882,8 +2867,8 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                     contentDescription = chapter.name,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(if (pageGapLevel == 0) 8.dp else pageGap),
-                    contentScale = if (fitWidth) ContentScale.FillWidth else ContentScale.Fit,
+                        .padding(if (state.readerPageGapLevel == 0) 8.dp else pageGap),
+                    contentScale = if (state.readerFitWidth) ContentScale.FillWidth else ContentScale.Fit,
                 )
             }
         }
@@ -2972,18 +2957,18 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         FilterChip(
-                            selected = fitWidth,
+                            selected = state.readerFitWidth,
                             enabled = state.readerMode == ReaderMode.PAGED,
                             onClick = {
-                                fitWidth = !fitWidth
+                                viewModel.setReaderFitWidth(!state.readerFitWidth)
                                 resetZoom()
                             },
                             label = { Text("Fit width") },
                         )
                         FilterChip(
-                            selected = pageGapLevel > 0,
-                            onClick = { pageGapLevel = (pageGapLevel + 1) % 4 },
-                            label = { Text(readerGapLabel(pageGapLevel)) },
+                            selected = state.readerPageGapLevel > 0,
+                            onClick = { viewModel.setReaderPageGapLevel((state.readerPageGapLevel + 1) % 4) },
+                            label = { Text(readerGapLabel(state.readerPageGapLevel)) },
                         )
                         FilterChip(
                             selected = readerScale > 1.05f,
@@ -3201,18 +3186,46 @@ private fun SettingsScreen(
     ) {
         Text("Settings", style = MaterialTheme.typography.titleLarge)
 
-        Text("Theme", style = MaterialTheme.typography.titleMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ThemeModeChip("System", TankobunThemeMode.SYSTEM, state, viewModel)
-            ThemeModeChip("Light", TankobunThemeMode.LIGHT, state, viewModel)
-            ThemeModeChip("Dark", TankobunThemeMode.DARK, state, viewModel)
-        }
+        ThemePicker(
+            selected = state.themeMode,
+            onSelect = viewModel::setThemeMode,
+        )
 
         Text("Library view", style = MaterialTheme.typography.titleMedium)
         MediaViewModeRow(selected = state.libraryViewMode, onSelect = viewModel::setLibraryViewMode)
 
         Text("Browse view", style = MaterialTheme.typography.titleMedium)
         MediaViewModeRow(selected = state.browseViewMode, onSelect = viewModel::setBrowseViewMode)
+
+        Text("Reader", style = MaterialTheme.typography.titleMedium)
+        FlowRowCompat {
+            FilterChip(
+                selected = state.readerMode == ReaderMode.PAGED,
+                onClick = { viewModel.setReaderMode(ReaderMode.PAGED) },
+                label = { Text("Paged") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
+            )
+            FilterChip(
+                selected = state.readerMode == ReaderMode.WEBTOON,
+                onClick = { viewModel.setReaderMode(ReaderMode.WEBTOON) },
+                label = { Text("Webtoon") },
+            )
+        }
+        Text("Page gaps", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FlowRowCompat {
+            (0..3).forEach { level ->
+                FilterChip(
+                    selected = state.readerPageGapLevel == level,
+                    onClick = { viewModel.setReaderPageGapLevel(level) },
+                    label = { Text(readerGapLabel(level)) },
+                )
+            }
+            FilterChip(
+                selected = state.readerFitWidth,
+                onClick = { viewModel.setReaderFitWidth(!state.readerFitWidth) },
+                label = { Text("Fit paged width") },
+            )
+        }
 
         ElevatedCard(onClick = onOpenSources) {
             ListItem(
@@ -3393,18 +3406,114 @@ private fun sourceLanguageLabel(language: String): String =
         else -> language.uppercase()
     }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ThemeModeChip(
-    label: String,
-    mode: TankobunThemeMode,
-    state: TankobunUiState,
-    viewModel: MainViewModel,
+private fun ThemePicker(
+    selected: TankobunThemeMode,
+    onSelect: (TankobunThemeMode) -> Unit,
 ) {
-    FilterChip(
-        selected = state.themeMode == mode,
-        onClick = { viewModel.setThemeMode(mode) },
-        label = { Text(label) },
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                tankobunThemeChoices().firstOrNull { it.mode == selected }?.name ?: "Bunny Mochi",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(210.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(430.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            gridItems(tankobunThemeChoices(), key = { it.mode.name }) { choice ->
+                ThemeChoiceCard(
+                    choice = choice,
+                    selected = selected == choice.mode,
+                    onClick = { onSelect(choice.mode) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeChoiceCard(
+    choice: TankobunThemeChoice,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1f else 0.985f,
+        animationSpec = tween(durationMillis = 160),
+        label = "Theme card scale",
     )
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(128.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else LocalTankobunTokens.current.elevatedSurface,
+        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+        tonalElevation = if (selected) 4.dp else 1.dp,
+        shadowElevation = if (selected) 3.dp else 1.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ThemeSwatches(choice.swatches)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(choice.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(
+                        choice.description,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    when (choice.dark) {
+                        true -> "Dark"
+                        false -> "Light"
+                        null -> "Auto"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (selected) {
+                    Text("Selected", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeSwatches(colors: List<Color>) {
+    Row(horizontalArrangement = Arrangement.spacedBy((-8).dp), verticalAlignment = Alignment.CenterVertically) {
+        colors.take(3).forEach { color ->
+            Surface(
+                modifier = Modifier.size(28.dp),
+                shape = RoundedCornerShape(999.dp),
+                color = color,
+                tonalElevation = 1.dp,
+                shadowElevation = 1.dp,
+            ) {}
+        }
+    }
 }
 
 @Composable

@@ -2,6 +2,7 @@ package com.tankobun.app
 
 import android.content.Context
 import com.tankobun.core.model.AnilistMediaTag
+import com.tankobun.core.model.ReaderMode
 import java.util.Base64
 import java.util.Locale
 
@@ -40,6 +41,29 @@ class SettingsStore(context: Context) {
 
     fun saveBrowseViewMode(mode: MediaViewMode) {
         preferences.edit().putString(KEY_BROWSE_VIEW_MODE, mode.name).apply()
+    }
+
+    fun readerMode(): ReaderMode =
+        preferences.getString(KEY_READER_MODE, null)
+            ?.let { stored -> runCatching { ReaderMode.valueOf(stored) }.getOrNull() }
+            ?: ReaderMode.PAGED
+
+    fun saveReaderMode(mode: ReaderMode) {
+        preferences.edit().putString(KEY_READER_MODE, mode.name).apply()
+    }
+
+    fun readerPageGapLevel(): Int =
+        preferences.getInt(KEY_READER_PAGE_GAP_LEVEL, 0).coerceIn(0, 3)
+
+    fun saveReaderPageGapLevel(level: Int) {
+        preferences.edit().putInt(KEY_READER_PAGE_GAP_LEVEL, level.coerceIn(0, 3)).apply()
+    }
+
+    fun readerFitWidth(): Boolean =
+        preferences.getBoolean(KEY_READER_FIT_WIDTH, false)
+
+    fun saveReaderFitWidth(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_READER_FIT_WIDTH, enabled).apply()
     }
 
     fun anilistTags(): List<AnilistMediaTag> =
@@ -107,6 +131,9 @@ class SettingsStore(context: Context) {
         const val KEY_THEME_MODE = "theme.mode"
         const val KEY_LIBRARY_VIEW_MODE = "library.view.mode"
         const val KEY_BROWSE_VIEW_MODE = "browse.view.mode"
+        const val KEY_READER_MODE = "reader.mode"
+        const val KEY_READER_PAGE_GAP_LEVEL = "reader.page.gap.level"
+        const val KEY_READER_FIT_WIDTH = "reader.fit.width"
         const val KEY_ANILIST_TAGS = "anilist.tags"
         const val KEY_ANILIST_TAGS_CACHED_AT = "anilist.tags.cached.at"
         const val KEY_SOURCE_LANGUAGES = "source.languages"
@@ -125,6 +152,12 @@ enum class TankobunThemeMode {
     SYSTEM,
     LIGHT,
     DARK,
+    BUNNY_MOCHI,
+    PEACH_SODA,
+    MATCHA_MILK,
+    MIDNIGHT_RAMEN,
+    STARRY_INK,
+    PLUM_NIGHT,
 }
 
 enum class MediaViewMode {

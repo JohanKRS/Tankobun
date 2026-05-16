@@ -4,6 +4,8 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceManga
 import com.tankobun.core.model.SourceSearchResult
+import java.text.Normalizer
+import java.util.Locale
 import kotlin.math.max
 
 class SourceMatcher {
@@ -20,35 +22,64 @@ class SourceMatcher {
             media.title.native?.let(::add)
             addAll(media.synonyms)
         }.map(::normalize)
+            .filter { it.isNotBlank() }
 
         return candidates
             .map { manga ->
                 val normalizedCandidate = normalize(manga.title)
-                val exact = titles.any { it == normalizedCandidate }
-                val contains = titles.any { it.contains(normalizedCandidate) || normalizedCandidate.contains(it) }
-                val tokenScore = titles.maxOfOrNull { tokenOverlap(it, normalizedCandidate) } ?: 0.0
-                val score = when {
-                    exact -> 1.0
-                    contains -> max(0.82, tokenScore)
-                    else -> tokenScore
-                }
+                val best = titles
+                    .asSequence()
+                    .map { scoreTitleMatch(it, normalizedCandidate) }
+                    .maxByOrNull { it.score }
+                    ?: TitleMatchScore()
+                val score = best.score
+                val preferredLanguage = source.lang.equals("en", ignoreCase = true)
+                val adjustedScore = if (preferredLanguage) minOf(1.0, score + 0.03) else score
                 val reasons = buildList {
-                    if (exact) add("exact title")
-                    if (!exact && contains) add("title contains")
-                    if (tokenScore > 0.65) add("shared words")
-                    if (source.lang == "en") add("preferred language")
+                    if (best.exact) add("exact title")
+                    if (!best.exact && best.contains) add("title contains")
+                    if (best.acronym) add("acronym")
+                    if (best.sharedWords) add("shared words")
+                    if (preferredLanguage) add("preferred language")
                 }
                 SourceSearchResult(
                     mediaId = media.id,
                     source = source,
                     manga = manga,
-                    score = if (source.lang == "en") minOf(1.0, score + 0.03) else score,
+                    score = adjustedScore,
                     reasons = reasons,
                     searchedAtEpochMillis = searchedAtEpochMillis,
                 )
             }
-            .filter { it.score >= 0.45 }
+            .filter { it.score >= MIN_MATCH_SCORE }
             .sortedByDescending { it.score }
+    }
+
+    private fun scoreTitleMatch(expected: String, candidate: String): TitleMatchScore {
+        if (expected.isBlank() || candidate.isBlank()) return TitleMatchScore()
+        if (expected == candidate) {
+            return TitleMatchScore(score = 1.0, exact = true)
+        }
+
+        val contains = expected.contains(candidate) || candidate.contains(expected)
+        val tokenScore = tokenOverlap(expected, candidate)
+        val acronym = acronymOf(expected)?.let { it == candidate } == true ||
+            acronymOf(candidate)?.let { it == expected } == true
+        val score = max(
+            when {
+                contains -> max(0.84, tokenScore)
+                acronym -> 0.9
+                else -> tokenScore
+            },
+            tokenScore,
+        )
+
+        return TitleMatchScore(
+            score = score,
+            contains = contains,
+            acronym = acronym,
+            sharedWords = tokenScore > 0.58,
+        )
     }
 
     private fun tokenOverlap(left: String, right: String): Double {
@@ -56,15 +87,39 @@ class SourceMatcher {
         val rightTokens = right.split(' ').filter { it.isNotBlank() }.toSet()
         if (leftTokens.isEmpty() || rightTokens.isEmpty()) return 0.0
         val intersection = leftTokens.intersect(rightTokens).size.toDouble()
-        val union = leftTokens.union(rightTokens).size.toDouble()
-        return intersection / union
+        val dice = (2.0 * intersection) / (leftTokens.size + rightTokens.size)
+        val containment = intersection / minOf(leftTokens.size, rightTokens.size)
+        return max(dice, containment * 0.92)
+    }
+
+    private fun acronymOf(value: String): String? {
+        val tokens = value.split(' ').filter { it.isNotBlank() }
+        if (tokens.size < 2) return null
+        return tokens.joinToString(separator = "") { it.first().toString() }
+            .takeIf { it.length >= 2 }
     }
 
     private fun normalize(value: String): String {
-        return value
-            .lowercase()
-            .replace(Regex("[^a-z0-9\\p{IsHan}\\p{IsHiragana}\\p{IsKatakana}]+"), " ")
+        val withoutMarks = Normalizer.normalize(value, Normalizer.Form.NFKD)
+            .replace(Regex("\\p{Mn}+"), "")
+        return withoutMarks
+            .lowercase(Locale.ROOT)
+            .replace("&", " and ")
+            .replace(Regex("['’]"), "")
+            .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
             .trim()
             .replace(Regex("\\s+"), " ")
+    }
+
+    private data class TitleMatchScore(
+        val score: Double = 0.0,
+        val exact: Boolean = false,
+        val contains: Boolean = false,
+        val acronym: Boolean = false,
+        val sharedWords: Boolean = false,
+    )
+
+    private companion object {
+        const val MIN_MATCH_SCORE = 0.35
     }
 }

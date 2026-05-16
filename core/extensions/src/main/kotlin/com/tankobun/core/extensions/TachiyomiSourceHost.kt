@@ -90,7 +90,7 @@ class TachiyomiSourceHost(
 
         runSourceAction(source, catalogueSource, "search") {
             val filters = catalogueSource.getFilterList()
-            catalogueSource.getSearchManga(page, query, filters).mangas.map { manga ->
+            catalogueSource.fetchSearchManga(page, query, filters).toBlocking().first().mangas.map { manga ->
                 manga.toSourceManga(catalogueSource.id)
             }
         }
