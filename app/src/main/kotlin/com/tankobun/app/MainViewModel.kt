@@ -57,6 +57,8 @@ data class TankobunUiState(
     val browseSort: String = BROWSE_SORT_SEARCH_MATCH,
     val browseTrending: List<AnilistMedia> = emptyList(),
     val browsePopular: List<AnilistMedia> = emptyList(),
+    val browsePopularManhwa: List<AnilistMedia> = emptyList(),
+    val browseTopManga: List<AnilistMedia> = emptyList(),
     val browseLandingLoaded: Boolean = false,
     val selectedMedia: AnilistMedia? = null,
     val selectedListEntry: AnilistListEntry? = null,
@@ -110,6 +112,13 @@ data class LibrarySection(
 private data class VerifiedSourceMatches(
     val matches: List<SourceSearchResult>,
     val chapterCounts: Map<String, Int>,
+)
+
+private data class BrowseLandingData(
+    val trending: List<AnilistMedia>,
+    val popular: List<AnilistMedia>,
+    val popularManhwa: List<AnilistMedia>,
+    val topManga: List<AnilistMedia>,
 )
 
 class MainViewModel(
@@ -410,6 +419,24 @@ class MainViewModel(
         searchAniList()
     }
 
+    fun viewAllPopularManhwa() {
+        _state.update {
+            it.copy(
+                searchQuery = "",
+                searchResults = emptyList(),
+                browseSearched = false,
+                browseGenres = emptySet(),
+                browseFormat = null,
+                browsePublishingStatus = null,
+                browseCountryOfOrigin = "KR",
+                browseYear = null,
+                browseSort = "POPULARITY_DESC",
+                message = null,
+            )
+        }
+        searchAniList()
+    }
+
     fun loadBrowseLanding(force: Boolean = false) {
         if (!force && _state.value.browseLandingLoaded) return
         viewModelScope.launch {
@@ -421,12 +448,24 @@ class MainViewModel(
                 val popular = cachedAnilistBrowseMedia(BROWSE_POPULAR_CACHE_KEY) {
                     container.anilistRepository.browseManga(sort = "POPULARITY_DESC", perPage = 12)
                 }
-                trending to popular
-            }.onSuccess { (trending, popular) ->
+                val popularManhwa = cachedAnilistBrowseMedia(BROWSE_MANHWA_CACHE_KEY) {
+                    container.anilistRepository.browseManga(
+                        countryOfOrigin = "KR",
+                        sort = "POPULARITY_DESC",
+                        perPage = 12,
+                    )
+                }
+                val topManga = cachedAnilistBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY) {
+                    container.anilistRepository.browseManga(sort = "SCORE_DESC", perPage = 100)
+                }
+                BrowseLandingData(trending, popular, popularManhwa, topManga)
+            }.onSuccess { landing ->
                 _state.update {
                     it.copy(
-                        browseTrending = trending,
-                        browsePopular = popular,
+                        browseTrending = landing.trending,
+                        browsePopular = landing.popular,
+                        browsePopularManhwa = landing.popularManhwa,
+                        browseTopManga = landing.topManga,
                         browseLandingLoaded = true,
                         busy = false,
                     )
@@ -1400,6 +1439,8 @@ private fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
 private const val BROWSE_SORT_SEARCH_MATCH = "SEARCH_MATCH"
 private const val BROWSE_TRENDING_CACHE_KEY = "browse:section:trending"
 private const val BROWSE_POPULAR_CACHE_KEY = "browse:section:popular"
+private const val BROWSE_MANHWA_CACHE_KEY = "browse:section:popular-manhwa"
+private const val BROWSE_TOP_MANGA_CACHE_KEY = "browse:section:top-100"
 
 private fun TankobunUiState.hasBrowseFilters(): Boolean =
     browseGenres.isNotEmpty() ||

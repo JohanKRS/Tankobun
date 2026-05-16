@@ -27,7 +27,12 @@ object AnilistQueries {
               bannerImage
               chapters
               volumes
+              format
               status
+              averageScore
+              popularity
+              startDate { year }
+              endDate { year }
               siteUrl
               genres
               synonyms
@@ -50,7 +55,12 @@ object AnilistQueries {
               bannerImage
               chapters
               volumes
+              format
               status
+              averageScore
+              popularity
+              startDate { year }
+              endDate { year }
               siteUrl
               genres
               synonyms
@@ -95,7 +105,12 @@ object AnilistQueries {
               bannerImage
               chapters
               volumes
+              format
               status
+              averageScore
+              popularity
+              startDate { year }
+              endDate { year }
               siteUrl
               genres
               synonyms
@@ -117,7 +132,12 @@ object AnilistQueries {
             bannerImage
             chapters
             volumes
+            format
             status
+            averageScore
+            popularity
+            startDate { year }
+            endDate { year }
             siteUrl
             genres
             synonyms
@@ -146,7 +166,12 @@ object AnilistQueries {
                   bannerImage
                   chapters
                   volumes
+                  format
                   status
+                  averageScore
+                  popularity
+                  startDate { year }
+                  endDate { year }
                   siteUrl
                   genres
                   synonyms
@@ -184,7 +209,12 @@ object AnilistQueries {
                   bannerImage
                   chapters
                   volumes
+                  format
                   status
+                  averageScore
+                  popularity
+                  startDate { year }
+                  endDate { year }
                   siteUrl
                   genres
                   synonyms
@@ -222,7 +252,12 @@ object AnilistQueries {
                   bannerImage
                   chapters
                   volumes
+                  format
                   status
+                  averageScore
+                  popularity
+                  startDate { year }
+                  endDate { year }
                   siteUrl
                   genres
                   synonyms

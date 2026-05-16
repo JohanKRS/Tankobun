@@ -22,6 +22,8 @@ object AnilistJsonMapper {
         val obj = element.jsonObject
         val title = obj["title"]?.jsonObject ?: JsonObject(emptyMap())
         val cover = obj["coverImage"]?.jsonObject
+        val startDate = obj["startDate"]?.jsonObject
+        val endDate = obj["endDate"]?.jsonObject
         return AnilistMedia(
             id = obj.int("id"),
             idMal = obj.intOrNull("idMal"),
@@ -38,7 +40,12 @@ object AnilistJsonMapper {
             bannerImage = obj.stringOrNull("bannerImage"),
             chapters = obj.intOrNull("chapters"),
             volumes = obj.intOrNull("volumes"),
+            format = obj.stringOrNull("format"),
             status = obj.stringOrNull("status"),
+            averageScore = obj.intOrNull("averageScore"),
+            popularity = obj.intOrNull("popularity"),
+            startDateYear = startDate?.intOrNull("year"),
+            endDateYear = endDate?.intOrNull("year"),
             siteUrl = obj.stringOrNull("siteUrl"),
             genres = obj.stringArray("genres"),
             synonyms = obj.stringArray("synonyms"),

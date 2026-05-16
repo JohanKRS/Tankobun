@@ -12,7 +12,7 @@ object DatabaseFactory {
             TankobunDatabase::class.java,
             "tankobun.db",
         )
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
     }
 
@@ -44,6 +44,16 @@ object DatabaseFactory {
             )
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_anilist_search_results_query` ON `anilist_search_results` (`query`)")
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_anilist_search_results_mediaId` ON `anilist_search_results` (`mediaId`)")
+        }
+    }
+
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `format` TEXT")
+            db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `averageScore` INTEGER")
+            db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `popularity` INTEGER")
+            db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `startDateYear` INTEGER")
+            db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `endDateYear` INTEGER")
         }
     }
 }

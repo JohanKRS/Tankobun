@@ -22,6 +22,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -35,6 +36,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -1138,6 +1140,21 @@ private fun BrowseLanding(
                 onSelectMedia = viewModel::selectMedia,
             )
         }
+        item {
+            BrowseMangaShelf(
+                title = "POPULAR MANHWA",
+                media = state.browsePopularManhwa,
+                onViewAll = viewModel::viewAllPopularManhwa,
+                onSelectMedia = viewModel::selectMedia,
+            )
+        }
+        item {
+            BrowseTopMangaSection(
+                media = state.browseTopManga,
+                onViewAll = { viewModel.viewAllBrowseSection("SCORE_DESC") },
+                onSelectMedia = viewModel::selectMedia,
+            )
+        }
     }
 }
 
@@ -1197,11 +1214,216 @@ private fun BrowseShelfTile(media: AnilistMedia, onClick: () -> Unit) {
                     .aspectRatio(2f / 3f),
             )
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+            Surface(
+                modifier = Modifier
+                    .padding(top = 5.dp)
+                    .size(12.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = media.status.statusColor(),
+            ) {}
+            Text(
+                text = media.title.userPreferred,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BrowseTopMangaSection(
+    media: List<AnilistMedia>,
+    onViewAll: () -> Unit,
+    onSelectMedia: (AnilistMedia) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "TOP 100 MANGA",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            TextButton(onClick = onViewAll) {
+                Text("View All")
+            }
+        }
+        if (media.isEmpty()) {
+            Text(
+                "Cached rankings will appear here after AniList responds.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                media.forEachIndexed { index, item ->
+                    BrowseRankedMangaRow(
+                        rank = index + 1,
+                        media = item,
+                        onClick = { onSelectMedia(item) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BrowseRankedMangaRow(rank: Int, media: AnilistMedia, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(
+            "#$rank",
+            modifier = Modifier.width(72.dp),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ElevatedCard(
+            onClick = onClick,
+            modifier = Modifier.weight(1f),
+        ) {
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                if (maxWidth < 720.dp) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            BrowseRankCover(media)
+                            BrowseRankTitle(media = media, modifier = Modifier.weight(1f))
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            BrowseRankMeta(
+                                primary = media.averageScore?.let { "$it%" } ?: "-",
+                                secondary = media.popularity?.let { "${it.formatCompact()} users" } ?: "users unknown",
+                                modifier = Modifier.weight(1f),
+                            )
+                            BrowseRankMeta(
+                                primary = media.format.mediaFormatLabel(),
+                                secondary = media.chapters?.let { "$it chapters" } ?: media.status.statusLabel(),
+                                modifier = Modifier.weight(1f),
+                            )
+                            BrowseRankMeta(
+                                primary = media.publishingYearLabel(),
+                                secondary = media.status.statusLabel(),
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        BrowseRankCover(media)
+                        BrowseRankTitle(
+                            media = media,
+                            modifier = Modifier
+                                .weight(1.5f)
+                                .widthIn(min = 220.dp),
+                        )
+                        BrowseRankMeta(
+                            primary = media.averageScore?.let { "$it%" } ?: "-",
+                            secondary = media.popularity?.let { "${it.formatCompact()} users" } ?: "users unknown",
+                            modifier = Modifier.weight(0.85f),
+                        )
+                        BrowseRankMeta(
+                            primary = media.format.mediaFormatLabel(),
+                            secondary = media.chapters?.let { "$it chapters" } ?: media.status.statusLabel(),
+                            modifier = Modifier.weight(0.85f),
+                        )
+                        BrowseRankMeta(
+                            primary = media.publishingYearLabel(),
+                            secondary = media.status.statusLabel(),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowseRankCover(media: AnilistMedia) {
+    CoverImage(
+        url = media.coverImage,
+        title = media.title.userPreferred,
+        modifier = Modifier.size(width = 64.dp, height = 90.dp),
+    )
+}
+
+@Composable
+private fun BrowseRankTitle(media: AnilistMedia, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Text(
             media.title.userPreferred,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            maxLines = 2,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            media.genres.take(5).forEach { genre ->
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary,
+                ) {
+                    Text(
+                        genre.lowercase(),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowseRankMeta(primary: String, secondary: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(
+            primary,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            secondary,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
@@ -1439,6 +1661,46 @@ private fun browseSummary(state: TankobunUiState): String {
     }
     return parts.ifEmpty { listOf("AniList manga database") }.joinToString(" / ")
 }
+
+@Composable
+private fun String?.statusColor(): Color = when (this) {
+    "RELEASING" -> Color(0xFF7ED957)
+    "FINISHED" -> Color(0xFFFF7A7A)
+    "HIATUS" -> Color(0xFFFFB15C)
+    "NOT_YET_RELEASED" -> MaterialTheme.colorScheme.tertiary
+    "CANCELLED" -> MaterialTheme.colorScheme.error
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+private fun String?.statusLabel(): String = when (this) {
+    "RELEASING" -> "Releasing"
+    "FINISHED" -> "Finished"
+    "HIATUS" -> "Hiatus"
+    "NOT_YET_RELEASED" -> "Not yet released"
+    "CANCELLED" -> "Cancelled"
+    else -> "Status unknown"
+}
+
+private fun String?.mediaFormatLabel(): String = when (this) {
+    "MANGA" -> "Manga"
+    "NOVEL" -> "Novel"
+    "ONE_SHOT" -> "One Shot"
+    else -> "Manga"
+}
+
+private fun AnilistMedia.publishingYearLabel(): String = when {
+    startDateYear != null && endDateYear != null && startDateYear != endDateYear -> "$startDateYear - $endDateYear"
+    startDateYear != null && status == "RELEASING" -> "Since $startDateYear"
+    startDateYear != null -> startDateYear.toString()
+    else -> "Date unknown"
+}
+
+private fun Int.formatCompact(): String =
+    when {
+        this >= 1_000_000 -> "${this / 1_000_000}m"
+        this >= 10_000 -> "${this / 1_000}k"
+        else -> toString()
+    }
 
 @Composable
 private fun MediaViewModeRow(
