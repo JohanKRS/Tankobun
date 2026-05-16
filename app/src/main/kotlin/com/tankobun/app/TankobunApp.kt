@@ -96,6 +96,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -103,6 +104,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -112,6 +114,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.layout.ContentScale
@@ -122,6 +125,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -138,7 +142,10 @@ import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceSearchResult
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.pow
 
 private enum class SettingsRoute {
     MAIN,
@@ -149,6 +156,11 @@ private enum class QuickDrawerMode {
     CLOSED,
     OVERLAY,
     PINNED,
+}
+
+private enum class ReaderPanAxis {
+    BOTH,
+    HORIZONTAL,
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2614,27 +2626,61 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     val transformKey = "${chapter.url}:${state.readerMode}:${if (state.readerMode == ReaderMode.PAGED) state.currentPageIndex else "webtoon"}"
     var readerScale by remember(transformKey) { mutableStateOf(1f) }
     var readerOffset by remember(transformKey) { mutableStateOf(Offset.Zero) }
-    val readerTransformSpec = tween<Float>(durationMillis = 90)
-    val animatedScale by animateFloatAsState(
-        targetValue = readerScale,
-        animationSpec = readerTransformSpec,
-        label = "Reader scale",
-    )
-    val animatedOffsetX by animateFloatAsState(
-        targetValue = readerOffset.x,
-        animationSpec = readerTransformSpec,
-        label = "Reader offset x",
-    )
-    val animatedOffsetY by animateFloatAsState(
-        targetValue = readerOffset.y,
-        animationSpec = readerTransformSpec,
-        label = "Reader offset y",
-    )
+    val coroutineScope = rememberCoroutineScope()
+    var flingJob by remember(transformKey) { mutableStateOf<Job?>(null) }
     val pageGap = readerPageGap(pageGapLevel)
-    val zoomPercent = (animatedScale * 100).toInt()
+    val zoomPercent = (readerScale * 100).toInt()
+    fun cancelFling() {
+        flingJob?.cancel()
+        flingJob = null
+    }
     fun resetZoom() {
+        cancelFling()
         readerScale = 1f
         readerOffset = Offset.Zero
+    }
+    fun launchReaderFling(velocity: Velocity, width: Float, height: Float, panAxis: ReaderPanAxis) {
+        val initialVelocity = when (panAxis) {
+            ReaderPanAxis.BOTH -> Offset(velocity.x, velocity.y)
+            ReaderPanAxis.HORIZONTAL -> Offset(velocity.x, 0f)
+        }
+        if (readerScale <= 1.01f || (abs(initialVelocity.x) < 90f && abs(initialVelocity.y) < 90f)) return
+        cancelFling()
+        flingJob = coroutineScope.launch {
+            var velocityOffset = initialVelocity
+            var lastFrameNanos = 0L
+            while (abs(velocityOffset.x) > 20f || abs(velocityOffset.y) > 20f) {
+                val frameNanos = withFrameNanos { it }
+                if (lastFrameNanos == 0L) {
+                    lastFrameNanos = frameNanos
+                    continue
+                }
+
+                val deltaSeconds = ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0f, 0.05f)
+                lastFrameNanos = frameNanos
+                val proposedOffset = readerOffset + velocityOffset * deltaSeconds
+                val clampedOffset = proposedOffset.clampedReaderOffset(readerScale, width, height)
+                readerOffset = when (panAxis) {
+                    ReaderPanAxis.BOTH -> clampedOffset
+                    ReaderPanAxis.HORIZONTAL -> Offset(clampedOffset.x, 0f)
+                }
+
+                velocityOffset = Offset(
+                    x = if (clampedOffset.x != proposedOffset.x) 0f else velocityOffset.x,
+                    y = if (clampedOffset.y != proposedOffset.y || panAxis == ReaderPanAxis.HORIZONTAL) {
+                        0f
+                    } else {
+                        velocityOffset.y
+                    },
+                )
+                val decay = 0.88f.pow(deltaSeconds * 60f)
+                velocityOffset *= decay
+            }
+        }
+    }
+
+    DisposableEffect(transformKey) {
+        onDispose { cancelFling() }
     }
 
     Box(
@@ -2644,17 +2690,19 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
             .pointerInput(transformKey, controlsVisible, readerScale) {
                 detectTapGestures(
                     onDoubleTap = { tapOffset ->
+                        cancelFling()
                         val nextScale = if (readerScale > 1.05f) 1f else 2.5f
                         readerScale = nextScale
                         readerOffset = if (nextScale == 1f) {
                             Offset.Zero
                         } else {
-                            readerDoubleTapOffset(
+                            val zoomOffset = readerDoubleTapOffset(
                                 tapOffset = tapOffset,
                                 scale = nextScale,
                                 width = size.width.toFloat(),
                                 height = size.height.toFloat(),
                             )
+                            if (state.readerMode == ReaderMode.WEBTOON) Offset(zoomOffset.x, 0f) else zoomOffset
                         }
                     },
                     onTap = { offset ->
@@ -2680,7 +2728,14 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(transformKey) {
-                        detectReaderTransformGestures(scaleProvider = { readerScale }) { centroid, pan, zoom ->
+                        detectReaderTransformGestures(
+                            scaleProvider = { readerScale },
+                            panAxis = ReaderPanAxis.HORIZONTAL,
+                            onGestureStart = ::cancelFling,
+                            onGestureEnd = { velocity, width, height ->
+                                launchReaderFling(velocity, width, height, ReaderPanAxis.HORIZONTAL)
+                            },
+                        ) { centroid, pan, zoom ->
                             val nextScale = (readerScale * zoom).coerceIn(1f, 5f)
                             val nextOffset = readerTransformOffset(
                                 currentOffset = readerOffset,
@@ -2692,14 +2747,14 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                                 height = size.height.toFloat(),
                             )
                             readerScale = nextScale
-                            readerOffset = nextOffset
+                            readerOffset = Offset(nextOffset.x, 0f)
                         }
                     }
                     .graphicsLayer {
-                        scaleX = animatedScale
-                        scaleY = animatedScale
-                        translationX = animatedOffsetX
-                        translationY = animatedOffsetY
+                        scaleX = readerScale
+                        scaleY = readerScale
+                        translationX = readerOffset.x
+                        translationY = 0f
                     },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(pageGap),
@@ -2719,7 +2774,14 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(transformKey) {
-                        detectReaderTransformGestures(scaleProvider = { readerScale }) { centroid, pan, zoom ->
+                        detectReaderTransformGestures(
+                            scaleProvider = { readerScale },
+                            panAxis = ReaderPanAxis.BOTH,
+                            onGestureStart = ::cancelFling,
+                            onGestureEnd = { velocity, width, height ->
+                                launchReaderFling(velocity, width, height, ReaderPanAxis.BOTH)
+                            },
+                        ) { centroid, pan, zoom ->
                             val nextScale = (readerScale * zoom).coerceIn(1f, 5f)
                             val nextOffset = readerTransformOffset(
                                 currentOffset = readerOffset,
@@ -2735,10 +2797,10 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                         }
                     }
                     .graphicsLayer {
-                        scaleX = animatedScale
-                        scaleY = animatedScale
-                        translationX = animatedOffsetX
-                        translationY = animatedOffsetY
+                        scaleX = readerScale
+                        scaleY = readerScale
+                        translationX = readerOffset.x
+                        translationY = readerOffset.y
                     },
                 contentAlignment = Alignment.Center,
             ) {
@@ -2914,11 +2976,16 @@ private fun Offset.clampedReaderOffset(scale: Float, width: Float, height: Float
 
 private suspend fun PointerInputScope.detectReaderTransformGestures(
     scaleProvider: () -> Float,
+    panAxis: ReaderPanAxis,
+    onGestureStart: () -> Unit = {},
+    onGestureEnd: (velocity: Velocity, width: Float, height: Float) -> Unit = { _, _, _ -> },
     onGesture: (centroid: Offset, pan: Offset, zoom: Float) -> Unit,
 ) {
     awaitEachGesture {
+        val velocityTracker = VelocityTracker()
         awaitFirstDown(requireUnconsumed = false)
         var transforming = false
+        var trackingVelocity = false
         do {
             val event = awaitPointerEvent()
             val pressedPointers = event.changes.count { it.pressed }
@@ -2926,18 +2993,65 @@ private suspend fun PointerInputScope.detectReaderTransformGestures(
 
             val currentScale = scaleProvider()
             val multiTouch = pressedPointers > 1
-            if (multiTouch || transforming || currentScale > 1.01f) {
+            val rawPan = event.calculatePan()
+            val oneFingerZoomPan = currentScale > 1.01f && !multiTouch
+            val singleFingerPanAllowed = when (panAxis) {
+                ReaderPanAxis.BOTH -> oneFingerZoomPan
+                ReaderPanAxis.HORIZONTAL -> oneFingerZoomPan && abs(rawPan.x) > abs(rawPan.y)
+            }
+            val shouldTransform = multiTouch || singleFingerPanAllowed
+            if (shouldTransform) {
                 val zoom = if (multiTouch) event.calculateZoom() else 1f
-                val pan = if (currentScale > 1.01f || transforming) event.calculatePan() else Offset.Zero
-                val shouldTransform = multiTouch || currentScale > 1.01f || zoom != 1f || pan != Offset.Zero
-                if (shouldTransform) {
+                val pan = if (currentScale > 1.01f || transforming) rawPan.readerPanForAxis(panAxis) else Offset.Zero
+                if (!transforming) {
                     transforming = true
-                    onGesture(event.calculateCentroid(true), pan, zoom)
-                    event.changes.forEach { change -> change.consume() }
+                    onGestureStart()
                 }
+                if (singleFingerPanAllowed) {
+                    val velocityChange = event.changes.firstOrNull { it.pressed }
+                    if (velocityChange != null) {
+                        if (!trackingVelocity) {
+                            velocityTracker.resetTracking()
+                            velocityTracker.addPosition(
+                                velocityChange.previousUptimeMillis,
+                                velocityChange.previousPosition.readerVelocityPosition(panAxis),
+                            )
+                            trackingVelocity = true
+                        }
+                        velocityTracker.addPosition(
+                            velocityChange.uptimeMillis,
+                            velocityChange.position.readerVelocityPosition(panAxis),
+                        )
+                    }
+                } else {
+                    trackingVelocity = false
+                    velocityTracker.resetTracking()
+                }
+                onGesture(event.calculateCentroid(true), pan, zoom)
+                event.changes.forEach { change -> change.consume() }
             }
         } while (event.changes.any { it.pressed })
+
+        if (transforming && trackingVelocity) {
+            val velocity = velocityTracker.calculateVelocity().readerVelocityForAxis(panAxis)
+            onGestureEnd(velocity, size.width.toFloat(), size.height.toFloat())
+        }
     }
+}
+
+private fun Offset.readerPanForAxis(axis: ReaderPanAxis): Offset = when (axis) {
+    ReaderPanAxis.BOTH -> this
+    ReaderPanAxis.HORIZONTAL -> Offset(x, 0f)
+}
+
+private fun Offset.readerVelocityPosition(axis: ReaderPanAxis): Offset = when (axis) {
+    ReaderPanAxis.BOTH -> this
+    ReaderPanAxis.HORIZONTAL -> Offset(x, 0f)
+}
+
+private fun Velocity.readerVelocityForAxis(axis: ReaderPanAxis): Velocity = when (axis) {
+    ReaderPanAxis.BOTH -> this
+    ReaderPanAxis.HORIZONTAL -> Velocity(x, 0f)
 }
 
 @Composable
