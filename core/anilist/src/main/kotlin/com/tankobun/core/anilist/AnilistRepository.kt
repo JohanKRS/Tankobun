@@ -47,6 +47,47 @@ class AnilistRepository(
         }
     }
 
+    suspend fun browseManga(
+        search: String? = null,
+        genres: Set<String> = emptySet(),
+        format: String? = null,
+        status: String? = null,
+        countryOfOrigin: String? = null,
+        year: Int? = null,
+        sort: String = "TRENDING_DESC",
+        page: Int = 1,
+        perPage: Int = 50,
+    ): List<AnilistMedia> {
+        val normalizedSearch = search?.trim().orEmpty()
+        if (genres.isEmpty() && format == null && status == null && countryOfOrigin == null && year == null) {
+            normalizedSearch.extractAniListMangaId()?.let { mediaId ->
+                return runCatching { listOf(mediaDetailsWithEntry(mediaId, accessToken = null).first) }
+                    .getOrDefault(emptyList())
+            }
+        }
+
+        val data = graphQlClient.execute(
+            query = AnilistQueries.BrowseManga,
+            variables = buildJsonObject {
+                put("page", page)
+                put("perPage", perPage)
+                if (normalizedSearch.isNotBlank()) put("search", normalizedSearch)
+                if (genres.isNotEmpty()) {
+                    put("genres", buildJsonArray { genres.sorted().forEach { add(it) } })
+                }
+                if (!format.isNullOrBlank()) put("format", format)
+                if (!status.isNullOrBlank()) put("status", status)
+                if (!countryOfOrigin.isNullOrBlank()) put("countryOfOrigin", countryOfOrigin)
+                if (year != null) {
+                    put("startDateGreater", year * 10_000 + 101)
+                    put("startDateLesser", year * 10_000 + 12_31)
+                }
+                put("sort", buildJsonArray { add(sort) })
+            },
+        )
+        return AnilistJsonMapper.searchPage(data)
+    }
+
     private suspend fun fallbackSearchManga(query: String): List<AnilistMedia> {
         val normalizedQuery = query.normalizedSearchTokens()
         if (normalizedQuery.isEmpty()) return emptyList()

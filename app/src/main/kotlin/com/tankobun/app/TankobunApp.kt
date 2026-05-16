@@ -31,10 +31,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -53,6 +55,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.MenuOpen
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Link
@@ -61,6 +65,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -85,6 +90,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -807,46 +813,631 @@ private fun LibraryPager(
     }
 }
 
+private enum class BrowsePicker {
+    FORMAT,
+    STATUS,
+    COUNTRY,
+    YEAR,
+}
+
+private data class BrowseOption(
+    val label: String,
+    val value: String?,
+)
+
+private const val BROWSE_SORT_SEARCH_MATCH_UI = "SEARCH_MATCH"
+
+private val BrowseGenres = listOf(
+    "Action",
+    "Adventure",
+    "Comedy",
+    "Drama",
+    "Ecchi",
+    "Fantasy",
+    "Horror",
+    "Mahou Shoujo",
+    "Mecha",
+    "Music",
+    "Mystery",
+    "Psychological",
+    "Romance",
+    "Sci-Fi",
+    "Slice of Life",
+    "Sports",
+    "Supernatural",
+    "Thriller",
+)
+
+private val BrowseFormatOptions = listOf(
+    BrowseOption("Any", null),
+    BrowseOption("Manga", "MANGA"),
+    BrowseOption("Novel", "NOVEL"),
+    BrowseOption("One Shot", "ONE_SHOT"),
+)
+
+private val BrowseStatusOptions = listOf(
+    BrowseOption("Any", null),
+    BrowseOption("Releasing", "RELEASING"),
+    BrowseOption("Finished", "FINISHED"),
+    BrowseOption("Not Yet Released", "NOT_YET_RELEASED"),
+    BrowseOption("Cancelled", "CANCELLED"),
+    BrowseOption("Hiatus", "HIATUS"),
+)
+
+private val BrowseCountryOptions = listOf(
+    BrowseOption("Any", null),
+    BrowseOption("Japan", "JP"),
+    BrowseOption("South Korea", "KR"),
+    BrowseOption("China", "CN"),
+    BrowseOption("Taiwan", "TW"),
+)
+
+private val BrowseSortOptions = listOf(
+    BrowseOption("Search Match", "SEARCH_MATCH"),
+    BrowseOption("Trending", "TRENDING_DESC"),
+    BrowseOption("Popularity", "POPULARITY_DESC"),
+    BrowseOption("Favorites", "FAVOURITES_DESC"),
+    BrowseOption("Average Score", "SCORE_DESC"),
+    BrowseOption("Recently Updated", "UPDATED_AT_DESC"),
+    BrowseOption("Newest", "START_DATE_DESC"),
+    BrowseOption("Title", "TITLE_ROMAJI"),
+)
+
 @Composable
 private fun BrowseScreen(state: TankobunUiState, viewModel: MainViewModel) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = state.searchQuery,
-                onValueChange = viewModel::setSearchQuery,
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                label = { Text("Search AniList manga") },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { viewModel.searchAniList() }),
+    LaunchedEffect(Unit) {
+        viewModel.loadBrowseLanding()
+    }
+
+    var picker by remember { mutableStateOf<BrowsePicker?>(null) }
+    var genresOpen by remember { mutableStateOf(false) }
+    var advancedOpen by remember { mutableStateOf(false) }
+    val controlsActive = state.browseControlsActive()
+
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            BrowseFilterBar(
+                state = state,
+                viewModel = viewModel,
+                onOpenGenres = { genresOpen = true },
+                onOpenPicker = { picker = it },
+                onOpenAdvanced = { advancedOpen = true },
             )
-            IconButton(onClick = viewModel::searchAniList) {
-                Icon(Icons.Default.Search, contentDescription = "Search")
+
+            state.message?.let {
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(it, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+                }
+            }
+
+            if (controlsActive || state.browseSearched) {
+                BrowseResults(
+                    state = state,
+                    viewModel = viewModel,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                BrowseLanding(
+                    state = state,
+                    viewModel = viewModel,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
 
+        if (genresOpen) {
+            BrowseGenreDialog(
+                state = state,
+                viewModel = viewModel,
+                onDismiss = { genresOpen = false },
+            )
+        }
+
+        picker?.let { activePicker ->
+            BrowseOptionDialog(
+                title = when (activePicker) {
+                    BrowsePicker.FORMAT -> "Format"
+                    BrowsePicker.STATUS -> "Publishing Status"
+                    BrowsePicker.COUNTRY -> "Country Of Origin"
+                    BrowsePicker.YEAR -> "Year"
+                },
+                options = when (activePicker) {
+                    BrowsePicker.FORMAT -> BrowseFormatOptions
+                    BrowsePicker.STATUS -> BrowseStatusOptions
+                    BrowsePicker.COUNTRY -> BrowseCountryOptions
+                    BrowsePicker.YEAR -> browseYearOptions()
+                },
+                selectedValue = when (activePicker) {
+                    BrowsePicker.FORMAT -> state.browseFormat
+                    BrowsePicker.STATUS -> state.browsePublishingStatus
+                    BrowsePicker.COUNTRY -> state.browseCountryOfOrigin
+                    BrowsePicker.YEAR -> state.browseYear?.toString()
+                },
+                onSelect = { value ->
+                    when (activePicker) {
+                        BrowsePicker.FORMAT -> viewModel.setBrowseFormat(value)
+                        BrowsePicker.STATUS -> viewModel.setBrowsePublishingStatus(value)
+                        BrowsePicker.COUNTRY -> viewModel.setBrowseCountryOfOrigin(value)
+                        BrowsePicker.YEAR -> viewModel.setBrowseYear(value?.toIntOrNull())
+                    }
+                    picker = null
+                    viewModel.searchAniList()
+                },
+                onDismiss = { picker = null },
+            )
+        }
+
+        if (advancedOpen) {
+            BrowseAdvancedDialog(
+                state = state,
+                viewModel = viewModel,
+                onDismiss = { advancedOpen = false },
+            )
+        }
+    }
+}
+
+@Composable
+private fun BrowseFilterBar(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    onOpenGenres: () -> Unit,
+    onOpenPicker: (BrowsePicker) -> Unit,
+    onOpenAdvanced: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Column(
+            modifier = Modifier.width(260.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            BrowseFilterLabel("Search")
+            OutlinedTextField(
+                value = state.searchQuery,
+                onValueChange = viewModel::setSearchQuery,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    IconButton(onClick = viewModel::searchAniList) {
+                        Icon(Icons.Default.Search, contentDescription = "Search")
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { viewModel.searchAniList() }),
+            )
+        }
+        BrowseSelectField(
+            label = "Genres",
+            value = if (state.browseGenres.isEmpty()) "Any" else "${state.browseGenres.size} selected",
+            width = 230.dp,
+            onClick = onOpenGenres,
+        )
+        BrowseSelectField(
+            label = "Format",
+            value = BrowseFormatOptions.labelFor(state.browseFormat),
+            onClick = { onOpenPicker(BrowsePicker.FORMAT) },
+        )
+        BrowseSelectField(
+            label = "Publishing Status",
+            value = BrowseStatusOptions.labelFor(state.browsePublishingStatus),
+            width = 260.dp,
+            onClick = { onOpenPicker(BrowsePicker.STATUS) },
+        )
+        BrowseSelectField(
+            label = "Country Of Origin",
+            value = BrowseCountryOptions.labelFor(state.browseCountryOfOrigin),
+            width = 260.dp,
+            onClick = { onOpenPicker(BrowsePicker.COUNTRY) },
+        )
+        BrowseSelectField(
+            label = "Year",
+            value = state.browseYear?.toString() ?: "Any",
+            onClick = { onOpenPicker(BrowsePicker.YEAR) },
+        )
+        IconButton(
+            onClick = onOpenAdvanced,
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(LocalTankobunTokens.current.elevatedSurface),
+        ) {
+            Icon(Icons.Default.Tune, contentDescription = "Advanced filters")
+        }
+    }
+}
+
+@Composable
+private fun BrowseFilterLabel(label: String) {
+    Text(
+        label,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurface,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun BrowseSelectField(
+    label: String,
+    value: String,
+    width: androidx.compose.ui.unit.Dp = 230.dp,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.width(width),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        BrowseFilterLabel(label)
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onClick),
+            color = LocalTankobunTokens.current.elevatedSurface,
+            tonalElevation = 1.dp,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    value,
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowseLanding(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    modifier: Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(34.dp),
+    ) {
+        item {
+            BrowseMangaShelf(
+                title = "TRENDING NOW",
+                media = state.browseTrending,
+                onViewAll = { viewModel.viewAllBrowseSection("TRENDING_DESC") },
+                onSelectMedia = viewModel::selectMedia,
+            )
+        }
+        item {
+            BrowseMangaShelf(
+                title = "ALL TIME POPULAR",
+                media = state.browsePopular,
+                onViewAll = { viewModel.viewAllBrowseSection("POPULARITY_DESC") },
+                onSelectMedia = viewModel::selectMedia,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BrowseMangaShelf(
+    title: String,
+    media: List<AnilistMedia>,
+    onViewAll: () -> Unit,
+    onSelectMedia: (AnilistMedia) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            TextButton(onClick = onViewAll) {
+                Text("View All")
+            }
+        }
+        if (media.isEmpty()) {
+            Text(
+                "Cached discovery will appear here after AniList responds.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+                items(media, key = { it.id }) { item ->
+                    BrowseShelfTile(media = item, onClick = { onSelectMedia(item) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowseShelfTile(media: AnilistMedia, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(190.dp)
+            .clickable(onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            tonalElevation = 1.dp,
+            shadowElevation = 2.dp,
+        ) {
+            CoverImage(
+                url = media.coverImage,
+                title = media.title.userPreferred,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f),
+            )
+        }
+        Text(
+            media.title.userPreferred,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun BrowseResults(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    modifier: Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    if (state.searchQuery.isBlank()) "Browse Manga" else "Search Results",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    browseSummary(state),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            TextButton(onClick = viewModel::resetBrowseFilters) {
+                Text("Reset")
+            }
+        }
         MediaViewModeRow(
             selected = state.browseViewMode,
             onSelect = viewModel::setBrowseViewMode,
         )
-
         MediaCollection(
             media = state.searchResults,
             viewMode = state.browseViewMode,
             modifier = Modifier.weight(1f),
             onSelectMedia = viewModel::selectMedia,
-            emptyMessage = if (state.browseSearched) {
-                "No AniList manga found for this search."
+            emptyMessage = if (state.busy) {
+                "Searching AniList..."
             } else {
-                "Search AniList to discover manga."
+                "No AniList manga found for these filters."
             },
         )
     }
+}
+
+@Composable
+private fun BrowseGenreDialog(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.82f)
+                .fillMaxHeight(0.72f),
+            shape = RoundedCornerShape(12.dp),
+            color = LocalTankobunTokens.current.elevatedSurface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                DialogHeader(title = "Genres", onDismiss = onDismiss)
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(150.dp),
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    gridItems(BrowseGenres, key = { it }) { genre ->
+                        FilterChip(
+                            selected = genre in state.browseGenres,
+                            onClick = { viewModel.setBrowseGenre(genre, genre !in state.browseGenres) },
+                            label = {
+                                Text(genre, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            },
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        onClick = {
+                            state.browseGenres.forEach { viewModel.setBrowseGenre(it, false) }
+                        },
+                    ) {
+                        Text("Clear")
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Button(
+                        onClick = {
+                            onDismiss()
+                            viewModel.searchAniList()
+                        },
+                    ) {
+                        Text("Apply")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowseOptionDialog(
+    title: String,
+    options: List<BrowseOption>,
+    selectedValue: String?,
+    onSelect: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .width(380.dp)
+                .heightIn(max = 640.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = LocalTankobunTokens.current.elevatedSurface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                DialogHeader(title = title, onDismiss = onDismiss)
+                options.forEach { option ->
+                    FilterChip(
+                        selected = option.value == selectedValue,
+                        onClick = { onSelect(option.value) },
+                        label = { Text(option.label) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowseAdvancedDialog(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.72f),
+            shape = RoundedCornerShape(12.dp),
+            color = LocalTankobunTokens.current.elevatedSurface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                DialogHeader(title = "Browse Options", onDismiss = onDismiss)
+                Text("Sort", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                FlowRowCompat {
+                    BrowseSortOptions.forEach { option ->
+                        FilterChip(
+                            selected = state.browseSort == option.value,
+                            onClick = { option.value?.let(viewModel::setBrowseSort) },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
+                Text("View", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                MediaViewModeRow(
+                    selected = state.browseViewMode,
+                    onSelect = viewModel::setBrowseViewMode,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = viewModel::resetBrowseFilters) {
+                        Text("Reset")
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Button(
+                        onClick = {
+                            onDismiss()
+                            viewModel.searchAniList()
+                        },
+                    ) {
+                        Text("Apply")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DialogHeader(title: String, onDismiss: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        IconButton(onClick = onDismiss) {
+            Icon(Icons.Default.Close, contentDescription = "Close")
+        }
+    }
+}
+
+private fun List<BrowseOption>.labelFor(value: String?): String =
+    firstOrNull { it.value == value }?.label ?: "Any"
+
+private fun browseYearOptions(): List<BrowseOption> {
+    val currentYear = java.time.Year.now().value
+    return listOf(BrowseOption("Any", null)) +
+        (currentYear downTo 1970).map { BrowseOption(it.toString(), it.toString()) }
+}
+
+private fun TankobunUiState.browseControlsActive(): Boolean =
+    searchQuery.isNotBlank() ||
+        browseGenres.isNotEmpty() ||
+        browseFormat != null ||
+        browsePublishingStatus != null ||
+        browseCountryOfOrigin != null ||
+        browseYear != null ||
+        browseSort != BROWSE_SORT_SEARCH_MATCH_UI
+
+private fun browseSummary(state: TankobunUiState): String {
+    val parts = buildList {
+        state.searchQuery.trim().takeIf { it.isNotBlank() }?.let { add("Search \"$it\"") }
+        if (state.browseGenres.isNotEmpty()) add(state.browseGenres.sorted().joinToString(", "))
+        state.browseFormat?.let { add(BrowseFormatOptions.labelFor(it)) }
+        state.browsePublishingStatus?.let { add(BrowseStatusOptions.labelFor(it)) }
+        state.browseCountryOfOrigin?.let { add(BrowseCountryOptions.labelFor(it)) }
+        state.browseYear?.let { add(it.toString()) }
+        BrowseSortOptions.labelFor(state.browseSort).takeIf { it != "Search Match" }?.let { add("Sort: $it") }
+    }
+    return parts.ifEmpty { listOf("AniList manga database") }.joinToString(" / ")
 }
 
 @Composable

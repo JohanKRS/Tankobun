@@ -49,6 +49,15 @@ data class TankobunUiState(
     val searchQuery: String = "",
     val searchResults: List<AnilistMedia> = emptyList(),
     val browseSearched: Boolean = false,
+    val browseGenres: Set<String> = emptySet(),
+    val browseFormat: String? = null,
+    val browsePublishingStatus: String? = null,
+    val browseCountryOfOrigin: String? = null,
+    val browseYear: Int? = null,
+    val browseSort: String = BROWSE_SORT_SEARCH_MATCH,
+    val browseTrending: List<AnilistMedia> = emptyList(),
+    val browsePopular: List<AnilistMedia> = emptyList(),
+    val browseLandingLoaded: Boolean = false,
     val selectedMedia: AnilistMedia? = null,
     val selectedListEntry: AnilistListEntry? = null,
     val selectedRecommendations: List<AnilistRecommendation> = emptyList(),
@@ -333,45 +342,165 @@ class MainViewModel(
         _state.update { it.copy(searchQuery = query) }
     }
 
+    fun setBrowseGenre(genre: String, selected: Boolean) {
+        _state.update {
+            it.copy(
+                browseGenres = if (selected) {
+                    it.browseGenres + genre
+                } else {
+                    it.browseGenres - genre
+                },
+            )
+        }
+    }
+
+    fun setBrowseFormat(format: String?) {
+        _state.update { it.copy(browseFormat = format) }
+    }
+
+    fun setBrowsePublishingStatus(status: String?) {
+        _state.update { it.copy(browsePublishingStatus = status) }
+    }
+
+    fun setBrowseCountryOfOrigin(country: String?) {
+        _state.update { it.copy(browseCountryOfOrigin = country) }
+    }
+
+    fun setBrowseYear(year: Int?) {
+        _state.update { it.copy(browseYear = year) }
+    }
+
+    fun setBrowseSort(sort: String) {
+        _state.update { it.copy(browseSort = sort) }
+    }
+
+    fun resetBrowseFilters() {
+        _state.update {
+            it.copy(
+                searchQuery = "",
+                searchResults = emptyList(),
+                browseSearched = false,
+                browseGenres = emptySet(),
+                browseFormat = null,
+                browsePublishingStatus = null,
+                browseCountryOfOrigin = null,
+                browseYear = null,
+                browseSort = BROWSE_SORT_SEARCH_MATCH,
+                message = null,
+            )
+        }
+        loadBrowseLanding()
+    }
+
+    fun viewAllBrowseSection(sort: String) {
+        _state.update {
+            it.copy(
+                searchQuery = "",
+                searchResults = emptyList(),
+                browseSearched = false,
+                browseGenres = emptySet(),
+                browseFormat = null,
+                browsePublishingStatus = null,
+                browseCountryOfOrigin = null,
+                browseYear = null,
+                browseSort = sort,
+                message = null,
+            )
+        }
+        searchAniList()
+    }
+
+    fun loadBrowseLanding(force: Boolean = false) {
+        if (!force && _state.value.browseLandingLoaded) return
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                val trending = cachedAnilistBrowseMedia(BROWSE_TRENDING_CACHE_KEY) {
+                    container.anilistRepository.browseManga(sort = "TRENDING_DESC", perPage = 12)
+                }
+                val popular = cachedAnilistBrowseMedia(BROWSE_POPULAR_CACHE_KEY) {
+                    container.anilistRepository.browseManga(sort = "POPULARITY_DESC", perPage = 12)
+                }
+                trending to popular
+            }.onSuccess { (trending, popular) ->
+                _state.update {
+                    it.copy(
+                        browseTrending = trending,
+                        browsePopular = popular,
+                        browseLandingLoaded = true,
+                        busy = false,
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "AniList browse landing failed", error)
+                _state.update {
+                    it.copy(busy = false, message = error.userMessage("Browse failed"))
+                }
+            }
+        }
+    }
+
     fun searchAniList() {
-        val query = _state.value.searchQuery.trim()
-        if (query.isBlank()) {
-            _state.update { it.copy(message = "Type a manga title to search AniList") }
+        val snapshot = _state.value
+        val query = snapshot.searchQuery.trim()
+        if (!snapshot.hasBrowseQueryOrFilters()) {
+            _state.update { it.copy(searchResults = emptyList(), browseSearched = false, message = null) }
+            loadBrowseLanding()
             return
         }
         viewModelScope.launch {
             _state.update { it.copy(busy = true, browseSearched = true, message = null) }
             runCatching {
-                val now = System.currentTimeMillis()
-                val cacheKey = query.normalizedSearchKey()
-                val cachedRows = container.database.searchResultDao().cachedSearchRows(cacheKey)
-                val cachedIsFresh = cachedRows.isNotEmpty() &&
-                    cachedRows.all { now - it.fetchedAtEpochMillis <= cachePolicy.anilistSearchTtlMillis }
-                if (cachedIsFresh) {
-                    return@runCatching container.database.searchResultDao().cachedSearchMedia(cacheKey).map { it.toModel() }
-                }
-                container.anilistRepository.searchManga(query)
-            }.onSuccess { results ->
-                val now = System.currentTimeMillis()
-                val cacheKey = query.normalizedSearchKey()
-                container.database.mediaDao().upsertMedia(results.map { it.toEntity(now) })
-                container.database.searchResultDao().deleteForQuery(cacheKey)
-                container.database.searchResultDao().upsertResults(
-                    results.mapIndexed { index, media ->
-                        AnilistSearchResultEntity(
-                            query = cacheKey,
-                            mediaId = media.id,
-                            orderIndex = index,
-                            fetchedAtEpochMillis = now,
+                val cacheKey = snapshot.browseCacheKey()
+                cachedAnilistBrowseMedia(cacheKey) {
+                    if (!snapshot.hasBrowseFilters() && snapshot.browseSort == BROWSE_SORT_SEARCH_MATCH) {
+                        container.anilistRepository.searchManga(query)
+                    } else {
+                        container.anilistRepository.browseManga(
+                            search = query.takeIf { it.isNotBlank() },
+                            genres = snapshot.browseGenres,
+                            format = snapshot.browseFormat,
+                            status = snapshot.browsePublishingStatus,
+                            countryOfOrigin = snapshot.browseCountryOfOrigin,
+                            year = snapshot.browseYear,
+                            sort = snapshot.effectiveBrowseSort(),
                         )
-                    },
-                )
+                    }
+                }
+            }.onSuccess { results ->
                 _state.update { it.copy(searchResults = results, busy = false) }
             }.onFailure { error ->
                 Log.e(TAG, "AniList search failed for $query", error)
                 _state.update { it.copy(busy = false, message = error.userMessage("Search failed")) }
             }
         }
+    }
+
+    private suspend fun cachedAnilistBrowseMedia(
+        cacheKey: String,
+        fetch: suspend () -> List<AnilistMedia>,
+    ): List<AnilistMedia> {
+        val now = System.currentTimeMillis()
+        val cachedRows = container.database.searchResultDao().cachedSearchRows(cacheKey)
+        val cachedIsFresh = cachedRows.isNotEmpty() &&
+            cachedRows.all { now - it.fetchedAtEpochMillis <= cachePolicy.anilistSearchTtlMillis }
+        if (cachedIsFresh) {
+            return container.database.searchResultDao().cachedSearchMedia(cacheKey).map { it.toModel() }
+        }
+        val results = fetch()
+        container.database.mediaDao().upsertMedia(results.map { it.toEntity(now) })
+        container.database.searchResultDao().deleteForQuery(cacheKey)
+        container.database.searchResultDao().upsertResults(
+            results.mapIndexed { index, media ->
+                AnilistSearchResultEntity(
+                    query = cacheKey,
+                    mediaId = media.id,
+                    orderIndex = index,
+                    fetchedAtEpochMillis = now,
+                )
+            },
+        )
+        return results
     }
 
     fun selectMedia(media: AnilistMedia) {
@@ -1267,6 +1396,40 @@ private fun SourceSearchResult.sourceMatchKey(): String =
 
 private fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
     "$sourceId:$mangaUrl"
+
+private const val BROWSE_SORT_SEARCH_MATCH = "SEARCH_MATCH"
+private const val BROWSE_TRENDING_CACHE_KEY = "browse:section:trending"
+private const val BROWSE_POPULAR_CACHE_KEY = "browse:section:popular"
+
+private fun TankobunUiState.hasBrowseFilters(): Boolean =
+    browseGenres.isNotEmpty() ||
+        browseFormat != null ||
+        browsePublishingStatus != null ||
+        browseCountryOfOrigin != null ||
+        browseYear != null
+
+private fun TankobunUiState.hasBrowseQueryOrFilters(): Boolean =
+    searchQuery.trim().isNotBlank() ||
+        hasBrowseFilters() ||
+        browseSort != BROWSE_SORT_SEARCH_MATCH
+
+private fun TankobunUiState.effectiveBrowseSort(): String =
+    if (browseSort == BROWSE_SORT_SEARCH_MATCH && searchQuery.isBlank()) {
+        "TRENDING_DESC"
+    } else {
+        browseSort
+    }
+
+private fun TankobunUiState.browseCacheKey(): String = buildString {
+    append("browse:")
+    append("q=").append(searchQuery.normalizedSearchKey())
+    append("|genres=").append(browseGenres.sorted().joinToString(",") { it.normalizedSearchKey() })
+    append("|format=").append(browseFormat.orEmpty())
+    append("|status=").append(browsePublishingStatus.orEmpty())
+    append("|country=").append(browseCountryOfOrigin.orEmpty())
+    append("|year=").append(browseYear?.toString().orEmpty())
+    append("|sort=").append(effectiveBrowseSort())
+}
 
 private fun String.normalizedSearchKey(): String =
     trim().lowercase(Locale.ROOT)

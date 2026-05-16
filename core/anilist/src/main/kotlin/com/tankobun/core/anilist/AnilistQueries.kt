@@ -61,6 +61,51 @@ object AnilistQueries {
         }
     """
 
+    const val BrowseManga = """
+        query BrowseManga(
+          ${'$'}page: Int!,
+          ${'$'}perPage: Int!,
+          ${'$'}search: String,
+          ${'$'}genres: [String],
+          ${'$'}format: MediaFormat,
+          ${'$'}status: MediaStatus,
+          ${'$'}countryOfOrigin: CountryCode,
+          ${'$'}startDateGreater: FuzzyDateInt,
+          ${'$'}startDateLesser: FuzzyDateInt,
+          ${'$'}sort: [MediaSort]
+        ) {
+          Page(page: ${'$'}page, perPage: ${'$'}perPage) {
+            pageInfo { hasNextPage currentPage lastPage }
+            media(
+              type: MANGA,
+              search: ${'$'}search,
+              genre_in: ${'$'}genres,
+              format: ${'$'}format,
+              status: ${'$'}status,
+              countryOfOrigin: ${'$'}countryOfOrigin,
+              startDate_greater: ${'$'}startDateGreater,
+              startDate_lesser: ${'$'}startDateLesser,
+              sort: ${'$'}sort
+            ) {
+              id
+              idMal
+              title { romaji english native userPreferred }
+              description(asHtml: false)
+              coverImage { extraLarge large color }
+              bannerImage
+              chapters
+              volumes
+              status
+              siteUrl
+              genres
+              synonyms
+              isAdult
+              updatedAt
+            }
+          }
+        }
+    """
+
     const val MediaDetails = """
         query MediaDetails(${'$'}id: Int!) {
           Media(id: ${'$'}id, type: MANGA) {
