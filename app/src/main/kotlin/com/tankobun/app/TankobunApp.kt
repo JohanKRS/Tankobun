@@ -16,6 +16,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -102,8 +107,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -114,6 +121,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -2601,31 +2609,100 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     val chapter = state.activeChapter ?: return
     if (state.readerPages.isEmpty()) return
     var controlsVisible by remember(chapter.url) { mutableStateOf(false) }
+    var pageGapLevel by remember(chapter.url) { mutableIntStateOf(0) }
+    var fitWidth by remember(chapter.url) { mutableStateOf(false) }
+    val transformKey = "${chapter.url}:${state.readerMode}:${if (state.readerMode == ReaderMode.PAGED) state.currentPageIndex else "webtoon"}"
+    var readerScale by remember(transformKey) { mutableStateOf(1f) }
+    var readerOffset by remember(transformKey) { mutableStateOf(Offset.Zero) }
+    val readerTransformSpec = tween<Float>(durationMillis = 90)
+    val animatedScale by animateFloatAsState(
+        targetValue = readerScale,
+        animationSpec = readerTransformSpec,
+        label = "Reader scale",
+    )
+    val animatedOffsetX by animateFloatAsState(
+        targetValue = readerOffset.x,
+        animationSpec = readerTransformSpec,
+        label = "Reader offset x",
+    )
+    val animatedOffsetY by animateFloatAsState(
+        targetValue = readerOffset.y,
+        animationSpec = readerTransformSpec,
+        label = "Reader offset y",
+    )
+    val pageGap = readerPageGap(pageGapLevel)
+    val zoomPercent = (animatedScale * 100).toInt()
+    fun resetZoom() {
+        readerScale = 1f
+        readerOffset = Offset.Zero
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(chapter.url, state.currentPageIndex, controlsVisible) {
-                detectTapGestures { offset ->
-                    val centerX = size.width / 3f..size.width * 2f / 3f
-                    val centerY = size.height / 3f..size.height * 2f / 3f
-                    when {
-                        offset.x in centerX && offset.y in centerY -> controlsVisible = !controlsVisible
-                        !controlsVisible && state.readerMode == ReaderMode.PAGED && offset.x < size.width / 3f -> {
-                            viewModel.moveReaderPage(-1)
+            .pointerInput(transformKey, controlsVisible, readerScale) {
+                detectTapGestures(
+                    onDoubleTap = { tapOffset ->
+                        val nextScale = if (readerScale > 1.05f) 1f else 2.5f
+                        readerScale = nextScale
+                        readerOffset = if (nextScale == 1f) {
+                            Offset.Zero
+                        } else {
+                            readerDoubleTapOffset(
+                                tapOffset = tapOffset,
+                                scale = nextScale,
+                                width = size.width.toFloat(),
+                                height = size.height.toFloat(),
+                            )
                         }
-                        !controlsVisible && state.readerMode == ReaderMode.PAGED && offset.x > size.width * 2f / 3f -> {
-                            viewModel.moveReaderPage(1)
+                    },
+                    onTap = { offset ->
+                        val centerX = size.width / 3f..size.width * 2f / 3f
+                        val centerY = size.height / 3f..size.height * 2f / 3f
+                        when {
+                            offset.x in centerX && offset.y in centerY -> controlsVisible = !controlsVisible
+                            !controlsVisible &&
+                                readerScale <= 1.05f &&
+                                state.readerMode == ReaderMode.PAGED &&
+                                offset.x < size.width / 3f -> viewModel.moveReaderPage(-1)
+                            !controlsVisible &&
+                                readerScale <= 1.05f &&
+                                state.readerMode == ReaderMode.PAGED &&
+                                offset.x > size.width * 2f / 3f -> viewModel.moveReaderPage(1)
                         }
-                    }
-                }
+                    },
+                )
             },
     ) {
         if (state.readerMode == ReaderMode.WEBTOON) {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(transformKey) {
+                        detectReaderTransformGestures(scaleProvider = { readerScale }) { centroid, pan, zoom ->
+                            val nextScale = (readerScale * zoom).coerceIn(1f, 5f)
+                            val nextOffset = readerTransformOffset(
+                                currentOffset = readerOffset,
+                                centroid = centroid,
+                                pan = pan,
+                                scale = readerScale,
+                                nextScale = nextScale,
+                                width = size.width.toFloat(),
+                                height = size.height.toFloat(),
+                            )
+                            readerScale = nextScale
+                            readerOffset = nextOffset
+                        }
+                    }
+                    .graphicsLayer {
+                        scaleX = animatedScale
+                        scaleY = animatedScale
+                        translationX = animatedOffsetX
+                        translationY = animatedOffsetY
+                    },
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(pageGap),
             ) {
                 itemsIndexed(state.readerPages, key = { _, page -> "${page.index}:${page.imageUrl}" }) { _, page ->
                     AsyncImage(
@@ -2638,14 +2715,42 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
             }
         } else {
             val page = state.readerPages[state.currentPageIndex]
-            AsyncImage(
-                model = readerImageRequest(page),
-                contentDescription = chapter.name,
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(8.dp),
-                contentScale = ContentScale.Fit,
-            )
+                    .pointerInput(transformKey) {
+                        detectReaderTransformGestures(scaleProvider = { readerScale }) { centroid, pan, zoom ->
+                            val nextScale = (readerScale * zoom).coerceIn(1f, 5f)
+                            val nextOffset = readerTransformOffset(
+                                currentOffset = readerOffset,
+                                centroid = centroid,
+                                pan = pan,
+                                scale = readerScale,
+                                nextScale = nextScale,
+                                width = size.width.toFloat(),
+                                height = size.height.toFloat(),
+                            )
+                            readerScale = nextScale
+                            readerOffset = nextOffset
+                        }
+                    }
+                    .graphicsLayer {
+                        scaleX = animatedScale
+                        scaleY = animatedScale
+                        translationX = animatedOffsetX
+                        translationY = animatedOffsetY
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = readerImageRequest(page),
+                    contentDescription = chapter.name,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(if (pageGapLevel == 0) 8.dp else pageGap),
+                    contentScale = if (fitWidth) ContentScale.FillWidth else ContentScale.Fit,
+                )
+            }
         }
 
         if (controlsVisible) {
@@ -2684,33 +2789,154 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(LocalTankobunTokens.current.readerOverlay)
                         .padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    IconButton(onClick = { viewModel.moveReaderPage(-1) }) {
-                        Icon(Icons.Default.SkipPrevious, contentDescription = "Previous page", tint = Color.White)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(onClick = { viewModel.moveReaderPage(-1) }) {
+                            Icon(Icons.Default.SkipPrevious, contentDescription = "Previous page", tint = Color.White)
+                        }
+                        FilterChip(
+                            selected = state.readerMode == ReaderMode.PAGED,
+                            onClick = {
+                                resetZoom()
+                                viewModel.setReaderMode(ReaderMode.PAGED)
+                            },
+                            label = { Text("Paged") },
+                        )
+                        FilterChip(
+                            selected = state.readerMode == ReaderMode.WEBTOON,
+                            onClick = {
+                                resetZoom()
+                                viewModel.setReaderMode(ReaderMode.WEBTOON)
+                            },
+                            label = { Text("Webtoon") },
+                        )
+                        Text(
+                            "$zoomPercent%",
+                            color = Color.White.copy(alpha = 0.78f),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        IconButton(onClick = { viewModel.moveReaderPage(1) }) {
+                            Icon(Icons.Default.SkipNext, contentDescription = "Next page", tint = Color.White)
+                        }
                     }
-                    FilterChip(
-                        selected = state.readerMode == ReaderMode.PAGED,
-                        onClick = { viewModel.setReaderMode(ReaderMode.PAGED) },
-                        label = { Text("Paged") },
-                    )
-                    FilterChip(
-                        selected = state.readerMode == ReaderMode.WEBTOON,
-                        onClick = { viewModel.setReaderMode(ReaderMode.WEBTOON) },
-                        label = { Text("Webtoon") },
-                    )
-                    IconButton(onClick = { viewModel.moveReaderPage(1) }) {
-                        Icon(Icons.Default.SkipNext, contentDescription = "Next page", tint = Color.White)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        FilterChip(
+                            selected = fitWidth,
+                            enabled = state.readerMode == ReaderMode.PAGED,
+                            onClick = {
+                                fitWidth = !fitWidth
+                                resetZoom()
+                            },
+                            label = { Text("Fit width") },
+                        )
+                        FilterChip(
+                            selected = pageGapLevel > 0,
+                            onClick = { pageGapLevel = (pageGapLevel + 1) % 4 },
+                            label = { Text(readerGapLabel(pageGapLevel)) },
+                        )
+                        FilterChip(
+                            selected = readerScale > 1.05f,
+                            onClick = { resetZoom() },
+                            label = { Text("Reset zoom") },
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+private fun readerPageGap(level: Int): Dp = when (level) {
+    1 -> 8.dp
+    2 -> 16.dp
+    3 -> 24.dp
+    else -> 0.dp
+}
+
+private fun readerGapLabel(level: Int): String = when (level) {
+    1 -> "Small gaps"
+    2 -> "Medium gaps"
+    3 -> "Large gaps"
+    else -> "No gaps"
+}
+
+private fun readerDoubleTapOffset(
+    tapOffset: Offset,
+    scale: Float,
+    width: Float,
+    height: Float,
+): Offset {
+    val center = Offset(width / 2f, height / 2f)
+    return ((center - tapOffset) * (scale - 1f)).clampedReaderOffset(scale, width, height)
+}
+
+private fun readerTransformOffset(
+    currentOffset: Offset,
+    centroid: Offset,
+    pan: Offset,
+    scale: Float,
+    nextScale: Float,
+    width: Float,
+    height: Float,
+): Offset {
+    if (nextScale <= 1.01f) return Offset.Zero
+    val center = Offset(width / 2f, height / 2f)
+    val scaleChange = nextScale / scale.coerceAtLeast(0.01f)
+    return (currentOffset * scaleChange + (centroid - center) * (1f - scaleChange) + pan)
+        .clampedReaderOffset(nextScale, width, height)
+}
+
+private fun Offset.clampedReaderOffset(scale: Float, width: Float, height: Float): Offset {
+    if (scale <= 1.01f) return Offset.Zero
+    val maxX = width * (scale - 1f) / 2f
+    val maxY = height * (scale - 1f) / 2f
+    return Offset(
+        x = x.coerceIn(-maxX, maxX),
+        y = y.coerceIn(-maxY, maxY),
+    )
+}
+
+private suspend fun PointerInputScope.detectReaderTransformGestures(
+    scaleProvider: () -> Float,
+    onGesture: (centroid: Offset, pan: Offset, zoom: Float) -> Unit,
+) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        var transforming = false
+        do {
+            val event = awaitPointerEvent()
+            val pressedPointers = event.changes.count { it.pressed }
+            if (pressedPointers == 0) break
+
+            val currentScale = scaleProvider()
+            val multiTouch = pressedPointers > 1
+            if (multiTouch || transforming || currentScale > 1.01f) {
+                val zoom = if (multiTouch) event.calculateZoom() else 1f
+                val pan = if (currentScale > 1.01f || transforming) event.calculatePan() else Offset.Zero
+                val shouldTransform = multiTouch || currentScale > 1.01f || zoom != 1f || pan != Offset.Zero
+                if (shouldTransform) {
+                    transforming = true
+                    onGesture(event.calculateCentroid(true), pan, zoom)
+                    event.changes.forEach { change -> change.consume() }
+                }
+            }
+        } while (event.changes.any { it.pressed })
     }
 }
 
