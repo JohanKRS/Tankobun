@@ -57,6 +57,12 @@ data class AnilistMedia(
     val updatedAtEpochSeconds: Long?,
 )
 
+data class AnilistMediaTag(
+    val name: String,
+    val category: String?,
+    val isAdult: Boolean,
+)
+
 data class AnilistListEntry(
     val id: Int,
     val mediaId: Int,
@@ -72,6 +78,18 @@ data class AnilistListEntry(
 data class AnilistRecommendation(
     val media: AnilistMedia,
     val rating: Int?,
+)
+
+data class AnilistRecommendationPage(
+    val recommendations: List<AnilistRecommendation>,
+    val currentPage: Int,
+    val hasNextPage: Boolean,
+)
+
+data class AnilistMediaDetails(
+    val media: AnilistMedia,
+    val listEntry: AnilistListEntry?,
+    val recommendationPage: AnilistRecommendationPage,
 )
 
 data class SourceDescriptor(
@@ -172,6 +190,7 @@ data class CachePolicy(
     val libraryTtlMillis: Long = 6 * 60 * 60 * 1000L,
     val mediaDetailsTtlMillis: Long = 7 * 24 * 60 * 60 * 1000L,
     val anilistSearchTtlMillis: Long = 24 * 60 * 60 * 1000L,
+    val anilistTagsTtlMillis: Long = 7 * 24 * 60 * 60 * 1000L,
     val sourceSearchTtlMillis: Long = 7 * 24 * 60 * 60 * 1000L,
     val sourceChapterTtlMillis: Long = 24 * 60 * 60 * 1000L,
 )

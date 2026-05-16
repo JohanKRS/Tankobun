@@ -11,6 +11,7 @@ import com.tankobun.core.database.toModel
 import com.tankobun.core.database.AnilistSearchResultEntity
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
+import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.reader.ReaderProgressCalculator
 import com.tankobun.core.reader.ReaderSession
@@ -50,6 +51,8 @@ data class TankobunUiState(
     val searchResults: List<AnilistMedia> = emptyList(),
     val browseSearched: Boolean = false,
     val browseGenres: Set<String> = emptySet(),
+    val browseTags: Set<String> = emptySet(),
+    val browseAvailableTags: List<AnilistMediaTag> = emptyList(),
     val browseFormat: String? = null,
     val browsePublishingStatus: String? = null,
     val browseCountryOfOrigin: String? = null,
@@ -63,6 +66,9 @@ data class TankobunUiState(
     val selectedMedia: AnilistMedia? = null,
     val selectedListEntry: AnilistListEntry? = null,
     val selectedRecommendations: List<AnilistRecommendation> = emptyList(),
+    val selectedRecommendationsPage: Int = 0,
+    val selectedRecommendationsHasMore: Boolean = false,
+    val recommendationsLoading: Boolean = false,
     val trackingStatus: MediaStatus = MediaStatus.PLANNING,
     val trackingProgress: String = "0",
     val trackingScore: String = "",
@@ -135,6 +141,7 @@ class MainViewModel(
             librarySyncedAtEpochMillis = container.settingsStore.librarySyncedAtEpochMillis(),
             libraryViewMode = container.settingsStore.libraryViewMode(),
             browseViewMode = container.settingsStore.browseViewMode(),
+            browseAvailableTags = container.settingsStore.anilistTags(),
             sourceLanguages = container.settingsStore.sourceLanguages(),
             extensionRepositoryUrl = container.settingsStore.extensionRepositoryUrl(),
             themeMode = container.settingsStore.themeMode(),
@@ -363,6 +370,18 @@ class MainViewModel(
         }
     }
 
+    fun setBrowseTag(tag: String, selected: Boolean) {
+        _state.update {
+            it.copy(
+                browseTags = if (selected) {
+                    it.browseTags + tag
+                } else {
+                    it.browseTags - tag
+                },
+            )
+        }
+    }
+
     fun setBrowseFormat(format: String?) {
         _state.update { it.copy(browseFormat = format) }
     }
@@ -390,6 +409,7 @@ class MainViewModel(
                 searchResults = emptyList(),
                 browseSearched = false,
                 browseGenres = emptySet(),
+                browseTags = emptySet(),
                 browseFormat = null,
                 browsePublishingStatus = null,
                 browseCountryOfOrigin = null,
@@ -408,6 +428,7 @@ class MainViewModel(
                 searchResults = emptyList(),
                 browseSearched = false,
                 browseGenres = emptySet(),
+                browseTags = emptySet(),
                 browseFormat = null,
                 browsePublishingStatus = null,
                 browseCountryOfOrigin = null,
@@ -426,6 +447,7 @@ class MainViewModel(
                 searchResults = emptyList(),
                 browseSearched = false,
                 browseGenres = emptySet(),
+                browseTags = emptySet(),
                 browseFormat = null,
                 browsePublishingStatus = null,
                 browseCountryOfOrigin = "KR",
@@ -456,7 +478,7 @@ class MainViewModel(
                     )
                 }
                 val topManga = cachedAnilistBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY) {
-                    container.anilistRepository.browseManga(sort = "SCORE_DESC", perPage = 100)
+                    fetchTopManga()
                 }
                 BrowseLandingData(trending, popular, popularManhwa, topManga)
             }.onSuccess { landing ->
@@ -475,6 +497,26 @@ class MainViewModel(
                 _state.update {
                     it.copy(busy = false, message = error.userMessage("Browse failed"))
                 }
+            }
+        }
+    }
+
+    fun loadBrowseTags(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        val cachedTags = container.settingsStore.anilistTags()
+        val cachedAt = container.settingsStore.anilistTagsCachedAtEpochMillis()
+        if (!force && cachedTags.isNotEmpty() && now - cachedAt <= cachePolicy.anilistTagsTtlMillis) {
+            _state.update { it.copy(browseAvailableTags = cachedTags) }
+            return
+        }
+        viewModelScope.launch {
+            runCatching {
+                container.anilistRepository.mediaTags()
+            }.onSuccess { tags ->
+                container.settingsStore.saveAnilistTags(tags, System.currentTimeMillis())
+                _state.update { it.copy(browseAvailableTags = tags) }
+            }.onFailure { error ->
+                Log.w(TAG, "AniList tag collection failed", error)
             }
         }
     }
@@ -498,6 +540,7 @@ class MainViewModel(
                         container.anilistRepository.browseManga(
                             search = query.takeIf { it.isNotBlank() },
                             genres = snapshot.browseGenres,
+                            tags = snapshot.browseTags,
                             format = snapshot.browseFormat,
                             status = snapshot.browsePublishingStatus,
                             countryOfOrigin = snapshot.browseCountryOfOrigin,
@@ -542,6 +585,12 @@ class MainViewModel(
         return results
     }
 
+    private suspend fun fetchTopManga(): List<AnilistMedia> {
+        val firstPage = container.anilistRepository.browseManga(sort = "SCORE_DESC", page = 1, perPage = 50)
+        val secondPage = container.anilistRepository.browseManga(sort = "SCORE_DESC", page = 2, perPage = 50)
+        return (firstPage + secondPage).distinctBy { it.id }.take(100)
+    }
+
     fun selectMedia(media: AnilistMedia) {
         val existingEntry = _state.value.libraryItems.firstOrNull { item -> item.media.id == media.id }?.entry
         _state.update {
@@ -553,6 +602,9 @@ class MainViewModel(
                 sourcePickerLoading = false,
                 selectedListEntry = existingEntry,
                 selectedRecommendations = emptyList(),
+                selectedRecommendationsPage = 0,
+                selectedRecommendationsHasMore = false,
+                recommendationsLoading = false,
                 trackingStatus = existingEntry?.status ?: MediaStatus.PLANNING,
                 trackingProgress = (existingEntry?.progress ?: 0).toString(),
                 trackingScore = existingEntry?.score?.toString().orEmpty(),
@@ -599,6 +651,9 @@ class MainViewModel(
                 sourcePickerLoading = false,
                 selectedListEntry = null,
                 selectedRecommendations = emptyList(),
+                selectedRecommendationsPage = 0,
+                selectedRecommendationsHasMore = false,
+                recommendationsLoading = false,
                 selectedSourceManga = null,
                 sourceChapters = emptyList(),
                 latestProgress = null,
@@ -714,6 +769,8 @@ class MainViewModel(
                             selectedMedia = cachedMedia?.toModel() ?: it.selectedMedia,
                             selectedListEntry = cachedEntry,
                             selectedRecommendations = cachedRecommendations,
+                            selectedRecommendationsPage = cachedRecommendations.recommendationPageCount(),
+                            selectedRecommendationsHasMore = cachedRecommendations.size >= RECOMMENDATIONS_PAGE_SIZE,
                             trackingStatus = cachedEntry?.status ?: it.trackingStatus,
                             trackingProgress = cachedEntry?.progress?.toString() ?: it.trackingProgress,
                             trackingScore = cachedEntry?.score?.toString() ?: it.trackingScore,
@@ -736,8 +793,17 @@ class MainViewModel(
             }
 
             runCatching {
-                container.anilistRepository.mediaDetailsWithEntry(mediaId, token)
-            }.onSuccess { (details, entry, recommendations) ->
+                container.anilistRepository.mediaDetailsWithEntry(
+                    mediaId = mediaId,
+                    accessToken = token,
+                    recommendationsPage = 1,
+                    recommendationsPerPage = RECOMMENDATIONS_PAGE_SIZE,
+                )
+            }.onSuccess { result ->
+                val details = result.media
+                val entry = result.listEntry
+                val recommendationPage = result.recommendationPage
+                val recommendations = recommendationPage.recommendations
                 container.database.mediaDao().upsertMedia(details.toEntity(now))
                 container.database.mediaDao().upsertMedia(recommendations.map { it.media.toEntity(now) })
                 container.database.recommendationDao().deleteForMedia(mediaId)
@@ -762,6 +828,9 @@ class MainViewModel(
                             selectedMedia = details,
                             selectedListEntry = effectiveEntry,
                             selectedRecommendations = recommendations,
+                            selectedRecommendationsPage = recommendationPage.currentPage,
+                            selectedRecommendationsHasMore = recommendationPage.hasNextPage,
+                            recommendationsLoading = false,
                             library = nextItems.map { item -> item.media },
                             libraryItems = nextItems,
                             trackingStatus = effectiveEntry?.status ?: it.trackingStatus,
@@ -775,6 +844,61 @@ class MainViewModel(
                 }
             }.onFailure { error ->
                 Log.w(TAG, "AniList details failed for $mediaId", error)
+                _state.update {
+                    if (it.selectedMedia?.id == mediaId) it.copy(recommendationsLoading = false) else it
+                }
+            }
+        }
+    }
+
+    fun loadMoreRecommendations() {
+        val snapshot = _state.value
+        val mediaId = snapshot.selectedMedia?.id ?: return
+        if (!snapshot.selectedRecommendationsHasMore || snapshot.recommendationsLoading) return
+        val nextPage = snapshot.selectedRecommendationsPage.coerceAtLeast(1) + 1
+
+        viewModelScope.launch {
+            val token = container.tokenStore.accessToken()
+            _state.update { it.copy(recommendationsLoading = true, message = null) }
+            runCatching {
+                container.anilistRepository.mediaRecommendations(
+                    mediaId = mediaId,
+                    page = nextPage,
+                    perPage = RECOMMENDATIONS_PAGE_SIZE,
+                    accessToken = token,
+                )
+            }.onSuccess { recommendationPage ->
+                val now = System.currentTimeMillis()
+                container.database.mediaDao().upsertMedia(recommendationPage.recommendations.map { it.media.toEntity(now) })
+                container.database.recommendationDao().upsertRecommendations(
+                    recommendationPage.recommendations.map { it.toEntity(mediaId, now) },
+                )
+                _state.update {
+                    if (it.selectedMedia?.id != mediaId) {
+                        it
+                    } else {
+                        val combined = (it.selectedRecommendations + recommendationPage.recommendations)
+                            .distinctBy { recommendation -> recommendation.media.id }
+                        it.copy(
+                            selectedRecommendations = combined,
+                            selectedRecommendationsPage = recommendationPage.currentPage,
+                            selectedRecommendationsHasMore = recommendationPage.hasNextPage,
+                            recommendationsLoading = false,
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                Log.w(TAG, "AniList recommendations failed for $mediaId page $nextPage", error)
+                _state.update {
+                    if (it.selectedMedia?.id == mediaId) {
+                        it.copy(
+                            recommendationsLoading = false,
+                            message = error.userMessage("Recommendations failed"),
+                        )
+                    } else {
+                        it
+                    }
+                }
             }
         }
     }
@@ -1440,10 +1564,12 @@ private const val BROWSE_SORT_SEARCH_MATCH = "SEARCH_MATCH"
 private const val BROWSE_TRENDING_CACHE_KEY = "browse:section:trending"
 private const val BROWSE_POPULAR_CACHE_KEY = "browse:section:popular"
 private const val BROWSE_MANHWA_CACHE_KEY = "browse:section:popular-manhwa"
-private const val BROWSE_TOP_MANGA_CACHE_KEY = "browse:section:top-100"
+private const val BROWSE_TOP_MANGA_CACHE_KEY = "browse:section:top-100:v2"
+private const val RECOMMENDATIONS_PAGE_SIZE = 18
 
 private fun TankobunUiState.hasBrowseFilters(): Boolean =
     browseGenres.isNotEmpty() ||
+        browseTags.isNotEmpty() ||
         browseFormat != null ||
         browsePublishingStatus != null ||
         browseCountryOfOrigin != null ||
@@ -1465,6 +1591,7 @@ private fun TankobunUiState.browseCacheKey(): String = buildString {
     append("browse:")
     append("q=").append(searchQuery.normalizedSearchKey())
     append("|genres=").append(browseGenres.sorted().joinToString(",") { it.normalizedSearchKey() })
+    append("|tags=").append(browseTags.sorted().joinToString(",") { it.normalizedSearchKey() })
     append("|format=").append(browseFormat.orEmpty())
     append("|status=").append(browsePublishingStatus.orEmpty())
     append("|country=").append(browseCountryOfOrigin.orEmpty())
@@ -1474,6 +1601,9 @@ private fun TankobunUiState.browseCacheKey(): String = buildString {
 
 private fun String.normalizedSearchKey(): String =
     trim().lowercase(Locale.ROOT)
+
+private fun List<AnilistRecommendation>.recommendationPageCount(): Int =
+    if (isEmpty()) 0 else ((size - 1) / RECOMMENDATIONS_PAGE_SIZE) + 1
 
 private fun List<LibraryItem>.toLibrarySections(): List<LibrarySection> {
     val statusSections = listOf(

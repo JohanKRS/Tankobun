@@ -1,6 +1,8 @@
 package com.tankobun.app
 
 import android.content.Context
+import com.tankobun.core.model.AnilistMediaTag
+import java.util.Base64
 import java.util.Locale
 
 class SettingsStore(context: Context) {
@@ -40,6 +42,39 @@ class SettingsStore(context: Context) {
         preferences.edit().putString(KEY_BROWSE_VIEW_MODE, mode.name).apply()
     }
 
+    fun anilistTags(): List<AnilistMediaTag> =
+        preferences.getString(KEY_ANILIST_TAGS, "").orEmpty()
+            .lineSequence()
+            .mapNotNull { line ->
+                val parts = line.split('|')
+                if (parts.size != 3) return@mapNotNull null
+                runCatching {
+                    AnilistMediaTag(
+                        name = decodePart(parts[0]),
+                        category = parts[1].takeIf { it.isNotBlank() }?.let(::decodePart),
+                        isAdult = parts[2].toBooleanStrictOrNull() ?: false,
+                    )
+                }.getOrNull()
+            }
+            .toList()
+
+    fun anilistTagsCachedAtEpochMillis(): Long =
+        preferences.getLong(KEY_ANILIST_TAGS_CACHED_AT, 0L)
+
+    fun saveAnilistTags(tags: List<AnilistMediaTag>, cachedAtEpochMillis: Long) {
+        val payload = tags.joinToString("\n") { tag ->
+            listOf(
+                encodePart(tag.name),
+                tag.category?.let(::encodePart).orEmpty(),
+                tag.isAdult.toString(),
+            ).joinToString("|")
+        }
+        preferences.edit()
+            .putString(KEY_ANILIST_TAGS, payload)
+            .putLong(KEY_ANILIST_TAGS_CACHED_AT, cachedAtEpochMillis)
+            .apply()
+    }
+
     fun sourceLanguages(): Set<String> =
         preferences.getStringSet(KEY_SOURCE_LANGUAGES, null)
             ?.map { it.trim().lowercase().replace('_', '-') }
@@ -72,11 +107,19 @@ class SettingsStore(context: Context) {
         const val KEY_THEME_MODE = "theme.mode"
         const val KEY_LIBRARY_VIEW_MODE = "library.view.mode"
         const val KEY_BROWSE_VIEW_MODE = "browse.view.mode"
+        const val KEY_ANILIST_TAGS = "anilist.tags"
+        const val KEY_ANILIST_TAGS_CACHED_AT = "anilist.tags.cached.at"
         const val KEY_SOURCE_LANGUAGES = "source.languages"
         const val KEY_VIEWER_NAME = "anilist.viewer.name"
         const val KEY_LIBRARY_SYNCED_AT = "anilist.library.synced.at"
     }
 }
+
+private fun encodePart(value: String): String =
+    Base64.getUrlEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
+
+private fun decodePart(value: String): String =
+    String(Base64.getUrlDecoder().decode(value), Charsets.UTF_8)
 
 enum class TankobunThemeMode {
     SYSTEM,

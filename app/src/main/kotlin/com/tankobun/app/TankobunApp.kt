@@ -57,7 +57,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.MenuOpen
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Explore
@@ -124,6 +123,7 @@ import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.ReaderPage
@@ -889,10 +889,12 @@ private val BrowseSortOptions = listOf(
 private fun BrowseScreen(state: TankobunUiState, viewModel: MainViewModel) {
     LaunchedEffect(Unit) {
         viewModel.loadBrowseLanding()
+        viewModel.loadBrowseTags()
     }
 
     var picker by remember { mutableStateOf<BrowsePicker?>(null) }
     var genresOpen by remember { mutableStateOf(false) }
+    var tagsOpen by remember { mutableStateOf(false) }
     var advancedOpen by remember { mutableStateOf(false) }
     val controlsActive = state.browseControlsActive()
 
@@ -907,6 +909,7 @@ private fun BrowseScreen(state: TankobunUiState, viewModel: MainViewModel) {
                 state = state,
                 viewModel = viewModel,
                 onOpenGenres = { genresOpen = true },
+                onOpenTags = { tagsOpen = true },
                 onOpenPicker = { picker = it },
                 onOpenAdvanced = { advancedOpen = true },
             )
@@ -941,6 +944,14 @@ private fun BrowseScreen(state: TankobunUiState, viewModel: MainViewModel) {
                 state = state,
                 viewModel = viewModel,
                 onDismiss = { genresOpen = false },
+            )
+        }
+
+        if (tagsOpen) {
+            BrowseTagDialog(
+                state = state,
+                viewModel = viewModel,
+                onDismiss = { tagsOpen = false },
             )
         }
 
@@ -993,125 +1004,110 @@ private fun BrowseFilterBar(
     state: TankobunUiState,
     viewModel: MainViewModel,
     onOpenGenres: () -> Unit,
+    onOpenTags: () -> Unit,
     onOpenPicker: (BrowsePicker) -> Unit,
     onOpenAdvanced: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        Column(
-            modifier = Modifier.width(260.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            BrowseFilterLabel("Search")
-            OutlinedTextField(
-                value = state.searchQuery,
-                onValueChange = viewModel::setSearchQuery,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                trailingIcon = {
-                    IconButton(onClick = viewModel::searchAniList) {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
-                    }
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { viewModel.searchAniList() }),
-            )
-        }
-        BrowseSelectField(
-            label = "Genres",
-            value = if (state.browseGenres.isEmpty()) "Any" else "${state.browseGenres.size} selected",
-            width = 230.dp,
-            onClick = onOpenGenres,
-        )
-        BrowseSelectField(
-            label = "Format",
-            value = BrowseFormatOptions.labelFor(state.browseFormat),
-            onClick = { onOpenPicker(BrowsePicker.FORMAT) },
-        )
-        BrowseSelectField(
-            label = "Publishing Status",
-            value = BrowseStatusOptions.labelFor(state.browsePublishingStatus),
-            width = 260.dp,
-            onClick = { onOpenPicker(BrowsePicker.STATUS) },
-        )
-        BrowseSelectField(
-            label = "Country Of Origin",
-            value = BrowseCountryOptions.labelFor(state.browseCountryOfOrigin),
-            width = 260.dp,
-            onClick = { onOpenPicker(BrowsePicker.COUNTRY) },
-        )
-        BrowseSelectField(
-            label = "Year",
-            value = state.browseYear?.toString() ?: "Any",
-            onClick = { onOpenPicker(BrowsePicker.YEAR) },
-        )
-        IconButton(
-            onClick = onOpenAdvanced,
-            modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(LocalTankobunTokens.current.elevatedSurface),
-        ) {
-            Icon(Icons.Default.Tune, contentDescription = "Advanced filters")
-        }
-    }
-}
-
-@Composable
-private fun BrowseFilterLabel(label: String) {
-    Text(
-        label,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-        fontWeight = FontWeight.Bold,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
-}
-
-@Composable
-private fun BrowseSelectField(
-    label: String,
-    value: String,
-    width: androidx.compose.ui.unit.Dp = 230.dp,
-    onClick: () -> Unit,
-) {
     Column(
-        modifier = Modifier.width(width),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        BrowseFilterLabel(label)
-        Surface(
+        OutlinedTextField(
+            value = state.searchQuery,
+            onValueChange = viewModel::setSearchQuery,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = {
+                IconButton(onClick = viewModel::searchAniList) {
+                    Icon(Icons.Default.Search, contentDescription = "Search")
+                }
+            },
+            placeholder = { Text("Search AniList manga") },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { viewModel.searchAniList() }),
+            shape = RoundedCornerShape(18.dp),
+        )
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onClick),
-            color = LocalTankobunTokens.current.elevatedSurface,
-            tonalElevation = 1.dp,
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            BrowseFilterPill(
+                label = "Genres",
+                value = if (state.browseGenres.isEmpty()) "Any" else state.browseGenres.size.toString(),
+                selected = state.browseGenres.isNotEmpty(),
+                onClick = onOpenGenres,
+            )
+            BrowseFilterPill(
+                label = "Tags",
+                value = if (state.browseTags.isEmpty()) "Any" else state.browseTags.size.toString(),
+                selected = state.browseTags.isNotEmpty(),
+                onClick = onOpenTags,
+            )
+            BrowseFilterPill(
+                label = "Format",
+                value = BrowseFormatOptions.labelFor(state.browseFormat),
+                selected = state.browseFormat != null,
+                onClick = { onOpenPicker(BrowsePicker.FORMAT) },
+            )
+            BrowseFilterPill(
+                label = "Status",
+                value = BrowseStatusOptions.labelFor(state.browsePublishingStatus),
+                selected = state.browsePublishingStatus != null,
+                onClick = { onOpenPicker(BrowsePicker.STATUS) },
+            )
+            BrowseFilterPill(
+                label = "Country",
+                value = BrowseCountryOptions.labelFor(state.browseCountryOfOrigin),
+                selected = state.browseCountryOfOrigin != null,
+                onClick = { onOpenPicker(BrowsePicker.COUNTRY) },
+            )
+            BrowseFilterPill(
+                label = "Year",
+                value = state.browseYear?.toString() ?: "Any",
+                selected = state.browseYear != null,
+                onClick = { onOpenPicker(BrowsePicker.YEAR) },
+            )
+            BrowseFilterPill(
+                label = "Sort",
+                value = BrowseSortOptions.labelFor(state.browseSort),
+                selected = state.browseSort != BROWSE_SORT_SEARCH_MATCH_UI,
+                onClick = onOpenAdvanced,
+            )
+            IconButton(
+                onClick = onOpenAdvanced,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(LocalTankobunTokens.current.elevatedSurface),
             ) {
-                Text(
-                    value,
-                    modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                Icon(Icons.Default.Tune, contentDescription = "Browse options")
             }
         }
     }
+}
+
+@Composable
+private fun BrowseFilterPill(
+    label: String,
+    value: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Text(
+                if (selected) "$label: $value" else label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+    )
 }
 
 @Composable
@@ -1533,6 +1529,96 @@ private fun BrowseGenreDialog(
 }
 
 @Composable
+private fun BrowseTagDialog(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    onDismiss: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    val visibleTags = state.browseAvailableTags.visibleTags(query)
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.86f)
+                .fillMaxHeight(0.78f),
+            shape = RoundedCornerShape(18.dp),
+            color = LocalTankobunTokens.current.elevatedSurface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                DialogHeader(title = "Tags", onDismiss = onDismiss)
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    placeholder = { Text("Find a tag") },
+                    shape = RoundedCornerShape(16.dp),
+                )
+                if (state.browseAvailableTags.isEmpty()) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            "Tags will appear here after AniList responds.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedButton(onClick = { viewModel.loadBrowseTags(force = true) }) {
+                            Text("Refresh tags")
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(142.dp),
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        gridItems(visibleTags, key = { it.name }) { tag ->
+                            FilterChip(
+                                selected = tag.name in state.browseTags,
+                                onClick = { viewModel.setBrowseTag(tag.name, tag.name !in state.browseTags) },
+                                label = {
+                                    Text(
+                                        tag.name,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        onClick = {
+                            state.browseTags.forEach { viewModel.setBrowseTag(it, false) }
+                        },
+                    ) {
+                        Text("Clear")
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Button(
+                        onClick = {
+                            onDismiss()
+                            viewModel.searchAniList()
+                        },
+                    ) {
+                        Text("Apply")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun BrowseOptionDialog(
     title: String,
     options: List<BrowseOption>,
@@ -1545,7 +1631,7 @@ private fun BrowseOptionDialog(
             modifier = Modifier
                 .width(380.dp)
                 .heightIn(max = 640.dp),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(18.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
             tonalElevation = 6.dp,
         ) {
@@ -1557,12 +1643,23 @@ private fun BrowseOptionDialog(
             ) {
                 DialogHeader(title = title, onDismiss = onDismiss)
                 options.forEach { option ->
-                    FilterChip(
-                        selected = option.value == selectedValue,
-                        onClick = { onSelect(option.value) },
-                        label = { Text(option.label) },
-                        modifier = Modifier.fillMaxWidth(),
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { onSelect(option.value) },
+                        color = if (option.value == selectedValue) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            Color.Transparent
+                        },
                     )
+                    {
+                        ListItem(
+                            headlineContent = { Text(option.label) },
+                            supportingContent = { Text(option.value?.optionSummary() ?: "Any") },
+                        )
+                    }
                 }
             }
         }
@@ -1634,6 +1731,21 @@ private fun DialogHeader(title: String, onDismiss: () -> Unit) {
 private fun List<BrowseOption>.labelFor(value: String?): String =
     firstOrNull { it.value == value }?.label ?: "Any"
 
+private fun String.optionSummary(): String = lowercase().replace('_', ' ')
+
+private fun List<AnilistMediaTag>.visibleTags(query: String): List<AnilistMediaTag> {
+    val normalizedQuery = query.trim().lowercase()
+    return asSequence()
+        .filter { !it.isAdult }
+        .filter { tag ->
+            normalizedQuery.isBlank() ||
+                tag.name.lowercase().contains(normalizedQuery) ||
+                tag.category.orEmpty().lowercase().contains(normalizedQuery)
+        }
+        .sortedWith(compareBy<AnilistMediaTag> { it.category.orEmpty() }.thenBy { it.name })
+        .toList()
+}
+
 private fun browseYearOptions(): List<BrowseOption> {
     val currentYear = java.time.Year.now().value
     return listOf(BrowseOption("Any", null)) +
@@ -1643,6 +1755,7 @@ private fun browseYearOptions(): List<BrowseOption> {
 private fun TankobunUiState.browseControlsActive(): Boolean =
     searchQuery.isNotBlank() ||
         browseGenres.isNotEmpty() ||
+        browseTags.isNotEmpty() ||
         browseFormat != null ||
         browsePublishingStatus != null ||
         browseCountryOfOrigin != null ||
@@ -1653,6 +1766,7 @@ private fun browseSummary(state: TankobunUiState): String {
     val parts = buildList {
         state.searchQuery.trim().takeIf { it.isNotBlank() }?.let { add("Search \"$it\"") }
         if (state.browseGenres.isNotEmpty()) add(state.browseGenres.sorted().joinToString(", "))
+        if (state.browseTags.isNotEmpty()) add(state.browseTags.sorted().joinToString(", "))
         state.browseFormat?.let { add(BrowseFormatOptions.labelFor(it)) }
         state.browsePublishingStatus?.let { add(BrowseStatusOptions.labelFor(it)) }
         state.browseCountryOfOrigin?.let { add(BrowseCountryOptions.labelFor(it)) }
@@ -1997,6 +2111,9 @@ private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, 
                 item {
                     RecommendationsSection(
                         recommendations = state.selectedRecommendations,
+                        hasMore = state.selectedRecommendationsHasMore,
+                        loadingMore = state.recommendationsLoading,
+                        onLoadMore = viewModel::loadMoreRecommendations,
                         onSelectMedia = viewModel::selectMedia,
                     )
                 }
@@ -2091,27 +2208,121 @@ private fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewMo
 @Composable
 private fun RecommendationsSection(
     recommendations: List<AnilistRecommendation>,
+    hasMore: Boolean,
+    loadingMore: Boolean,
+    onLoadMore: () -> Unit,
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Recommendations", style = MaterialTheme.typography.titleLarge)
-        recommendations.chunked(4).forEach { row ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                row.forEach { recommendation ->
-                    MediaCoverTile(
-                        media = recommendation.media,
-                        viewMode = MediaViewMode.COVER_WITH_INFO,
-                        onClick = { onSelectMedia(recommendation.media) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                repeat(4 - row.size) {
-                    Spacer(Modifier.weight(1f))
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                "Recommendations",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                "${recommendations.size} shown",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val columns = when {
+                maxWidth >= 1280.dp -> 6
+                maxWidth >= 980.dp -> 5
+                maxWidth >= 680.dp -> 4
+                else -> 3
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                recommendations.chunked(columns).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        row.forEach { recommendation ->
+                            RecommendationTile(
+                                recommendation = recommendation,
+                                onClick = { onSelectMedia(recommendation.media) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        repeat(columns - row.size) {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
                 }
             }
+        }
+
+        if (hasMore) {
+            Button(
+                onClick = onLoadMore,
+                enabled = !loadingMore,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            ) {
+                if (loadingMore) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.size(8.dp))
+                }
+                Text(if (loadingMore) "Loading" else "Load more")
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecommendationTile(
+    recommendation: AnilistRecommendation,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val media = recommendation.media
+    Column(
+        modifier = modifier.clickable(onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(7.dp),
+            tonalElevation = 1.dp,
+            shadowElevation = 2.dp,
+        ) {
+            CoverImage(
+                url = media.coverImage,
+                title = media.title.userPreferred,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f),
+            )
+        }
+        Text(
+            media.title.userPreferred,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                modifier = Modifier.size(8.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = media.status.statusColor(),
+            ) {}
+            Text(
+                listOfNotNull(
+                    media.format.mediaFormatLabel(),
+                    recommendation.rating?.let { "$it votes" },
+                ).joinToString(" / "),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

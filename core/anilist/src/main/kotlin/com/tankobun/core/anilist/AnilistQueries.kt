@@ -71,12 +71,23 @@ object AnilistQueries {
         }
     """
 
+    const val MediaTags = """
+        query MediaTags {
+          MediaTagCollection {
+            name
+            category
+            isAdult
+          }
+        }
+    """
+
     const val BrowseManga = """
         query BrowseManga(
           ${'$'}page: Int!,
           ${'$'}perPage: Int!,
           ${'$'}search: String,
           ${'$'}genres: [String],
+          ${'$'}tags: [String],
           ${'$'}format: MediaFormat,
           ${'$'}status: MediaStatus,
           ${'$'}countryOfOrigin: CountryCode,
@@ -90,6 +101,7 @@ object AnilistQueries {
               type: MANGA,
               search: ${'$'}search,
               genre_in: ${'$'}genres,
+              tag_in: ${'$'}tags,
               format: ${'$'}format,
               status: ${'$'}status,
               countryOfOrigin: ${'$'}countryOfOrigin,
@@ -122,7 +134,7 @@ object AnilistQueries {
     """
 
     const val MediaDetails = """
-        query MediaDetails(${'$'}id: Int!) {
+        query MediaDetails(${'$'}id: Int!, ${'$'}recommendationsPage: Int!, ${'$'}recommendationsPerPage: Int!) {
           Media(id: ${'$'}id, type: MANGA) {
             id
             idMal
@@ -154,7 +166,48 @@ object AnilistQueries {
               customLists(asArray: true)
               updatedAt
             }
-            recommendations(sort: RATING_DESC, perPage: 12) {
+            recommendations(sort: RATING_DESC, page: ${'$'}recommendationsPage, perPage: ${'$'}recommendationsPerPage) {
+              pageInfo {
+                currentPage
+                hasNextPage
+              }
+              nodes {
+                rating
+                mediaRecommendation {
+                  id
+                  idMal
+                  title { romaji english native userPreferred }
+                  description(asHtml: false)
+                  coverImage { extraLarge large color }
+                  bannerImage
+                  chapters
+                  volumes
+                  format
+                  status
+                  averageScore
+                  popularity
+                  startDate { year }
+                  endDate { year }
+                  siteUrl
+                  genres
+                  synonyms
+                  isAdult
+                  updatedAt
+                }
+              }
+            }
+          }
+        }
+    """
+
+    const val MediaRecommendations = """
+        query MediaRecommendations(${'$'}id: Int!, ${'$'}page: Int!, ${'$'}perPage: Int!) {
+          Media(id: ${'$'}id, type: MANGA) {
+            recommendations(sort: RATING_DESC, page: ${'$'}page, perPage: ${'$'}perPage) {
+              pageInfo {
+                currentPage
+                hasNextPage
+              }
               nodes {
                 rating
                 mediaRecommendation {

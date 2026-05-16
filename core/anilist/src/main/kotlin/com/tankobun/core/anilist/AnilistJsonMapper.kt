@@ -2,7 +2,10 @@ package com.tankobun.core.anilist
 
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.AnilistMediaDetails
+import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
+import com.tankobun.core.model.AnilistRecommendationPage
 import com.tankobun.core.model.AnilistTitle
 import com.tankobun.core.model.MediaStatus
 import kotlinx.serialization.json.JsonArray
@@ -69,13 +72,25 @@ object AnilistJsonMapper {
         )
     }
 
-    fun mediaDetails(data: JsonObject): Triple<AnilistMedia, AnilistListEntry?, List<AnilistRecommendation>> {
+    fun mediaDetails(data: JsonObject): AnilistMediaDetails {
         val mediaElement = requireNotNull(data["Media"])
         val mediaObj = mediaElement.jsonObject
         val entry = mediaObj["mediaListEntry"]
             ?.takeUnless { it is JsonNull }
             ?.let(::listEntry)
-        return Triple(media(mediaElement), entry, recommendations(mediaObj))
+        return AnilistMediaDetails(
+            media = media(mediaElement),
+            listEntry = entry,
+            recommendationPage = recommendationPage(mediaObj),
+        )
+    }
+
+    fun mediaRecommendations(data: JsonObject): AnilistRecommendationPage {
+        val mediaObj = data["Media"]
+            ?.takeUnless { it is JsonNull }
+            ?.jsonObject
+            ?: JsonObject(emptyMap())
+        return recommendationPage(mediaObj)
     }
 
     fun listCollection(data: JsonObject): List<Pair<AnilistMedia, AnilistListEntry>> {
@@ -103,10 +118,29 @@ object AnilistJsonMapper {
             .map(::media)
     }
 
-    private fun recommendations(mediaObj: JsonObject): List<AnilistRecommendation> {
-        return mediaObj["recommendations"]
+    fun mediaTags(data: JsonObject): List<AnilistMediaTag> {
+        return data["MediaTagCollection"]
+            ?.jsonArray
+            .orEmpty()
+            .mapNotNull { tag ->
+                val obj = tag.jsonObject
+                val name = obj.stringOrNull("name") ?: return@mapNotNull null
+                AnilistMediaTag(
+                    name = name,
+                    category = obj.stringOrNull("category"),
+                    isAdult = obj.booleanOrFalse("isAdult"),
+                )
+            }
+    }
+
+    private fun recommendationPage(mediaObj: JsonObject): AnilistRecommendationPage {
+        val recommendationObj = mediaObj["recommendations"]
+            ?.takeUnless { it is JsonNull }
             ?.jsonObject
-            ?.get("nodes")
+            ?: JsonObject(emptyMap())
+        val pageInfo = recommendationObj["pageInfo"]?.jsonObject
+        val recommendations = recommendationObj
+            .get("nodes")
             ?.jsonArray
             .orEmpty()
             .mapNotNull { node ->
@@ -119,6 +153,11 @@ object AnilistJsonMapper {
                     rating = obj.intOrNull("rating"),
                 )
             }
+        return AnilistRecommendationPage(
+            recommendations = recommendations,
+            currentPage = pageInfo?.intOrNull("currentPage") ?: 1,
+            hasNextPage = pageInfo?.booleanOrFalse("hasNextPage") ?: false,
+        )
     }
 
     private fun String?.toMediaStatus(): MediaStatus = when (this) {
