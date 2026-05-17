@@ -4268,7 +4268,7 @@ private fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMod
             .groupBy { it.lang.normalizedSourceLanguage() }
             .map { (language, sources) ->
                 language to sources.sortedWith(
-                    compareBy<SourceDescriptor> { it.name.lowercase() }
+                    compareBy<SourceDescriptor> { it.name.extensionDisplayName().lowercase() }
                         .thenBy { it.id },
                 )
             }
@@ -4293,7 +4293,7 @@ private fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMod
     val repositoryEntries = remember(state.availableExtensions) {
         state.availableExtensions.sortedWith(
             compareBy<ExtensionIndexEntry> { sourceLanguageSortPriority(it.lang.normalizedSourceLanguage()) }
-                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name.extensionDisplayName() }
                 .thenByDescending { it.versionCode },
         )
     }
@@ -4681,6 +4681,7 @@ private fun SourceSettingsRow(
     onInstall: (ExtensionIndexEntry) -> Unit,
     onUninstall: (String) -> Unit,
 ) {
+    val displayName = source.name.extensionDisplayName()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -4690,12 +4691,12 @@ private fun SourceSettingsRow(
     ) {
         ExtensionIcon(
             packageName = source.packageName,
-            name = source.name,
+            name = displayName,
             iconUrl = iconUrl,
             modifier = Modifier.size(34.dp),
         )
         Column(modifier = Modifier.weight(1f)) {
-            Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
+            Text(displayName, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
             Text(
                 sourceMetadata(source, active),
                 style = MaterialTheme.typography.bodySmall,
@@ -4718,7 +4719,7 @@ private fun SourceSettingsRow(
                 } else {
                     Icon(
                         Icons.Default.Download,
-                        contentDescription = "Update ${source.name}",
+                        contentDescription = "Update $displayName",
                     )
                 }
             }
@@ -4727,7 +4728,7 @@ private fun SourceSettingsRow(
             onClick = { onUninstall(source.packageName) },
             modifier = Modifier.size(40.dp),
         ) {
-            Icon(Icons.Default.Close, contentDescription = "Uninstall ${source.name}")
+            Icon(Icons.Default.Close, contentDescription = "Uninstall $displayName")
         }
         Switch(
             checked = active,
@@ -4745,6 +4746,7 @@ private fun ExtensionRepositoryRow(
     onInstall: () -> Unit,
     onUninstall: () -> Unit,
 ) {
+    val displayName = extension.name.extensionDisplayName()
     val installedVersionCode = installedSources.mapNotNull { it.versionCode }.maxOrNull()
     val installed = installedSources.isNotEmpty()
     val updateAvailable = installedVersionCode?.let { extension.versionCode > it } == true
@@ -4761,12 +4763,12 @@ private fun ExtensionRepositoryRow(
         ) {
             ExtensionIcon(
                 packageName = installedSources.firstOrNull()?.packageName,
-                name = extension.name,
+                name = displayName,
                 iconUrl = iconUrl,
                 modifier = Modifier.size(36.dp),
             )
             Column(modifier = Modifier.weight(1f)) {
-                Text(extension.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     listOfNotNull(
                         sourceLanguageDisplay(extension.lang.normalizedSourceLanguage()),
@@ -4807,7 +4809,7 @@ private fun ExtensionRepositoryRow(
                     onClick = onUninstall,
                     modifier = Modifier.size(40.dp),
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "Uninstall ${extension.name}")
+                    Icon(Icons.Default.Close, contentDescription = "Uninstall $displayName")
                 }
             }
         }
@@ -4824,15 +4826,17 @@ private fun SourceDescriptor.matchesSourceSettingsQuery(
     if (query.isBlank()) return true
     return listOfNotNull(
         name,
+        name.extensionDisplayName(),
         packageName,
         packageName.substringAfterLast('.'),
         lang,
         sourceLanguageLabel(lang),
         extension?.name,
+        extension?.name?.extensionDisplayName(),
         extension?.packageName,
     ).any { it.matchesSourceSettingsQuery(query) } ||
         extension?.sources.orEmpty().any { source ->
-            listOfNotNull(source.name, source.lang, source.lang?.let(::sourceLanguageLabel))
+            listOfNotNull(source.name, source.name.extensionDisplayName(), source.lang, source.lang?.let(::sourceLanguageLabel))
                 .any { it.matchesSourceSettingsQuery(query) }
         }
 }
@@ -4841,6 +4845,7 @@ private fun ExtensionIndexEntry.matchesSourceSettingsQuery(query: String): Boole
     if (query.isBlank()) return true
     return listOfNotNull(
         name,
+        name.extensionDisplayName(),
         packageName,
         packageName.substringAfterLast('.'),
         lang,
@@ -4848,7 +4853,7 @@ private fun ExtensionIndexEntry.matchesSourceSettingsQuery(query: String): Boole
         versionName,
     ).any { it.matchesSourceSettingsQuery(query) } ||
         sources.any { source ->
-            listOfNotNull(source.name, source.lang, source.lang?.let(::sourceLanguageLabel))
+            listOfNotNull(source.name, source.name.extensionDisplayName(), source.lang, source.lang?.let(::sourceLanguageLabel))
                 .any { it.matchesSourceSettingsQuery(query) }
         }
 }
@@ -4925,13 +4930,20 @@ private fun Drawable.toImageBitmap(): ImageBitmap {
 }
 
 private fun extensionInitials(name: String): String =
-    name.removePrefix("Tachiyomi:")
+    name.extensionDisplayName()
         .trim()
         .split(Regex("\\s+"))
         .filter { it.isNotBlank() }
         .take(2)
         .joinToString("") { it.first().uppercase() }
         .ifBlank { "?" }
+
+private val TachiyomiNamePrefix = Regex("^\\s*tachiyomi\\s*:?\\s*", RegexOption.IGNORE_CASE)
+
+private fun String.extensionDisplayName(): String {
+    val cleaned = replace(TachiyomiNamePrefix, "").trim()
+    return cleaned.ifBlank { trim() }
+}
 
 private fun requestExtensionInstall(
     context: Context,
