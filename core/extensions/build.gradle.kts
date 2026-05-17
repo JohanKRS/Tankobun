@@ -21,6 +21,7 @@ dependencies {
     implementation(libs.jsoup)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.serialization.json.okio)
 
     testImplementation(libs.junit)
 }

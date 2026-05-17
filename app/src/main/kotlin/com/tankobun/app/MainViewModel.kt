@@ -31,6 +31,7 @@ import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceManga
 import com.tankobun.core.model.SourceSearchResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.Dispatchers
@@ -100,6 +101,7 @@ data class TankobunUiState(
     val sourcePickerOpen: Boolean = false,
     val sourcePickerLoading: Boolean = false,
     val sourcePickerMessage: String? = null,
+    val sourcePickerDiagnostics: List<String> = emptyList(),
     val selectedSourceManga: SourceManga? = null,
     val sourceChapters: List<SourceChapter> = emptyList(),
     val latestProgress: ReadingProgress? = null,
@@ -150,6 +152,8 @@ private data class VerifiedReadableMatch(
     val match: SourceSearchResult,
     val chapterCount: Int,
 )
+
+private class SourceQueryTimeoutException(query: String) : RuntimeException("Search timed out for '$query'")
 
 private data class BrowseLandingData(
     val trending: List<AnilistMedia>,
@@ -820,6 +824,7 @@ class MainViewModel(
                 sourcePickerOpen = false,
                 sourcePickerLoading = false,
                 sourcePickerMessage = null,
+                sourcePickerDiagnostics = emptyList(),
                 selectedListEntry = existingEntry,
                 selectedRecommendations = emptyList(),
                 selectedRecommendationsPage = 0,
@@ -870,6 +875,7 @@ class MainViewModel(
                 sourcePickerOpen = false,
                 sourcePickerLoading = false,
                 sourcePickerMessage = null,
+                sourcePickerDiagnostics = emptyList(),
                 selectedListEntry = null,
                 selectedRecommendations = emptyList(),
                 selectedRecommendationsPage = 0,
@@ -1259,6 +1265,7 @@ class MainViewModel(
             it.copy(
                 sourcePickerOpen = true,
                 sourcePickerMessage = null,
+                sourcePickerDiagnostics = emptyList(),
                 message = null,
             )
         }
@@ -1267,12 +1274,19 @@ class MainViewModel(
             return
         }
         if (!_state.value.sourcePickerLoading) {
-            findSourceMatches()
+            findSourceMatches(forceRefresh = true)
         }
     }
 
     fun closeSourcePicker() {
-        _state.update { it.copy(sourcePickerOpen = false, sourcePickerLoading = false, sourcePickerMessage = null) }
+        _state.update {
+            it.copy(
+                sourcePickerOpen = false,
+                sourcePickerLoading = false,
+                sourcePickerMessage = null,
+                sourcePickerDiagnostics = emptyList(),
+            )
+        }
     }
 
     fun bindSelectedSource() {
@@ -1292,12 +1306,14 @@ class MainViewModel(
                     busy = true,
                     sourcePickerLoading = true,
                     sourcePickerMessage = "Searching ${source.name}...",
+                    sourcePickerDiagnostics = emptyList(),
                     message = null,
                 )
             }
             runCatching {
                 val now = System.currentTimeMillis()
                 val matches = searchSourceMatches(media, source, now)
+                    .filter { it.isReadableMatchCandidate() }
                 val verified = firstReadableMatch(source, matches, now)
                     ?: error("No readable manga found on ${source.name}")
                 saveSourceBinding(verified.match)
@@ -1339,19 +1355,28 @@ class MainViewModel(
         val queries = sourceSearchQueries(media)
         val candidates = mutableListOf<SourceManga>()
         var searchedQueries = 0
+        var failedQueries = 0
+        var lastSearchError: Throwable? = null
 
         for (query in queries) {
+            var stopSourceSearch = false
             val results = runCatching {
                 withTimeoutOrNull(SOURCE_QUERY_TIMEOUT_MILLIS) {
                     container.sourceHost.search(source, query)
-                }.orEmpty()
+                } ?: throw SourceQueryTimeoutException(query)
             }.onFailure { error ->
+                failedQueries += 1
+                lastSearchError = error
+                stopSourceSearch = isFatalSourceSearchError(error)
                 Log.w(TAG, "Source search failed for ${source.name} with '$query'", error)
             }.getOrDefault(emptyList())
 
             searchedQueries += 1
             if (results.isNotEmpty()) {
                 candidates += results
+            }
+            if (stopSourceSearch) {
+                break
             }
 
             val rankedSoFar = container.sourceMatcher.rank(
@@ -1369,11 +1394,15 @@ class MainViewModel(
         }
 
         val distinctCandidates = candidates.distinctBy { "${it.sourceId}:${it.url}:${it.title}" }
+        val searchError = lastSearchError
+        if (distinctCandidates.isEmpty() && searchError != null) {
+            throw searchError
+        }
 
         val ranked = container.sourceMatcher.rank(media, source, distinctCandidates, now)
         Log.i(
             TAG,
-            "Source search ${source.name}: queries=$searchedQueries/${queries.size}, candidates=${distinctCandidates.size}, ranked=${ranked.size}",
+            "Source search ${source.name}: queries=$searchedQueries/${queries.size}, failed=$failedQueries, candidates=${distinctCandidates.size}, ranked=${ranked.size}",
         )
         return ranked.ifEmpty {
             distinctCandidates.take(SOURCE_FALLBACK_CANDIDATES_PER_SOURCE).map { sourceManga ->
@@ -1557,19 +1586,53 @@ class MainViewModel(
     }
 
     private fun sourcePickerErrorMessage(sourceName: String, error: Throwable): String {
-        val detail = generateSequence(error) { it.cause }
-            .mapNotNull { it.message?.takeIf(String::isNotBlank) }
-            .firstOrNull()
+        val detail = errorDetail(error)
             ?: error.javaClass.simpleName
         return when {
+            isMissingSourceCompatibilityClass(error) ->
+                "$sourceName needs a compatibility library that was missing from the app. Update the app and try again."
             detail.contains("syntax error in regexp pattern", ignoreCase = true) ->
                 "$sourceName failed while parsing source data. The extension reported a regexp error; try another source or update that extension."
-            detail.contains("timeout", ignoreCase = true) ->
+            detail.contains("timeout", ignoreCase = true) || detail.contains("timed out", ignoreCase = true) ->
                 "$sourceName took too long to respond. Try again or choose another source."
             detail.contains("No readable manga found", ignoreCase = true) ->
                 detail
             else -> "$sourceName failed: $detail"
         }
+    }
+
+    private fun sourcePickerDiagnosticDetail(error: Throwable): String {
+        val detail = errorDetail(error) ?: error.javaClass.simpleName
+        return when {
+            isMissingSourceCompatibilityClass(error) -> "missing compatibility class"
+            detail.contains("HTTP error", ignoreCase = true) -> detail
+            detail.contains("syntax error in regexp pattern", ignoreCase = true) -> "regexp parse error"
+            detail.contains("timeout", ignoreCase = true) -> "timed out"
+            else -> detail.take(120)
+        }
+    }
+
+    private fun errorDetail(error: Throwable): String? =
+        errorDetails(error)
+            .firstOrNull { it.contains("HTTP error", ignoreCase = true) }
+            ?: errorDetails(error).firstOrNull()
+
+    private fun errorDetails(error: Throwable): List<String> =
+        generateSequence(error) { it.cause }
+            .mapNotNull { it.message?.takeIf(String::isNotBlank) }
+            .toList()
+
+    private fun isMissingSourceCompatibilityClass(error: Throwable): Boolean =
+        generateSequence(error) { it.cause }.any { cause ->
+            cause is NoClassDefFoundError ||
+                cause.message?.contains("OkioStreamsKt", ignoreCase = true) == true
+        }
+
+    private fun isFatalSourceSearchError(error: Throwable): Boolean {
+        val details = errorDetails(error).joinToString(separator = "\n")
+        return isMissingSourceCompatibilityClass(error) ||
+            details.contains("HTTP error 401", ignoreCase = true) ||
+            details.contains("HTTP error 403", ignoreCase = true)
     }
 
     fun findSourceMatches(forceRefresh: Boolean = false) {
@@ -1585,6 +1648,7 @@ class MainViewModel(
                     busy = true,
                     sourcePickerLoading = true,
                     sourcePickerMessage = "Searching enabled sources...",
+                    sourcePickerDiagnostics = emptyList(),
                     message = null,
                 )
             }
@@ -1593,6 +1657,7 @@ class MainViewModel(
                 cachedVerifiedMatches(media.id, sources, now)
                     .takeIf { !forceRefresh && it.matches.isNotEmpty() }
                     ?: searchVerifiedMatches(media, sources, now).also { verified ->
+                        container.database.sourceSearchDao().clearForMedia(media.id)
                         if (verified.matches.isNotEmpty()) {
                             container.database.sourceSearchDao().upsertResults(verified.matches.map { it.toEntity() })
                         }
@@ -1698,18 +1763,45 @@ class MainViewModel(
             .map { source ->
                 async {
                     semaphore.withPermit {
-                        runCatching {
-                            val candidates = withTimeoutOrNull(SOURCE_MATCH_TIMEOUT_MILLIS) {
-                                searchSourceMatches(media, source, now).take(SOURCE_CANDIDATES_TO_VERIFY)
-                            }.orEmpty()
-                            withTimeoutOrNull(SOURCE_VERIFY_TIMEOUT_MILLIS) {
-                                firstReadableMatch(source, candidates, now)
-                            }?.also { readable ->
-                                publishSourcePickerMatch(media.id, readable.match, readable.chapterCount)
+                        try {
+                            val searchResults = withTimeoutOrNull(SOURCE_MATCH_TIMEOUT_MILLIS) {
+                                searchSourceMatches(media, source, now)
                             }
-                        }.onFailure { error ->
+                            val candidates = searchResults
+                                .orEmpty()
+                                .filter { it.isReadableMatchCandidate() }
+                                .take(SOURCE_CANDIDATES_TO_VERIFY)
+                            when {
+                                searchResults == null -> {
+                                    publishSourcePickerDiagnostic(media.id, source, "search timed out")
+                                    null
+                                }
+                                searchResults.isEmpty() -> {
+                                    publishSourcePickerDiagnostic(media.id, source, "no search results")
+                                    null
+                                }
+                                candidates.isEmpty() -> {
+                                    publishSourcePickerDiagnostic(media.id, source, "no confident title match")
+                                    null
+                                }
+                                else -> {
+                                    val readable = withTimeoutOrNull(SOURCE_VERIFY_TIMEOUT_MILLIS) {
+                                        firstReadableMatch(source, candidates, now)
+                                    }
+                                    if (readable == null) {
+                                        publishSourcePickerDiagnostic(media.id, source, "no readable chapters")
+                                    } else {
+                                        publishSourcePickerMatch(media.id, readable.match, readable.chapterCount)
+                                    }
+                                    readable
+                                }
+                            }
+                        } catch (error: Throwable) {
+                            if (error is CancellationException) throw error
                             Log.w(TAG, "Source verification failed for ${source.name}", error)
-                        }.getOrNull()
+                            publishSourcePickerDiagnostic(media.id, source, sourcePickerDiagnosticDetail(error))
+                            null
+                        }
                     }
                 }
             }
@@ -1774,6 +1866,19 @@ class MainViewModel(
                     sourcePickerMessage = "Found ${nextMatches.size} readable sources",
                     message = null,
                 )
+            }
+        }
+    }
+
+    private fun publishSourcePickerDiagnostic(mediaId: Int, source: SourceDescriptor, detail: String) {
+        val diagnostic = "${source.name}: $detail"
+        _state.update {
+            if (it.selectedMedia?.id != mediaId) {
+                it
+            } else if (diagnostic in it.sourcePickerDiagnostics) {
+                it
+            } else {
+                it.copy(sourcePickerDiagnostics = it.sourcePickerDiagnostics + diagnostic)
             }
         }
     }
@@ -2070,9 +2175,13 @@ private fun Throwable.userMessage(fallback: String): String = when (this) {
 private fun SourceSearchResult.sourceMatchKey(): String =
     sourceMatchKey(source.id, manga.url)
 
+private fun SourceSearchResult.isReadableMatchCandidate(): Boolean =
+    score >= SOURCE_READABLE_MATCH_SCORE
+
 private fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
     "$sourceId:$mangaUrl"
 
+private const val SOURCE_READABLE_MATCH_SCORE = 0.9
 private const val BROWSE_SORT_SEARCH_MATCH = "SEARCH_MATCH"
 private const val BROWSE_TRENDING_CACHE_KEY = "browse:section:trending"
 private const val BROWSE_POPULAR_CACHE_KEY = "browse:section:popular"

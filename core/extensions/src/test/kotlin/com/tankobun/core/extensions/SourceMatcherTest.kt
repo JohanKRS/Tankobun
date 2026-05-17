@@ -73,6 +73,18 @@ class SourceMatcherTest {
     }
 
     @Test
+    fun singleWordInsideDifferentTitleIsLooseMatch() {
+        val ranked = matcher.rank(
+            media = media("Berserk"),
+            source = source,
+            candidates = listOf(SourceManga(1, "/berserk-princess", "Berserk Princess", null, null, null, null, null)),
+            searchedAtEpochMillis = 0,
+        )
+
+        assertTrue(ranked.first().score < 0.9)
+    }
+
+    @Test
     fun nonLatinLetterTitlesArePreserved() {
         val ranked = matcher.rank(
             media = media("나 혼자만 레벨업"),

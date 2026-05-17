@@ -2443,6 +2443,7 @@ private fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel,
     val matchSourceKeys = remember(matches) {
         matches.mapTo(mutableSetOf()) { it.source.sourceSettingsKey() }
     }
+    val diagnostics = state.sourcePickerDiagnostics
 
     Dialog(
         onDismissRequest = viewModel::closeSourcePicker,
@@ -2540,6 +2541,14 @@ private fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel,
                                 )
                             }
                         }
+                        if (diagnostics.isNotEmpty()) {
+                            item {
+                                Text("Skipped sources", style = MaterialTheme.typography.titleMedium)
+                            }
+                            items(diagnostics, key = { "diagnostic:$it" }) { diagnostic ->
+                                SourceDiagnosticRow(diagnostic)
+                            }
+                        }
                     }
                 }
 
@@ -2553,12 +2562,28 @@ private fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel,
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     }
                     Text(
-                        "${matches.size} matches / ${availableSources.size} sources",
+                        "${matches.size} readable / ${availableSources.size} enabled",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SourceDiagnosticRow(message: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    ) {
+        Text(
+            message,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 

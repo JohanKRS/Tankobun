@@ -61,18 +61,22 @@ class SourceMatcher {
             return TitleMatchScore(score = 1.0, exact = true)
         }
 
+        val expectedTokens = titleTokens(expected)
+        val candidateTokens = titleTokens(candidate)
         val contains = expected.contains(candidate) || candidate.contains(expected)
-        val tokenScore = tokenOverlap(expected, candidate)
+        val looseSingleTokenContainment = contains &&
+            minOf(expectedTokens.size, candidateTokens.size) == 1 &&
+            maxOf(expectedTokens.size, candidateTokens.size) > 1
+        val tokenScore = tokenOverlap(expectedTokens, candidateTokens)
         val acronym = acronymOf(expected)?.let { it == candidate } == true ||
             acronymOf(candidate)?.let { it == expected } == true
-        val score = max(
-            when {
-                contains -> max(0.84, tokenScore)
-                acronym -> 0.9
-                else -> tokenScore
-            },
-            tokenScore,
-        )
+        val baseScore = when {
+            looseSingleTokenContainment -> max(0.62, tokenScore.coerceAtMost(0.82))
+            contains -> max(0.84, tokenScore)
+            acronym -> 0.9
+            else -> tokenScore
+        }
+        val score = if (looseSingleTokenContainment) baseScore else max(baseScore, tokenScore)
 
         return TitleMatchScore(
             score = score,
@@ -82,15 +86,16 @@ class SourceMatcher {
         )
     }
 
-    private fun tokenOverlap(left: String, right: String): Double {
-        val leftTokens = left.split(' ').filter { it.isNotBlank() }.toSet()
-        val rightTokens = right.split(' ').filter { it.isNotBlank() }.toSet()
+    private fun tokenOverlap(leftTokens: Set<String>, rightTokens: Set<String>): Double {
         if (leftTokens.isEmpty() || rightTokens.isEmpty()) return 0.0
         val intersection = leftTokens.intersect(rightTokens).size.toDouble()
         val dice = (2.0 * intersection) / (leftTokens.size + rightTokens.size)
         val containment = intersection / minOf(leftTokens.size, rightTokens.size)
         return max(dice, containment * 0.92)
     }
+
+    private fun titleTokens(value: String): Set<String> =
+        value.split(' ').filter { it.isNotBlank() }.toSet()
 
     private fun acronymOf(value: String): String? {
         val tokens = value.split(' ').filter { it.isNotBlank() }
