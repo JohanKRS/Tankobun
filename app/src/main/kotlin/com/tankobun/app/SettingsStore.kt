@@ -28,19 +28,51 @@ class SettingsStore(context: Context) {
     fun libraryViewMode(): MediaViewMode =
         preferences.getString(KEY_LIBRARY_VIEW_MODE, null)
             ?.let { stored -> runCatching { MediaViewMode.valueOf(stored) }.getOrNull() }
+            ?.supportedMediaViewMode()
             ?: MediaViewMode.COVER_GRID
 
     fun saveLibraryViewMode(mode: MediaViewMode) {
-        preferences.edit().putString(KEY_LIBRARY_VIEW_MODE, mode.name).apply()
+        preferences.edit().putString(KEY_LIBRARY_VIEW_MODE, mode.supportedMediaViewMode().name).apply()
+    }
+
+    fun libraryCoverColumns(): Int =
+        preferences.getInt(KEY_LIBRARY_COVER_COLUMNS, DEFAULT_MEDIA_COVER_COLUMNS)
+            .supportedCoverColumns()
+
+    fun saveLibraryCoverColumns(count: Int) {
+        preferences.edit().putInt(KEY_LIBRARY_COVER_COLUMNS, count.supportedCoverColumns()).apply()
+    }
+
+    fun libraryShowWholeCovers(): Boolean =
+        preferences.getBoolean(KEY_LIBRARY_SHOW_WHOLE_COVERS, false)
+
+    fun saveLibraryShowWholeCovers(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_LIBRARY_SHOW_WHOLE_COVERS, enabled).apply()
     }
 
     fun browseViewMode(): MediaViewMode =
         preferences.getString(KEY_BROWSE_VIEW_MODE, null)
             ?.let { stored -> runCatching { MediaViewMode.valueOf(stored) }.getOrNull() }
+            ?.supportedMediaViewMode()
             ?: MediaViewMode.COVER_GRID
 
     fun saveBrowseViewMode(mode: MediaViewMode) {
-        preferences.edit().putString(KEY_BROWSE_VIEW_MODE, mode.name).apply()
+        preferences.edit().putString(KEY_BROWSE_VIEW_MODE, mode.supportedMediaViewMode().name).apply()
+    }
+
+    fun browseCoverColumns(): Int =
+        preferences.getInt(KEY_BROWSE_COVER_COLUMNS, DEFAULT_MEDIA_COVER_COLUMNS)
+            .supportedCoverColumns()
+
+    fun saveBrowseCoverColumns(count: Int) {
+        preferences.edit().putInt(KEY_BROWSE_COVER_COLUMNS, count.supportedCoverColumns()).apply()
+    }
+
+    fun browseShowWholeCovers(): Boolean =
+        preferences.getBoolean(KEY_BROWSE_SHOW_WHOLE_COVERS, false)
+
+    fun saveBrowseShowWholeCovers(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_BROWSE_SHOW_WHOLE_COVERS, enabled).apply()
     }
 
     fun readerMode(): ReaderMode =
@@ -144,7 +176,11 @@ class SettingsStore(context: Context) {
         const val KEY_EXTENSION_REPOSITORY_URL = "extension.repository.url"
         const val KEY_THEME_MODE = "theme.mode"
         const val KEY_LIBRARY_VIEW_MODE = "library.view.mode"
+        const val KEY_LIBRARY_COVER_COLUMNS = "library.cover.columns"
+        const val KEY_LIBRARY_SHOW_WHOLE_COVERS = "library.show.whole.covers"
         const val KEY_BROWSE_VIEW_MODE = "browse.view.mode"
+        const val KEY_BROWSE_COVER_COLUMNS = "browse.cover.columns"
+        const val KEY_BROWSE_SHOW_WHOLE_COVERS = "browse.show.whole.covers"
         const val KEY_READER_MODE = "reader.mode"
         const val KEY_READER_PAGE_GAP_LEVEL = "reader.page.gap.level"
         const val KEY_READER_FIT_WIDTH = "reader.fit.width"
@@ -170,9 +206,15 @@ enum class TankobunThemeMode {
     BUNNY_MOCHI,
     PEACH_SODA,
     MATCHA_MILK,
+    SAKURA_MINT,
+    CLOUDBERRY_POP,
+    YUZU_GARDEN,
     MIDNIGHT_RAMEN,
     STARRY_INK,
     PLUM_NIGHT,
+    NEON_KOI,
+    MOON_JELLY,
+    INKBERRY_FIZZ,
 }
 
 enum class MediaViewMode {
@@ -182,6 +224,20 @@ enum class MediaViewMode {
     JUSTIFIED,
     LIST,
 }
+
+fun MediaViewMode.supportedMediaViewMode(): MediaViewMode =
+    when (this) {
+        MediaViewMode.MASONRY,
+        MediaViewMode.JUSTIFIED -> MediaViewMode.COVER_GRID
+        else -> this
+    }
+
+const val DEFAULT_MEDIA_COVER_COLUMNS = 4
+private const val MIN_MEDIA_COVER_COLUMNS = 2
+private const val MAX_MEDIA_COVER_COLUMNS = 8
+
+fun Int.supportedCoverColumns(): Int =
+    coerceIn(MIN_MEDIA_COVER_COLUMNS, MAX_MEDIA_COVER_COLUMNS)
 
 fun defaultSourceLanguages(): Set<String> =
     buildSet {

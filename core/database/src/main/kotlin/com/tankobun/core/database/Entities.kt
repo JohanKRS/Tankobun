@@ -30,6 +30,8 @@ data class AnilistMediaEntity(
     val siteUrl: String?,
     val genres: List<String>,
     val synonyms: List<String>,
+    val staff: List<String>,
+    val tags: List<String>,
     val isAdult: Boolean,
     val updatedAtEpochSeconds: Long?,
     val fetchedAtEpochMillis: Long,

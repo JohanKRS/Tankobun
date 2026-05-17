@@ -12,7 +12,7 @@ object DatabaseFactory {
             TankobunDatabase::class.java,
             "tankobun.db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
     }
 
@@ -54,6 +54,13 @@ object DatabaseFactory {
             db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `popularity` INTEGER")
             db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `startDateYear` INTEGER")
             db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `endDateYear` INTEGER")
+        }
+    }
+
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `staff` TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `tags` TEXT NOT NULL DEFAULT ''")
         }
     }
 }

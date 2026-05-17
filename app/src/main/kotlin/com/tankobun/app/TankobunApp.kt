@@ -64,9 +64,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -157,6 +154,7 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.MediaStatus
+import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.SourceChapter
@@ -169,8 +167,33 @@ import kotlin.math.pow
 
 private enum class SettingsRoute {
     MAIN,
+    APPEARANCE,
+    LIBRARY,
+    BROWSE,
+    READER,
+    ANILIST,
     SOURCES,
 }
+
+private val SettingsDetailRoutes = listOf(
+    SettingsRoute.APPEARANCE,
+    SettingsRoute.LIBRARY,
+    SettingsRoute.BROWSE,
+    SettingsRoute.READER,
+    SettingsRoute.ANILIST,
+    SettingsRoute.SOURCES,
+)
+
+private fun SettingsRoute.settingsTitle(): String =
+    when (this) {
+        SettingsRoute.MAIN -> "Settings"
+        SettingsRoute.APPEARANCE -> "Appearance"
+        SettingsRoute.LIBRARY -> "Library"
+        SettingsRoute.BROWSE -> "Browse"
+        SettingsRoute.READER -> "Reader"
+        SettingsRoute.ANILIST -> "AniList"
+        SettingsRoute.SOURCES -> "Sources"
+    }
 
 private enum class QuickDrawerMode {
     CLOSED,
@@ -182,7 +205,6 @@ private enum class LibraryPicker {
     FORMAT,
     STATUS,
     YEAR,
-    SORT,
 }
 
 private enum class ReaderPanAxis {
@@ -290,7 +312,7 @@ private fun TankobunScaffold(
         topBar = {
             TankobunTopBar(
                 title = selectedMedia?.title?.userPreferred
-                    ?: if (selectedTab == 3 && settingsRoute == SettingsRoute.SOURCES) "Sources" else "Tankobun",
+                    ?: if (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN) settingsRoute.settingsTitle() else "Tankobun",
                 showBack = selectedMedia != null || (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN),
                 onBack = {
                     if (selectedMedia != null) {
@@ -341,14 +363,12 @@ private fun TankobunScaffold(
                             0 -> LibraryScreen(state, viewModel)
                             1 -> BrowseScreen(state, viewModel)
                             2 -> DownloadsScreen(state)
-                            3 -> when (settingsRoute) {
-                                SettingsRoute.MAIN -> SettingsScreen(
-                                    state = state,
-                                    viewModel = viewModel,
-                                    onOpenSources = { onOpenSettingsRoute(SettingsRoute.SOURCES) },
-                                )
-                                SettingsRoute.SOURCES -> SourcesSettingsScreen(state, viewModel)
-                            }
+                            3 -> SettingsScreen(
+                                state = state,
+                                viewModel = viewModel,
+                                route = settingsRoute,
+                                onOpenRoute = onOpenSettingsRoute,
+                            )
                         }
                     }
                 }
@@ -801,10 +821,18 @@ private fun LibraryScreen(state: TankobunUiState, viewModel: MainViewModel) {
     var publishingStatus by remember { mutableStateOf<String?>(null) }
     var year by remember { mutableStateOf<String?>(null) }
     var sort by remember { mutableStateOf(LIBRARY_SORT_LIST_ORDER) }
+    var optionsOpen by remember { mutableStateOf(false) }
     val sections = state.librarySections
     val formatOptions = remember(sections) { libraryFormatOptions(sections) }
     val statusOptions = remember(sections) { libraryStatusOptions(sections) }
     val yearOptions = remember(sections) { libraryYearOptions(sections) }
+    val resetLibraryControls = {
+        query = ""
+        format = null
+        publishingStatus = null
+        year = null
+        sort = LIBRARY_SORT_LIST_ORDER
+    }
 
     Column(
         modifier = Modifier
@@ -823,13 +851,8 @@ private fun LibraryScreen(state: TankobunUiState, viewModel: MainViewModel) {
             statusOptions = statusOptions,
             yearOptions = yearOptions,
             onOpenPicker = { picker = it },
-            onReset = {
-                query = ""
-                format = null
-                publishingStatus = null
-                year = null
-                sort = LIBRARY_SORT_LIST_ORDER
-            },
+            onOpenOptions = { optionsOpen = true },
+            onReset = resetLibraryControls,
         )
 
         state.message?.let {
@@ -860,6 +883,9 @@ private fun LibraryScreen(state: TankobunUiState, viewModel: MainViewModel) {
             publishingStatus = publishingStatus,
             year = year,
             sort = sort,
+            viewMode = state.libraryViewMode,
+            coverColumns = state.libraryCoverColumns,
+            showWholeCovers = state.libraryShowWholeCovers,
             modifier = Modifier.weight(1f),
             onSelectMedia = viewModel::selectMedia,
         )
@@ -871,30 +897,37 @@ private fun LibraryScreen(state: TankobunUiState, viewModel: MainViewModel) {
                 LibraryPicker.FORMAT -> "Format"
                 LibraryPicker.STATUS -> "Publishing Status"
                 LibraryPicker.YEAR -> "Year"
-                LibraryPicker.SORT -> "Library Options"
             },
             options = when (activePicker) {
                 LibraryPicker.FORMAT -> formatOptions
                 LibraryPicker.STATUS -> statusOptions
                 LibraryPicker.YEAR -> yearOptions
-                LibraryPicker.SORT -> LibrarySortOptions
             },
             selectedValue = when (activePicker) {
                 LibraryPicker.FORMAT -> format
                 LibraryPicker.STATUS -> publishingStatus
                 LibraryPicker.YEAR -> year
-                LibraryPicker.SORT -> sort
             },
             onSelect = { value ->
                 when (activePicker) {
                     LibraryPicker.FORMAT -> format = value
                     LibraryPicker.STATUS -> publishingStatus = value
                     LibraryPicker.YEAR -> year = value
-                    LibraryPicker.SORT -> sort = value ?: LIBRARY_SORT_LIST_ORDER
                 }
                 picker = null
             },
             onDismiss = { picker = null },
+        )
+    }
+
+    if (optionsOpen) {
+        LibraryOptionsDialog(
+            state = state,
+            viewModel = viewModel,
+            sort = sort,
+            onSortChange = { sort = it ?: LIBRARY_SORT_LIST_ORDER },
+            onReset = resetLibraryControls,
+            onDismiss = { optionsOpen = false },
         )
     }
 }
@@ -911,6 +944,7 @@ private fun LibraryFilterBar(
     statusOptions: List<BrowseOption>,
     yearOptions: List<BrowseOption>,
     onOpenPicker: (LibraryPicker) -> Unit,
+    onOpenOptions: () -> Unit,
     onReset: () -> Unit,
 ) {
     val controlsActive = query.isNotBlank() ||
@@ -969,10 +1003,10 @@ private fun LibraryFilterBar(
                 label = "Sort",
                 value = LibrarySortOptions.labelFor(sort),
                 selected = sort != LIBRARY_SORT_LIST_ORDER,
-                onClick = { onOpenPicker(LibraryPicker.SORT) },
+                onClick = onOpenOptions,
             )
             IconButton(
-                onClick = { onOpenPicker(LibraryPicker.SORT) },
+                onClick = onOpenOptions,
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(16.dp))
@@ -1040,6 +1074,9 @@ private fun LibraryPager(
     publishingStatus: String?,
     year: String?,
     sort: String,
+    viewMode: MediaViewMode,
+    coverColumns: Int,
+    showWholeCovers: Boolean,
     modifier: Modifier,
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
@@ -1096,7 +1133,9 @@ private fun LibraryPager(
         ) { page ->
             MediaCollection(
                 media = visibleSections[page].items.map { it.media },
-                viewMode = MediaViewMode.COVER_WITH_INFO,
+                viewMode = viewMode,
+                coverColumns = coverColumns,
+                showWholeCovers = showWholeCovers,
                 onSelectMedia = onSelectMedia,
                 modifier = Modifier
                     .fillMaxSize()
@@ -1807,13 +1846,11 @@ private fun BrowseResults(
                 Text("Reset")
             }
         }
-        MediaViewModeRow(
-            selected = state.browseViewMode,
-            onSelect = viewModel::setBrowseViewMode,
-        )
         MediaCollection(
             media = state.searchResults,
             viewMode = state.browseViewMode,
+            coverColumns = state.browseCoverColumns,
+            showWholeCovers = state.browseShowWholeCovers,
             modifier = Modifier.weight(1f),
             onSelectMedia = viewModel::selectMedia,
             emptyMessage = if (state.busy) {
@@ -2013,8 +2050,67 @@ private fun BrowseOptionDialog(
                     {
                         ListItem(
                             headlineContent = { Text(option.label) },
-                            supportingContent = { Text(option.value?.optionSummary() ?: "Any") },
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryOptionsDialog(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    sort: String,
+    onSortChange: (String?) -> Unit,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.72f),
+            shape = RoundedCornerShape(12.dp),
+            color = LocalTankobunTokens.current.elevatedSurface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                DialogHeader(title = "Library Options", onDismiss = onDismiss)
+                Text("Sort", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                FlowRowCompat {
+                    LibrarySortOptions.forEach { option ->
+                        FilterChip(
+                            selected = sort == option.value,
+                            onClick = { onSortChange(option.value) },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
+                Text("View", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                MediaViewModeRow(
+                    selected = state.libraryViewMode,
+                    onSelect = viewModel::setLibraryViewMode,
+                )
+                Text("Covers per row", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                CoverColumnsRow(
+                    selected = state.libraryCoverColumns,
+                    onSelect = viewModel::setLibraryCoverColumns,
+                )
+                Text("Cover framing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                CoverFramingRow(
+                    showWholeCover = state.libraryShowWholeCovers,
+                    onShowWholeCoverChange = viewModel::setLibraryShowWholeCovers,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onReset) {
+                        Text("Reset")
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Button(onClick = onDismiss) {
+                        Text("Apply")
                     }
                 }
             }
@@ -2055,6 +2151,16 @@ private fun BrowseAdvancedDialog(
                     selected = state.browseViewMode,
                     onSelect = viewModel::setBrowseViewMode,
                 )
+                Text("Covers per row", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                CoverColumnsRow(
+                    selected = state.browseCoverColumns,
+                    onSelect = viewModel::setBrowseCoverColumns,
+                )
+                Text("Cover framing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                CoverFramingRow(
+                    showWholeCover = state.browseShowWholeCovers,
+                    onShowWholeCoverChange = viewModel::setBrowseShowWholeCovers,
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = viewModel::resetBrowseFilters) {
                         Text("Reset")
@@ -2075,6 +2181,44 @@ private fun BrowseAdvancedDialog(
 }
 
 @Composable
+private fun CoverColumnsRow(
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val selectedColumns = selected.supportedCoverColumns()
+    FlowRowCompat {
+        (2..8).forEach { count ->
+            FilterChip(
+                selected = selectedColumns == count,
+                onClick = { onSelect(count) },
+                label = { Text(count.toString()) },
+                modifier = modifier,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CoverFramingRow(
+    showWholeCover: Boolean,
+    onShowWholeCoverChange: (Boolean) -> Unit,
+) {
+    FlowRowCompat {
+        FilterChip(
+            selected = !showWholeCover,
+            onClick = { onShowWholeCoverChange(false) },
+            label = { Text("Fill frame") },
+        )
+        FilterChip(
+            selected = showWholeCover,
+            onClick = { onShowWholeCoverChange(true) },
+            label = { Text("Show whole cover") },
+        )
+    }
+}
+
+@Composable
 private fun DialogHeader(title: String, onDismiss: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -2086,8 +2230,6 @@ private fun DialogHeader(title: String, onDismiss: () -> Unit) {
 
 private fun List<BrowseOption>.labelFor(value: String?): String =
     firstOrNull { it.value == value }?.label ?: "Any"
-
-private fun String.optionSummary(): String = lowercase().replace('_', ' ')
 
 private fun List<AnilistMediaTag>.visibleTags(query: String): List<AnilistMediaTag> {
     val normalizedQuery = query.trim().lowercase()
@@ -2165,6 +2307,9 @@ private fun AnilistMedia.publishingYearLabel(): String = when {
     else -> "Date unknown"
 }
 
+private fun List<String>.authorLabel(): String =
+    take(3).joinToString(", ").ifBlank { "Unknown" }
+
 private fun Int.formatCompact(): String =
     when {
         this >= 1_000_000 -> "${this / 1_000_000}m"
@@ -2178,6 +2323,7 @@ private fun MediaViewModeRow(
     onSelect: (MediaViewMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val selectedMode = selected.supportedMediaViewMode()
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -2186,14 +2332,12 @@ private fun MediaViewModeRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         listOf(
-            MediaViewMode.COVER_GRID to "Covers",
-        MediaViewMode.COVER_WITH_INFO to "Info",
-            MediaViewMode.MASONRY to "Flow",
-            MediaViewMode.JUSTIFIED to "Large",
+            MediaViewMode.COVER_GRID to "Cover only",
+            MediaViewMode.COVER_WITH_INFO to "Cover + info",
             MediaViewMode.LIST to "List",
         ).forEach { (mode, label) ->
             FilterChip(
-                selected = selected == mode,
+                selected = selectedMode == mode,
                 onClick = { onSelect(mode) },
                 label = { Text(label) },
             )
@@ -2206,6 +2350,8 @@ private fun MediaViewModeRow(
 private fun MediaCollection(
     media: List<AnilistMedia>,
     viewMode: MediaViewMode,
+    coverColumns: Int,
+    showWholeCovers: Boolean,
     onSelectMedia: (AnilistMedia) -> Unit,
     modifier: Modifier = Modifier,
     emptyMessage: String = "No manga here yet.",
@@ -2217,7 +2363,8 @@ private fun MediaCollection(
         return
     }
 
-    when (viewMode) {
+    val supportedViewMode = viewMode.supportedMediaViewMode()
+    when (supportedViewMode) {
         MediaViewMode.LIST -> LazyColumn(
             modifier = modifier,
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -2226,22 +2373,8 @@ private fun MediaCollection(
                 MediaRow(media = item, onClick = { onSelectMedia(item) })
             }
         }
-        MediaViewMode.MASONRY -> LazyVerticalStaggeredGrid(
-            columns = StaggeredGridCells.Adaptive(150.dp),
-            modifier = modifier,
-            verticalItemSpacing = 16.dp,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            staggeredItems(media, key = { it.id }) { item ->
-                MediaCoverTile(
-                    media = item,
-                    viewMode = MediaViewMode.MASONRY,
-                    onClick = { onSelectMedia(item) },
-                )
-            }
-        }
         else -> LazyVerticalGrid(
-            columns = GridCells.Adaptive(if (viewMode == MediaViewMode.COVER_WITH_INFO) 180.dp else 140.dp),
+            columns = GridCells.Fixed(coverColumns.supportedCoverColumns()),
             modifier = modifier,
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -2249,7 +2382,8 @@ private fun MediaCollection(
             gridItems(media, key = { it.id }) { item ->
                 MediaCoverTile(
                     media = item,
-                    viewMode = viewMode,
+                    viewMode = supportedViewMode,
+                    showWholeCover = showWholeCovers,
                     onClick = { onSelectMedia(item) },
                 )
             }
@@ -2261,6 +2395,7 @@ private fun MediaCollection(
 private fun MediaCoverTile(
     media: AnilistMedia,
     viewMode: MediaViewMode,
+    showWholeCover: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -2271,15 +2406,10 @@ private fun MediaCoverTile(
         animationSpec = tween(durationMillis = 120),
         label = "Cover press scale",
     )
+    val supportedViewMode = viewMode.supportedMediaViewMode()
     val coverModifier = Modifier
         .fillMaxWidth()
-        .aspectRatio(
-            when (viewMode) {
-                MediaViewMode.JUSTIFIED -> 0.82f
-                MediaViewMode.MASONRY -> if (media.id % 3 == 0) 0.72f else 0.58f
-                else -> 2f / 3f
-            },
-        )
+        .aspectRatio(2f / 3f)
 
     Column(
         modifier = modifier
@@ -2296,6 +2426,7 @@ private fun MediaCoverTile(
     ) {
         Surface(
             shape = RoundedCornerShape(8.dp),
+            color = if (showWholeCover) Color.Transparent else MaterialTheme.colorScheme.surface,
             tonalElevation = 1.dp,
             shadowElevation = if (pressed) 1.dp else 3.dp,
         ) {
@@ -2303,16 +2434,18 @@ private fun MediaCoverTile(
                 url = media.coverImage,
                 title = media.title.userPreferred,
                 modifier = coverModifier,
+                contentScale = if (showWholeCover) ContentScale.Fit else ContentScale.Crop,
+                imageAlignment = if (showWholeCover) Alignment.TopCenter else Alignment.Center,
             )
         }
-        if (viewMode != MediaViewMode.COVER_GRID) {
+        if (supportedViewMode != MediaViewMode.COVER_GRID) {
             Text(
                 media.title.userPreferred,
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (viewMode == MediaViewMode.COVER_WITH_INFO) {
+            if (supportedViewMode == MediaViewMode.COVER_WITH_INFO) {
                 Text(
                     listOfNotNull(media.status, media.chapters?.let { "$it ch" }).joinToString(" / "),
                     style = MaterialTheme.typography.labelSmall,
@@ -2364,57 +2497,18 @@ private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, 
         ) {
             item {
                 Spacer(Modifier.height(4.dp))
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    color = LocalTankobunTokens.current.elevatedSurface,
-                    tonalElevation = 1.dp,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(18.dp),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
-                    ) {
-                        CoverImage(
-                            url = media.coverImage,
-                            title = media.title.userPreferred,
-                            modifier = Modifier
-                                .width(190.dp)
-                                .aspectRatio(2f / 3f),
-                        )
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Text(media.title.userPreferred, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                            Text(
-                                listOfNotNull(media.status, media.chapters?.let { "$it chapters" }, media.volumes?.let { "$it volumes" })
-                                    .joinToString(" / "),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                media.description?.replace(Regex("<[^>]*>"), "").orEmpty(),
-                                maxLines = 12,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            if (media.genres.isNotEmpty()) {
-                                FlowRowCompat {
-                                    media.genres.take(8).forEach { genre ->
-                                        AssistChip(onClick = {}, label = { Text(genre) })
-                                    }
-                                }
-                            }
-                            media.siteUrl?.let { site ->
-                                Text(
-                                    site,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                    }
+                MangaHeroSection(media)
+            }
+
+            if (state.selectedRecommendations.isNotEmpty()) {
+                item {
+                    RecommendationsSection(
+                        recommendations = state.selectedRecommendations,
+                        hasMore = state.selectedRecommendationsHasMore,
+                        loadingMore = state.recommendationsLoading,
+                        onLoadMore = viewModel::loadMoreRecommendations,
+                        onSelectMedia = viewModel::selectMedia,
+                    )
                 }
             }
 
@@ -2434,8 +2528,16 @@ private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, 
                 if (state.selectedSourceManga == null) {
                     Text("Choose a source first.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    Button(onClick = viewModel::loadChaptersForCurrentMatch) {
-                        Text(if (state.sourceChapters.isEmpty()) "Load chapters" else "Refresh chapters")
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val readingActionChapter = state.primaryReadingActionChapter()
+                        if (readingActionChapter != null) {
+                            Button(onClick = { viewModel.openChapter(readingActionChapter) }) {
+                                Text(if (state.latestProgress == null) "Start reading" else "Resume")
+                            }
+                        }
+                        OutlinedButton(onClick = viewModel::loadChaptersForCurrentMatch) {
+                            Text(if (state.sourceChapters.isEmpty()) "Load chapters" else "Refresh chapters")
+                        }
                     }
                 }
             }
@@ -2446,18 +2548,10 @@ private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, 
                 }
             } else {
                 items(state.sourceChapters, key = { "${it.sourceId}:${it.url}" }) { chapter ->
-                    ChapterRow(chapter, viewModel)
-                }
-            }
-
-            if (state.selectedRecommendations.isNotEmpty()) {
-                item {
-                    RecommendationsSection(
-                        recommendations = state.selectedRecommendations,
-                        hasMore = state.selectedRecommendationsHasMore,
-                        loadingMore = state.recommendationsLoading,
-                        onLoadMore = viewModel::loadMoreRecommendations,
-                        onSelectMedia = viewModel::selectMedia,
+                    ChapterRow(
+                        chapter = chapter,
+                        viewModel = viewModel,
+                        read = chapter.isReadBy(state.latestProgress),
                     )
                 }
             }
@@ -2466,6 +2560,87 @@ private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, 
         if (state.sourcePickerOpen) {
             SourcePickerDialog(state, viewModel, media)
         }
+    }
+}
+
+@Composable
+private fun MangaHeroSection(media: AnilistMedia) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = LocalTankobunTokens.current.elevatedSurface,
+        tonalElevation = 1.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            CoverImage(
+                url = media.coverImage,
+                title = media.title.userPreferred,
+                modifier = Modifier
+                    .width(250.dp)
+                    .aspectRatio(2f / 3f),
+                contentScale = ContentScale.Fit,
+                imageAlignment = Alignment.TopCenter,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    media.title.userPreferred,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    listOfNotNull(
+                        media.format.mediaFormatLabel(),
+                        media.status.statusLabel(),
+                        media.chapters?.let { "$it chapters" },
+                        media.volumes?.let { "$it volumes" },
+                        media.averageScore?.let { "$it% score" },
+                    ).joinToString(" / "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                FlowRowCompat {
+                    mangaInfoPill("Author", media.staff.authorLabel())
+                    mangaInfoPill("Published", media.publishingYearLabel())
+                    media.popularity?.let { mangaInfoPill("Readers", it.formatCompact()) }
+                }
+                Text(
+                    media.description?.replace(Regex("<[^>]*>"), "").orEmpty(),
+                    maxLines = 8,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val tags = media.tags.ifEmpty { media.genres }
+                if (tags.isNotEmpty()) {
+                    FlowRowCompat {
+                        tags.take(10).forEach { tag ->
+                            AssistChip(onClick = {}, label = { Text(tag) })
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun mangaInfoPill(label: String, value: String) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    ) {
+        Text(
+            "$label: $value",
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -2569,50 +2744,39 @@ private fun RecommendationsSection(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (hasMore) {
+                TextButton(onClick = onLoadMore, enabled = !loadingMore) {
+                    Text(if (loadingMore) "Loading" else "Load more")
+                }
+            }
         }
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val columns = when {
-                maxWidth >= 1280.dp -> 6
-                maxWidth >= 980.dp -> 5
-                maxWidth >= 680.dp -> 4
+            val visibleCount = when {
+                maxWidth >= 840.dp -> 7
+                maxWidth >= 600.dp -> 5
                 else -> 3
             }
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                recommendations.chunked(columns).forEach { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        row.forEach { recommendation ->
-                            RecommendationTile(
-                                recommendation = recommendation,
-                                onClick = { onSelectMedia(recommendation.media) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        repeat(columns - row.size) {
-                            Spacer(Modifier.weight(1f))
-                        }
+            val tileSpacing = 12.dp
+            val tileWidth = ((maxWidth - tileSpacing * (visibleCount - 1).toFloat()) / visibleCount.toFloat())
+                .coerceIn(92.dp, 132.dp)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(tileSpacing)) {
+                items(recommendations, key = { it.media.id }) { recommendation ->
+                    RecommendationTile(
+                        recommendation = recommendation,
+                        onClick = { onSelectMedia(recommendation.media) },
+                        modifier = Modifier.width(tileWidth),
+                    )
+                }
+                if (hasMore) {
+                    item {
+                        LoadMoreRecommendationsTile(
+                            loading = loadingMore,
+                            onClick = onLoadMore,
+                            modifier = Modifier.width(tileWidth),
+                        )
                     }
                 }
-            }
-        }
-
-        if (hasMore) {
-            Button(
-                onClick = onLoadMore,
-                enabled = !loadingMore,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            ) {
-                if (loadingMore) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                    )
-                    Spacer(Modifier.size(8.dp))
-                }
-                Text(if (loadingMore) "Loading" else "Load more")
             }
         }
     }
@@ -2627,7 +2791,7 @@ private fun RecommendationTile(
     val media = recommendation.media
     Column(
         modifier = modifier.clickable(onClick = onClick),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Surface(
             shape = RoundedCornerShape(7.dp),
@@ -2644,7 +2808,7 @@ private fun RecommendationTile(
         }
         Text(
             media.title.userPreferred,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
@@ -2671,13 +2835,46 @@ private fun RecommendationTile(
 }
 
 @Composable
+private fun LoadMoreRecommendationsTile(
+    loading: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .aspectRatio(2f / 3f)
+            .clickable(enabled = !loading, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        tonalElevation = 1.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (loading) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Text("Loading", style = MaterialTheme.typography.labelMedium)
+            } else {
+                Icon(Icons.Default.Refresh, contentDescription = null)
+                Text(
+                    "Load more",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
     val selectedManga = state.selectedSourceManga
     val selectedSource = state.selectedSource
     val latestProgress = state.latestProgress
-    val resumeChapter = latestProgress?.let { progress ->
-        state.sourceChapters.firstOrNull { it.url == progress.chapterUrl }
-    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Source", style = MaterialTheme.typography.titleLarge)
@@ -2727,15 +2924,8 @@ private fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewMode
                         )
                     },
                     trailingContent = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (resumeChapter != null) {
-                                OutlinedButton(onClick = { viewModel.openChapter(resumeChapter) }) {
-                                    Text("Resume")
-                                }
-                            }
-                            Button(onClick = viewModel::openSourcePicker) {
-                                Text("Change")
-                            }
+                        Button(onClick = viewModel::openSourcePicker) {
+                            Text("Change")
                         }
                     },
                 )
@@ -2993,18 +3183,31 @@ private fun MediaStatus.displayName(): String = when (this) {
 }
 
 @Composable
-private fun CoverImage(url: String?, title: String, modifier: Modifier = Modifier) {
+private fun CoverImage(
+    url: String?,
+    title: String,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    imageAlignment: Alignment = Alignment.Center,
+) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .then(
+                if (url.isNullOrBlank()) {
+                    Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                } else {
+                    Modifier
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
             model = url,
             contentDescription = title,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
+            contentScale = contentScale,
+            alignment = imageAlignment,
         )
         if (url.isNullOrBlank()) {
             Text(
@@ -3016,15 +3219,37 @@ private fun CoverImage(url: String?, title: String, modifier: Modifier = Modifie
     }
 }
 
+private fun TankobunUiState.primaryReadingActionChapter(): SourceChapter? =
+    latestProgress
+        ?.let { progress -> sourceChapters.firstOrNull { it.url == progress.chapterUrl } }
+        ?: sourceChapters
+            .filter { it.chapterNumber > 0f }
+            .minByOrNull { it.chapterNumber }
+        ?: sourceChapters.lastOrNull()
+
+private fun SourceChapter.isReadBy(progress: ReadingProgress?): Boolean {
+    progress ?: return false
+    if (chapterNumber <= 0f || progress.chapterNumber <= 0f) {
+        return url == progress.chapterUrl && progress.completed
+    }
+    return chapterNumber < progress.chapterNumber ||
+        (chapterNumber == progress.chapterNumber && progress.completed)
+}
+
 @Composable
-private fun ChapterRow(chapter: SourceChapter, viewModel: MainViewModel) {
-    ElevatedCard {
+private fun ChapterRow(
+    chapter: SourceChapter,
+    viewModel: MainViewModel,
+    read: Boolean,
+) {
+    ElevatedCard(
+        modifier = Modifier.graphicsLayer {
+            alpha = if (read) 0.56f else 1f
+        },
+    ) {
         ListItem(
             headlineContent = {
                 Text(chapter.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            },
-            supportingContent = {
-                Text("Chapter ${chapter.chapterNumber.takeIf { it > 0 } ?: "?"}")
             },
             trailingContent = {
                 Row {
@@ -3610,87 +3835,376 @@ private fun DownloadsScreen(state: TankobunUiState) {
 private fun SettingsScreen(
     state: TankobunUiState,
     viewModel: MainViewModel,
-    onOpenSources: () -> Unit,
+    route: SettingsRoute,
+    onOpenRoute: (SettingsRoute) -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val tabletLayout = maxWidth >= 720.dp
+        val detailRoute = if (route == SettingsRoute.MAIN) SettingsRoute.APPEARANCE else route
+
+        if (tabletLayout) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                SettingsIndexPane(
+                    state = state,
+                    selectedRoute = detailRoute,
+                    onOpenRoute = onOpenRoute,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .widthIn(min = 288.dp, max = 340.dp),
+                )
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = LocalTankobunTokens.current.elevatedSurface,
+                    tonalElevation = 1.dp,
+                ) {
+                    SettingsDetailContent(
+                        state = state,
+                        viewModel = viewModel,
+                        route = detailRoute,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        } else if (route == SettingsRoute.MAIN) {
+            SettingsIndexPane(
+                state = state,
+                selectedRoute = SettingsRoute.MAIN,
+                onOpenRoute = onOpenRoute,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+            )
+        } else {
+            SettingsDetailContent(
+                state = state,
+                viewModel = viewModel,
+                route = detailRoute,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsIndexPane(
+    state: TankobunUiState,
+    selectedRoute: SettingsRoute,
+    onOpenRoute: (SettingsRoute) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+        modifier = modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Settings", style = MaterialTheme.typography.titleLarge)
-
-        ThemePicker(
-            selected = state.themeMode,
-            onSelect = viewModel::setThemeMode,
-        )
-
-        Text("Library view", style = MaterialTheme.typography.titleMedium)
-        MediaViewModeRow(selected = state.libraryViewMode, onSelect = viewModel::setLibraryViewMode)
-
-        Text("Browse view", style = MaterialTheme.typography.titleMedium)
-        MediaViewModeRow(selected = state.browseViewMode, onSelect = viewModel::setBrowseViewMode)
-
-        Text("Reader", style = MaterialTheme.typography.titleMedium)
-        FlowRowCompat {
-            FilterChip(
-                selected = state.readerMode == ReaderMode.PAGED,
-                onClick = { viewModel.setReaderMode(ReaderMode.PAGED) },
-                label = { Text("Paged") },
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
-            )
-            FilterChip(
-                selected = state.readerMode == ReaderMode.WEBTOON,
-                onClick = { viewModel.setReaderMode(ReaderMode.WEBTOON) },
-                label = { Text("Webtoon") },
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Tune Tankobun for how you read, browse, and sync.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Text("Page gaps", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        FlowRowCompat {
-            (0..3).forEach { level ->
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = LocalTankobunTokens.current.elevatedSurface,
+            tonalElevation = 1.dp,
+        ) {
+            Column(Modifier.padding(vertical = 6.dp)) {
+                SettingsDetailRoutes.forEach { settingsRoute ->
+                    SettingsRouteRow(
+                        route = settingsRoute,
+                        summary = settingsRoute.settingsSummary(state),
+                        selected = settingsRoute == selectedRoute,
+                        onClick = { onOpenRoute(settingsRoute) },
+                    )
+                }
+            }
+        }
+        Text(
+            "Unofficial app. Source extensions and content providers are third parties.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun SettingsRouteRow(
+    route: SettingsRoute,
+    summary: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val rowColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+    val contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(rowColor)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SettingsRouteIcon(route = route, selected = selected)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                route.settingsTitle(),
+                style = MaterialTheme.typography.titleSmall,
+                color = contentColor,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+            )
+            Text(
+                summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (selected) contentColor.copy(alpha = 0.76f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (selected) {
+            Surface(
+                modifier = Modifier.size(width = 4.dp, height = 28.dp),
+                shape = RoundedCornerShape(999.dp),
+                color = MaterialTheme.colorScheme.primary,
+            ) {}
+        }
+    }
+}
+
+@Composable
+private fun SettingsRouteIcon(route: SettingsRoute, selected: Boolean) {
+    val tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    Icon(
+        imageVector = when (route) {
+            SettingsRoute.MAIN,
+            SettingsRoute.APPEARANCE -> Icons.Default.Settings
+            SettingsRoute.LIBRARY -> Icons.AutoMirrored.Filled.LibraryBooks
+            SettingsRoute.BROWSE -> Icons.Default.Explore
+            SettingsRoute.READER -> Icons.AutoMirrored.Filled.MenuBook
+            SettingsRoute.ANILIST -> Icons.Default.Link
+            SettingsRoute.SOURCES -> Icons.Default.Download
+        },
+        contentDescription = null,
+        tint = tint,
+    )
+}
+
+@Composable
+private fun SettingsDetailContent(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    route: SettingsRoute,
+    modifier: Modifier = Modifier,
+) {
+    when (route) {
+        SettingsRoute.MAIN,
+        SettingsRoute.APPEARANCE -> SettingsDetailPanel(
+            title = "Appearance",
+            subtitle = "Choose a theme that feels right for your reading setup.",
+            modifier = modifier,
+        ) {
+            ThemePicker(
+                selected = state.themeMode,
+                onSelect = viewModel::setThemeMode,
+            )
+        }
+        SettingsRoute.LIBRARY -> SettingsDetailPanel(
+            title = "Library",
+            subtitle = "Pick the default layout for your swipeable AniList lists.",
+            modifier = modifier,
+        ) {
+            Text("Library view", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            MediaViewModeRow(selected = state.libraryViewMode, onSelect = viewModel::setLibraryViewMode)
+            Text("Covers per row", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            CoverColumnsRow(
+                selected = state.libraryCoverColumns,
+                onSelect = viewModel::setLibraryCoverColumns,
+            )
+            Text("Cover framing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            CoverFramingRow(
+                showWholeCover = state.libraryShowWholeCovers,
+                onShowWholeCoverChange = viewModel::setLibraryShowWholeCovers,
+            )
+        }
+        SettingsRoute.BROWSE -> SettingsDetailPanel(
+            title = "Browse",
+            subtitle = "Pick the default layout for AniList search and discovery.",
+            modifier = modifier,
+        ) {
+            Text("Browse view", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            MediaViewModeRow(selected = state.browseViewMode, onSelect = viewModel::setBrowseViewMode)
+            Text("Covers per row", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            CoverColumnsRow(
+                selected = state.browseCoverColumns,
+                onSelect = viewModel::setBrowseCoverColumns,
+            )
+            Text("Cover framing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            CoverFramingRow(
+                showWholeCover = state.browseShowWholeCovers,
+                onShowWholeCoverChange = viewModel::setBrowseShowWholeCovers,
+            )
+        }
+        SettingsRoute.READER -> SettingsDetailPanel(
+            title = "Reader",
+            subtitle = "Adjust paging, scrolling, and spacing.",
+            modifier = modifier,
+        ) {
+            Text("Reading mode", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            FlowRowCompat {
                 FilterChip(
-                    selected = state.readerPageGapLevel == level,
-                    onClick = { viewModel.setReaderPageGapLevel(level) },
-                    label = { Text(readerGapLabel(level)) },
+                    selected = state.readerMode == ReaderMode.PAGED,
+                    onClick = { viewModel.setReaderMode(ReaderMode.PAGED) },
+                    label = { Text("Paged") },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
+                )
+                FilterChip(
+                    selected = state.readerMode == ReaderMode.WEBTOON,
+                    onClick = { viewModel.setReaderMode(ReaderMode.WEBTOON) },
+                    label = { Text("Webtoon") },
                 )
             }
-            FilterChip(
-                selected = state.readerFitWidth,
-                onClick = { viewModel.setReaderFitWidth(!state.readerFitWidth) },
-                label = { Text("Fit paged width") },
-            )
-        }
-
-        ElevatedCard(onClick = onOpenSources) {
-            ListItem(
-                headlineContent = { Text("Sources") },
-                supportingContent = {
-                    Text(
-                        "${state.installedSources.size} active / ${state.allInstalledSources.size} installed. Extension repositories are user-provided.",
+            Text("Page gaps", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            FlowRowCompat {
+                (0..3).forEach { level ->
+                    FilterChip(
+                        selected = state.readerPageGapLevel == level,
+                        onClick = { viewModel.setReaderPageGapLevel(level) },
+                        label = { Text(readerGapLabel(level)) },
                     )
-                },
-                trailingContent = { Icon(Icons.Default.Settings, contentDescription = null) },
-            )
-        }
-
-        Text("AniList", style = MaterialTheme.typography.titleMedium)
-        Text("Redirect URI: ${BuildConfig.ANILIST_REDIRECT_URI}")
-        state.librarySyncedAtEpochMillis.takeIf { it > 0 }?.let {
-            Text("Library cache: ${cacheAgeLabel(it)}")
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (state.loggedIn) {
-                Button(onClick = viewModel::refreshLibrary) {
-                    Text("Sync AniList")
                 }
-                Button(onClick = viewModel::signOut) {
-                    Text("Sign out")
+                FilterChip(
+                    selected = state.readerFitWidth,
+                    onClick = { viewModel.setReaderFitWidth(!state.readerFitWidth) },
+                    label = { Text("Fit paged width") },
+                )
+            }
+        }
+        SettingsRoute.ANILIST -> SettingsDetailPanel(
+            title = "AniList",
+            subtitle = "Manage sync and account connection.",
+            modifier = modifier,
+        ) {
+            Text("Connection", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp,
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        state.viewerName?.let { "Signed in as $it" } ?: if (state.clientConfigured) {
+                            "AniList is ready to connect."
+                        } else {
+                            "AniList client setup needed."
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        "Redirect URI: ${BuildConfig.ANILIST_REDIRECT_URI}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    state.librarySyncedAtEpochMillis.takeIf { it > 0 }?.let {
+                        Text(
+                            "Library cache: ${cacheAgeLabel(it)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            if (state.loggedIn) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = viewModel::refreshLibrary) {
+                        Text("Sync AniList")
+                    }
+                    OutlinedButton(onClick = viewModel::signOut) {
+                        Text("Sign out")
+                    }
                 }
             }
         }
+        SettingsRoute.SOURCES -> SourcesSettingsScreen(state, viewModel)
+    }
+}
 
-        Text("Unofficial app. Source extensions and content providers are third parties.")
+@Composable
+private fun SettingsDetailPanel(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        content()
+    }
+}
+
+private fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
+    when (this) {
+        SettingsRoute.MAIN -> "Settings"
+        SettingsRoute.APPEARANCE -> tankobunThemeChoices().firstOrNull { it.mode == state.themeMode }?.name ?: "Bunny Mochi"
+        SettingsRoute.LIBRARY -> state.libraryViewMode.mediaViewSettingsSummary(
+            columns = state.libraryCoverColumns,
+            showWholeCovers = state.libraryShowWholeCovers,
+        )
+        SettingsRoute.BROWSE -> state.browseViewMode.mediaViewSettingsSummary(
+            columns = state.browseCoverColumns,
+            showWholeCovers = state.browseShowWholeCovers,
+        )
+        SettingsRoute.READER -> buildList {
+            add(if (state.readerMode == ReaderMode.WEBTOON) "Webtoon" else "Paged")
+            add(readerGapLabel(state.readerPageGapLevel))
+            if (state.readerFitWidth) add("Fit width")
+        }.joinToString(" / ")
+        SettingsRoute.ANILIST -> state.viewerName?.let { "Signed in as $it" }
+            ?: if (state.clientConfigured) "Ready to connect" else "Client setup needed"
+        SettingsRoute.SOURCES -> "${state.installedSources.size} active / ${state.allInstalledSources.size} installed"
+    }
+
+private fun MediaViewMode.mediaViewLabel(): String =
+    when (supportedMediaViewMode()) {
+        MediaViewMode.COVER_GRID -> "Cover only"
+        MediaViewMode.COVER_WITH_INFO -> "Cover + info"
+        MediaViewMode.LIST -> "List"
+        MediaViewMode.MASONRY,
+        MediaViewMode.JUSTIFIED -> "Cover only"
+    }
+
+private fun MediaViewMode.mediaViewSettingsSummary(columns: Int, showWholeCovers: Boolean): String {
+    val supportedMode = supportedMediaViewMode()
+    return if (supportedMode == MediaViewMode.LIST) {
+        mediaViewLabel()
+    } else {
+        val framing = if (showWholeCovers) "whole covers" else "filled covers"
+        "${mediaViewLabel()} / ${columns.supportedCoverColumns()} per row / $framing"
     }
 }
 
@@ -4612,29 +5126,36 @@ private fun ThemePicker(
     selected: TankobunThemeMode,
     onSelect: (TankobunThemeMode) -> Unit,
 ) {
+    val choices = tankobunThemeChoices()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
-                tankobunThemeChoices().firstOrNull { it.mode == selected }?.name ?: "Bunny Mochi",
+                choices.firstOrNull { it.mode == selected }?.name ?: "Bunny Mochi",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(210.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(430.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            gridItems(tankobunThemeChoices(), key = { it.mode.name }) { choice ->
-                ThemeChoiceCard(
-                    choice = choice,
-                    selected = selected == choice.mode,
-                    onClick = { onSelect(choice.mode) },
-                )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val minCellWidth = 210.dp
+            val columnCount = (maxWidth / minCellWidth).toInt().coerceAtLeast(1)
+            val rowCount = ((choices.size + columnCount - 1) / columnCount).coerceAtLeast(1)
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minCellWidth),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(164.dp * rowCount.toFloat()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                userScrollEnabled = false,
+            ) {
+                gridItems(choices, key = { it.mode.name }) { choice ->
+                    ThemeChoiceCard(
+                        choice = choice,
+                        selected = selected == choice.mode,
+                        onClick = { onSelect(choice.mode) },
+                    )
+                }
             }
         }
     }
@@ -4654,7 +5175,7 @@ private fun ThemeChoiceCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(128.dp)
+            .height(152.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -4673,12 +5194,18 @@ private fun ThemeChoiceCard(
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ThemeSwatches(choice.swatches)
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(choice.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(
+                        choice.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Text(
                         choice.description,
                         style = MaterialTheme.typography.labelMedium,
                         color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }

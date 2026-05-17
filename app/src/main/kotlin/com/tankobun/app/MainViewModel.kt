@@ -59,7 +59,11 @@ data class TankobunUiState(
     val libraryItems: List<LibraryItem> = emptyList(),
     val librarySyncedAtEpochMillis: Long = 0L,
     val libraryViewMode: MediaViewMode = MediaViewMode.COVER_GRID,
+    val libraryCoverColumns: Int = DEFAULT_MEDIA_COVER_COLUMNS,
+    val libraryShowWholeCovers: Boolean = false,
     val browseViewMode: MediaViewMode = MediaViewMode.COVER_GRID,
+    val browseCoverColumns: Int = DEFAULT_MEDIA_COVER_COLUMNS,
+    val browseShowWholeCovers: Boolean = false,
     val searchQuery: String = "",
     val searchResults: List<AnilistMedia> = emptyList(),
     val browseSearched: Boolean = false,
@@ -180,7 +184,11 @@ class MainViewModel(
             viewerName = container.settingsStore.viewerName(),
             librarySyncedAtEpochMillis = container.settingsStore.librarySyncedAtEpochMillis(),
             libraryViewMode = container.settingsStore.libraryViewMode(),
+            libraryCoverColumns = container.settingsStore.libraryCoverColumns(),
+            libraryShowWholeCovers = container.settingsStore.libraryShowWholeCovers(),
             browseViewMode = container.settingsStore.browseViewMode(),
+            browseCoverColumns = container.settingsStore.browseCoverColumns(),
+            browseShowWholeCovers = container.settingsStore.browseShowWholeCovers(),
             browseAvailableTags = container.settingsStore.anilistTags(),
             sourceLanguages = container.settingsStore.sourceLanguages(),
             disabledSourceKeys = container.settingsStore.disabledSourceKeys(),
@@ -278,13 +286,37 @@ class MainViewModel(
     }
 
     fun setLibraryViewMode(mode: MediaViewMode) {
-        container.settingsStore.saveLibraryViewMode(mode)
-        _state.update { it.copy(libraryViewMode = mode) }
+        val supportedMode = mode.supportedMediaViewMode()
+        container.settingsStore.saveLibraryViewMode(supportedMode)
+        _state.update { it.copy(libraryViewMode = supportedMode) }
+    }
+
+    fun setLibraryCoverColumns(count: Int) {
+        val supportedCount = count.supportedCoverColumns()
+        container.settingsStore.saveLibraryCoverColumns(supportedCount)
+        _state.update { it.copy(libraryCoverColumns = supportedCount) }
+    }
+
+    fun setLibraryShowWholeCovers(enabled: Boolean) {
+        container.settingsStore.saveLibraryShowWholeCovers(enabled)
+        _state.update { it.copy(libraryShowWholeCovers = enabled) }
     }
 
     fun setBrowseViewMode(mode: MediaViewMode) {
-        container.settingsStore.saveBrowseViewMode(mode)
-        _state.update { it.copy(browseViewMode = mode) }
+        val supportedMode = mode.supportedMediaViewMode()
+        container.settingsStore.saveBrowseViewMode(supportedMode)
+        _state.update { it.copy(browseViewMode = supportedMode) }
+    }
+
+    fun setBrowseCoverColumns(count: Int) {
+        val supportedCount = count.supportedCoverColumns()
+        container.settingsStore.saveBrowseCoverColumns(supportedCount)
+        _state.update { it.copy(browseCoverColumns = supportedCount) }
+    }
+
+    fun setBrowseShowWholeCovers(enabled: Boolean) {
+        container.settingsStore.saveBrowseShowWholeCovers(enabled)
+        _state.update { it.copy(browseShowWholeCovers = enabled) }
     }
 
     fun setSourceLanguageEnabled(language: String, enabled: Boolean) {
@@ -1022,7 +1054,10 @@ class MainViewModel(
                 }
             }
 
-            val cachedMediaIsFresh = cachedMedia != null && now - cachedMedia.fetchedAtEpochMillis <= cachePolicy.mediaDetailsTtlMillis
+            val cachedMediaHasEnrichedDetails = cachedMedia?.let { it.staff.isNotEmpty() || it.tags.isNotEmpty() } ?: false
+            val cachedMediaIsFresh = cachedMedia != null &&
+                cachedMediaHasEnrichedDetails &&
+                now - cachedMedia.fetchedAtEpochMillis <= cachePolicy.mediaDetailsTtlMillis
             val cachedRecommendationsAreFresh = container.database.recommendationDao()
                 .cachedRecommendations(mediaId)
                 .firstOrNull()

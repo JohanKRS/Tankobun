@@ -54,6 +54,8 @@ object AnilistJsonMapper {
             synonyms = obj.stringArray("synonyms"),
             isAdult = obj.booleanOrFalse("isAdult"),
             updatedAtEpochSeconds = obj.longOrNull("updatedAt"),
+            staff = obj.staffNames(),
+            tags = obj.mediaTagNames(),
         )
     }
 
@@ -193,3 +195,65 @@ private fun JsonObject.stringArray(name: String): List<String> =
     this[name]?.takeUnless { it is JsonNull }?.jsonArray?.mapNotNull {
         it.takeUnless { value -> value is JsonNull }?.jsonPrimitive?.content
     }.orEmpty()
+
+private fun JsonObject.staffNames(): List<String> =
+    preferredCreatorNames().ifEmpty {
+        this["staff"]
+            ?.takeUnless { it is JsonNull }
+            ?.jsonObject
+            ?.get("nodes")
+            ?.jsonArray
+            .orEmpty()
+            .mapNotNull { node ->
+                node.jsonObject["name"]
+                    ?.takeUnless { it is JsonNull }
+                    ?.jsonObject
+                    ?.stringOrNull("userPreferred")
+            }
+            .distinct()
+    }
+
+private fun JsonObject.preferredCreatorNames(): List<String> =
+    this["staff"]
+        ?.takeUnless { it is JsonNull }
+        ?.jsonObject
+        ?.get("edges")
+        ?.jsonArray
+        .orEmpty()
+        .mapNotNull { edge ->
+            val obj = edge.jsonObject
+            val role = obj.stringOrNull("role")
+            if (!role.isCreatorRole()) return@mapNotNull null
+            obj["node"]
+                ?.takeUnless { it is JsonNull }
+                ?.jsonObject
+                ?.get("name")
+                ?.takeUnless { it is JsonNull }
+                ?.jsonObject
+                ?.stringOrNull("userPreferred")
+        }
+        .distinct()
+
+private fun String?.isCreatorRole(): Boolean {
+    val normalized = this?.lowercase().orEmpty()
+    return normalized.contains("story") ||
+        normalized.contains("art") ||
+        normalized.contains("author") ||
+        normalized.contains("creator")
+}
+
+private fun JsonObject.mediaTagNames(): List<String> =
+    this["tags"]
+        ?.takeUnless { it is JsonNull }
+        ?.jsonArray
+        .orEmpty()
+        .mapNotNull { tag ->
+            val obj = tag.jsonObject
+            if (obj.booleanOrFalse("isMediaSpoiler") || obj.booleanOrFalse("isGeneralSpoiler")) return@mapNotNull null
+            obj.stringOrNull("name")?.let { name -> obj.intOrNull("rank").orZero() to name }
+        }
+        .sortedByDescending { (rank, _) -> rank }
+        .map { (_, name) -> name }
+        .distinct()
+
+private fun Int?.orZero(): Int = this ?: 0

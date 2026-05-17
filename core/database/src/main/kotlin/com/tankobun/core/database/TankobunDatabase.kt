@@ -17,7 +17,7 @@ import androidx.room.TypeConverters
         DownloadJobEntity::class,
         SyncMutationEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(TankobunTypeConverters::class)

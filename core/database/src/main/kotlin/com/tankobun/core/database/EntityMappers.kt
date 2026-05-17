@@ -33,6 +33,8 @@ fun AnilistMedia.toEntity(fetchedAtEpochMillis: Long): AnilistMediaEntity =
         siteUrl = siteUrl,
         genres = genres,
         synonyms = synonyms,
+        staff = staff,
+        tags = tags,
         isAdult = isAdult,
         updatedAtEpochSeconds = updatedAtEpochSeconds,
         fetchedAtEpochMillis = fetchedAtEpochMillis,
@@ -57,6 +59,8 @@ fun AnilistMediaEntity.toModel(): AnilistMedia =
         siteUrl = siteUrl,
         genres = genres,
         synonyms = synonyms,
+        staff = staff,
+        tags = tags,
         isAdult = isAdult,
         updatedAtEpochSeconds = updatedAtEpochSeconds,
     )

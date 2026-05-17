@@ -155,6 +155,23 @@ object AnilistQueries {
             synonyms
             isAdult
             updatedAt
+            tags {
+              name
+              rank
+              isMediaSpoiler
+              isGeneralSpoiler
+            }
+            staff(sort: RELEVANCE, perPage: 5) {
+              edges {
+                role
+                node {
+                  name { userPreferred }
+                }
+              }
+              nodes {
+                name { userPreferred }
+              }
+            }
             mediaListEntry {
               id
               mediaId

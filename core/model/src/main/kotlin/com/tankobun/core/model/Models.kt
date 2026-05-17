@@ -55,6 +55,8 @@ data class AnilistMedia(
     val synonyms: List<String>,
     val isAdult: Boolean,
     val updatedAtEpochSeconds: Long?,
+    val staff: List<String> = emptyList(),
+    val tags: List<String> = emptyList(),
 )
 
 data class AnilistMediaTag(
