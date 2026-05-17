@@ -50,6 +50,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -92,8 +98,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryScrollableTabRow
@@ -130,6 +136,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -171,6 +178,13 @@ private enum class QuickDrawerMode {
     PINNED,
 }
 
+private enum class LibraryPicker {
+    FORMAT,
+    STATUS,
+    YEAR,
+    SORT,
+}
+
 private enum class ReaderPanAxis {
     BOTH,
     HORIZONTAL,
@@ -179,6 +193,19 @@ private enum class ReaderPanAxis {
 
 private const val SOURCE_LANGUAGE_FILTER_ACTIVE = "__active__"
 private const val SOURCE_LANGUAGE_FILTER_ALL = "__all__"
+private const val LIBRARY_SORT_LIST_ORDER = "LIST_ORDER"
+private const val LIBRARY_SORT_TITLE = "TITLE"
+private const val LIBRARY_SORT_UPDATED = "UPDATED"
+private const val LIBRARY_SORT_PROGRESS = "PROGRESS"
+private const val LIBRARY_SORT_SCORE = "SCORE"
+
+private val LibrarySortOptions = listOf(
+    BrowseOption("List Order", LIBRARY_SORT_LIST_ORDER),
+    BrowseOption("Title", LIBRARY_SORT_TITLE),
+    BrowseOption("Recently Updated", LIBRARY_SORT_UPDATED),
+    BrowseOption("Progress", LIBRARY_SORT_PROGRESS),
+    BrowseOption("Score", LIBRARY_SORT_SCORE),
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -256,13 +283,14 @@ private fun TankobunScaffold(
     onCloseQuickDrawer: () -> Unit,
     onToggleQuickDrawerPin: () -> Unit,
 ) {
+    val cutoutEndPadding = displayCutoutEndPadding()
+    val drawerSafeEndPadding = maxOf(cutoutEndPadding, 10.dp)
     Scaffold(
         containerColor = LocalTankobunTokens.current.appBackdrop,
         topBar = {
             TankobunTopBar(
                 title = selectedMedia?.title?.userPreferred
                     ?: if (selectedTab == 3 && settingsRoute == SettingsRoute.SOURCES) "Sources" else "Tankobun",
-                subtitle = state.viewerName?.let { "AniList: $it" } ?: "AniList-first manga reader",
                 showBack = selectedMedia != null || (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN),
                 onBack = {
                     if (selectedMedia != null) {
@@ -282,6 +310,18 @@ private fun TankobunScaffold(
                 onOpenQuickDrawer = onOpenQuickDrawer,
             )
         },
+        bottomBar = {
+            if (selectedMedia == null) {
+                TankobunBottomNavigationBar(
+                    selectedTab = selectedTab,
+                    onSelectTab = onSelectTab,
+                    modifier = Modifier.padding(
+                        start = displayCutoutStartPadding(),
+                        end = displayCutoutEndPadding(),
+                    ),
+                )
+            }
+        },
     ) { padding ->
         Box(
             modifier = Modifier
@@ -293,9 +333,6 @@ private fun TankobunScaffold(
                     .fillMaxSize()
                     .background(LocalTankobunTokens.current.appBackdrop),
             ) {
-                if (selectedMedia == null) {
-                    TankobunNavigationRail(selectedTab = selectedTab, onSelectTab = onSelectTab)
-                }
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                     if (selectedMedia != null) {
                         MangaDetailScreen(state, viewModel, selectedMedia)
@@ -321,48 +358,78 @@ private fun TankobunScaffold(
                         animationSpec = tween(durationMillis = 220),
                         label = "Pinned drawer width",
                     )
-                    QuickDrawer(
-                        state = state,
-                        viewModel = viewModel,
-                        selectedMedia = selectedMedia,
-                        pinned = true,
-                        onClose = onCloseQuickDrawer,
-                        onTogglePin = onToggleQuickDrawerPin,
-                        modifier = Modifier.width(pinnedWidth).fillMaxHeight(),
-                    )
+                    Box(
+                        modifier = Modifier
+                            .width(pinnedWidth + cutoutEndPadding)
+                            .fillMaxHeight(),
+                    ) {
+                        QuickDrawer(
+                            state = state,
+                            viewModel = viewModel,
+                            selectedMedia = selectedMedia,
+                            pinned = true,
+                            onClose = onCloseQuickDrawer,
+                            onTogglePin = onToggleQuickDrawerPin,
+                            modifier = Modifier
+                                .width(pinnedWidth)
+                                .fillMaxHeight()
+                                .align(Alignment.CenterStart),
+                        )
+                    }
                 }
             }
-            if (quickDrawerMode != QuickDrawerMode.PINNED) {
+            if (quickDrawerMode == QuickDrawerMode.CLOSED) {
                 QuickDrawerHandle(
+                    expanded = false,
                     onClick = onOpenQuickDrawer,
-                    modifier = Modifier.align(Alignment.CenterEnd),
+                    onSwipeIn = onOpenQuickDrawer,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = drawerSafeEndPadding),
                 )
             }
-            if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
-                AnimatedVisibility(
-                    visible = true,
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                    enter = slideInHorizontally(
-                        initialOffsetX = { it },
-                        animationSpec = tween(durationMillis = 260),
-                    ) + fadeIn(tween(180)),
-                    exit = slideOutHorizontally(
-                        targetOffsetX = { it },
-                        animationSpec = tween(durationMillis = 220),
-                    ) + fadeOut(tween(140)),
-                ) {
-                    QuickDrawer(
-                        state = state,
-                        viewModel = viewModel,
-                        selectedMedia = selectedMedia,
-                        pinned = false,
-                        onClose = onCloseQuickDrawer,
-                        onTogglePin = onToggleQuickDrawerPin,
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .width(340.dp),
-                    )
-                }
+            AnimatedVisibility(
+                visible = quickDrawerMode == QuickDrawerMode.OVERLAY,
+                modifier = Modifier.fillMaxSize(),
+                enter = fadeIn(tween(140)),
+                exit = fadeOut(tween(160)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.20f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onCloseQuickDrawer,
+                        ),
+                )
+            }
+            AnimatedVisibility(
+                visible = quickDrawerMode == QuickDrawerMode.OVERLAY,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = cutoutEndPadding),
+                enter = slideInHorizontally(
+                    initialOffsetX = { it },
+                    animationSpec = tween(durationMillis = 320),
+                ) + fadeIn(tween(160)),
+                exit = slideOutHorizontally(
+                    targetOffsetX = { it },
+                    animationSpec = tween(durationMillis = 260),
+                ) + fadeOut(tween(120)),
+            ) {
+                QuickDrawer(
+                    state = state,
+                    viewModel = viewModel,
+                    selectedMedia = selectedMedia,
+                    pinned = false,
+                    onClose = onCloseQuickDrawer,
+                    onTogglePin = onToggleQuickDrawerPin,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(340.dp),
+                )
             }
             if (state.busy) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -371,22 +438,74 @@ private fun TankobunScaffold(
     }
 }
 
+private suspend fun PointerInputScope.detectQuickDrawerHandleSwipe(
+    expanded: Boolean,
+    onSwipeIn: () -> Unit,
+    onSwipeOut: () -> Unit,
+) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        var totalX = 0f
+        var totalY = 0f
+        var swipingHorizontally = false
+        do {
+            val event = awaitPointerEvent()
+            val change = event.changes.firstOrNull() ?: break
+            val delta = change.position - change.previousPosition
+            totalX += delta.x
+            totalY += delta.y
+            if (!swipingHorizontally && abs(totalX) > 16f && abs(totalX) > abs(totalY)) {
+                swipingHorizontally = true
+            }
+            if (swipingHorizontally) {
+                change.consume()
+            }
+        } while (event.changes.any { it.pressed })
+
+        if (swipingHorizontally) {
+            when {
+                expanded && totalX > 48f -> onSwipeOut()
+                !expanded && totalX < -48f -> onSwipeIn()
+            }
+        }
+    }
+}
+
+@Composable
+private fun displayCutoutStartPadding(): Dp {
+    val layoutDirection = LocalLayoutDirection.current
+    return maxOf(
+        WindowInsets.displayCutout.asPaddingValues().calculateStartPadding(layoutDirection),
+        WindowInsets.safeDrawing.asPaddingValues().calculateStartPadding(layoutDirection),
+    )
+}
+
+@Composable
+private fun displayCutoutEndPadding(): Dp {
+    val layoutDirection = LocalLayoutDirection.current
+    return maxOf(
+        WindowInsets.displayCutout.asPaddingValues().calculateEndPadding(layoutDirection),
+        WindowInsets.safeDrawing.asPaddingValues().calculateEndPadding(layoutDirection),
+    )
+}
+
 @Composable
 private fun TankobunTopBar(
     title: String,
-    subtitle: String,
     showBack: Boolean,
     onBack: () -> Unit,
     onSync: () -> Unit,
     onSearch: () -> Unit,
     onOpenQuickDrawer: () -> Unit,
 ) {
+    val startInset = displayCutoutStartPadding()
+    val endInset = displayCutoutEndPadding()
     Surface(color = LocalTankobunTokens.current.elevatedSurface, tonalElevation = 1.dp) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(84.dp)
-                .padding(horizontal = 20.dp),
+                .height(72.dp)
+                .padding(start = 18.dp + startInset, end = 18.dp + endInset),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -395,35 +514,19 @@ private fun TankobunTopBar(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
             }
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = LocalTankobunTokens.current.softAccent,
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.ic_launcher_foreground),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .padding(2.dp)
-                        .fillMaxSize(),
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    title,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            Image(
+                painter = painterResource(R.drawable.ic_launcher_foreground),
+                contentDescription = null,
+                modifier = Modifier.size(56.dp),
+            )
+            Text(
+                title,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge,
+            )
             IconButton(onClick = onSync) {
                 Icon(Icons.Default.Refresh, contentDescription = "Sync")
             }
@@ -438,19 +541,24 @@ private fun TankobunTopBar(
 }
 
 @Composable
-private fun TankobunNavigationRail(selectedTab: Int, onSelectTab: (Int) -> Unit) {
-    NavigationRail(
-        containerColor = MaterialTheme.colorScheme.surface,
+private fun TankobunBottomNavigationBar(
+    selectedTab: Int,
+    onSelectTab: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    NavigationBar(
+        modifier = modifier,
+        containerColor = LocalTankobunTokens.current.elevatedSurface,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        tonalElevation = 2.dp,
     ) {
-        Spacer(Modifier.height(8.dp))
         listOf(
             Triple("Library", Icons.AutoMirrored.Filled.LibraryBooks, 0),
             Triple("Browse", Icons.Default.Explore, 1),
             Triple("Downloads", Icons.Default.Download, 2),
             Triple("Settings", Icons.Default.Settings, 3),
         ).forEach { (label, icon, index) ->
-            NavigationRailItem(
+            NavigationBarItem(
                 selected = selectedTab == index,
                 onClick = { onSelectTab(index) },
                 icon = { Icon(icon, contentDescription = label) },
@@ -461,17 +569,56 @@ private fun TankobunNavigationRail(selectedTab: Int, onSelectTab: (Int) -> Unit)
 }
 
 @Composable
-private fun QuickDrawerHandle(onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun QuickDrawerHandle(
+    expanded: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onSwipeIn: () -> Unit = onClick,
+    onSwipeOut: () -> Unit = onClick,
+) {
+    val handleWidth by animateDpAsState(
+        targetValue = if (expanded) 40.dp else 36.dp,
+        animationSpec = tween(durationMillis = 220),
+        label = "Quick drawer handle width",
+    )
+    val handleHeight by animateDpAsState(
+        targetValue = if (expanded) 104.dp else 88.dp,
+        animationSpec = tween(durationMillis = 220),
+        label = "Quick drawer handle height",
+    )
+    val handleShape = if (expanded) {
+        RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp)
+    } else {
+        RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
+    }
     Surface(
         modifier = modifier
-            .padding(end = 2.dp)
-            .width(10.dp)
-            .height(64.dp)
-            .clip(RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp))
+            .width(handleWidth)
+            .height(handleHeight)
+            .clip(handleShape)
+            .pointerInput(expanded) {
+                detectQuickDrawerHandleSwipe(
+                    expanded = expanded,
+                    onSwipeIn = onSwipeIn,
+                    onSwipeOut = onSwipeOut,
+                )
+            }
             .clickable(onClick = onClick),
-        color = LocalTankobunTokens.current.drawerHandle,
-        tonalElevation = 2.dp,
-    ) {}
+        shape = handleShape,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.86f),
+        tonalElevation = if (expanded) 3.dp else 2.dp,
+        shadowElevation = if (expanded) 3.dp else 1.dp,
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Surface(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(if (expanded) 42.dp else 36.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.52f),
+            ) {}
+        }
+    }
 }
 
 @Composable
@@ -484,68 +631,58 @@ private fun QuickDrawer(
     onTogglePin: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier,
-        shape = if (pinned) RoundedCornerShape(0.dp) else RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp),
-        color = LocalTankobunTokens.current.elevatedSurface,
-        tonalElevation = if (pinned) 1.dp else 10.dp,
-        shadowElevation = if (pinned) 0.dp else 10.dp,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+    Box(modifier = modifier) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            shape = if (pinned) RoundedCornerShape(0.dp) else RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp),
+            color = LocalTankobunTokens.current.elevatedSurface,
+            tonalElevation = if (pinned) 1.dp else 10.dp,
+            shadowElevation = if (pinned) 0.dp else 10.dp,
         ) {
-            Surface(
+            Column(
                 modifier = Modifier
-                    .width(34.dp)
-                    .height(4.dp)
-                    .align(Alignment.CenterHorizontally),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.22f),
-            ) {}
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Quick Drawer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(
-                        if (pinned) "Pinned utility panel" else "Resume, sources, sync",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                TextButton(onClick = onTogglePin) {
-                    Text(if (pinned) "Unpin" else "Pin")
-                }
-                TextButton(onClick = onClose) {
-                    Text("Close")
-                }
-            }
-
-            QuickDrawerSection(title = "Continue Reading") {
-                val progress = state.latestProgress
-                val chapter = progress?.let { saved -> state.sourceChapters.firstOrNull { it.url == saved.chapterUrl } }
-                if (chapter != null) {
-                    Text(chapter.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        "Page ${progress.pageIndex + 1}/${progress.totalPages} / chapter ${progress.chapterNumber.takeIf { it > 0 } ?: "?"}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Button(onClick = { viewModel.openChapter(chapter) }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Resume")
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Quick Drawer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (pinned) "Pinned utility panel" else "Resume, sources, sync",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                } else {
-                    Text(
-                        selectedMedia?.let { "Open a chapter to create a resume point." } ?: "Open a title to see resume actions here.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    TextButton(onClick = onTogglePin) {
+                        Text(if (pinned) "Unpin" else "Pin")
+                    }
                 }
-            }
+
+                QuickDrawerSection(title = "Continue Reading") {
+                    val progress = state.latestProgress
+                    val chapter = progress?.let { saved -> state.sourceChapters.firstOrNull { it.url == saved.chapterUrl } }
+                    if (chapter != null) {
+                        Text(chapter.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            "Page ${progress.pageIndex + 1}/${progress.totalPages} / chapter ${progress.chapterNumber.takeIf { it > 0 } ?: "?"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Button(onClick = { viewModel.openChapter(chapter) }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Resume")
+                        }
+                    } else {
+                        Text(
+                            selectedMedia?.let { "Open a chapter to create a resume point." } ?: "Open a title to see resume actions here.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
 
             QuickDrawerSection(title = "Source Health") {
                 val source = state.selectedSource
@@ -628,6 +765,15 @@ private fun QuickDrawer(
                 }
             }
         }
+        }
+        if (!pinned) {
+            QuickDrawerHandle(
+                expanded = true,
+                onClick = onClose,
+                onSwipeOut = onClose,
+                modifier = Modifier.align(Alignment.CenterStart),
+            )
+        }
     }
 }
 
@@ -649,19 +795,40 @@ private fun QuickDrawerSection(title: String, content: @Composable ColumnScope.(
 @Composable
 private fun LibraryScreen(state: TankobunUiState, viewModel: MainViewModel) {
     val context = LocalContext.current
+    var query by remember { mutableStateOf("") }
+    var picker by remember { mutableStateOf<LibraryPicker?>(null) }
+    var format by remember { mutableStateOf<String?>(null) }
+    var publishingStatus by remember { mutableStateOf<String?>(null) }
+    var year by remember { mutableStateOf<String?>(null) }
+    var sort by remember { mutableStateOf(LIBRARY_SORT_LIST_ORDER) }
+    val sections = state.librarySections
+    val formatOptions = remember(sections) { libraryFormatOptions(sections) }
+    val statusOptions = remember(sections) { libraryStatusOptions(sections) }
+    val yearOptions = remember(sections) { libraryYearOptions(sections) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        LibraryHero(
-            state = state,
-            onSync = viewModel::refreshLibrary,
-            onConnect = {
-                viewModel.loginUrl()?.let { url ->
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                }
+        LibraryFilterBar(
+            query = query,
+            onQueryChange = { query = it },
+            format = format,
+            publishingStatus = publishingStatus,
+            year = year,
+            sort = sort,
+            formatOptions = formatOptions,
+            statusOptions = statusOptions,
+            yearOptions = yearOptions,
+            onOpenPicker = { picker = it },
+            onReset = {
+                query = ""
+                format = null
+                publishingStatus = null
+                year = null
+                sort = LIBRARY_SORT_LIST_ORDER
             },
         )
 
@@ -675,79 +842,191 @@ private fun LibraryScreen(state: TankobunUiState, viewModel: MainViewModel) {
             }
         }
 
+        if (!state.loggedIn) {
+            LibraryConnectPrompt(
+                clientConfigured = state.clientConfigured,
+                onConnect = {
+                    viewModel.loginUrl()?.let { url ->
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    }
+                },
+            )
+        }
+
         LibraryPager(
-            sections = state.librarySections,
-            viewMode = state.libraryViewMode,
-            onViewModeChange = viewModel::setLibraryViewMode,
+            sections = sections,
+            query = query,
+            format = format,
+            publishingStatus = publishingStatus,
+            year = year,
+            sort = sort,
             modifier = Modifier.weight(1f),
             onSelectMedia = viewModel::selectMedia,
+        )
+    }
+
+    picker?.let { activePicker ->
+        BrowseOptionDialog(
+            title = when (activePicker) {
+                LibraryPicker.FORMAT -> "Format"
+                LibraryPicker.STATUS -> "Publishing Status"
+                LibraryPicker.YEAR -> "Year"
+                LibraryPicker.SORT -> "Library Options"
+            },
+            options = when (activePicker) {
+                LibraryPicker.FORMAT -> formatOptions
+                LibraryPicker.STATUS -> statusOptions
+                LibraryPicker.YEAR -> yearOptions
+                LibraryPicker.SORT -> LibrarySortOptions
+            },
+            selectedValue = when (activePicker) {
+                LibraryPicker.FORMAT -> format
+                LibraryPicker.STATUS -> publishingStatus
+                LibraryPicker.YEAR -> year
+                LibraryPicker.SORT -> sort
+            },
+            onSelect = { value ->
+                when (activePicker) {
+                    LibraryPicker.FORMAT -> format = value
+                    LibraryPicker.STATUS -> publishingStatus = value
+                    LibraryPicker.YEAR -> year = value
+                    LibraryPicker.SORT -> sort = value ?: LIBRARY_SORT_LIST_ORDER
+                }
+                picker = null
+            },
+            onDismiss = { picker = null },
         )
     }
 }
 
 @Composable
-private fun LibraryHero(
-    state: TankobunUiState,
-    onSync: () -> Unit,
+private fun LibraryFilterBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    format: String?,
+    publishingStatus: String?,
+    year: String?,
+    sort: String,
+    formatOptions: List<BrowseOption>,
+    statusOptions: List<BrowseOption>,
+    yearOptions: List<BrowseOption>,
+    onOpenPicker: (LibraryPicker) -> Unit,
+    onReset: () -> Unit,
+) {
+    val controlsActive = query.isNotBlank() ||
+        format != null ||
+        publishingStatus != null ||
+        year != null ||
+        sort != LIBRARY_SORT_LIST_ORDER
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = {
+                if (query.isNotBlank()) {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(Icons.Default.Close, contentDescription = "Clear library search")
+                    }
+                }
+            },
+            placeholder = { Text("Search your library") },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            shape = RoundedCornerShape(18.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            BrowseFilterPill(
+                label = "Format",
+                value = formatOptions.labelFor(format),
+                selected = format != null,
+                onClick = { onOpenPicker(LibraryPicker.FORMAT) },
+            )
+            BrowseFilterPill(
+                label = "Status",
+                value = statusOptions.labelFor(publishingStatus),
+                selected = publishingStatus != null,
+                onClick = { onOpenPicker(LibraryPicker.STATUS) },
+            )
+            BrowseFilterPill(
+                label = "Year",
+                value = yearOptions.labelFor(year),
+                selected = year != null,
+                onClick = { onOpenPicker(LibraryPicker.YEAR) },
+            )
+            BrowseFilterPill(
+                label = "Sort",
+                value = LibrarySortOptions.labelFor(sort),
+                selected = sort != LIBRARY_SORT_LIST_ORDER,
+                onClick = { onOpenPicker(LibraryPicker.SORT) },
+            )
+            IconButton(
+                onClick = { onOpenPicker(LibraryPicker.SORT) },
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(LocalTankobunTokens.current.elevatedSurface),
+            ) {
+                Icon(Icons.Default.Tune, contentDescription = "Library options")
+            }
+            if (controlsActive) {
+                TextButton(onClick = onReset) {
+                    Text("Reset")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryConnectPrompt(
+    clientConfigured: Boolean,
     onConnect: () -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        color = LocalTankobunTokens.current.elevatedSurface,
-        tonalElevation = 1.dp,
-        shadowElevation = 1.dp,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
         Row(
-            modifier = Modifier.padding(18.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(
-                modifier = Modifier.size(54.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = LocalTankobunTokens.current.softAccent,
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.LibraryBooks,
-                    contentDescription = null,
-                    modifier = Modifier.padding(14.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(Icons.Default.Link, contentDescription = null)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    if (state.loggedIn) "Your AniList library" else "Connect AniList",
-                    style = MaterialTheme.typography.headlineSmall,
+                    if (clientConfigured) "Connect AniList" else "AniList setup needed",
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    if (state.loggedIn) {
-                        listOfNotNull(
-                            "${state.libraryItems.size} manga",
-                            state.librarySyncedAtEpochMillis.takeIf { it > 0 }?.let { "cached ${cacheAgeLabel(it)}" },
-                        ).joinToString(" / ")
+                    if (clientConfigured) {
+                        "Sign in to show your lists here."
                     } else {
-                        "Fetch your manga library, progress, custom lists, and recommendations."
+                        "Add AniList credentials in settings before connecting."
                     },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Button(
-                enabled = if (state.loggedIn) true else state.clientConfigured,
-                onClick = if (state.loggedIn) onSync else onConnect,
-            ) {
-                Icon(
-                    if (state.loggedIn) Icons.Default.Refresh else Icons.Default.Link,
-                    contentDescription = null,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(if (state.loggedIn) "Sync" else if (state.clientConfigured) "Connect" else "Setup")
+            Button(enabled = clientConfigured, onClick = onConnect) {
+                Text("Connect")
             }
         }
     }
@@ -756,8 +1035,11 @@ private fun LibraryHero(
 @Composable
 private fun LibraryPager(
     sections: List<LibrarySection>,
-    viewMode: MediaViewMode,
-    onViewModeChange: (MediaViewMode) -> Unit,
+    query: String,
+    format: String?,
+    publishingStatus: String?,
+    year: String?,
+    sort: String,
     modifier: Modifier,
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
@@ -770,70 +1052,42 @@ private fun LibraryPager(
 
     val pagerState = rememberPagerState(pageCount = { sections.size })
     val scope = rememberCoroutineScope()
-    val currentSection = sections[pagerState.currentPage.coerceAtMost(sections.lastIndex)]
-
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            color = LocalTankobunTokens.current.elevatedSurface,
-            tonalElevation = 1.dp,
-        ) {
-            Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-                MediaViewModeRow(
-                    selected = viewMode,
-                    onSelect = onViewModeChange,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
-                PrimaryScrollableTabRow(
-                    selectedTabIndex = pagerState.currentPage.coerceAtMost(sections.lastIndex),
-                    edgePadding = 0.dp,
-                    containerColor = Color.Transparent,
-                ) {
-                    sections.forEachIndexed { index, section ->
-                        Tab(
-                            selected = pagerState.currentPage == index,
-                            onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-                            text = {
-                                Text(
-                                    "${section.title} ${section.items.size}",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                        )
-                    }
-                }
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(currentSection.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(
-                    "${currentSection.items.size} titles",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                sections.forEachIndexed { index, _ ->
-                    val width by animateDpAsState(
-                        targetValue = if (index == pagerState.currentPage) 18.dp else 6.dp,
-                        animationSpec = tween(durationMillis = 180),
-                        label = "Library pager dot",
+    val visibleSections = remember(sections, query, format, publishingStatus, year, sort) {
+        sections.map { section ->
+            section.copy(
+                items = section.items
+                    .filterLibraryItems(
+                        query = query,
+                        format = format,
+                        publishingStatus = publishingStatus,
+                        year = year,
                     )
-                    Surface(
-                        modifier = Modifier
-                            .width(width)
-                            .height(6.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (index == pagerState.currentPage) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.22f)
-                        },
-                    ) {}
-                }
+                    .sortLibraryItems(sort),
+            )
+        }
+    }
+    val filtersActive = query.isNotBlank() || format != null || publishingStatus != null || year != null
+
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        PrimaryScrollableTabRow(
+            selectedTabIndex = pagerState.currentPage.coerceAtMost(sections.lastIndex),
+            edgePadding = 0.dp,
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.primary,
+        ) {
+            sections.forEachIndexed { index, section ->
+                val count = visibleSections[index].items.size
+                Tab(
+                    selected = pagerState.currentPage == index,
+                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                    text = {
+                        Text(
+                            "${section.title} $count",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                )
             }
         }
         HorizontalPager(
@@ -841,16 +1095,81 @@ private fun LibraryPager(
             modifier = Modifier.weight(1f),
         ) { page ->
             MediaCollection(
-                media = sections[page].items.map { it.media },
-                viewMode = viewMode,
+                media = visibleSections[page].items.map { it.media },
+                viewMode = MediaViewMode.COVER_WITH_INFO,
                 onSelectMedia = onSelectMedia,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = 12.dp),
+                emptyMessage = if (filtersActive) {
+                    "No titles match these library filters."
+                } else {
+                    "No manga in this AniList list yet."
+                },
             )
         }
     }
 }
+
+private fun libraryFormatOptions(sections: List<LibrarySection>): List<BrowseOption> =
+    listOf(BrowseOption("Any", null)) +
+        sections.flatMap { section -> section.items }
+            .mapNotNull { it.media.format }
+            .distinct()
+            .sorted()
+            .map { BrowseOption(it.mediaFormatLabel(), it) }
+
+private fun libraryStatusOptions(sections: List<LibrarySection>): List<BrowseOption> =
+    listOf(BrowseOption("Any", null)) +
+        sections.flatMap { section -> section.items }
+            .mapNotNull { it.media.status }
+            .distinct()
+            .sorted()
+            .map { BrowseOption(it.statusLabel(), it) }
+
+private fun libraryYearOptions(sections: List<LibrarySection>): List<BrowseOption> =
+    listOf(BrowseOption("Any", null)) +
+        sections.flatMap { section -> section.items }
+            .mapNotNull { it.media.startDateYear }
+            .distinct()
+            .sortedDescending()
+            .map { BrowseOption(it.toString(), it.toString()) }
+
+private fun List<LibraryItem>.filterLibraryItems(
+    query: String,
+    format: String?,
+    publishingStatus: String?,
+    year: String?,
+): List<LibraryItem> {
+    val normalizedQuery = query.trim().lowercase()
+    return filter { item ->
+        val media = item.media
+        val queryMatches = normalizedQuery.isBlank() || media.librarySearchText().contains(normalizedQuery)
+        val formatMatches = format == null || media.format == format
+        val statusMatches = publishingStatus == null || media.status == publishingStatus
+        val yearMatches = year == null || media.startDateYear?.toString() == year
+        queryMatches && formatMatches && statusMatches && yearMatches
+    }
+}
+
+private fun List<LibraryItem>.sortLibraryItems(sort: String): List<LibraryItem> =
+    when (sort) {
+        LIBRARY_SORT_TITLE -> sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.media.title.userPreferred })
+        LIBRARY_SORT_UPDATED -> sortedByDescending { it.entry.updatedAtEpochSeconds ?: it.media.updatedAtEpochSeconds ?: 0L }
+        LIBRARY_SORT_PROGRESS -> sortedByDescending { it.entry.progress }
+        LIBRARY_SORT_SCORE -> sortedByDescending { it.entry.score ?: 0.0 }
+        else -> this
+    }
+
+private fun AnilistMedia.librarySearchText(): String =
+    buildList {
+        add(title.userPreferred)
+        title.romaji?.let(::add)
+        title.english?.let(::add)
+        title.native?.let(::add)
+        genres.forEach(::add)
+        synonyms.forEach(::add)
+    }.joinToString(" ").lowercase()
 
 private enum class BrowsePicker {
     FORMAT,
