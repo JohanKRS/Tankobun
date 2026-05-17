@@ -39,4 +39,11 @@ class ExtensionIndexRepository(
         val apkPath = "$indexPath/apk/${entry.apkName}".replace("//", "/")
         return URI(uri.scheme, uri.authority, apkPath, null, null).toString()
     }
+
+    fun iconUrl(indexUrl: String, entry: ExtensionIndexEntry): String {
+        val uri = URI(indexUrl)
+        val indexPath = uri.path.substringBeforeLast('/', "")
+        val iconPath = "$indexPath/icon/${entry.packageName}.png".replace("//", "/")
+        return URI(uri.scheme, uri.authority, iconPath, null, null).toString()
+    }
 }

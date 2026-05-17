@@ -104,11 +104,25 @@ class SettingsStore(context: Context) {
             ?.map { it.trim().lowercase().replace('_', '-') }
             ?.filter { it.isNotBlank() }
             ?.toSet()
+            ?.plus(UNIVERSAL_SOURCE_LANGUAGE)
             ?: defaultSourceLanguages()
 
     fun saveSourceLanguages(languages: Set<String>) {
         preferences.edit()
             .putStringSet(KEY_SOURCE_LANGUAGES, languages.map { it.trim().lowercase().replace('_', '-') }.toSet())
+            .apply()
+    }
+
+    fun disabledSourceKeys(): Set<String> =
+        preferences.getStringSet(KEY_DISABLED_SOURCE_KEYS, emptySet())
+            .orEmpty()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .toSet()
+
+    fun saveDisabledSourceKeys(keys: Set<String>) {
+        preferences.edit()
+            .putStringSet(KEY_DISABLED_SOURCE_KEYS, keys.map { it.trim() }.filter { it.isNotBlank() }.toSet())
             .apply()
     }
 
@@ -137,6 +151,7 @@ class SettingsStore(context: Context) {
         const val KEY_ANILIST_TAGS = "anilist.tags"
         const val KEY_ANILIST_TAGS_CACHED_AT = "anilist.tags.cached.at"
         const val KEY_SOURCE_LANGUAGES = "source.languages"
+        const val KEY_DISABLED_SOURCE_KEYS = "source.disabled.keys"
         const val KEY_VIEWER_NAME = "anilist.viewer.name"
         const val KEY_LIBRARY_SYNCED_AT = "anilist.library.synced.at"
     }
@@ -171,10 +186,12 @@ enum class MediaViewMode {
 fun defaultSourceLanguages(): Set<String> =
     buildSet {
         add("en")
-        add("all")
+        add(UNIVERSAL_SOURCE_LANGUAGE)
         val locale = Locale.getDefault()
         val language = locale.language.lowercase(Locale.ROOT)
         val tag = locale.toLanguageTag().lowercase(Locale.ROOT)
         if (language.isNotBlank()) add(language)
         if (tag.isNotBlank()) add(tag)
     }
+
+const val UNIVERSAL_SOURCE_LANGUAGE = "all"

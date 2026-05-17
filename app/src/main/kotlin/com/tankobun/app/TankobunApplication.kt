@@ -25,6 +25,7 @@ class TankobunApplication : Application() {
 }
 
 class AppContainer(application: Application) {
+    val application: Application = application
     val database = DatabaseFactory.create(application)
 
     private val cacheDir = File(application.cacheDir, "http").also { it.mkdirs() }

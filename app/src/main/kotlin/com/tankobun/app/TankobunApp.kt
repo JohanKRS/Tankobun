@@ -1,9 +1,17 @@
 package com.tankobun.app
 
+import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -111,6 +119,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -135,6 +145,7 @@ import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
+import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
@@ -142,6 +153,7 @@ import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.SourceChapter
+import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceSearchResult
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -164,6 +176,9 @@ private enum class ReaderPanAxis {
     HORIZONTAL,
     WEBTOON,
 }
+
+private const val SOURCE_LANGUAGE_FILTER_ACTIVE = "__active__"
+private const val SOURCE_LANGUAGE_FILTER_ALL = "__all__"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -2415,6 +2430,19 @@ private fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel,
     val matches = state.sourceMatches.filter { match ->
         state.sourceMatchChapterCounts[sourceMatchKey(match.source.id, match.manga.url)] != null
     }
+    val availableSources = remember(state.installedSources, state.selectedSourceId) {
+        state.installedSources
+            .distinctBy { it.sourceSettingsKey() }
+            .sortedWith(
+                compareBy<SourceDescriptor> { if (it.id == state.selectedSourceId) 0 else 1 }
+                    .thenBy { sourceLanguageSortPriority(it.lang.normalizedSourceLanguage()) }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.lang },
+            )
+    }
+    val matchSourceKeys = remember(matches) {
+        matches.mapTo(mutableSetOf()) { it.source.sourceSettingsKey() }
+    }
 
     Dialog(
         onDismissRequest = viewModel::closeSourcePicker,
@@ -2436,7 +2464,7 @@ private fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel,
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Find source", style = MaterialTheme.typography.headlineSmall)
                         Text(
-                            media.title.userPreferred,
+                            "${media.title.userPreferred} / ${availableSources.size} enabled sources",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -2452,16 +2480,15 @@ private fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel,
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
 
-                if (matches.isEmpty() && !state.sourcePickerLoading) {
+                if (matches.isEmpty() && availableSources.isEmpty() && !state.sourcePickerLoading) {
                     Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("No readable matches yet.", style = MaterialTheme.typography.titleMedium)
+                            Text("No enabled sources.", style = MaterialTheme.typography.titleMedium)
                             Spacer(Modifier.height(8.dp))
-                            OutlinedButton(onClick = { viewModel.findSourceMatches(forceRefresh = true) }) {
-                                Icon(Icons.Default.Search, contentDescription = null)
-                                Spacer(Modifier.size(8.dp))
-                                Text("Search again")
-                            }
+                            Text(
+                                "Enable or install sources from Settings.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 } else {
@@ -2469,16 +2496,34 @@ private fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel,
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        items(matches, key = { "${it.source.id}:${it.manga.url}" }) { match ->
-                            val count = state.sourceMatchChapterCounts[sourceMatchKey(match.source.id, match.manga.url)] ?: 0
-                            SourceMatchRow(
-                                match = match,
-                                chapterCount = count,
-                                current = state.selectedSourceId == match.source.id &&
-                                    state.selectedSourceManga?.url == match.manga.url,
-                                mediaCover = media.coverImage,
-                                onClick = { viewModel.bindSourceMatch(match) },
-                            )
+                        if (matches.isNotEmpty()) {
+                            item {
+                                Text("Readable matches", style = MaterialTheme.typography.titleMedium)
+                            }
+                            items(matches, key = { "match:${it.source.id}:${it.manga.url}" }) { match ->
+                                val count = state.sourceMatchChapterCounts[sourceMatchKey(match.source.id, match.manga.url)] ?: 0
+                                SourceMatchRow(
+                                    match = match,
+                                    chapterCount = count,
+                                    current = state.selectedSourceId == match.source.id &&
+                                        state.selectedSourceManga?.url == match.manga.url,
+                                    mediaCover = media.coverImage,
+                                    onClick = { viewModel.bindSourceMatch(match) },
+                                )
+                            }
+                        }
+                        val fallbackSources = availableSources.filterNot { it.sourceSettingsKey() in matchSourceKeys }
+                        if (fallbackSources.isNotEmpty()) {
+                            item {
+                                Text("Try a specific source", style = MaterialTheme.typography.titleMedium)
+                            }
+                            items(fallbackSources, key = { "source:${it.sourceSettingsKey()}" }) { source ->
+                                SourceCandidateRow(
+                                    source = source,
+                                    current = state.selectedSourceId == source.id,
+                                    onClick = { viewModel.bindSource(source) },
+                                )
+                            }
                         }
                     }
                 }
@@ -2493,7 +2538,7 @@ private fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel,
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     }
                     Text(
-                        "${matches.size} sources",
+                        "${matches.size} matches / ${availableSources.size} sources",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -2531,6 +2576,37 @@ private fun SourceMatchRow(
                 if (current) {
                     Text("Current", color = MaterialTheme.colorScheme.secondary)
                 }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SourceCandidateRow(
+    source: SourceDescriptor,
+    current: Boolean,
+    onClick: () -> Unit,
+) {
+    ElevatedCard(onClick = onClick) {
+        ListItem(
+            headlineContent = { Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            supportingContent = {
+                Text(
+                    sourceMetadata(source, active = true),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            leadingContent = {
+                ExtensionIcon(
+                    packageName = source.packageName,
+                    name = source.name,
+                    iconUrl = null,
+                    modifier = Modifier.size(42.dp),
+                )
+            },
+            trailingContent = {
+                Text(if (current) "Selected" else "Try", color = MaterialTheme.colorScheme.secondary)
             },
         )
     }
@@ -3262,10 +3338,124 @@ private fun SettingsScreen(
 @Composable
 private fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewModel) {
     val context = LocalContext.current
-    val languageOptions = (state.allInstalledSources.map { it.lang.normalizedSourceLanguage() } + state.sourceLanguages)
-        .filter { it.isNotBlank() }
-        .distinct()
-        .sortedWith(compareBy<String> { if (it in setOf("en", "all")) 0 else 1 }.thenBy { it })
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedLanguageFilter by remember { mutableStateOf(SOURCE_LANGUAGE_FILTER_ACTIVE) }
+    var selectedRepositoryLanguageFilter by remember { mutableStateOf(SOURCE_LANGUAGE_FILTER_ACTIVE) }
+    var sourceSettingsQuery by remember { mutableStateOf("") }
+    var launchedInstallRequest by remember { mutableStateOf<ExtensionInstallRequest?>(null) }
+    val installLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        launchedInstallRequest?.let(viewModel::refreshInstalledSourcesAfterExtensionInstall)
+        launchedInstallRequest = null
+    }
+    LaunchedEffect(state.extensionInstallRequest?.apkUri) {
+        val installRequest = state.extensionInstallRequest ?: return@LaunchedEffect
+        launchedInstallRequest = installRequest
+        installLauncher.launch(downloadedExtensionInstallIntent(installRequest))
+        viewModel.consumeExtensionInstallRequest()
+    }
+    val repositoryByPackage = remember(state.availableExtensions) {
+        state.availableExtensions
+            .groupBy { it.packageName }
+            .mapValues { (_, entries) -> entries.maxBy { it.versionCode } }
+    }
+    val installedByPackage = remember(state.allInstalledSources) {
+        state.allInstalledSources.groupBy { it.packageName }
+    }
+    val normalizedSourceSettingsQuery = remember(sourceSettingsQuery) {
+        sourceSettingsQuery.trim().lowercase()
+    }
+    val searchableInstalledSources = remember(
+        state.allInstalledSources,
+        repositoryByPackage,
+        normalizedSourceSettingsQuery,
+    ) {
+        state.allInstalledSources.filter { source ->
+            source.matchesSourceSettingsQuery(
+                query = normalizedSourceSettingsQuery,
+                extension = repositoryByPackage[source.packageName],
+            )
+        }
+    }
+    val activeInstalledSources = remember(searchableInstalledSources, state.installedSources) {
+        searchableInstalledSources.filter { source -> state.sourceActive(source) }
+    }
+    val visibleInstalledSourceList = remember(
+        searchableInstalledSources,
+        activeInstalledSources,
+        selectedLanguageFilter,
+    ) {
+        when (selectedLanguageFilter) {
+            SOURCE_LANGUAGE_FILTER_ACTIVE -> activeInstalledSources
+            SOURCE_LANGUAGE_FILTER_ALL -> searchableInstalledSources
+            else -> searchableInstalledSources.filter { it.lang.normalizedSourceLanguage() == selectedLanguageFilter }
+        }
+    }
+    val sourceGroups = remember(visibleInstalledSourceList) {
+        visibleInstalledSourceList
+            .groupBy { it.lang.normalizedSourceLanguage() }
+            .map { (language, sources) ->
+                language to sources.sortedWith(
+                    compareBy<SourceDescriptor> { it.name.lowercase() }
+                        .thenBy { it.id },
+                )
+            }
+            .sortedWith(
+                compareBy<Pair<String, List<SourceDescriptor>>> { sourceLanguageSortPriority(it.first) }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { sourceLanguageLabel(it.first) },
+            )
+    }
+    val languageOptions = remember(searchableInstalledSources) {
+        searchableInstalledSources
+            .map { it.lang.normalizedSourceLanguage() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sortedWith(compareBy<String> { sourceLanguageSortPriority(it) }.thenBy { sourceLanguageLabel(it) })
+    }
+    val installedLanguageCounts = remember(searchableInstalledSources) {
+        searchableInstalledSources
+            .groupingBy { it.lang.normalizedSourceLanguage() }
+            .eachCount()
+    }
+    val visibleInstalledSources = visibleInstalledSourceList
+    val repositoryEntries = remember(state.availableExtensions) {
+        state.availableExtensions.sortedWith(
+            compareBy<ExtensionIndexEntry> { sourceLanguageSortPriority(it.lang.normalizedSourceLanguage()) }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+                .thenByDescending { it.versionCode },
+        )
+    }
+    val searchableRepositoryEntries = remember(repositoryEntries, normalizedSourceSettingsQuery) {
+        repositoryEntries.filter { it.matchesSourceSettingsQuery(normalizedSourceSettingsQuery) }
+    }
+    val activeRepositoryEntries = remember(searchableRepositoryEntries, state.sourceLanguages) {
+        searchableRepositoryEntries.filter {
+            val language = it.lang.normalizedSourceLanguage()
+            language in state.sourceLanguages || language == UNIVERSAL_SOURCE_LANGUAGE
+        }
+    }
+    val repositoryLanguageOptions = remember(searchableRepositoryEntries) {
+        searchableRepositoryEntries
+            .map { it.lang.normalizedSourceLanguage() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sortedWith(compareBy<String> { sourceLanguageSortPriority(it) }.thenBy { sourceLanguageLabel(it) })
+    }
+    val repositoryLanguageCounts = remember(searchableRepositoryEntries) {
+        searchableRepositoryEntries
+            .groupingBy { it.lang.normalizedSourceLanguage() }
+            .eachCount()
+    }
+    val visibleRepositoryEntries = remember(
+        searchableRepositoryEntries,
+        activeRepositoryEntries,
+        selectedRepositoryLanguageFilter,
+    ) {
+        when (selectedRepositoryLanguageFilter) {
+            SOURCE_LANGUAGE_FILTER_ACTIVE -> activeRepositoryEntries
+            SOURCE_LANGUAGE_FILTER_ALL -> searchableRepositoryEntries
+            else -> searchableRepositoryEntries.filter { it.lang.normalizedSourceLanguage() == selectedRepositoryLanguageFilter }
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -3274,107 +3464,635 @@ private fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMod
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Source Languages", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            FlowRowCompat {
-                languageOptions.forEach { language ->
-                    FilterChip(
-                        selected = language in state.sourceLanguages,
-                        onClick = {
-                            viewModel.setSourceLanguageEnabled(
-                                language = language,
-                                enabled = language !in state.sourceLanguages,
-                            )
-                        },
-                        label = { Text(sourceLanguageLabel(language)) },
-                    )
-                }
-            }
-            Text(
-                "Tankobun only searches active languages from the manga page.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            SourceSettingsSummary(
+                state = state,
+                repositoryCount = state.availableExtensions.size,
+                selectedTab = selectedTab,
+                onSelectTab = { selectedTab = it },
+                onRefreshInstalled = viewModel::refreshInstalledSources,
+                onRefreshRepository = viewModel::refreshExtensionIndex,
             )
         }
-
         item {
-            Text("Installed Sources", style = MaterialTheme.typography.titleMedium)
-        }
-
-        if (state.allInstalledSources.isEmpty()) {
-            item {
-                Text("No installed Tachiyomi-compatible source extensions found.")
-            }
-        } else {
-            items(state.allInstalledSources, key = { "${it.packageName}:${it.id}:${it.lang}" }) { source ->
-                val active = state.installedSources.any { it.id == source.id }
-                ElevatedCard {
-                    ListItem(
-                        headlineContent = { Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = {
-                            Text(
-                                listOfNotNull(
-                                    sourceLanguageLabel(source.lang.normalizedSourceLanguage()),
-                                    source.versionName?.let { "v$it" },
-                                    if (source.isNsfw) "NSFW" else null,
-                                    if (active) "active" else "filtered",
-                                ).joinToString(" / "),
-                            )
-                        },
-                    )
-                }
-            }
-        }
-
-        item {
-            Text("Extension Repository", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = state.extensionRepositoryUrl,
-                onValueChange = viewModel::setExtensionRepositoryUrl,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("User-provided repository index URL") },
+            SourceSettingsSearchField(
+                query = sourceSettingsQuery,
+                selectedTab = selectedTab,
+                onQueryChange = { sourceSettingsQuery = it },
             )
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = viewModel::refreshInstalledSources) {
-                    Text("Refresh installed")
-                }
-                Button(onClick = viewModel::refreshExtensionIndex) {
-                    Text("Browse repository")
-                }
-            }
         }
-
-        if (state.availableExtensions.isNotEmpty()) {
+        state.message?.let { message ->
             item {
-                Text("Repository", style = MaterialTheme.typography.titleMedium)
-            }
-            items(state.availableExtensions, key = { "${it.packageName}:${it.versionCode}" }) { extension ->
-                ElevatedCard(
-                    onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(viewModel.extensionApkUrl(extension))))
-                    },
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = RoundedCornerShape(8.dp),
                 ) {
-                    ListItem(
-                        headlineContent = { Text(extension.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = { Text("${sourceLanguageLabel(extension.lang.normalizedSourceLanguage())} / v${extension.versionName}") },
-                        trailingContent = { Text("Install") },
-                    )
+                    Text(message, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
                 }
             }
         }
 
-        item {
-            Text(
-                "Source-specific options will appear here as Tankobun's compatibility layer learns how to render each extension's settings safely.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        if (selectedTab == 0) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Installed",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    TextButton(onClick = { viewModel.setSourcesEnabled(visibleInstalledSources, enabled = true) }) {
+                        Text("Visible on")
+                    }
+                    TextButton(onClick = { viewModel.setSourcesEnabled(visibleInstalledSources, enabled = false) }) {
+                        Text("Visible off")
+                    }
+                }
+            }
+            item {
+                SourceLanguageFilters(
+                    selectedFilter = selectedLanguageFilter,
+                    languageOptions = languageOptions,
+                    activeLabel = "Enabled",
+                    activeCount = activeInstalledSources.size,
+                    allCount = searchableInstalledSources.size,
+                    languageCounts = installedLanguageCounts,
+                    onSelectFilter = { selectedLanguageFilter = it },
+                )
+            }
+
+            if (state.allInstalledSources.isEmpty()) {
+                item {
+                    Text("No installed Tachiyomi-compatible source extensions found.")
+                }
+            } else if (sourceGroups.isEmpty()) {
+                item {
+                    Text(
+                        "No installed sources match this search and language filter.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                items(sourceGroups, key = { it.first }) { (language, sources) ->
+                    SourceLanguageGroupSection(
+                        language = language,
+                        sources = sources,
+                        state = state,
+                        repositoryByPackage = repositoryByPackage,
+                        onSourceEnabledChange = viewModel::setSourceEnabled,
+                        onGroupEnabledChange = viewModel::setSourcesEnabled,
+                        installingPackageName = state.installingExtensionPackageName,
+                        iconUrlFor = viewModel::extensionIconUrl,
+                        onInstall = { entry -> requestExtensionInstall(context, viewModel, entry) },
+                        onUninstall = { packageName -> openExtensionUninstall(context, packageName) },
+                    )
+                }
+            }
+
+        } else {
+            item {
+                Text("Extension Repository", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = state.extensionRepositoryUrl,
+                    onValueChange = viewModel::setExtensionRepositoryUrl,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("User-provided repository index URL") },
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Button(onClick = viewModel::refreshExtensionIndex) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Load")
+                    }
+                    OutlinedButton(onClick = viewModel::refreshInstalledSources) {
+                        Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Rescan")
+                    }
+                }
+                if (state.availableExtensions.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "${state.availableExtensions.size} extensions loaded",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (repositoryEntries.isEmpty()) {
+                item {
+                    Text(
+                        "Load a repository index to browse installable extensions.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                item {
+                    SourceLanguageFilters(
+                        selectedFilter = selectedRepositoryLanguageFilter,
+                        languageOptions = repositoryLanguageOptions,
+                        activeLabel = "Preferred",
+                        activeCount = activeRepositoryEntries.size,
+                        allCount = searchableRepositoryEntries.size,
+                        languageCounts = repositoryLanguageCounts,
+                        onSelectFilter = { selectedRepositoryLanguageFilter = it },
+                    )
+                }
+                if (visibleRepositoryEntries.isEmpty()) {
+                    item {
+                        Text(
+                            "No repository extensions match this search and language filter.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                items(visibleRepositoryEntries, key = { "${it.packageName}:${it.versionCode}" }) { extension ->
+                    ExtensionRepositoryRow(
+                        extension = extension,
+                        installedSources = installedByPackage[extension.packageName].orEmpty(),
+                        iconUrl = viewModel.extensionIconUrl(extension),
+                        installing = state.installingExtensionPackageName == extension.packageName,
+                        onInstall = { requestExtensionInstall(context, viewModel, extension) },
+                        onUninstall = { openExtensionUninstall(context, extension.packageName) },
+                    )
+                }
+            }
         }
     }
 }
+
+@Composable
+private fun SourceSettingsSummary(
+    state: TankobunUiState,
+    repositoryCount: Int,
+    selectedTab: Int,
+    onSelectTab: (Int) -> Unit,
+    onRefreshInstalled: () -> Unit,
+    onRefreshRepository: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = LocalTankobunTokens.current.elevatedSurface,
+        tonalElevation = 1.dp,
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Sources", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        "${state.installedSources.size} active / ${state.allInstalledSources.size} installed / $repositoryCount in repository",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = onRefreshInstalled) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh installed sources")
+                }
+                IconButton(onClick = onRefreshRepository) {
+                    Icon(Icons.Default.Download, contentDescription = "Load extension repository")
+                }
+            }
+            PrimaryScrollableTabRow(
+                selectedTabIndex = selectedTab,
+                edgePadding = 0.dp,
+                containerColor = Color.Transparent,
+            ) {
+                listOf("Installed", "Repository").forEachIndexed { index, label ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { onSelectTab(index) },
+                        text = { Text(label) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceSettingsSearchField(
+    query: String,
+    selectedTab: Int,
+    onQueryChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        label = { Text(if (selectedTab == 0) "Search installed sources" else "Search extensions") },
+        leadingIcon = {
+            Icon(Icons.Default.Search, contentDescription = null)
+        },
+        trailingIcon = {
+            if (query.isNotBlank()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Default.Close, contentDescription = "Clear source search")
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun SourceLanguageFilters(
+    selectedFilter: String,
+    languageOptions: List<String>,
+    activeLabel: String,
+    activeCount: Int,
+    allCount: Int,
+    languageCounts: Map<String, Int>,
+    onSelectFilter: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Languages", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FlowRowCompat {
+            FilterChip(
+                selected = selectedFilter == SOURCE_LANGUAGE_FILTER_ACTIVE,
+                onClick = { onSelectFilter(SOURCE_LANGUAGE_FILTER_ACTIVE) },
+                label = { Text("$activeLabel $activeCount") },
+            )
+            FilterChip(
+                selected = selectedFilter == SOURCE_LANGUAGE_FILTER_ALL,
+                onClick = { onSelectFilter(SOURCE_LANGUAGE_FILTER_ALL) },
+                label = { Text("All $allCount") },
+            )
+            languageOptions.forEach { language ->
+                val count = languageCounts[language] ?: 0
+                FilterChip(
+                    selected = selectedFilter == language,
+                    onClick = { onSelectFilter(language) },
+                    label = { Text("${sourceLanguageDisplay(language)} $count") },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceLanguageGroupSection(
+    language: String,
+    sources: List<SourceDescriptor>,
+    state: TankobunUiState,
+    repositoryByPackage: Map<String, ExtensionIndexEntry>,
+    onSourceEnabledChange: (SourceDescriptor, Boolean) -> Unit,
+    onGroupEnabledChange: (Collection<SourceDescriptor>, Boolean) -> Unit,
+    installingPackageName: String?,
+    iconUrlFor: (ExtensionIndexEntry) -> String?,
+    onInstall: (ExtensionIndexEntry) -> Unit,
+    onUninstall: (String) -> Unit,
+) {
+    val activeCount = sources.count { source -> state.sourceActive(source) }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+    ) {
+        Column(Modifier.padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(sourceLanguageDisplay(language), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "$activeCount of ${sources.size} active",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = { onGroupEnabledChange(sources, true) }) {
+                    Text("All on")
+                }
+                TextButton(onClick = { onGroupEnabledChange(sources, false) }) {
+                    Text("All off")
+                }
+            }
+            sources.forEach { source ->
+                SourceSettingsRow(
+                    source = source,
+                    active = state.sourceActive(source),
+                    extension = repositoryByPackage[source.packageName],
+                    iconUrl = repositoryByPackage[source.packageName]?.let(iconUrlFor),
+                    installing = installingPackageName == source.packageName,
+                    onEnabledChange = { enabled -> onSourceEnabledChange(source, enabled) },
+                    onInstall = onInstall,
+                    onUninstall = onUninstall,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceSettingsRow(
+    source: SourceDescriptor,
+    active: Boolean,
+    extension: ExtensionIndexEntry?,
+    iconUrl: String?,
+    installing: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    onInstall: (ExtensionIndexEntry) -> Unit,
+    onUninstall: (String) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ExtensionIcon(
+            packageName = source.packageName,
+            name = source.name,
+            iconUrl = iconUrl,
+            modifier = Modifier.size(34.dp),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                sourceMetadata(source, active),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        val updateAvailable = extension?.let { entry ->
+            source.versionCode?.let { installedVersion -> entry.versionCode > installedVersion } == true
+        } == true
+        if (extension != null && updateAvailable) {
+            IconButton(
+                enabled = !installing,
+                onClick = { onInstall(extension) },
+                modifier = Modifier.size(40.dp),
+            ) {
+                if (installing) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(
+                        Icons.Default.Download,
+                        contentDescription = "Update ${source.name}",
+                    )
+                }
+            }
+        }
+        IconButton(
+            onClick = { onUninstall(source.packageName) },
+            modifier = Modifier.size(40.dp),
+        ) {
+            Icon(Icons.Default.Close, contentDescription = "Uninstall ${source.name}")
+        }
+        Switch(
+            checked = active,
+            onCheckedChange = onEnabledChange,
+        )
+    }
+}
+
+@Composable
+private fun ExtensionRepositoryRow(
+    extension: ExtensionIndexEntry,
+    installedSources: List<SourceDescriptor>,
+    iconUrl: String?,
+    installing: Boolean,
+    onInstall: () -> Unit,
+    onUninstall: () -> Unit,
+) {
+    val installedVersionCode = installedSources.mapNotNull { it.versionCode }.maxOrNull()
+    val installed = installedSources.isNotEmpty()
+    val updateAvailable = installedVersionCode?.let { extension.versionCode > it } == true
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = LocalTankobunTokens.current.elevatedSurface,
+        tonalElevation = 1.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ExtensionIcon(
+                packageName = installedSources.firstOrNull()?.packageName,
+                name = extension.name,
+                iconUrl = iconUrl,
+                modifier = Modifier.size(36.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(extension.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    listOfNotNull(
+                        sourceLanguageDisplay(extension.lang.normalizedSourceLanguage()),
+                        "v${extension.versionName}",
+                        if (extension.isNsfw) "NSFW" else null,
+                        if (installed) "${installedSources.size} source${if (installedSources.size == 1) "" else "s"} installed" else null,
+                    ).joinToString(" / "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Button(
+                enabled = !installing,
+                onClick = onInstall,
+            ) {
+                if (installing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                } else {
+                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        when {
+                            updateAvailable -> "Update"
+                            installed -> "Reinstall"
+                            else -> "Install"
+                        },
+                    )
+                }
+            }
+            if (installed) {
+                IconButton(
+                    onClick = onUninstall,
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Uninstall ${extension.name}")
+                }
+            }
+        }
+    }
+}
+
+private fun TankobunUiState.sourceActive(source: SourceDescriptor): Boolean =
+    installedSources.any { it.sourceSettingsKey() == source.sourceSettingsKey() }
+
+private fun SourceDescriptor.matchesSourceSettingsQuery(
+    query: String,
+    extension: ExtensionIndexEntry?,
+): Boolean {
+    if (query.isBlank()) return true
+    return listOfNotNull(
+        name,
+        packageName,
+        packageName.substringAfterLast('.'),
+        lang,
+        sourceLanguageLabel(lang),
+        extension?.name,
+        extension?.packageName,
+    ).any { it.matchesSourceSettingsQuery(query) } ||
+        extension?.sources.orEmpty().any { source ->
+            listOfNotNull(source.name, source.lang, source.lang?.let(::sourceLanguageLabel))
+                .any { it.matchesSourceSettingsQuery(query) }
+        }
+}
+
+private fun ExtensionIndexEntry.matchesSourceSettingsQuery(query: String): Boolean {
+    if (query.isBlank()) return true
+    return listOfNotNull(
+        name,
+        packageName,
+        packageName.substringAfterLast('.'),
+        lang,
+        sourceLanguageLabel(lang),
+        versionName,
+    ).any { it.matchesSourceSettingsQuery(query) } ||
+        sources.any { source ->
+            listOfNotNull(source.name, source.lang, source.lang?.let(::sourceLanguageLabel))
+                .any { it.matchesSourceSettingsQuery(query) }
+        }
+}
+
+private fun String.matchesSourceSettingsQuery(query: String): Boolean =
+    lowercase().contains(query)
+
+private fun sourceMetadata(source: SourceDescriptor, active: Boolean): String =
+    listOfNotNull(
+        sourceLanguageDisplay(source.lang.normalizedSourceLanguage()),
+        source.versionName?.let { "v$it" },
+        if (source.isNsfw) "NSFW" else null,
+        if (active) "active" else "off",
+    ).joinToString(" / ")
+
+@Composable
+private fun ExtensionIcon(
+    packageName: String?,
+    name: String,
+    iconUrl: String?,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val packageIcon = remember(packageName) {
+        packageName
+            ?.let { pkg ->
+                runCatching {
+                    context.packageManager.getApplicationIcon(pkg).toImageBitmap()
+                }.getOrNull()
+            }
+    }
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        tonalElevation = 1.dp,
+    ) {
+        when {
+            packageIcon != null -> {
+                Image(
+                    bitmap = packageIcon,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().padding(3.dp),
+                )
+            }
+            iconUrl != null -> {
+                AsyncImage(
+                    model = iconUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().padding(3.dp),
+                )
+            }
+            else -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        extensionInitials(name),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun Drawable.toImageBitmap(): ImageBitmap {
+    val width = intrinsicWidth.takeIf { it > 0 } ?: 96
+    val height = intrinsicHeight.takeIf { it > 0 } ?: 96
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    setBounds(0, 0, canvas.width, canvas.height)
+    draw(canvas)
+    return bitmap.asImageBitmap()
+}
+
+private fun extensionInitials(name: String): String =
+    name.removePrefix("Tachiyomi:")
+        .trim()
+        .split(Regex("\\s+"))
+        .filter { it.isNotBlank() }
+        .take(2)
+        .joinToString("") { it.first().uppercase() }
+        .ifBlank { "?" }
+
+private fun requestExtensionInstall(
+    context: Context,
+    viewModel: MainViewModel,
+    extension: ExtensionIndexEntry,
+) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+        viewModel.requireExtensionInstallPermission()
+        context.startActivity(
+            Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:${context.packageName}"),
+            ),
+        )
+        return
+    }
+    viewModel.installExtension(extension)
+}
+
+private fun downloadedExtensionInstallIntent(installRequest: ExtensionInstallRequest): Intent =
+    Intent(Intent.ACTION_VIEW)
+        .setDataAndType(Uri.parse(installRequest.apkUri), "application/vnd.android.package-archive")
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+private fun openExtensionUninstall(context: Context, packageName: String) {
+    context.startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$packageName")))
+}
+
+private fun sourceLanguageSortPriority(language: String): Int =
+    when (language.normalizedSourceLanguage()) {
+        "en" -> 0
+        "all" -> 1
+        else -> 2
+    }
 
 private fun cacheAgeLabel(syncedAtEpochMillis: Long): String {
     val ageMillis = (System.currentTimeMillis() - syncedAtEpochMillis).coerceAtLeast(0L)
@@ -3394,17 +4112,140 @@ private fun String.normalizedSourceLanguage(): String =
 
 private fun sourceLanguageLabel(language: String): String =
     when (language.normalizedSourceLanguage()) {
-        "all" -> "All"
+        "all" -> "Multilingual"
+        "af" -> "Afrikaans"
+        "ar" -> "Arabic"
+        "az" -> "Azerbaijani"
+        "be" -> "Belarusian"
+        "bg" -> "Bulgarian"
+        "bn" -> "Bengali"
+        "ca" -> "Catalan"
+        "cs" -> "Czech"
+        "da" -> "Danish"
+        "de" -> "German"
+        "el" -> "Greek"
         "en" -> "English"
+        "eo" -> "Esperanto"
         "pt" -> "Portuguese"
         "pt-br" -> "Portuguese (BR)"
         "es" -> "Spanish"
+        "eu" -> "Basque"
+        "fa" -> "Persian"
+        "fi" -> "Finnish"
         "fr" -> "French"
+        "ga" -> "Irish"
+        "gl" -> "Galician"
+        "he" -> "Hebrew"
+        "hi" -> "Hindi"
+        "hr" -> "Croatian"
+        "hu" -> "Hungarian"
+        "id" -> "Indonesian"
+        "it" -> "Italian"
         "ja" -> "Japanese"
+        "ka" -> "Georgian"
+        "kk" -> "Kazakh"
         "ko" -> "Korean"
+        "la" -> "Latin"
+        "lt" -> "Lithuanian"
+        "ms" -> "Malay"
+        "mn" -> "Mongolian"
+        "my" -> "Burmese"
+        "ne" -> "Nepali"
+        "nl" -> "Dutch"
+        "no" -> "Norwegian"
+        "pl" -> "Polish"
+        "ro" -> "Romanian"
+        "ru" -> "Russian"
+        "sr" -> "Serbian"
+        "sv" -> "Swedish"
+        "ta" -> "Tamil"
+        "te" -> "Telugu"
+        "th" -> "Thai"
+        "tr" -> "Turkish"
+        "uk" -> "Ukrainian"
+        "ur" -> "Urdu"
+        "vi" -> "Vietnamese"
         "zh" -> "Chinese"
+        "zh-hans" -> "Chinese (Simplified)"
+        "zh-hant" -> "Chinese (Traditional)"
         else -> language.uppercase()
     }
+
+private fun sourceLanguageDisplay(language: String): String =
+    sourceLanguageFlag(language)?.let { flag -> "$flag ${sourceLanguageLabel(language)}" }
+        ?: sourceLanguageLabel(language)
+
+private fun sourceLanguageFlag(language: String): String? {
+    val normalized = language.normalizedSourceLanguage()
+    if (normalized == UNIVERSAL_SOURCE_LANGUAGE) {
+        return String(Character.toChars(0x1F310))
+    }
+    val region = normalized.substringAfter('-', "")
+        .takeIf { it.length == 2 && it.all { char -> char in 'a'..'z' } }
+    val countryCode = region ?: when (normalized.substringBefore('-')) {
+        "af" -> "za"
+        "ar" -> "sa"
+        "az" -> "az"
+        "be" -> "by"
+        "bn" -> "bd"
+        "bg" -> "bg"
+        "ca" -> "es"
+        "cs" -> "cz"
+        "da" -> "dk"
+        "de" -> "de"
+        "el" -> "gr"
+        "en" -> "gb"
+        "es" -> "es"
+        "eu" -> "es"
+        "fa" -> "ir"
+        "fi" -> "fi"
+        "fr" -> "fr"
+        "ga" -> "ie"
+        "gl" -> "es"
+        "he" -> "il"
+        "hi" -> "in"
+        "hr" -> "hr"
+        "hu" -> "hu"
+        "id" -> "id"
+        "it" -> "it"
+        "ja" -> "jp"
+        "ka" -> "ge"
+        "kk" -> "kz"
+        "ko" -> "kr"
+        "la" -> "va"
+        "lt" -> "lt"
+        "ms" -> "my"
+        "mn" -> "mn"
+        "my" -> "mm"
+        "ne" -> "np"
+        "nl" -> "nl"
+        "no" -> "no"
+        "pl" -> "pl"
+        "pt" -> "pt"
+        "ro" -> "ro"
+        "ru" -> "ru"
+        "sr" -> "rs"
+        "sv" -> "se"
+        "ta" -> "in"
+        "te" -> "in"
+        "th" -> "th"
+        "tr" -> "tr"
+        "uk" -> "ua"
+        "ur" -> "pk"
+        "vi" -> "vn"
+        "zh" -> "cn"
+        else -> null
+    }
+    return countryCode?.let(::countryFlagEmoji)
+}
+
+private fun countryFlagEmoji(countryCode: String): String? {
+    val normalized = countryCode.uppercase()
+        .takeIf { it.length == 2 && it.all { char -> char in 'A'..'Z' } }
+        ?: return null
+    val codePoints = normalized.map { char -> 0x1F1E6 + (char - 'A') }.toIntArray()
+    return String(codePoints, 0, codePoints.size)
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

@@ -1,7 +1,9 @@
 package com.tankobun.app
 
+import android.net.Uri
 import android.util.Log
 import com.tankobun.core.anilist.AnilistGraphQlException
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -31,14 +33,19 @@ import com.tankobun.core.model.SourceManga
 import com.tankobun.core.model.SourceSearchResult
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.Request
+import java.io.File
 import java.util.Locale
 import java.util.UUID
 
@@ -83,8 +90,11 @@ data class TankobunUiState(
     val allInstalledSources: List<SourceDescriptor> = emptyList(),
     val installedSources: List<SourceDescriptor> = emptyList(),
     val sourceLanguages: Set<String> = defaultSourceLanguages(),
+    val disabledSourceKeys: Set<String> = emptySet(),
     val extensionRepositoryUrl: String = "",
     val availableExtensions: List<ExtensionIndexEntry> = emptyList(),
+    val installingExtensionPackageName: String? = null,
+    val extensionInstallRequest: ExtensionInstallRequest? = null,
     val sourceMatches: List<SourceSearchResult> = emptyList(),
     val sourceMatchChapterCounts: Map<String, Int> = emptyMap(),
     val sourcePickerOpen: Boolean = false,
@@ -110,6 +120,14 @@ data class TankobunUiState(
     val librarySections: List<LibrarySection>
         get() = libraryItems.toLibrarySections()
 }
+
+data class ExtensionInstallRequest(
+    val packageName: String,
+    val name: String,
+    val apkUri: String,
+    val expectedVersionCode: Int,
+    val expectedVersionName: String,
+)
 
 data class LibraryItem(
     val media: AnilistMedia,
@@ -139,6 +157,11 @@ private data class BrowseLandingData(
     val topManga: List<AnilistMedia>,
 )
 
+private data class InstalledExtensionVersion(
+    val versionCode: Int,
+    val versionName: String,
+)
+
 class MainViewModel(
     private val container: AppContainer,
 ) : ViewModel() {
@@ -155,6 +178,7 @@ class MainViewModel(
             browseViewMode = container.settingsStore.browseViewMode(),
             browseAvailableTags = container.settingsStore.anilistTags(),
             sourceLanguages = container.settingsStore.sourceLanguages(),
+            disabledSourceKeys = container.settingsStore.disabledSourceKeys(),
             extensionRepositoryUrl = container.settingsStore.extensionRepositoryUrl(),
             themeMode = container.settingsStore.themeMode(),
             readerMode = container.settingsStore.readerMode(),
@@ -166,6 +190,9 @@ class MainViewModel(
 
     init {
         refreshInstalledSources()
+        if (_state.value.extensionRepositoryUrl.isNotBlank()) {
+            refreshExtensionIndex(silent = true)
+        }
         if (_state.value.loggedIn) {
             loadCachedLibrary(syncIfEmpty = true)
         }
@@ -218,7 +245,10 @@ class MainViewModel(
                 }.getOrDefault(emptyList()).ifEmpty { listOf(descriptor) }
             }
             val allSources = discoveredSources.visibleSources()
-            val sources = allSources.preferredVisibleSources(_state.value.sourceLanguages)
+            val sources = allSources.preferredVisibleSources(
+                preferredLanguages = _state.value.sourceLanguages,
+                disabledSourceKeys = _state.value.disabledSourceKeys,
+            )
             val selectedSourceId = _state.value.selectedSourceId
             _state.update {
                 it.copy(
@@ -260,9 +290,10 @@ class MainViewModel(
             _state.value.sourceLanguages - normalized
         }
         val next = selectedLanguages.ifEmpty { defaultSourceLanguages() }
+            .plus(UNIVERSAL_SOURCE_LANGUAGE)
         container.settingsStore.saveSourceLanguages(next)
         _state.update {
-            val sources = it.allInstalledSources.preferredVisibleSources(next)
+            val sources = it.allInstalledSources.preferredVisibleSources(next, it.disabledSourceKeys)
             it.copy(
                 sourceLanguages = next,
                 installedSources = sources,
@@ -273,27 +304,69 @@ class MainViewModel(
         }
     }
 
-    fun refreshExtensionIndex() {
+    fun setSourceEnabled(source: SourceDescriptor, enabled: Boolean) {
+        setSourcesEnabled(listOf(source), enabled)
+    }
+
+    fun setSourcesEnabled(sources: Collection<SourceDescriptor>, enabled: Boolean) {
+        val keys = sources.mapTo(mutableSetOf()) { it.sourceSettingsKey() }
+        if (keys.isEmpty()) return
+        val languages = sources.mapTo(mutableSetOf()) { it.normalizedLanguage() }
+            .filterTo(mutableSetOf()) { it.isNotBlank() }
+        val nextLanguages = if (enabled) {
+            _state.value.sourceLanguages + languages + UNIVERSAL_SOURCE_LANGUAGE
+        } else {
+            _state.value.sourceLanguages + UNIVERSAL_SOURCE_LANGUAGE
+        }
+        val nextDisabledKeys = if (enabled) {
+            _state.value.disabledSourceKeys - keys
+        } else {
+            _state.value.disabledSourceKeys + keys
+        }
+
+        container.settingsStore.saveSourceLanguages(nextLanguages)
+        container.settingsStore.saveDisabledSourceKeys(nextDisabledKeys)
+        _state.update { current ->
+            val visibleSources = current.allInstalledSources.preferredVisibleSources(nextLanguages, nextDisabledKeys)
+            current.copy(
+                sourceLanguages = nextLanguages,
+                disabledSourceKeys = nextDisabledKeys,
+                installedSources = visibleSources,
+                selectedSourceId = current.selectedSourceId
+                    ?.takeIf { selected -> visibleSources.any { source -> source.id == selected } }
+                    ?: visibleSources.firstOrNull()?.id,
+            )
+        }
+    }
+
+    fun refreshExtensionIndex(silent: Boolean = false) {
         val repositoryUrl = _state.value.extensionRepositoryUrl.trim()
         if (repositoryUrl.isBlank()) {
-            _state.update { it.copy(message = "Paste an extension repository index URL first") }
+            if (!silent) {
+                _state.update { it.copy(message = "Paste an extension repository index URL first") }
+            }
             return
         }
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
+            if (!silent) {
+                _state.update { it.copy(busy = true, message = null) }
+            }
             runCatching {
                 container.extensionRepository.fetchIndex(repositoryUrl)
             }.onSuccess { extensions ->
                 _state.update {
                     it.copy(
                         availableExtensions = extensions,
-                        busy = false,
-                        message = "Loaded ${extensions.size} extensions",
+                        busy = if (silent) it.busy else false,
+                        message = if (silent) it.message else "Loaded ${extensions.size} extensions",
                     )
                 }
             }.onFailure { error ->
                 _state.update {
-                    it.copy(busy = false, message = error.message ?: "Extension index failed")
+                    it.copy(
+                        busy = if (silent) it.busy else false,
+                        message = if (silent) it.message else error.message ?: "Extension index failed",
+                    )
                 }
             }
         }
@@ -301,6 +374,136 @@ class MainViewModel(
 
     fun extensionApkUrl(entry: ExtensionIndexEntry): String =
         container.extensionRepository.apkUrl(_state.value.extensionRepositoryUrl.trim(), entry)
+
+    fun extensionIconUrl(entry: ExtensionIndexEntry): String? =
+        _state.value.extensionRepositoryUrl.trim()
+            .takeIf { it.isNotBlank() }
+            ?.let { container.extensionRepository.iconUrl(it, entry) }
+
+    fun installExtension(entry: ExtensionIndexEntry) {
+        val apkUrl = extensionApkUrl(entry)
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    installingExtensionPackageName = entry.packageName,
+                    extensionInstallRequest = null,
+                    message = "Downloading ${entry.name}",
+                )
+            }
+            runCatching {
+                downloadExtensionApk(apkUrl, entry)
+            }.onSuccess { apkUri ->
+                _state.update {
+                    it.copy(
+                        installingExtensionPackageName = null,
+                        extensionInstallRequest = ExtensionInstallRequest(
+                            packageName = entry.packageName,
+                            name = entry.name,
+                            apkUri = apkUri.toString(),
+                            expectedVersionCode = entry.versionCode,
+                            expectedVersionName = entry.versionName,
+                        ),
+                        message = "Ready to install ${entry.name}",
+                    )
+                }
+            }.onFailure { error ->
+                Log.w(TAG, "Extension APK download failed for ${entry.packageName}", error)
+                _state.update {
+                    it.copy(
+                        installingExtensionPackageName = null,
+                        message = error.message ?: "Extension download failed",
+                    )
+                }
+            }
+        }
+    }
+
+    fun requireExtensionInstallPermission() {
+        _state.update {
+            it.copy(message = "Allow Tankobun to install extensions, then tap Install again")
+        }
+    }
+
+    fun consumeExtensionInstallRequest() {
+        _state.update { it.copy(extensionInstallRequest = null) }
+    }
+
+    fun refreshInstalledSourcesAfterExtensionInstall(request: ExtensionInstallRequest) {
+        viewModelScope.launch {
+            var installedVersion: InstalledExtensionVersion? = null
+            for (attempt in 0 until 5) {
+                refreshInstalledSources()
+                installedVersion = installedExtensionVersion(request.packageName)
+                if ((installedVersion?.versionCode ?: -1) >= request.expectedVersionCode) {
+                    break
+                }
+                delay(1_000L * (attempt + 1))
+            }
+            refreshInstalledSources()
+            val version = installedVersion
+            val message = when {
+                version == null -> "Installer returned before ${request.name} was installed"
+                version.versionCode >= request.expectedVersionCode -> "Updated ${request.name} to v${version.versionName}"
+                else -> "${request.name} is still v${version.versionName}; Android did not finish the update"
+            }
+            _state.update { it.copy(message = message) }
+            Log.i(
+                TAG,
+                "Installer returned for ${request.packageName}; installed=${version?.versionCode}, expected=${request.expectedVersionCode}",
+            )
+        }
+    }
+
+    private fun installedExtensionVersion(packageName: String): InstalledExtensionVersion? =
+        runCatching {
+            val packageInfo = container.application.packageManager.getPackageInfo(packageName, 0)
+            InstalledExtensionVersion(
+                versionCode = if (android.os.Build.VERSION.SDK_INT >= 28) {
+                    packageInfo.longVersionCode.toInt()
+                } else {
+                    @Suppress("DEPRECATION")
+                    packageInfo.versionCode
+                },
+                versionName = packageInfo.versionName.orEmpty(),
+            )
+        }.getOrNull()
+
+    private suspend fun downloadExtensionApk(apkUrl: String, entry: ExtensionIndexEntry): Uri =
+        withContext(Dispatchers.IO) {
+            val cacheDir = File(container.application.cacheDir, "extension_apks").also { it.mkdirs() }
+            val safeName = "${entry.packageName}-${entry.versionCode}.apk"
+                .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val apkFile = File(cacheDir, safeName)
+            val partialFile = File(cacheDir, "$safeName.part")
+
+            cacheDir.listFiles()
+                ?.filter { it.name.startsWith(entry.packageName) && it.name != apkFile.name }
+                ?.forEach { it.delete() }
+
+            val request = Request.Builder().url(apkUrl).build()
+            container.okHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    error("APK download failed: HTTP ${response.code}")
+                }
+                val body = response.body
+                partialFile.outputStream().use { output ->
+                    body.byteStream().use { input -> input.copyTo(output) }
+                }
+            }
+
+            if (partialFile.length() <= 0L) {
+                partialFile.delete()
+                error("APK download failed: empty file")
+            }
+            if (apkFile.exists()) apkFile.delete()
+            check(partialFile.renameTo(apkFile)) { "APK download failed: could not finalize file" }
+
+            FileProvider.getUriForFile(
+                container.application,
+                "${container.application.packageName}.fileprovider",
+                apkFile,
+            )
+        }
 
     private fun loadCachedLibrary(syncIfEmpty: Boolean = false) {
         viewModelScope.launch {
@@ -1051,7 +1254,7 @@ class MainViewModel(
         val sources = sourcePickerSources()
         _state.update { it.copy(sourcePickerOpen = true, message = null) }
         if (sources.isEmpty()) {
-            _state.update { it.copy(message = "Install a source extension first") }
+            _state.update { it.copy(message = "Enable or install a source extension first") }
             return
         }
         if (!_state.value.sourcePickerLoading) {
@@ -1066,9 +1269,14 @@ class MainViewModel(
     fun bindSelectedSource() {
         val media = _state.value.selectedMedia ?: return
         val source = _state.value.selectedSource ?: run {
-            _state.update { it.copy(message = "Install a source extension first") }
+            _state.update { it.copy(message = "Enable or install a source extension first") }
             return
         }
+        bindSource(source)
+    }
+
+    fun bindSource(source: SourceDescriptor) {
+        val media = _state.value.selectedMedia ?: return
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
@@ -1264,8 +1472,7 @@ class MainViewModel(
     private fun sourcePickerSources(): List<SourceDescriptor> {
         val snapshot = _state.value
         val selectedSourceId = snapshot.selectedSourceId
-        return snapshot.allInstalledSources
-            .ifEmpty { snapshot.installedSources }
+        return snapshot.installedSources
             .distinctBy { "${it.packageName}:${it.id}" }
             .sortedWith(
                 compareBy<SourceDescriptor> { if (it.id == selectedSourceId) 0 else 1 }
@@ -1768,9 +1975,16 @@ private fun List<SourceDescriptor>.visibleSources(): List<SourceDescriptor> =
             .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
             .thenBy(String.CASE_INSENSITIVE_ORDER) { it.lang })
 
-private fun List<SourceDescriptor>.preferredVisibleSources(preferredLanguages: Set<String>): List<SourceDescriptor> {
-    val preferredSources = filter { it.normalizedLanguage() in preferredLanguages }
+private fun List<SourceDescriptor>.preferredVisibleSources(
+    preferredLanguages: Set<String>,
+    disabledSourceKeys: Set<String> = emptySet(),
+): List<SourceDescriptor> {
+    val preferredSources = filter {
+        val language = it.normalizedLanguage()
+        language in preferredLanguages || language == UNIVERSAL_SOURCE_LANGUAGE
+    }
     return (preferredSources.ifEmpty { this })
+        .filterNot { it.sourceSettingsKey() in disabledSourceKeys }
         .distinctBy { "${it.packageName}:${it.id}:${it.name}:${it.lang}" }
         .sortedWith(compareBy<SourceDescriptor> { it.languageSortPriority(preferredLanguages) }
             .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
@@ -1788,3 +2002,6 @@ private fun SourceDescriptor.languageSortPriority(preferredLanguages: Set<String
 
 private fun SourceDescriptor.normalizedLanguage(): String =
     lang.lowercase(Locale.ROOT).replace('_', '-')
+
+internal fun SourceDescriptor.sourceSettingsKey(): String =
+    "$packageName:$id"
