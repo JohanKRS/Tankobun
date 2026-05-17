@@ -110,7 +110,17 @@ class TachiyomiSourceHost(
                     fetchChapters = false,
                 ).manga
             }
-            details.toSourceManga(sourceInstance.id)
+            details.toSourceManga(sourceInstance.id).let { resolved ->
+                resolved.copy(
+                    url = resolved.url.ifBlank { manga.url },
+                    title = resolved.title.ifBlank { manga.title },
+                    thumbnailUrl = resolved.thumbnailUrl ?: manga.thumbnailUrl,
+                    description = resolved.description ?: manga.description,
+                    author = resolved.author ?: manga.author,
+                    artist = resolved.artist ?: manga.artist,
+                    status = resolved.status ?: manga.status,
+                )
+            }
         }
     }
 

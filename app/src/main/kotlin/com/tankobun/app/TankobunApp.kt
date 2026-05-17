@@ -2480,6 +2480,21 @@ private fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel,
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
 
+                state.sourcePickerMessage?.let { pickerMessage ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ) {
+                        Text(
+                            pickerMessage,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+
                 if (matches.isEmpty() && availableSources.isEmpty() && !state.sourcePickerLoading) {
                     Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {

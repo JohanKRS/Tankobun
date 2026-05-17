@@ -99,6 +99,7 @@ data class TankobunUiState(
     val sourceMatchChapterCounts: Map<String, Int> = emptyMap(),
     val sourcePickerOpen: Boolean = false,
     val sourcePickerLoading: Boolean = false,
+    val sourcePickerMessage: String? = null,
     val selectedSourceManga: SourceManga? = null,
     val sourceChapters: List<SourceChapter> = emptyList(),
     val latestProgress: ReadingProgress? = null,
@@ -818,6 +819,7 @@ class MainViewModel(
                 sourceMatchChapterCounts = emptyMap(),
                 sourcePickerOpen = false,
                 sourcePickerLoading = false,
+                sourcePickerMessage = null,
                 selectedListEntry = existingEntry,
                 selectedRecommendations = emptyList(),
                 selectedRecommendationsPage = 0,
@@ -867,6 +869,7 @@ class MainViewModel(
                 sourceMatchChapterCounts = emptyMap(),
                 sourcePickerOpen = false,
                 sourcePickerLoading = false,
+                sourcePickerMessage = null,
                 selectedListEntry = null,
                 selectedRecommendations = emptyList(),
                 selectedRecommendationsPage = 0,
@@ -1252,9 +1255,15 @@ class MainViewModel(
     fun openSourcePicker() {
         _state.value.selectedMedia ?: return
         val sources = sourcePickerSources()
-        _state.update { it.copy(sourcePickerOpen = true, message = null) }
+        _state.update {
+            it.copy(
+                sourcePickerOpen = true,
+                sourcePickerMessage = null,
+                message = null,
+            )
+        }
         if (sources.isEmpty()) {
-            _state.update { it.copy(message = "Enable or install a source extension first") }
+            _state.update { it.copy(sourcePickerMessage = "Enable or install a source extension first") }
             return
         }
         if (!_state.value.sourcePickerLoading) {
@@ -1263,7 +1272,7 @@ class MainViewModel(
     }
 
     fun closeSourcePicker() {
-        _state.update { it.copy(sourcePickerOpen = false, sourcePickerLoading = false) }
+        _state.update { it.copy(sourcePickerOpen = false, sourcePickerLoading = false, sourcePickerMessage = null) }
     }
 
     fun bindSelectedSource() {
@@ -1278,7 +1287,14 @@ class MainViewModel(
     fun bindSource(source: SourceDescriptor) {
         val media = _state.value.selectedMedia ?: return
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
+            _state.update {
+                it.copy(
+                    busy = true,
+                    sourcePickerLoading = true,
+                    sourcePickerMessage = "Searching ${source.name}...",
+                    message = null,
+                )
+            }
             runCatching {
                 val now = System.currentTimeMillis()
                 val matches = searchSourceMatches(media, source, now)
@@ -1294,13 +1310,23 @@ class MainViewModel(
                         },
                         selectedSourceId = match.source.id,
                         selectedSourceManga = match.manga,
+                        sourcePickerOpen = false,
+                        sourcePickerLoading = false,
+                        sourcePickerMessage = null,
                         message = "Source selected for ${match.manga.title}",
                     )
                 }
                 loadChapters(match.source, match.manga)
             }.onFailure { error ->
                 Log.w(TAG, "Selected source binding failed for ${source.name}", error)
-                _state.update { it.copy(busy = false, message = error.message ?: "Source selection failed") }
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        sourcePickerLoading = false,
+                        sourcePickerMessage = sourcePickerErrorMessage(source.name, error),
+                        message = null,
+                    )
+                }
             }
         }
     }
@@ -1381,14 +1407,11 @@ class MainViewModel(
     }
 
     private fun sourceSearchQueryVariants(title: String): List<String> {
-        val withoutHtml = title.replace(Regex("<[^>]*>"), " ")
-        val withoutParenthetical = withoutHtml.replace(Regex("\\([^)]*\\)|\\[[^\\]]*]|\\{[^}]*}"), " ")
-        val subtitlePrefix = withoutHtml
-            .split(Regex("[:\\uFF1A]|\\s[-\\u2010-\\u2015]\\s"))
-            .firstOrNull()
-            .orEmpty()
-        val spacedNumber = withoutHtml.replace(Regex("\\bNo\\.?(\\d)", RegexOption.IGNORE_CASE), "No. $1")
-        val withoutNumberPrefix = withoutHtml.replace(Regex("\\bNo\\.?\\s*", RegexOption.IGNORE_CASE), "")
+        val withoutHtml = title.withoutHtmlTags()
+        val withoutParenthetical = withoutHtml.withoutBracketedText()
+        val subtitlePrefix = withoutHtml.mainTitlePrefix()
+        val spacedNumber = withoutHtml.withSpacedNoNumber()
+        val withoutNumberPrefix = withoutHtml.withoutNoNumberPrefix()
         val words = cleanSourceSearchQuery(withoutHtml)
             .split(' ')
             .filter { it.isNotBlank() }
@@ -1412,21 +1435,159 @@ class MainViewModel(
     }
 
     private fun cleanSourceSearchQuery(query: String): String =
-        query
-            .replace("&", " and ")
-            .replace(Regex("[^\\p{L}\\p{N}\\s]+"), " ")
-            .trim()
-            .replace(Regex("\\s+"), " ")
+        buildString {
+            var previousWasSpace = true
+            query.forEach { char ->
+                val replacement = when {
+                    char == '&' -> " and "
+                    char.isLetterOrDigit() -> char.toString()
+                    char.isWhitespace() -> " "
+                    else -> " "
+                }
+                replacement.forEach { next ->
+                    if (next.isWhitespace()) {
+                        if (!previousWasSpace) append(' ')
+                        previousWasSpace = true
+                    } else {
+                        append(next)
+                        previousWasSpace = false
+                    }
+                }
+            }
+        }.trim()
+
+    private fun String.withoutHtmlTags(): String = buildString {
+        var insideTag = false
+        this@withoutHtmlTags.forEach { char ->
+            when (char) {
+                '<' -> {
+                    insideTag = true
+                    append(' ')
+                }
+                '>' -> {
+                    insideTag = false
+                    append(' ')
+                }
+                else -> if (!insideTag) append(char)
+            }
+        }
+    }
+
+    private fun String.withoutBracketedText(): String = buildString {
+        var closingBracket: Char? = null
+        this@withoutBracketedText.forEach { char ->
+            when {
+                closingBracket == null && char == '(' -> {
+                    closingBracket = ')'
+                    append(' ')
+                }
+                closingBracket == null && char == '[' -> {
+                    closingBracket = ']'
+                    append(' ')
+                }
+                closingBracket == null && char == '{' -> {
+                    closingBracket = '}'
+                    append(' ')
+                }
+                closingBracket != null && char == closingBracket -> {
+                    closingBracket = null
+                    append(' ')
+                }
+                closingBracket == null -> append(char)
+            }
+        }
+    }
+
+    private fun String.mainTitlePrefix(): String {
+        val separators = listOf(
+            ":",
+            "\uFF1A",
+            " - ",
+            " \u2010 ",
+            " \u2011 ",
+            " \u2012 ",
+            " \u2013 ",
+            " \u2014 ",
+            " \u2015 ",
+        )
+        val splitAt = separators.mapNotNull { separator ->
+            indexOf(separator).takeIf { it >= 0 }
+        }.minOrNull()
+        return splitAt?.let { take(it) }.orEmpty()
+    }
+
+    private fun String.withSpacedNoNumber(): String = buildString {
+        var index = 0
+        while (index < this@withSpacedNoNumber.length) {
+            val char = this@withSpacedNoNumber[index]
+            val next = this@withSpacedNoNumber.getOrNull(index + 1)
+            if ((char == 'N' || char == 'n') && (next == 'O' || next == 'o')) {
+                var cursor = index + 2
+                if (this@withSpacedNoNumber.getOrNull(cursor) == '.') cursor += 1
+                if (this@withSpacedNoNumber.getOrNull(cursor)?.isDigit() == true) {
+                    append("No. ")
+                    index = cursor
+                    continue
+                }
+            }
+            append(char)
+            index += 1
+        }
+    }
+
+    private fun String.withoutNoNumberPrefix(): String = buildString {
+        var index = 0
+        while (index < this@withoutNoNumberPrefix.length) {
+            val char = this@withoutNoNumberPrefix[index]
+            val next = this@withoutNoNumberPrefix.getOrNull(index + 1)
+            if ((char == 'N' || char == 'n') && (next == 'O' || next == 'o')) {
+                var cursor = index + 2
+                if (this@withoutNoNumberPrefix.getOrNull(cursor) == '.') cursor += 1
+                while (this@withoutNoNumberPrefix.getOrNull(cursor)?.isWhitespace() == true) {
+                    cursor += 1
+                }
+                if (this@withoutNoNumberPrefix.getOrNull(cursor)?.isDigit() == true) {
+                    index = cursor
+                    continue
+                }
+            }
+            append(char)
+            index += 1
+        }
+    }
+
+    private fun sourcePickerErrorMessage(sourceName: String, error: Throwable): String {
+        val detail = generateSequence(error) { it.cause }
+            .mapNotNull { it.message?.takeIf(String::isNotBlank) }
+            .firstOrNull()
+            ?: error.javaClass.simpleName
+        return when {
+            detail.contains("syntax error in regexp pattern", ignoreCase = true) ->
+                "$sourceName failed while parsing source data. The extension reported a regexp error; try another source or update that extension."
+            detail.contains("timeout", ignoreCase = true) ->
+                "$sourceName took too long to respond. Try again or choose another source."
+            detail.contains("No readable manga found", ignoreCase = true) ->
+                detail
+            else -> "$sourceName failed: $detail"
+        }
+    }
 
     fun findSourceMatches(forceRefresh: Boolean = false) {
         val media = _state.value.selectedMedia ?: return
         val sources = sourcePickerSources()
         if (sources.isEmpty()) {
-            _state.update { it.copy(message = "Install a source extension first") }
+            _state.update { it.copy(sourcePickerMessage = "Enable or install a source extension first") }
             return
         }
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, sourcePickerLoading = true, message = null) }
+            _state.update {
+                it.copy(
+                    busy = true,
+                    sourcePickerLoading = true,
+                    sourcePickerMessage = "Searching enabled sources...",
+                    message = null,
+                )
+            }
             runCatching {
                 val now = System.currentTimeMillis()
                 cachedVerifiedMatches(media.id, sources, now)
@@ -1450,11 +1611,12 @@ class MainViewModel(
                         sourceMatchChapterCounts = it.sourceMatchChapterCounts + verified.chapterCounts,
                         busy = false,
                         sourcePickerLoading = false,
-                        message = if (nextMatches.isEmpty()) {
-                            "No sources with chapters found"
+                        sourcePickerMessage = if (nextMatches.isEmpty()) {
+                            "No readable matches found automatically. Tap a source below to try it directly."
                         } else {
                             "Found ${nextMatches.size} readable sources"
                         },
+                        message = null,
                     )
                 }
             }.onFailure { error ->
@@ -1462,7 +1624,8 @@ class MainViewModel(
                     it.copy(
                         busy = false,
                         sourcePickerLoading = false,
-                        message = error.message ?: "Source search failed",
+                        sourcePickerMessage = sourcePickerErrorMessage("source search", error),
+                        message = null,
                     )
                 }
             }
@@ -1608,7 +1771,8 @@ class MainViewModel(
                 it.copy(
                     sourceMatches = nextMatches,
                     sourceMatchChapterCounts = it.sourceMatchChapterCounts + (match.sourceMatchKey() to chapterCount),
-                    message = "Found ${nextMatches.size} readable sources",
+                    sourcePickerMessage = "Found ${nextMatches.size} readable sources",
+                    message = null,
                 )
             }
         }
@@ -1639,7 +1803,14 @@ class MainViewModel(
 
     fun bindSourceMatch(match: SourceSearchResult) {
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, sourcePickerLoading = true, message = null) }
+            _state.update {
+                it.copy(
+                    busy = true,
+                    sourcePickerLoading = true,
+                    sourcePickerMessage = "Opening ${match.manga.title} from ${match.source.name}...",
+                    message = null,
+                )
+            }
             runCatching {
                 val resolved = match.withResolvedManga()
                 saveSourceBinding(resolved)
@@ -1651,6 +1822,7 @@ class MainViewModel(
                         selectedSourceManga = resolved.manga,
                         sourcePickerOpen = false,
                         sourcePickerLoading = false,
+                        sourcePickerMessage = null,
                         message = "Source selected for ${resolved.manga.title}",
                     )
                 }
@@ -1661,7 +1833,8 @@ class MainViewModel(
                     it.copy(
                         busy = false,
                         sourcePickerLoading = false,
-                        message = error.message ?: "Source selection failed",
+                        sourcePickerMessage = sourcePickerErrorMessage(match.source.name, error),
+                        message = null,
                     )
                 }
             }
