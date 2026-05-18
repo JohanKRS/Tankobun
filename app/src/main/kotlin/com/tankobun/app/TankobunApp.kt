@@ -101,6 +101,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
@@ -116,6 +117,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -161,9 +163,11 @@ import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceSearchResult
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.pow
+import kotlin.math.roundToInt
 
 private enum class SettingsRoute {
     MAIN,
@@ -3227,6 +3231,9 @@ private fun TankobunUiState.primaryReadingActionChapter(): SourceChapter? =
             .minByOrNull { it.chapterNumber }
         ?: sourceChapters.lastOrNull()
 
+private fun TankobunUiState.nextReaderChapter(): SourceChapter? =
+    sourceChapters.nextInReadingOrderAfter(activeChapter ?: return null)
+
 private fun SourceChapter.isReadBy(progress: ReadingProgress?): Boolean {
     progress ?: return false
     if (chapterNumber <= 0f || progress.chapterNumber <= 0f) {
@@ -3279,6 +3286,16 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     val pageGap = readerPageGap(state.readerPageGapLevel)
     val webtoonListState = rememberLazyListState()
     val zoomPercent = (readerScale * 100).toInt()
+    val pageCount = state.readerPages.size
+    val lastPageIndex = (pageCount - 1).coerceAtLeast(0)
+    val nextChapter = state.nextReaderChapter()
+    val canGoForward = state.currentPageIndex < lastPageIndex || nextChapter != null
+    var scrubberValue by remember(chapter.url, pageCount) {
+        mutableStateOf(state.currentPageIndex.coerceIn(0, lastPageIndex).toFloat())
+    }
+    var webtoonUserNavigated by remember(chapter.url) { mutableStateOf(false) }
+    var autoOpenedNextChapter by remember(chapter.url) { mutableStateOf(false) }
+    val displayedPageIndex = scrubberValue.roundToInt().coerceIn(0, lastPageIndex)
     fun cancelFling() {
         flingJob?.cancel()
         flingJob = null
@@ -3393,9 +3410,70 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
             }
         }
     }
+    fun goToReaderPage(index: Int) {
+        val targetIndex = index.coerceIn(0, lastPageIndex)
+        scrubberValue = targetIndex.toFloat()
+        resetZoom()
+        viewModel.setReaderPage(targetIndex)
+        if (state.readerMode == ReaderMode.WEBTOON) {
+            coroutineScope.launch {
+                webtoonListState.animateScrollToItem(targetIndex)
+            }
+        }
+    }
+    fun commitScrubbedPage() {
+        goToReaderPage(scrubberValue.roundToInt())
+    }
+    fun moveReaderPageFromControls(delta: Int) {
+        val targetIndex = state.currentPageIndex + delta
+        if (delta > 0 && targetIndex > lastPageIndex && nextChapter != null) {
+            resetZoom()
+            viewModel.openNextChapter()
+        } else {
+            goToReaderPage(targetIndex)
+        }
+    }
 
     DisposableEffect(transformKey) {
         onDispose { stopReaderMotion() }
+    }
+
+    LaunchedEffect(chapter.url, state.currentPageIndex, pageCount) {
+        scrubberValue = state.currentPageIndex.coerceIn(0, lastPageIndex).toFloat()
+    }
+
+    LaunchedEffect(chapter.url, state.readerMode, pageCount) {
+        if (state.readerMode == ReaderMode.WEBTOON && state.currentPageIndex > 0) {
+            webtoonListState.scrollToItem(state.currentPageIndex.coerceIn(0, lastPageIndex))
+        }
+    }
+
+    LaunchedEffect(chapter.url, state.readerMode, pageCount) {
+        if (state.readerMode == ReaderMode.WEBTOON) {
+            snapshotFlow { webtoonListState.firstVisibleItemIndex.coerceIn(0, lastPageIndex) }
+                .distinctUntilChanged()
+                .collect { viewModel.setReaderPage(it) }
+        }
+    }
+
+    LaunchedEffect(chapter.url, state.readerMode, pageCount, webtoonUserNavigated, autoOpenedNextChapter) {
+        if (state.readerMode == ReaderMode.WEBTOON && webtoonUserNavigated && !autoOpenedNextChapter) {
+            snapshotFlow {
+                val layoutInfo = webtoonListState.layoutInfo
+                val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                layoutInfo.totalItemsCount > 0 &&
+                    lastVisibleIndex >= layoutInfo.totalItemsCount - 1 &&
+                    !webtoonListState.canScrollForward
+            }
+                .distinctUntilChanged()
+                .collect { atEnd ->
+                    if (atEnd) {
+                        autoOpenedNextChapter = true
+                        viewModel.setReaderPage(lastPageIndex)
+                        viewModel.openNextChapter()
+                    }
+                }
+        }
     }
 
     Box(
@@ -3446,7 +3524,10 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                         detectReaderTransformGestures(
                             scaleProvider = { readerScale },
                             panAxis = ReaderPanAxis.WEBTOON,
-                            onGestureStart = ::stopReaderMotion,
+                            onGestureStart = {
+                                webtoonUserNavigated = true
+                                stopReaderMotion()
+                            },
                             onGestureEnd = { velocity, width, height ->
                                 launchWebtoonFling(velocity, width, height)
                             },
@@ -3535,106 +3616,175 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
 
         if (controlsVisible) {
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(WindowInsets.safeDrawing.asPaddingValues()),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Row(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(LocalTankobunTokens.current.readerOverlay)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = viewModel::closeReader) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Close reader",
-                            tint = Color.White,
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            chapter.name,
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            "${state.currentPageIndex + 1}/${state.readerPages.size}",
-                            color = Color.White.copy(alpha = 0.74f),
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(LocalTankobunTokens.current.readerOverlay)
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                        .padding(12.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = LocalTankobunTokens.current.readerOverlay,
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                        modifier = Modifier.padding(start = 4.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = { viewModel.moveReaderPage(-1) }) {
-                            Icon(Icons.Default.SkipPrevious, contentDescription = "Previous page", tint = Color.White)
+                        IconButton(onClick = viewModel::closeReader) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Close reader",
+                                tint = Color.White,
+                            )
                         }
-                        FilterChip(
-                            selected = state.readerMode == ReaderMode.PAGED,
-                            onClick = {
-                                resetZoom()
-                                viewModel.setReaderMode(ReaderMode.PAGED)
-                            },
-                            label = { Text("Paged") },
-                        )
-                        FilterChip(
-                            selected = state.readerMode == ReaderMode.WEBTOON,
-                            onClick = {
-                                resetZoom()
-                                viewModel.setReaderMode(ReaderMode.WEBTOON)
-                            },
-                            label = { Text("Webtoon") },
-                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                chapter.name,
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                "${if (state.readerMode == ReaderMode.WEBTOON) "Webtoon" else "Paged"} / Page ${state.currentPageIndex + 1} of $pageCount",
+                                color = Color.White.copy(alpha = 0.74f),
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                         Text(
                             "$zoomPercent%",
                             color = Color.White.copy(alpha = 0.78f),
                             style = MaterialTheme.typography.labelLarge,
                         )
-                        IconButton(onClick = { viewModel.moveReaderPage(1) }) {
-                            Icon(Icons.Default.SkipNext, contentDescription = "Next page", tint = Color.White)
-                        }
                     }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                }
+                Spacer(Modifier.weight(1f))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = LocalTankobunTokens.current.readerOverlay,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        FilterChip(
-                            selected = state.readerFitWidth,
-                            enabled = state.readerMode == ReaderMode.PAGED,
-                            onClick = {
-                                viewModel.setReaderFitWidth(!state.readerFitWidth)
-                                resetZoom()
-                            },
-                            label = { Text("Fit width") },
-                        )
-                        FilterChip(
-                            selected = state.readerPageGapLevel > 0,
-                            onClick = { viewModel.setReaderPageGapLevel((state.readerPageGapLevel + 1) % 4) },
-                            label = { Text(readerGapLabel(state.readerPageGapLevel)) },
-                        )
-                        FilterChip(
-                            selected = readerScale > 1.05f,
-                            onClick = { resetZoom() },
-                            label = { Text("Reset zoom") },
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            IconButton(
+                                enabled = state.currentPageIndex > 0,
+                                onClick = { moveReaderPageFromControls(-1) },
+                            ) {
+                                Icon(
+                                    Icons.Default.SkipPrevious,
+                                    contentDescription = "Previous page",
+                                    tint = Color.White.copy(alpha = if (state.currentPageIndex > 0) 1f else 0.34f),
+                                )
+                            }
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        "Page ${displayedPageIndex + 1}",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelLarge,
+                                    )
+                                    Text(
+                                        "$pageCount pages",
+                                        color = Color.White.copy(alpha = 0.68f),
+                                        style = MaterialTheme.typography.labelMedium,
+                                    )
+                                }
+                                if (pageCount > 1) {
+                                    Slider(
+                                        value = scrubberValue.coerceIn(0f, lastPageIndex.toFloat()),
+                                        onValueChange = {
+                                            scrubberValue = it.coerceIn(0f, lastPageIndex.toFloat())
+                                        },
+                                        onValueChangeFinished = { commitScrubbedPage() },
+                                        valueRange = 0f..lastPageIndex.toFloat(),
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                } else {
+                                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                                }
+                            }
+                            IconButton(
+                                enabled = canGoForward,
+                                onClick = { moveReaderPageFromControls(1) },
+                            ) {
+                                Icon(
+                                    Icons.Default.SkipNext,
+                                    contentDescription = if (state.currentPageIndex >= lastPageIndex && nextChapter != null) {
+                                        "Next chapter"
+                                    } else {
+                                        "Next page"
+                                    },
+                                    tint = Color.White.copy(alpha = if (canGoForward) 1f else 0.34f),
+                                )
+                            }
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            FilterChip(
+                                selected = state.readerMode == ReaderMode.PAGED,
+                                onClick = {
+                                    resetZoom()
+                                    viewModel.setReaderMode(ReaderMode.PAGED)
+                                },
+                                label = { Text("Paged") },
+                            )
+                            FilterChip(
+                                selected = state.readerMode == ReaderMode.WEBTOON,
+                                onClick = {
+                                    resetZoom()
+                                    viewModel.setReaderMode(ReaderMode.WEBTOON)
+                                },
+                                label = { Text("Webtoon") },
+                            )
+                            FilterChip(
+                                selected = state.readerFitWidth,
+                                enabled = state.readerMode == ReaderMode.PAGED,
+                                onClick = {
+                                    viewModel.setReaderFitWidth(!state.readerFitWidth)
+                                    resetZoom()
+                                },
+                                label = { Text("Fit width") },
+                            )
+                            FilterChip(
+                                selected = state.readerPageGapLevel > 0,
+                                onClick = { viewModel.setReaderPageGapLevel((state.readerPageGapLevel + 1) % 4) },
+                                label = { Text(readerGapLabel(state.readerPageGapLevel)) },
+                            )
+                            FilterChip(
+                                selected = readerScale > 1.05f,
+                                onClick = { resetZoom() },
+                                label = { Text("Reset zoom") },
+                            )
+                        }
                     }
                 }
             }

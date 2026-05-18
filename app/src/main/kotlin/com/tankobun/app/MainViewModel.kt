@@ -2065,7 +2065,7 @@ class MainViewModel(
         }
     }
 
-    fun openChapter(chapter: SourceChapter) {
+    fun openChapter(chapter: SourceChapter, startFromSavedProgress: Boolean = true) {
         val state = _state.value
         val media = state.selectedMedia ?: return
         val source = state.installedSources.firstOrNull { it.id == chapter.sourceId }
@@ -2080,7 +2080,11 @@ class MainViewModel(
             runCatching {
                 container.sourceHost.pages(source, chapter)
             }.onSuccess { pages ->
-                val savedProgress = container.database.progressDao().progressForChapter(media.id, chapter.url)
+                val savedProgress = if (startFromSavedProgress) {
+                    container.database.progressDao().progressForChapter(media.id, chapter.url)
+                } else {
+                    null
+                }
                 val startPageIndex = savedProgress?.pageIndex?.coerceIn(0, pages.lastIndex.coerceAtLeast(0)) ?: 0
                 Log.i(TAG, "Page load ${source.name}/${chapter.name}: pages=${pages.size}")
                 _state.update {
@@ -2112,12 +2116,38 @@ class MainViewModel(
     }
 
     fun moveReaderPage(delta: Int) {
-        val pages = _state.value.readerPages
+        val snapshot = _state.value
+        val pages = snapshot.readerPages
+        if (pages.isEmpty() || delta == 0) return
+        val targetIndex = snapshot.currentPageIndex + delta
+        if (delta > 0 && targetIndex > pages.lastIndex) {
+            openNextChapter()
+            return
+        }
+        val nextIndex = targetIndex.coerceIn(0, pages.lastIndex)
+        if (nextIndex == snapshot.currentPageIndex) return
+        _state.update { it.copy(currentPageIndex = nextIndex) }
+        saveReaderProgress()
+    }
+
+    fun setReaderPage(index: Int) {
+        val snapshot = _state.value
+        val pages = snapshot.readerPages
         if (pages.isEmpty()) return
-        _state.update {
-            it.copy(currentPageIndex = (it.currentPageIndex + delta).coerceIn(0, pages.lastIndex))
+        val nextIndex = index.coerceIn(0, pages.lastIndex)
+        if (nextIndex == snapshot.currentPageIndex) return
+        _state.update { it.copy(currentPageIndex = nextIndex) }
+        saveReaderProgress()
+    }
+
+    fun openNextChapter() {
+        val snapshot = _state.value
+        val nextChapter = snapshot.sourceChapters.nextInReadingOrderAfter(snapshot.activeChapter ?: return) ?: return
+        if (snapshot.readerPages.isNotEmpty()) {
+            _state.update { it.copy(currentPageIndex = snapshot.readerPages.lastIndex) }
         }
         saveReaderProgress()
+        openChapter(nextChapter, startFromSavedProgress = false)
     }
 
     fun enqueueDownload(chapter: SourceChapter) {
@@ -2195,6 +2225,16 @@ class MainViewModel(
         private const val SOURCE_MAX_CANDIDATES_PER_SOURCE = 40
         private const val SOURCE_STRONG_MATCH_SCORE = 0.9
     }
+}
+
+internal fun List<SourceChapter>.nextInReadingOrderAfter(chapter: SourceChapter): SourceChapter? {
+    if (chapter.chapterNumber > 0f) {
+        return filter { it.chapterNumber > chapter.chapterNumber }
+            .minByOrNull { it.chapterNumber }
+    }
+
+    val currentIndex = indexOfFirst { it.sourceId == chapter.sourceId && it.url == chapter.url }
+    return if (currentIndex > 0) this[currentIndex - 1] else null
 }
 
 private fun Throwable.userMessage(fallback: String): String = when (this) {
