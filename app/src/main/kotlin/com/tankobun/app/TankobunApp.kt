@@ -108,11 +108,14 @@ import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -122,6 +125,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -2767,7 +2771,7 @@ private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, 
                     ChapterRow(
                         chapter = chapter,
                         viewModel = viewModel,
-                        read = chapter.isReadBy(state.latestProgress),
+                        read = chapter.isReadBy(state.chapterProgress),
                     )
                 }
             }
@@ -3665,41 +3669,55 @@ private fun TankobunUiState.primaryReadingActionChapter(): SourceChapter? =
 private fun TankobunUiState.nextReaderChapter(): SourceChapter? =
     sourceChapters.nextInReadingOrderAfter(activeChapter ?: return null)
 
-private fun SourceChapter.isReadBy(progress: ReadingProgress?): Boolean {
-    progress ?: return false
-    if (chapterNumber <= 0f || progress.chapterNumber <= 0f) {
-        return url == progress.chapterUrl && progress.completed
-    }
-    return chapterNumber < progress.chapterNumber ||
-        (chapterNumber == progress.chapterNumber && progress.completed)
-}
+private fun SourceChapter.isReadBy(progressByChapter: Map<String, ReadingProgress>): Boolean =
+    progressByChapter[url]?.completed == true
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChapterRow(
     chapter: SourceChapter,
     viewModel: MainViewModel,
     read: Boolean,
 ) {
-    ElevatedCard(
-        modifier = Modifier.graphicsLayer {
-            alpha = if (read) 0.56f else 1f
-        },
-    ) {
-        ListItem(
-            headlineContent = {
-                Text(chapter.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            },
-            trailingContent = {
-                Row {
-                    IconButton(onClick = { viewModel.enqueueDownload(chapter) }) {
-                        Icon(Icons.Default.Download, contentDescription = "Download")
+    key(chapter.url, read) {
+        val dismissState = rememberSwipeToDismissBoxState(
+            confirmValueChange = { value ->
+                when (value) {
+                    SwipeToDismissBoxValue.StartToEnd,
+                    SwipeToDismissBoxValue.EndToStart -> {
+                        viewModel.setChapterRead(chapter, read = !read)
+                        false
                     }
-                    IconButton(onClick = { viewModel.openChapter(chapter) }) {
-                        Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = "Read")
-                    }
+
+                    SwipeToDismissBoxValue.Settled -> false
                 }
             },
+            positionalThreshold = { distance -> distance * 0.32f },
         )
+        SwipeToDismissBox(
+            state = dismissState,
+            enableDismissFromStartToEnd = true,
+            enableDismissFromEndToStart = true,
+            backgroundContent = {},
+        ) {
+            ElevatedCard(
+                onClick = { viewModel.openChapter(chapter) },
+                modifier = Modifier.graphicsLayer {
+                    alpha = if (read) 0.70f else 1f
+                },
+            ) {
+                ListItem(
+                    headlineContent = {
+                        Text(chapter.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
+                    trailingContent = {
+                        IconButton(onClick = { viewModel.enqueueDownload(chapter) }) {
+                            Icon(Icons.Default.Download, contentDescription = "Download")
+                        }
+                    },
+                )
+            }
+        }
     }
 }
 

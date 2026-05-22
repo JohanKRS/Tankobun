@@ -154,6 +154,9 @@ interface ProgressDao {
     @Query("SELECT * FROM reader_progress WHERE mediaId = :mediaId ORDER BY updatedAtEpochMillis DESC LIMIT 1")
     suspend fun latestProgress(mediaId: Int): ReadingProgressEntity?
 
+    @Query("SELECT * FROM reader_progress WHERE mediaId = :mediaId")
+    suspend fun progressForMedia(mediaId: Int): List<ReadingProgressEntity>
+
     @Query(
         """
         SELECT progress.* FROM reader_progress AS progress
@@ -178,6 +181,9 @@ interface ProgressDao {
 
     @Upsert
     suspend fun upsertProgress(progress: ReadingProgressEntity)
+
+    @Query("DELETE FROM reader_progress WHERE mediaId = :mediaId AND chapterUrl = :chapterUrl")
+    suspend fun deleteProgressForChapter(mediaId: Int, chapterUrl: String)
 }
 
 @Dao

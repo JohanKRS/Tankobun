@@ -114,6 +114,7 @@ data class TankobunUiState(
     val selectedSourceManga: SourceManga? = null,
     val sourceChapters: List<SourceChapter> = emptyList(),
     val latestProgress: ReadingProgress? = null,
+    val chapterProgress: Map<String, ReadingProgress> = emptyMap(),
     val recentReadingProgress: List<RecentReadingProgress> = emptyList(),
     val activeChapter: SourceChapter? = null,
     val readerPages: List<ReaderPage> = emptyList(),
@@ -928,6 +929,7 @@ class MainViewModel(
                 selectedSourceManga = null,
                 sourceChapters = emptyList(),
                 latestProgress = null,
+                chapterProgress = emptyMap(),
                 activeChapter = null,
                 readerPages = emptyList(),
                 currentPageIndex = 0,
@@ -948,6 +950,7 @@ class MainViewModel(
                     sameSource && manga.sourceId == sourceId
                 },
                 sourceChapters = it.sourceChapters.takeIf { sameSource }.orEmpty(),
+                chapterProgress = it.chapterProgress.takeIf { sameSource }.orEmpty(),
                 activeChapter = null,
                 readerPages = emptyList(),
                 currentPageIndex = 0,
@@ -973,6 +976,7 @@ class MainViewModel(
                 selectedSourceManga = null,
                 sourceChapters = emptyList(),
                 latestProgress = null,
+                chapterProgress = emptyMap(),
                 activeChapter = null,
                 readerPages = emptyList(),
                 currentPageIndex = 0,
@@ -1358,6 +1362,7 @@ class MainViewModel(
                 emptyList()
             }
             val latestProgress = container.database.progressDao().latestProgress(mediaId)?.toModel()
+            val chapterProgress = cachedProgressByChapter(mediaId)
             val visibleMatches = matches.toMutableList()
             if (boundSource != null && boundManga != null && chapters.isNotEmpty()) {
                 val selectedMatch = SourceSearchResult(
@@ -1385,11 +1390,18 @@ class MainViewModel(
                         selectedSourceManga = boundManga,
                         sourceChapters = chapters,
                         latestProgress = latestProgress,
+                        chapterProgress = chapterProgress,
                     )
                 }
             }
         }
     }
+
+    private suspend fun cachedProgressByChapter(mediaId: Int): Map<String, ReadingProgress> =
+        container.database.progressDao()
+            .progressForMedia(mediaId)
+            .map { it.toModel() }
+            .associateBy { it.chapterUrl }
 
     fun openSourcePicker() {
         _state.value.selectedMedia ?: return
@@ -2144,13 +2156,16 @@ class MainViewModel(
                 }.getOrNull() ?: manga
                 val chapters = cachedChapters(source, detailedManga, now, requireFresh = false)
                     ?: fetchAndCacheChapters(source, detailedManga, now)
-                detailedManga to chapters
-            }.onSuccess { (detailedManga, chapters) ->
+                val mediaId = _state.value.selectedMedia?.id
+                val chapterProgress = mediaId?.let { cachedProgressByChapter(it) }.orEmpty()
+                Triple(detailedManga, chapters, chapterProgress)
+            }.onSuccess { (detailedManga, chapters, chapterProgress) ->
                 Log.i(TAG, "Chapter load ${source.name}/${detailedManga.title}: chapters=${chapters.size}")
                 _state.update {
                     it.copy(
                         selectedSourceManga = detailedManga,
                         sourceChapters = chapters,
+                        chapterProgress = chapterProgress,
                         busy = false,
                         sourceMatchChapterCounts = it.sourceMatchChapterCounts + (sourceMatchKey(source.id, detailedManga.url) to chapters.size),
                         message = if (chapters.isEmpty()) "No chapters found" else "Loaded ${chapters.size} chapters",
@@ -2230,6 +2245,7 @@ class MainViewModel(
                 selectedSourceManga = null,
                 sourceChapters = emptyList(),
                 latestProgress = item.progress,
+                chapterProgress = mapOf(item.progress.chapterUrl to item.progress),
                 activeChapter = null,
                 readerPages = emptyList(),
                 currentPageIndex = 0,
@@ -2292,6 +2308,63 @@ class MainViewModel(
         openChapter(nextChapter, startFromSavedProgress = false)
     }
 
+    fun setChapterRead(chapter: SourceChapter, read: Boolean) {
+        val media = _state.value.selectedMedia ?: return
+        viewModelScope.launch {
+            val progressDao = container.database.progressDao()
+            val now = System.currentTimeMillis()
+            if (read) {
+                val existing = progressDao.progressForChapter(media.id, chapter.url)?.toModel()
+                val totalPages = existing?.totalPages?.takeIf { it > 0 } ?: 1
+                val progress = ReadingProgress(
+                    mediaId = media.id,
+                    chapterUrl = chapter.url,
+                    chapterNumber = chapter.chapterNumber,
+                    pageIndex = totalPages - 1,
+                    totalPages = totalPages,
+                    readerMode = existing?.readerMode ?: _state.value.readerMode,
+                    completed = true,
+                    updatedAtEpochMillis = now,
+                )
+                progressDao.upsertProgress(progress.toEntity())
+                val trackedProgress = _state.value.trackingProgress.toIntOrNull()
+                    ?: _state.value.selectedListEntry?.progress
+                    ?: 0
+                val chapterProgress = chapter.chapterNumber.toInt()
+                if (chapterProgress > trackedProgress) {
+                    val mutation = syncMutationFactory.saveMediaListEntry(
+                        mediaId = media.id,
+                        progress = chapterProgress,
+                        nowMillis = now,
+                    )
+                    container.database.syncMutationDao().upsertMutation(mutation.toEntity())
+                }
+            } else {
+                progressDao.deleteProgressForChapter(media.id, chapter.url)
+            }
+
+            val latestProgress = progressDao.latestProgress(media.id)?.toModel()
+            val chapterProgress = cachedProgressByChapter(media.id)
+            _state.update {
+                if (it.selectedMedia?.id == media.id) {
+                    it.copy(
+                        latestProgress = latestProgress,
+                        chapterProgress = chapterProgress,
+                        trackingProgress = if (read && chapter.chapterNumber.toInt() > (it.trackingProgress.toIntOrNull() ?: 0)) {
+                            chapter.chapterNumber.toInt().toString()
+                        } else {
+                            it.trackingProgress
+                        },
+                        message = if (read) "Marked ${chapter.name} as read" else "Marked ${chapter.name} as unread",
+                    )
+                } else {
+                    it
+                }
+            }
+            loadRecentReadingProgress()
+        }
+    }
+
     fun enqueueDownload(chapter: SourceChapter) {
         val media = _state.value.selectedMedia ?: return
         val now = System.currentTimeMillis()
@@ -2331,7 +2404,14 @@ class MainViewModel(
         viewModelScope.launch {
             container.database.progressDao().upsertProgress(progress.toEntity())
             _state.update {
-                if (it.selectedMedia?.id == media.id) it.copy(latestProgress = progress) else it
+                if (it.selectedMedia?.id == media.id) {
+                    it.copy(
+                        latestProgress = progress,
+                        chapterProgress = it.chapterProgress + (progress.chapterUrl to progress),
+                    )
+                } else {
+                    it
+                }
             }
             loadRecentReadingProgress()
             if (progress.completed && chapter.chapterNumber > 0) {
