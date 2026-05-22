@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -216,7 +217,10 @@ private enum class QuickDrawerMode {
 private val QuickDrawerOverlayWidth = 340.dp
 private val QuickDrawerPinnedWidth = 320.dp
 private val QuickDrawerHandleSlotWidth = 40.dp
-private const val QuickDrawerSnapMillis = 180
+private const val QuickDrawerSnapMillis = 240
+private const val QuickDrawerScrimAlpha = 0.20f
+private const val QuickDrawerBackdropBlurDp = 6f
+private const val QuickDrawerElasticLimitDp = 36f
 
 private enum class LibraryPicker {
     FORMAT,
@@ -277,7 +281,7 @@ fun TankobunApp(viewModel: MainViewModel) {
     }
 
     TankobunTheme(themeMode = state.themeMode) {
-        val cutoutEndPadding = displayCutoutEndPadding()
+        val cutoutEndPadding = displayCutoutEndPadding(ignoreDisplayCutout = state.ignoreDisplayCutout)
         Box(
             Modifier
                 .fillMaxSize()
@@ -336,11 +340,14 @@ private fun TankobunScaffold(
     onCloseQuickDrawer: () -> Unit,
     onToggleQuickDrawerPin: () -> Unit,
 ) {
-    val cutoutEndPadding = displayCutoutEndPadding()
+    val ignoreDisplayCutout = state.ignoreDisplayCutout
+    val cutoutStartPadding = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout)
+    val cutoutEndPadding = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout)
     val drawerSafeEndPadding = maxOf(cutoutEndPadding, 10.dp)
     val density = LocalDensity.current
     val drawerTravelPx = with(density) { (QuickDrawerOverlayWidth + cutoutEndPadding).toPx() }
     val drawerSnapThresholdPx = with(density) { 72.dp.toPx() }
+    val drawerElasticLimitPx = with(density) { QuickDrawerElasticLimitDp.dp.toPx() }
     val drawerScope = rememberCoroutineScope()
     var overlayDrawerDragOffsetPx by remember { mutableFloatStateOf(0f) }
     var closedDrawerDragOffsetPx by remember { mutableFloatStateOf(0f) }
@@ -352,10 +359,32 @@ private fun TankobunScaffold(
         label = "Overlay drawer drag offset",
     )
     val closedDrawerTranslationPx by animateFloatAsState(
-        targetValue = (drawerTravelPx + closedDrawerDragOffsetPx).coerceIn(0f, drawerTravelPx),
+        targetValue = drawerTravelPx + closedDrawerDragOffsetPx,
         animationSpec = tween(durationMillis = if (closedDrawerDragging) 0 else QuickDrawerSnapMillis),
         label = "Closed drawer peek offset",
     )
+    val overlayDrawerTranslationPx = if (overlayDrawerDragging) {
+        overlayDrawerDragOffsetPx
+    } else {
+        overlayDrawerOffsetPx
+    }
+    val overlayDrawerRevealFraction = if (quickDrawerMode == QuickDrawerMode.OVERLAY && drawerTravelPx > 0f) {
+        (1f - (overlayDrawerTranslationPx / drawerTravelPx)).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+    val closedDrawerRevealFraction = if (
+        quickDrawerMode == QuickDrawerMode.CLOSED &&
+        closedDrawerDragOffsetPx < -1f &&
+        drawerTravelPx > 0f
+    ) {
+        (1f - (closedDrawerTranslationPx / drawerTravelPx)).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+    val quickDrawerBackdropRevealFraction = maxOf(overlayDrawerRevealFraction, closedDrawerRevealFraction)
+    val drawerScrimAlpha = QuickDrawerScrimAlpha * quickDrawerBackdropRevealFraction
+    val drawerBackdropBlur = (QuickDrawerBackdropBlurDp * quickDrawerBackdropRevealFraction).dp
 
     LaunchedEffect(quickDrawerMode) {
         if (quickDrawerMode != QuickDrawerMode.OVERLAY) {
@@ -369,20 +398,29 @@ private fun TankobunScaffold(
     }
 
     fun openQuickDrawerFromClosed(initialTranslationPx: Float = drawerTravelPx) {
-        overlayDrawerDragging = false
-        overlayDrawerDragOffsetPx = initialTranslationPx.coerceIn(0f, drawerTravelPx)
-        closedDrawerDragging = false
-        closedDrawerDragOffsetPx = 0f
-        onOpenQuickDrawer()
         drawerScope.launch {
+            overlayDrawerDragging = true
+            overlayDrawerDragOffsetPx = initialTranslationPx
+            closedDrawerDragging = false
+            closedDrawerDragOffsetPx = 0f
+            onOpenQuickDrawer()
             withFrameNanos { }
+            withFrameNanos { }
+            overlayDrawerDragging = false
             overlayDrawerDragOffsetPx = 0f
         }
     }
 
-    fun closeQuickDrawerFromOverlay() {
+    fun settleOpenQuickDrawerFromDrag() {
+        closedDrawerDragging = false
+        val releaseTranslationPx = drawerTravelPx + closedDrawerDragOffsetPx
+        closedDrawerDragOffsetPx = 0f
+        openQuickDrawerFromClosed(releaseTranslationPx)
+    }
+
+    fun closeQuickDrawerFromOverlay(targetTranslationPx: Float = drawerTravelPx) {
         overlayDrawerDragging = false
-        overlayDrawerDragOffsetPx = drawerTravelPx
+        overlayDrawerDragOffsetPx = targetTranslationPx
         drawerScope.launch {
             delay(QuickDrawerSnapMillis.toLong())
             onCloseQuickDrawer()
@@ -392,11 +430,13 @@ private fun TankobunScaffold(
 
     Scaffold(
         containerColor = LocalTankobunTokens.current.appBackdrop,
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TankobunTopBar(
                 title = selectedMedia?.title?.userPreferred
                     ?: if (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN) settingsRoute.settingsTitle() else "Tankobun",
                 showBack = selectedMedia != null || (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN),
+                ignoreDisplayCutout = ignoreDisplayCutout,
                 onBack = {
                     if (selectedMedia != null) {
                         viewModel.clearSelectedMedia()
@@ -417,8 +457,8 @@ private fun TankobunScaffold(
                         selectedTab = selectedTab,
                         onSelectTab = onSelectTab,
                         modifier = Modifier.padding(
-                            start = displayCutoutStartPadding(),
-                            end = displayCutoutEndPadding(),
+                            start = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout),
+                            end = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout),
                         ),
                     )
                 }
@@ -430,9 +470,12 @@ private fun TankobunScaffold(
                 .fillMaxSize()
                 .padding(padding),
         ) {
+            val handleScreenCenterOffset = (padding.calculateBottomPadding() - padding.calculateTopPadding()) / 2f
             Row(
                 Modifier
                     .fillMaxSize()
+                    .padding(start = cutoutStartPadding, end = cutoutEndPadding)
+                    .blur(drawerBackdropBlur)
                     .background(LocalTankobunTokens.current.appBackdrop),
             ) {
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
@@ -471,6 +514,13 @@ private fun TankobunScaffold(
                     )
                 }
             }
+            if (quickDrawerMode == QuickDrawerMode.CLOSED && closedDrawerRevealFraction > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = drawerScrimAlpha)),
+                )
+            }
             if (quickDrawerMode == QuickDrawerMode.CLOSED && closedDrawerDragOffsetPx < -1f) {
                 QuickDrawer(
                     state = state,
@@ -493,35 +543,40 @@ private fun TankobunScaffold(
                     expanded = false,
                     onClick = { openQuickDrawerFromClosed() },
                     onSwipeIn = { openQuickDrawerFromClosed() },
+                    localDragOffset = {
+                        quickDrawerOpeningDragOffset(
+                            totalX = it,
+                            drawerTravelPx = drawerTravelPx,
+                            elasticLimitPx = drawerElasticLimitPx,
+                        )
+                    },
                     onDragOffset = {
                         closedDrawerDragging = true
-                        closedDrawerDragOffsetPx = it.coerceIn(-drawerTravelPx, 0f)
+                        closedDrawerDragOffsetPx = quickDrawerOpeningDragOffset(
+                            totalX = it,
+                            drawerTravelPx = drawerTravelPx,
+                            elasticLimitPx = drawerElasticLimitPx,
+                        )
                     },
                     onDragEnd = { totalX ->
                         closedDrawerDragging = false
                         if (totalX < -drawerSnapThresholdPx) {
-                            val releaseTranslationPx = (drawerTravelPx + totalX.coerceIn(-drawerTravelPx, 0f))
-                                .coerceIn(0f, drawerTravelPx)
-                            openQuickDrawerFromClosed(releaseTranslationPx)
+                            settleOpenQuickDrawerFromDrag()
                         } else {
                             closedDrawerDragOffsetPx = 0f
                         }
                     },
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
+                        .offset(y = handleScreenCenterOffset)
                         .padding(end = drawerSafeEndPadding),
                 )
             }
-            AnimatedVisibility(
-                visible = quickDrawerMode == QuickDrawerMode.OVERLAY,
-                modifier = Modifier.fillMaxSize(),
-                enter = fadeIn(tween(140)),
-                exit = fadeOut(tween(160)),
-            ) {
+            if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.20f))
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = drawerScrimAlpha))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -529,13 +584,7 @@ private fun TankobunScaffold(
                         ),
                 )
             }
-            AnimatedVisibility(
-                visible = quickDrawerMode == QuickDrawerMode.OVERLAY,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd),
-                enter = fadeIn(tween(120)),
-                exit = fadeOut(tween(120)),
-            ) {
+            if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
                 QuickDrawer(
                     state = state,
                     viewModel = viewModel,
@@ -545,9 +594,14 @@ private fun TankobunScaffold(
                     onTogglePin = onToggleQuickDrawerPin,
                     drawerWidth = QuickDrawerOverlayWidth,
                     endPadding = cutoutEndPadding,
+                    handleCenterOffset = handleScreenCenterOffset,
                     onHandleDragOffset = {
                         overlayDrawerDragging = true
-                        overlayDrawerDragOffsetPx = it.coerceIn(0f, drawerTravelPx)
+                        overlayDrawerDragOffsetPx = quickDrawerClosingDragOffset(
+                            totalX = it,
+                            drawerTravelPx = drawerTravelPx,
+                            elasticLimitPx = drawerElasticLimitPx,
+                        )
                     },
                     onHandleDragEnd = { totalX ->
                         overlayDrawerDragging = false
@@ -559,8 +613,9 @@ private fun TankobunScaffold(
                     },
                     handleDragLocally = false,
                     modifier = Modifier
+                        .align(Alignment.CenterEnd)
                         .fillMaxHeight()
-                        .graphicsLayer { translationX = overlayDrawerOffsetPx },
+                        .graphicsLayer { translationX = overlayDrawerTranslationPx },
                 )
             }
             if (state.busy) {
@@ -603,8 +658,51 @@ private suspend fun PointerInputScope.detectQuickDrawerHandleSwipe(
     }
 }
 
+private fun quickDrawerOpeningDragOffset(totalX: Float, drawerTravelPx: Float, elasticLimitPx: Float): Float {
+    val pullingOpenPx = totalX.coerceAtMost(0f)
+    return if (pullingOpenPx >= -drawerTravelPx) {
+        pullingOpenPx
+    } else {
+        -drawerTravelPx - quickDrawerElasticOvershoot(
+            overshootPx = (-drawerTravelPx - pullingOpenPx).coerceAtLeast(0f),
+            elasticLimitPx = elasticLimitPx,
+        )
+    }
+}
+
+private fun quickDrawerClosingDragOffset(totalX: Float, drawerTravelPx: Float, elasticLimitPx: Float): Float {
+    val pushingClosedPx = totalX.coerceAtLeast(0f)
+    return if (pushingClosedPx <= drawerTravelPx) {
+        pushingClosedPx
+    } else {
+        drawerTravelPx + quickDrawerElasticOvershoot(
+            overshootPx = (pushingClosedPx - drawerTravelPx).coerceAtLeast(0f),
+            elasticLimitPx = elasticLimitPx,
+        )
+    }
+}
+
+private fun quickDrawerElasticOvershoot(overshootPx: Float, elasticLimitPx: Float): Float =
+    if (elasticLimitPx <= 0f) {
+        0f
+    } else {
+        elasticLimitPx * overshootPx / (overshootPx + elasticLimitPx)
+    }
+
 @Composable
-private fun displayCutoutStartPadding(): Dp {
+private fun hasDisplayCutout(): Boolean {
+    val layoutDirection = LocalLayoutDirection.current
+    val density = LocalDensity.current
+    val cutoutInsets = WindowInsets.displayCutout
+    return cutoutInsets.getLeft(density, layoutDirection) > 0 ||
+        cutoutInsets.getRight(density, layoutDirection) > 0 ||
+        cutoutInsets.getTop(density) > 0 ||
+        cutoutInsets.getBottom(density) > 0
+}
+
+@Composable
+private fun displayCutoutStartPadding(ignoreDisplayCutout: Boolean): Dp {
+    if (ignoreDisplayCutout) return 0.dp
     val layoutDirection = LocalLayoutDirection.current
     return maxOf(
         WindowInsets.displayCutout.asPaddingValues().calculateStartPadding(layoutDirection),
@@ -613,7 +711,8 @@ private fun displayCutoutStartPadding(): Dp {
 }
 
 @Composable
-private fun displayCutoutEndPadding(): Dp {
+private fun displayCutoutEndPadding(ignoreDisplayCutout: Boolean): Dp {
+    if (ignoreDisplayCutout) return 0.dp
     val layoutDirection = LocalLayoutDirection.current
     return maxOf(
         WindowInsets.displayCutout.asPaddingValues().calculateEndPadding(layoutDirection),
@@ -625,10 +724,11 @@ private fun displayCutoutEndPadding(): Dp {
 private fun TankobunTopBar(
     title: String,
     showBack: Boolean,
+    ignoreDisplayCutout: Boolean,
     onBack: () -> Unit,
 ) {
-    val startInset = displayCutoutStartPadding()
-    val endInset = displayCutoutEndPadding()
+    val startInset = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout)
+    val endInset = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout)
     Surface(color = LocalTankobunTokens.current.elevatedSurface, tonalElevation = 1.dp) {
         Row(
             modifier = Modifier
@@ -696,6 +796,7 @@ private fun QuickDrawerHandle(
     onSwipeIn: () -> Unit = onClick,
     onSwipeOut: () -> Unit = onClick,
     dragLocally: Boolean = true,
+    localDragOffset: (Float) -> Float = { totalX -> if (expanded) totalX.coerceAtLeast(0f) else totalX.coerceAtMost(0f) },
     onDragOffset: (Float) -> Unit = {},
     onDragEnd: (Float) -> Unit = { totalX ->
         when {
@@ -721,7 +822,6 @@ private fun QuickDrawerHandle(
         animationSpec = tween(durationMillis = 220),
         label = "Quick drawer handle height",
     )
-    val handleShape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
     Box(
         modifier = modifier
             .width(handleWidth)
@@ -735,7 +835,7 @@ private fun QuickDrawerHandle(
                     onDragOffset = {
                         handleDragging = true
                         if (dragLocally) {
-                            dragOffsetPx = if (expanded) it.coerceAtLeast(0f) else it.coerceAtMost(0f)
+                            dragOffsetPx = localDragOffset(it)
                         }
                         onDragOffset(it)
                     },
@@ -746,7 +846,11 @@ private fun QuickDrawerHandle(
                     },
                 )
             }
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
@@ -770,6 +874,7 @@ private fun QuickDrawer(
     drawerWidth: Dp,
     endPadding: Dp,
     showHandle: Boolean = !pinned,
+    handleCenterOffset: Dp = 0.dp,
     onHandleDragOffset: (Float) -> Unit = {},
     onHandleDragEnd: (Float) -> Unit = {},
     handleDragLocally: Boolean = true,
@@ -782,7 +887,7 @@ private fun QuickDrawer(
                 .align(Alignment.CenterEnd)
                 .width(drawerWidth + endPadding)
                 .fillMaxHeight(),
-            shape = if (pinned) RoundedCornerShape(0.dp) else RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp),
+            shape = RoundedCornerShape(0.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
             tonalElevation = 0.dp,
             shadowElevation = if (pinned) 0.dp else 10.dp,
@@ -873,7 +978,9 @@ private fun QuickDrawer(
                 dragLocally = handleDragLocally,
                 onDragOffset = onHandleDragOffset,
                 onDragEnd = onHandleDragEnd,
-                modifier = Modifier.align(Alignment.CenterStart),
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(y = handleCenterOffset),
             )
         }
     }
@@ -4482,17 +4589,25 @@ private fun SettingsDetailContent(
     route: SettingsRoute,
     modifier: Modifier = Modifier,
 ) {
+    val deviceHasDisplayCutout = hasDisplayCutout()
     when (route) {
         SettingsRoute.MAIN,
         SettingsRoute.APPEARANCE -> SettingsDetailPanel(
             title = "Appearance",
-            subtitle = "Choose a theme that feels right for your reading setup.",
+            subtitle = "Choose a theme and layout behavior for your reading setup.",
             modifier = modifier,
         ) {
             ThemePicker(
                 selected = state.themeMode,
                 onSelect = viewModel::setThemeMode,
             )
+            if (deviceHasDisplayCutout) {
+                Text("Layout", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                CutoutLayoutToggle(
+                    ignoreDisplayCutout = state.ignoreDisplayCutout,
+                    onIgnoreDisplayCutoutChange = viewModel::setIgnoreDisplayCutout,
+                )
+            }
         }
         SettingsRoute.LIBRARY -> SettingsDetailPanel(
             title = "Library",
@@ -4638,6 +4753,36 @@ private fun SettingsDetailPanel(
             )
         }
         content()
+    }
+}
+
+@Composable
+private fun CutoutLayoutToggle(
+    ignoreDisplayCutout: Boolean,
+    onIgnoreDisplayCutoutChange: (Boolean) -> Unit,
+) {
+    ElevatedCard {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onIgnoreDisplayCutoutChange(!ignoreDisplayCutout) }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Ignore camera cutout", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    "Let content use the full display width as if this tablet had no notch.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = ignoreDisplayCutout,
+                onCheckedChange = onIgnoreDisplayCutoutChange,
+            )
+        }
     }
 }
 

@@ -56,6 +56,7 @@ data class TankobunUiState(
     val loggedIn: Boolean = false,
     val clientConfigured: Boolean = false,
     val themeMode: TankobunThemeMode = TankobunThemeMode.SYSTEM,
+    val ignoreDisplayCutout: Boolean = false,
     val viewerName: String? = null,
     val anilistScoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
     val anilistCustomLists: List<String> = emptyList(),
@@ -207,6 +208,7 @@ class MainViewModel(
             disabledSourceKeys = container.settingsStore.disabledSourceKeys(),
             extensionRepositoryUrl = container.settingsStore.extensionRepositoryUrl(),
             themeMode = container.settingsStore.themeMode(),
+            ignoreDisplayCutout = container.settingsStore.ignoreDisplayCutout(),
             readerMode = container.settingsStore.readerMode(),
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
             readerFitWidth = container.settingsStore.readerFitWidth(),
@@ -301,6 +303,11 @@ class MainViewModel(
     fun setThemeMode(mode: TankobunThemeMode) {
         container.settingsStore.saveThemeMode(mode)
         _state.update { it.copy(themeMode = mode) }
+    }
+
+    fun setIgnoreDisplayCutout(enabled: Boolean) {
+        container.settingsStore.saveIgnoreDisplayCutout(enabled)
+        _state.update { it.copy(ignoreDisplayCutout = enabled) }
     }
 
     fun setLibraryViewMode(mode: MediaViewMode) {

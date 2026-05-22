@@ -26,6 +26,13 @@ class SettingsStore(context: Context) {
         preferences.edit().putString(KEY_THEME_MODE, mode.name).apply()
     }
 
+    fun ignoreDisplayCutout(): Boolean =
+        preferences.getBoolean(KEY_IGNORE_DISPLAY_CUTOUT, false)
+
+    fun saveIgnoreDisplayCutout(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_IGNORE_DISPLAY_CUTOUT, enabled).apply()
+    }
+
     fun libraryViewMode(): MediaViewMode =
         preferences.getString(KEY_LIBRARY_VIEW_MODE, null)
             ?.let { stored -> runCatching { MediaViewMode.valueOf(stored) }.getOrNull() }
@@ -205,6 +212,7 @@ class SettingsStore(context: Context) {
     private companion object {
         const val KEY_EXTENSION_REPOSITORY_URL = "extension.repository.url"
         const val KEY_THEME_MODE = "theme.mode"
+        const val KEY_IGNORE_DISPLAY_CUTOUT = "layout.ignore.display.cutout"
         const val KEY_LIBRARY_VIEW_MODE = "library.view.mode"
         const val KEY_LIBRARY_COVER_COLUMNS = "library.cover.columns"
         const val KEY_LIBRARY_SHOW_WHOLE_COVERS = "library.show.whole.covers"
