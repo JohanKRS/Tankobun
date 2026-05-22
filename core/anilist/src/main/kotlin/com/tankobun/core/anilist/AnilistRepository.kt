@@ -5,6 +5,7 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaDetails
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendationPage
+import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.MediaStatus
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
@@ -23,10 +24,17 @@ class AnilistRepository(
             accessToken = accessToken,
         )
         val viewer = requireNotNull(data["Viewer"]).jsonObject
+        val mediaListOptions = viewer["mediaListOptions"]?.jsonObject
+        val mangaListOptions = mediaListOptions?.get("mangaList")?.jsonObject
         return AnilistViewer(
             id = requireNotNull(viewer["id"]?.jsonPrimitive?.intOrNull),
             name = requireNotNull(viewer["name"]?.jsonPrimitive?.content),
             avatarUrl = viewer["avatar"]?.jsonObject?.get("large")?.jsonPrimitive?.content,
+            scoreFormat = mediaListOptions
+                ?.stringOrNull("scoreFormat")
+                ?.toAnilistScoreFormat()
+                ?: AnilistScoreFormat.POINT_100,
+            mangaCustomLists = mangaListOptions?.stringArray("customLists").orEmpty(),
         )
     }
 
@@ -148,6 +156,7 @@ class AnilistRepository(
     suspend fun mediaDetailsWithEntry(
         mediaId: Int,
         accessToken: String?,
+        scoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
         recommendationsPage: Int = 1,
         recommendationsPerPage: Int = DEFAULT_RECOMMENDATIONS_PER_PAGE,
     ): AnilistMediaDetails {
@@ -155,6 +164,7 @@ class AnilistRepository(
             query = AnilistQueries.MediaDetails,
             variables = buildJsonObject {
                 put("id", mediaId)
+                put("scoreFormat", scoreFormat.name)
                 put("recommendationsPage", recommendationsPage)
                 put("recommendationsPerPage", recommendationsPerPage)
             },
@@ -185,13 +195,16 @@ class AnilistRepository(
         accessToken: String,
         userId: Int? = null,
         userName: String? = null,
+        scoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
     ): List<Pair<AnilistMedia, AnilistListEntry>> {
         val (query, variables) = when {
             userId != null -> AnilistQueries.MangaListCollectionByUserId to buildJsonObject {
                 put("userId", userId)
+                put("scoreFormat", scoreFormat.name)
             }
             !userName.isNullOrBlank() -> AnilistQueries.MangaListCollectionByUserName to buildJsonObject {
                 put("userName", userName)
+                put("scoreFormat", scoreFormat.name)
             }
             else -> error("AniList manga list needs a user id or username")
         }
@@ -213,6 +226,7 @@ class AnilistRepository(
         notes: String?,
         private: Boolean?,
         customLists: List<String>?,
+        scoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
     ): AnilistListEntry {
         val data = graphQlClient.execute(
             query = AnilistQueries.SaveMediaListEntry,
@@ -226,10 +240,32 @@ class AnilistRepository(
                 if (!customLists.isNullOrEmpty()) {
                     put("customLists", buildJsonArray { customLists.forEach { add(it) } })
                 }
+                put("scoreFormat", scoreFormat.name)
             },
             accessToken = accessToken,
         )
         return AnilistJsonMapper.listEntry(requireNotNull(data["SaveMediaListEntry"]))
+    }
+
+    suspend fun updateMangaCustomLists(
+        accessToken: String,
+        customLists: List<String>,
+    ): List<String> {
+        val data = graphQlClient.execute(
+            query = AnilistQueries.UpdateMangaCustomLists,
+            variables = buildJsonObject {
+                put("customLists", buildJsonArray { customLists.forEach { add(it) } })
+            },
+            accessToken = accessToken,
+        )
+        return data["UpdateUser"]
+            ?.jsonObject
+            ?.get("mediaListOptions")
+            ?.jsonObject
+            ?.get("mangaList")
+            ?.jsonObject
+            ?.stringArray("customLists")
+            .orEmpty()
     }
 }
 
@@ -280,3 +316,16 @@ private fun AnilistMedia.searchFallbackScore(tokens: List<String>): Int {
     }
     return score
 }
+
+private fun String.toAnilistScoreFormat(): AnilistScoreFormat =
+    runCatching { AnilistScoreFormat.valueOf(this) }.getOrDefault(AnilistScoreFormat.POINT_100)
+
+private fun kotlinx.serialization.json.JsonObject.stringOrNull(name: String): String? =
+    this[name]?.jsonPrimitive?.content
+
+private fun kotlinx.serialization.json.JsonObject.stringArray(name: String): List<String> =
+    this[name]?.let { value ->
+        value.takeIf { it !is kotlinx.serialization.json.JsonNull }
+            ?.let { it as? kotlinx.serialization.json.JsonArray }
+            ?.mapNotNull { it.jsonPrimitive.content }
+    }.orEmpty()

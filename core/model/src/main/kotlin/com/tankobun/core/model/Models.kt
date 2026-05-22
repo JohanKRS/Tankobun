@@ -10,6 +10,14 @@ enum class MediaStatus {
     UNKNOWN,
 }
 
+enum class AnilistScoreFormat {
+    POINT_100,
+    POINT_10_DECIMAL,
+    POINT_10,
+    POINT_5,
+    POINT_3,
+}
+
 enum class ReaderMode {
     PAGED,
     WEBTOON,

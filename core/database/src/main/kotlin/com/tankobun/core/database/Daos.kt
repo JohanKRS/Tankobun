@@ -139,6 +139,9 @@ interface ChapterDao {
     @Query("SELECT * FROM source_chapters WHERE sourceId = :sourceId AND mangaUrl = :mangaUrl ORDER BY chapterNumber DESC")
     suspend fun cachedChapters(sourceId: Long, mangaUrl: String): List<SourceChapterEntity>
 
+    @Query("SELECT * FROM source_chapters WHERE chapterUrl = :chapterUrl LIMIT 1")
+    suspend fun cachedChapterByUrl(chapterUrl: String): SourceChapterEntity?
+
     @Upsert
     suspend fun upsertChapters(chapters: List<SourceChapterEntity>)
 }
@@ -150,6 +153,25 @@ interface ProgressDao {
 
     @Query("SELECT * FROM reader_progress WHERE mediaId = :mediaId ORDER BY updatedAtEpochMillis DESC LIMIT 1")
     suspend fun latestProgress(mediaId: Int): ReadingProgressEntity?
+
+    @Query(
+        """
+        SELECT progress.* FROM reader_progress AS progress
+        INNER JOIN (
+            SELECT mediaId, MAX(updatedAtEpochMillis) AS updatedAtEpochMillis
+            FROM reader_progress
+            GROUP BY mediaId
+        ) AS latest
+            ON latest.mediaId = progress.mediaId
+            AND latest.updatedAtEpochMillis = progress.updatedAtEpochMillis
+        INNER JOIN anilist_list_entries AS entry
+            ON entry.mediaId = progress.mediaId
+        WHERE entry.status = 'CURRENT'
+        ORDER BY progress.updatedAtEpochMillis DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun latestCurrentProgress(limit: Int): List<ReadingProgressEntity>
 
     @Query("SELECT * FROM reader_progress WHERE mediaId = :mediaId AND chapterUrl = :chapterUrl")
     suspend fun progressForChapter(mediaId: Int, chapterUrl: String): ReadingProgressEntity?

@@ -15,6 +15,7 @@ import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
+import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.reader.ReaderProgressCalculator
 import com.tankobun.core.reader.ReaderSession
 import com.tankobun.core.sync.SyncMutationFactory
@@ -49,12 +50,15 @@ import okhttp3.Request
 import java.io.File
 import java.util.Locale
 import java.util.UUID
+import kotlin.math.roundToInt
 
 data class TankobunUiState(
     val loggedIn: Boolean = false,
     val clientConfigured: Boolean = false,
     val themeMode: TankobunThemeMode = TankobunThemeMode.SYSTEM,
     val viewerName: String? = null,
+    val anilistScoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
+    val anilistCustomLists: List<String> = emptyList(),
     val library: List<AnilistMedia> = emptyList(),
     val libraryItems: List<LibraryItem> = emptyList(),
     val librarySyncedAtEpochMillis: Long = 0L,
@@ -91,7 +95,7 @@ data class TankobunUiState(
     val trackingScore: String = "",
     val trackingNotes: String = "",
     val trackingPrivate: Boolean = false,
-    val trackingCustomLists: String = "",
+    val trackingCustomLists: Set<String> = emptySet(),
     val allInstalledSources: List<SourceDescriptor> = emptyList(),
     val installedSources: List<SourceDescriptor> = emptyList(),
     val sourceLanguages: Set<String> = defaultSourceLanguages(),
@@ -109,6 +113,7 @@ data class TankobunUiState(
     val selectedSourceManga: SourceManga? = null,
     val sourceChapters: List<SourceChapter> = emptyList(),
     val latestProgress: ReadingProgress? = null,
+    val recentReadingProgress: List<RecentReadingProgress> = emptyList(),
     val activeChapter: SourceChapter? = null,
     val readerPages: List<ReaderPage> = emptyList(),
     val currentPageIndex: Int = 0,
@@ -147,6 +152,12 @@ data class LibrarySection(
     val items: List<LibraryItem>,
 )
 
+data class RecentReadingProgress(
+    val media: AnilistMedia,
+    val progress: ReadingProgress,
+    val chapter: SourceChapter?,
+)
+
 private data class VerifiedSourceMatches(
     val matches: List<SourceSearchResult>,
     val chapterCounts: Map<String, Int>,
@@ -182,6 +193,8 @@ class MainViewModel(
             loggedIn = container.tokenStore.accessToken() != null,
             clientConfigured = BuildConfig.ANILIST_CLIENT_ID.isNotBlank(),
             viewerName = container.settingsStore.viewerName(),
+            anilistScoreFormat = container.settingsStore.anilistScoreFormat(),
+            anilistCustomLists = container.settingsStore.anilistCustomLists(),
             librarySyncedAtEpochMillis = container.settingsStore.librarySyncedAtEpochMillis(),
             libraryViewMode = container.settingsStore.libraryViewMode(),
             libraryCoverColumns = container.settingsStore.libraryCoverColumns(),
@@ -229,14 +242,19 @@ class MainViewModel(
     fun signOut() {
         container.tokenStore.clear()
         container.settingsStore.saveViewerName(null)
+        container.settingsStore.saveAnilistScoreFormat(AnilistScoreFormat.POINT_100)
+        container.settingsStore.saveAnilistCustomLists(emptyList())
         container.settingsStore.saveLibrarySyncedAtEpochMillis(0L)
         _state.update {
             it.copy(
                 loggedIn = false,
                 viewerName = null,
+                anilistScoreFormat = AnilistScoreFormat.POINT_100,
+                anilistCustomLists = emptyList(),
                 library = emptyList(),
                 libraryItems = emptyList(),
                 librarySyncedAtEpochMillis = 0L,
+                recentReadingProgress = emptyList(),
                 message = "Signed out",
             )
         }
@@ -561,9 +579,32 @@ class MainViewModel(
                         librarySyncedAtEpochMillis = container.settingsStore.librarySyncedAtEpochMillis(),
                     )
                 }
+                loadRecentReadingProgress()
             } else if (syncIfEmpty) {
                 refreshLibrary()
             }
+        }
+    }
+
+    private fun loadRecentReadingProgress() {
+        viewModelScope.launch {
+            val items = recentReadingProgressItems()
+            _state.update { it.copy(recentReadingProgress = items) }
+        }
+    }
+
+    private suspend fun recentReadingProgressItems(): List<RecentReadingProgress> {
+        val latestProgress = container.database.progressDao().latestCurrentProgress(RECENT_READING_LIMIT)
+            .map { it.toModel() }
+        if (latestProgress.isEmpty()) return emptyList()
+        val mediaById = container.database.mediaDao().cachedMedia().associateBy { it.id }
+        return latestProgress.mapNotNull { progress ->
+            val media = mediaById[progress.mediaId]?.toModel() ?: return@mapNotNull null
+            RecentReadingProgress(
+                media = media,
+                progress = progress,
+                chapter = container.database.chapterDao().cachedChapterByUrl(progress.chapterUrl)?.toModel(),
+            )
         }
     }
 
@@ -578,7 +619,11 @@ class MainViewModel(
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
                 val viewer = container.anilistRepository.viewer(token)
-                val entries = container.anilistRepository.mangaList(token, userId = viewer.id)
+                val entries = container.anilistRepository.mangaList(
+                    accessToken = token,
+                    userId = viewer.id,
+                    scoreFormat = viewer.scoreFormat,
+                )
                 val now = System.currentTimeMillis()
                 container.database.mediaDao().upsertMedia(entries.map { it.first.toEntity(now) })
                 container.database.listEntryDao().upsertEntries(entries.map { it.second.toEntity(now) })
@@ -589,10 +634,14 @@ class MainViewModel(
                     container.database.listEntryDao().deleteEntriesNotIn(entryIds)
                 }
                 container.settingsStore.saveViewerName(viewer.name)
+                container.settingsStore.saveAnilistScoreFormat(viewer.scoreFormat)
+                container.settingsStore.saveAnilistCustomLists(viewer.mangaCustomLists)
                 container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
                 _state.update {
                     it.copy(
                         viewerName = viewer.name,
+                        anilistScoreFormat = viewer.scoreFormat,
+                        anilistCustomLists = viewer.mangaCustomLists,
                         library = entries.map { pair -> pair.first },
                         libraryItems = entries.map { (media, entry) -> LibraryItem(media, entry) },
                         librarySyncedAtEpochMillis = now,
@@ -600,6 +649,7 @@ class MainViewModel(
                         message = "Library synced",
                     )
                 }
+                loadRecentReadingProgress()
             }.onFailure { error ->
                 Log.e(TAG, "AniList library sync failed", error)
                 _state.update {
@@ -864,10 +914,10 @@ class MainViewModel(
                 recommendationsLoading = false,
                 trackingStatus = existingEntry?.status ?: MediaStatus.PLANNING,
                 trackingProgress = (existingEntry?.progress ?: 0).toString(),
-                trackingScore = existingEntry?.score?.toString().orEmpty(),
+                trackingScore = existingEntry?.score.formatTrackingScore(it.anilistScoreFormat),
                 trackingNotes = existingEntry?.notes.orEmpty(),
                 trackingPrivate = existingEntry?.private ?: false,
-                trackingCustomLists = existingEntry?.customLists?.joinToString(", ").orEmpty(),
+                trackingCustomLists = existingEntry?.customLists.orEmpty().toSet(),
                 selectedSourceManga = null,
                 sourceChapters = emptyList(),
                 latestProgress = null,
@@ -950,7 +1000,7 @@ class MainViewModel(
     }
 
     fun setTrackingScore(score: String) {
-        _state.update { it.copy(trackingScore = score.filter { char -> char.isDigit() || char == '.' }.take(5)) }
+        _state.update { it.copy(trackingScore = score.filteredScoreInput(it.anilistScoreFormat)) }
     }
 
     fun setTrackingNotes(notes: String) {
@@ -961,8 +1011,32 @@ class MainViewModel(
         _state.update { it.copy(trackingPrivate = private) }
     }
 
-    fun setTrackingCustomLists(customLists: String) {
-        _state.update { it.copy(trackingCustomLists = customLists) }
+    fun setTrackingCustomListSelected(name: String, selected: Boolean) {
+        val normalizedName = name.trim()
+        if (normalizedName.isBlank()) return
+        _state.update {
+            it.copy(
+                trackingCustomLists = if (selected) {
+                    it.trackingCustomLists + normalizedName
+                } else {
+                    it.trackingCustomLists - normalizedName
+                },
+            )
+        }
+    }
+
+    fun addTrackingCustomList(name: String) {
+        val normalizedName = name.trim()
+        if (normalizedName.isBlank()) return
+        _state.update {
+            val knownLists = (it.anilistCustomLists + normalizedName).distinctBy { listName ->
+                listName.lowercase(Locale.ROOT)
+            }
+            it.copy(
+                anilistCustomLists = knownLists,
+                trackingCustomLists = it.trackingCustomLists + normalizedName,
+            )
+        }
     }
 
     fun saveTracking() {
@@ -975,16 +1049,25 @@ class MainViewModel(
 
         val snapshot = _state.value
         val progress = snapshot.trackingProgress.toIntOrNull()?.coerceAtLeast(0)
-        val score = snapshot.trackingScore.toDoubleOrNull()?.coerceIn(0.0, 100.0)
+        val score = snapshot.trackingScore.toAniListScore(snapshot.anilistScoreFormat)
         val notes = snapshot.trackingNotes.trim().ifBlank { null }
-        val customLists = snapshot.trackingCustomLists
-            .split(',', '\n')
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
+        val customLists = snapshot.trackingCustomLists.normalizedCustomLists()
 
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
+                val knownCustomLists = snapshot.anilistCustomLists.normalizedCustomLists()
+                val missingCustomLists = customLists.filterNot { selectedList ->
+                    knownCustomLists.any { knownList -> knownList.equals(selectedList, ignoreCase = true) }
+                }
+                val nextKnownCustomLists = if (missingCustomLists.isEmpty()) {
+                    knownCustomLists
+                } else {
+                    container.anilistRepository.updateMangaCustomLists(
+                        accessToken = token,
+                        customLists = (knownCustomLists + missingCustomLists).normalizedCustomLists(),
+                    ).ifEmpty { (knownCustomLists + missingCustomLists).normalizedCustomLists() }
+                }
                 val entry = container.anilistRepository.saveListEntry(
                     accessToken = token,
                     mediaId = media.id,
@@ -994,26 +1077,29 @@ class MainViewModel(
                     notes = notes,
                     private = snapshot.trackingPrivate,
                     customLists = customLists,
+                    scoreFormat = snapshot.anilistScoreFormat,
                 )
                 val now = System.currentTimeMillis()
                 container.database.mediaDao().upsertMedia(media.toEntity(now))
                 container.database.listEntryDao().upsertEntry(entry.toEntity(now))
-                entry
-            }.onSuccess { entry ->
+                container.settingsStore.saveAnilistCustomLists(nextKnownCustomLists)
+                nextKnownCustomLists to entry
+            }.onSuccess { (knownCustomLists, entry) ->
                 _state.update {
                     val nextItem = LibraryItem(media, entry)
                     val nextItems = (it.libraryItems.filterNot { item -> item.media.id == media.id } + nextItem)
                         .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
                     it.copy(
+                        anilistCustomLists = knownCustomLists,
                         library = nextItems.map { item -> item.media },
                         libraryItems = nextItems,
                         selectedListEntry = entry,
                         trackingStatus = entry.status,
                         trackingProgress = entry.progress.toString(),
-                        trackingScore = entry.score?.toString().orEmpty(),
+                        trackingScore = entry.score.formatTrackingScore(it.anilistScoreFormat),
                         trackingNotes = entry.notes.orEmpty(),
                         trackingPrivate = entry.private,
-                        trackingCustomLists = entry.customLists.joinToString(", "),
+                        trackingCustomLists = entry.customLists.toSet(),
                         busy = false,
                         message = "AniList tracking saved",
                     )
@@ -1045,10 +1131,12 @@ class MainViewModel(
                             selectedRecommendationsHasMore = cachedRecommendations.size >= RECOMMENDATIONS_PAGE_SIZE,
                             trackingStatus = cachedEntry?.status ?: it.trackingStatus,
                             trackingProgress = cachedEntry?.progress?.toString() ?: it.trackingProgress,
-                            trackingScore = cachedEntry?.score?.toString() ?: it.trackingScore,
+                            trackingScore = cachedEntry?.score.formatTrackingScore(it.anilistScoreFormat)
+                                .takeIf { score -> score.isNotBlank() }
+                                ?: it.trackingScore,
                             trackingNotes = cachedEntry?.notes ?: it.trackingNotes,
                             trackingPrivate = cachedEntry?.private ?: it.trackingPrivate,
-                            trackingCustomLists = cachedEntry?.customLists?.joinToString(", ") ?: it.trackingCustomLists,
+                            trackingCustomLists = cachedEntry?.customLists?.toSet() ?: it.trackingCustomLists,
                         )
                     }
                 }
@@ -1071,6 +1159,7 @@ class MainViewModel(
                 container.anilistRepository.mediaDetailsWithEntry(
                     mediaId = mediaId,
                     accessToken = token,
+                    scoreFormat = _state.value.anilistScoreFormat,
                     recommendationsPage = 1,
                     recommendationsPerPage = RECOMMENDATIONS_PAGE_SIZE,
                 )
@@ -1110,10 +1199,12 @@ class MainViewModel(
                             libraryItems = nextItems,
                             trackingStatus = effectiveEntry?.status ?: it.trackingStatus,
                             trackingProgress = effectiveEntry?.progress?.toString() ?: it.trackingProgress,
-                            trackingScore = effectiveEntry?.score?.toString() ?: it.trackingScore,
+                            trackingScore = effectiveEntry?.score.formatTrackingScore(it.anilistScoreFormat)
+                                .takeIf { score -> score.isNotBlank() }
+                                ?: it.trackingScore,
                             trackingNotes = effectiveEntry?.notes ?: it.trackingNotes,
                             trackingPrivate = effectiveEntry?.private ?: it.trackingPrivate,
-                            trackingCustomLists = effectiveEntry?.customLists?.joinToString(", ") ?: it.trackingCustomLists,
+                            trackingCustomLists = effectiveEntry?.customLists?.toSet() ?: it.trackingCustomLists,
                         )
                     }
                 }
@@ -2104,6 +2195,50 @@ class MainViewModel(
         }
     }
 
+    fun openRecentProgress(item: RecentReadingProgress) {
+        val existingEntry = _state.value.libraryItems.firstOrNull { libraryItem ->
+            libraryItem.media.id == item.media.id
+        }?.entry
+        _state.update {
+            it.copy(
+                selectedMedia = item.media,
+                selectedListEntry = existingEntry,
+                sourceMatches = emptyList(),
+                sourceMatchChapterCounts = emptyMap(),
+                sourcePickerOpen = false,
+                sourcePickerLoading = false,
+                sourcePickerMessage = null,
+                sourcePickerDiagnostics = emptyList(),
+                selectedRecommendations = emptyList(),
+                selectedRecommendationsPage = 0,
+                selectedRecommendationsHasMore = false,
+                recommendationsLoading = false,
+                trackingStatus = existingEntry?.status ?: MediaStatus.CURRENT,
+                trackingProgress = (existingEntry?.progress ?: 0).toString(),
+                trackingScore = existingEntry?.score.formatTrackingScore(it.anilistScoreFormat),
+                trackingNotes = existingEntry?.notes.orEmpty(),
+                trackingPrivate = existingEntry?.private ?: false,
+                trackingCustomLists = existingEntry?.customLists.orEmpty().toSet(),
+                selectedSourceId = item.chapter?.sourceId ?: it.selectedSourceId,
+                selectedSourceManga = null,
+                sourceChapters = emptyList(),
+                latestProgress = item.progress,
+                activeChapter = null,
+                readerPages = emptyList(),
+                currentPageIndex = 0,
+                message = null,
+            )
+        }
+        loadAnilistDetails(item.media.id)
+        loadCachedSourceState(item.media.id)
+        val chapter = item.chapter
+        if (chapter == null) {
+            _state.update { it.copy(message = "Chapter cache is missing for ${item.media.title.userPreferred}") }
+        } else {
+            openChapter(chapter)
+        }
+    }
+
     fun closeReader() {
         saveReaderProgress()
         _state.update {
@@ -2191,6 +2326,7 @@ class MainViewModel(
             _state.update {
                 if (it.selectedMedia?.id == media.id) it.copy(latestProgress = progress) else it
             }
+            loadRecentReadingProgress()
             if (progress.completed && chapter.chapterNumber > 0) {
                 val mutation = syncMutationFactory.saveMediaListEntry(
                     mediaId = media.id,
@@ -2218,6 +2354,7 @@ class MainViewModel(
         private const val SOURCE_QUERY_TIMEOUT_MILLIS = 6_000L
         private const val SOURCE_DETAILS_TIMEOUT_MILLIS = 6_000L
         private const val SOURCE_CHAPTER_TIMEOUT_MILLIS = 10_000L
+        private const val RECENT_READING_LIMIT = 3
         private const val SOURCE_SEARCH_CONCURRENCY = 4
         private const val SOURCE_SEARCH_QUERY_LIMIT = 12
         private const val SOURCE_CANDIDATES_TO_VERIFY = 5
@@ -2298,6 +2435,49 @@ private fun TankobunUiState.browseCacheKey(): String = buildString {
 
 private fun String.normalizedSearchKey(): String =
     trim().lowercase(Locale.ROOT)
+
+private fun Iterable<String>.normalizedCustomLists(): List<String> =
+    map { it.trim() }
+        .filter { it.isNotBlank() }
+        .distinctBy { it.lowercase(Locale.ROOT) }
+
+private fun String.filteredScoreInput(format: AnilistScoreFormat): String {
+    val allowDecimal = format == AnilistScoreFormat.POINT_10_DECIMAL
+    var hasDecimal = false
+    return buildString {
+        this@filteredScoreInput.forEach { char ->
+            when {
+                char.isDigit() -> append(char)
+                allowDecimal && char == '.' && !hasDecimal -> {
+                    append(char)
+                    hasDecimal = true
+                }
+            }
+        }
+    }.take(if (allowDecimal) 4 else 3)
+}
+
+private fun String.toAniListScore(format: AnilistScoreFormat): Double? {
+    val value = trim().toDoubleOrNull() ?: return null
+    return when (format) {
+        AnilistScoreFormat.POINT_100 -> value.coerceIn(0.0, 100.0).roundToInt().toDouble()
+        AnilistScoreFormat.POINT_10_DECIMAL -> (value.coerceIn(0.0, 10.0) * 10).roundToInt() / 10.0
+        AnilistScoreFormat.POINT_10 -> value.coerceIn(0.0, 10.0).roundToInt().toDouble()
+        AnilistScoreFormat.POINT_5 -> value.coerceIn(0.0, 5.0).roundToInt().toDouble()
+        AnilistScoreFormat.POINT_3 -> value.coerceIn(0.0, 3.0).roundToInt().toDouble()
+    }
+}
+
+private fun Double?.formatTrackingScore(format: AnilistScoreFormat): String {
+    val value = this ?: return ""
+    return when (format) {
+        AnilistScoreFormat.POINT_10_DECIMAL -> "%.1f".format(Locale.US, value)
+        AnilistScoreFormat.POINT_100,
+        AnilistScoreFormat.POINT_10,
+        AnilistScoreFormat.POINT_5,
+        AnilistScoreFormat.POINT_3 -> value.roundToInt().toString()
+    }
+}
 
 private fun List<AnilistRecommendation>.recommendationPageCount(): Int =
     if (isEmpty()) 0 else ((size - 1) / RECOMMENDATIONS_PAGE_SIZE) + 1

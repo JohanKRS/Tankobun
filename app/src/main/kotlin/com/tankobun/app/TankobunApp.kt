@@ -18,8 +18,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -72,20 +70,26 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.MenuOpen
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -112,6 +116,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -135,6 +140,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
@@ -155,6 +161,7 @@ import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
+import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.ReaderPage
@@ -163,6 +170,7 @@ import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceSearchResult
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -204,6 +212,11 @@ private enum class QuickDrawerMode {
     OVERLAY,
     PINNED,
 }
+
+private val QuickDrawerOverlayWidth = 340.dp
+private val QuickDrawerPinnedWidth = 320.dp
+private val QuickDrawerHandleSlotWidth = 40.dp
+private const val QuickDrawerSnapMillis = 180
 
 private enum class LibraryPicker {
     FORMAT,
@@ -264,7 +277,12 @@ fun TankobunApp(viewModel: MainViewModel) {
     }
 
     TankobunTheme(themeMode = state.themeMode) {
-        Box(Modifier.fillMaxSize()) {
+        val cutoutEndPadding = displayCutoutEndPadding()
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(LocalTankobunTokens.current.appBackdrop),
+        ) {
             TankobunScaffold(
                 state = state,
                 viewModel = viewModel,
@@ -287,6 +305,15 @@ fun TankobunApp(viewModel: MainViewModel) {
                     }
                 },
             )
+            if (!readerOpen && quickDrawerMode != QuickDrawerMode.CLOSED && cutoutEndPadding > 0.dp) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .width(cutoutEndPadding)
+                        .background(LocalTankobunTokens.current.elevatedSurface),
+                )
+            }
             if (readerOpen) {
                 FullScreenReader(state, viewModel)
             }
@@ -311,6 +338,58 @@ private fun TankobunScaffold(
 ) {
     val cutoutEndPadding = displayCutoutEndPadding()
     val drawerSafeEndPadding = maxOf(cutoutEndPadding, 10.dp)
+    val density = LocalDensity.current
+    val drawerTravelPx = with(density) { (QuickDrawerOverlayWidth + cutoutEndPadding).toPx() }
+    val drawerSnapThresholdPx = with(density) { 72.dp.toPx() }
+    val drawerScope = rememberCoroutineScope()
+    var overlayDrawerDragOffsetPx by remember { mutableFloatStateOf(0f) }
+    var closedDrawerDragOffsetPx by remember { mutableFloatStateOf(0f) }
+    var overlayDrawerDragging by remember { mutableStateOf(false) }
+    var closedDrawerDragging by remember { mutableStateOf(false) }
+    val overlayDrawerOffsetPx by animateFloatAsState(
+        targetValue = overlayDrawerDragOffsetPx,
+        animationSpec = tween(durationMillis = if (overlayDrawerDragging) 0 else QuickDrawerSnapMillis),
+        label = "Overlay drawer drag offset",
+    )
+    val closedDrawerTranslationPx by animateFloatAsState(
+        targetValue = (drawerTravelPx + closedDrawerDragOffsetPx).coerceIn(0f, drawerTravelPx),
+        animationSpec = tween(durationMillis = if (closedDrawerDragging) 0 else QuickDrawerSnapMillis),
+        label = "Closed drawer peek offset",
+    )
+
+    LaunchedEffect(quickDrawerMode) {
+        if (quickDrawerMode != QuickDrawerMode.OVERLAY) {
+            overlayDrawerDragging = false
+            overlayDrawerDragOffsetPx = 0f
+        }
+        if (quickDrawerMode != QuickDrawerMode.CLOSED) {
+            closedDrawerDragging = false
+            closedDrawerDragOffsetPx = 0f
+        }
+    }
+
+    fun openQuickDrawerFromClosed(initialTranslationPx: Float = drawerTravelPx) {
+        overlayDrawerDragging = false
+        overlayDrawerDragOffsetPx = initialTranslationPx.coerceIn(0f, drawerTravelPx)
+        closedDrawerDragging = false
+        closedDrawerDragOffsetPx = 0f
+        onOpenQuickDrawer()
+        drawerScope.launch {
+            withFrameNanos { }
+            overlayDrawerDragOffsetPx = 0f
+        }
+    }
+
+    fun closeQuickDrawerFromOverlay() {
+        overlayDrawerDragging = false
+        overlayDrawerDragOffsetPx = drawerTravelPx
+        drawerScope.launch {
+            delay(QuickDrawerSnapMillis.toLong())
+            onCloseQuickDrawer()
+            overlayDrawerDragOffsetPx = 0f
+        }
+    }
+
     Scaffold(
         containerColor = LocalTankobunTokens.current.appBackdrop,
         topBar = {
@@ -325,27 +404,24 @@ private fun TankobunScaffold(
                         onOpenSettingsRoute(SettingsRoute.MAIN)
                     }
                 },
-                onSync = viewModel::refreshLibrary,
-                onSearch = {
-                    if (selectedMedia != null) {
-                        viewModel.clearSelectedMedia()
-                    }
-                    onSelectTab(1)
-                    onOpenSettingsRoute(SettingsRoute.MAIN)
-                },
-                onOpenQuickDrawer = onOpenQuickDrawer,
             )
         },
         bottomBar = {
             if (selectedMedia == null) {
-                TankobunBottomNavigationBar(
-                    selectedTab = selectedTab,
-                    onSelectTab = onSelectTab,
-                    modifier = Modifier.padding(
-                        start = displayCutoutStartPadding(),
-                        end = displayCutoutEndPadding(),
-                    ),
-                )
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = LocalTankobunTokens.current.elevatedSurface,
+                    tonalElevation = 2.dp,
+                ) {
+                    TankobunBottomNavigationBar(
+                        selectedTab = selectedTab,
+                        onSelectTab = onSelectTab,
+                        modifier = Modifier.padding(
+                            start = displayCutoutStartPadding(),
+                            end = displayCutoutEndPadding(),
+                        ),
+                    )
+                }
             }
         },
     ) { padding ->
@@ -378,35 +454,59 @@ private fun TankobunScaffold(
                 }
                 if (quickDrawerMode == QuickDrawerMode.PINNED) {
                     val pinnedWidth by animateDpAsState(
-                        targetValue = 320.dp,
+                        targetValue = QuickDrawerPinnedWidth,
                         animationSpec = tween(durationMillis = 220),
                         label = "Pinned drawer width",
                     )
-                    Box(
-                        modifier = Modifier
-                            .width(pinnedWidth + cutoutEndPadding)
-                            .fillMaxHeight(),
-                    ) {
-                        QuickDrawer(
-                            state = state,
-                            viewModel = viewModel,
-                            selectedMedia = selectedMedia,
-                            pinned = true,
-                            onClose = onCloseQuickDrawer,
-                            onTogglePin = onToggleQuickDrawerPin,
-                            modifier = Modifier
-                                .width(pinnedWidth)
-                                .fillMaxHeight()
-                                .align(Alignment.CenterStart),
-                        )
-                    }
+                    QuickDrawer(
+                        state = state,
+                        viewModel = viewModel,
+                        selectedMedia = selectedMedia,
+                        pinned = true,
+                        onClose = onCloseQuickDrawer,
+                        onTogglePin = onToggleQuickDrawerPin,
+                        drawerWidth = pinnedWidth,
+                        endPadding = cutoutEndPadding,
+                        modifier = Modifier.fillMaxHeight(),
+                    )
                 }
+            }
+            if (quickDrawerMode == QuickDrawerMode.CLOSED && closedDrawerDragOffsetPx < -1f) {
+                QuickDrawer(
+                    state = state,
+                    viewModel = viewModel,
+                    selectedMedia = selectedMedia,
+                    pinned = false,
+                    onClose = onCloseQuickDrawer,
+                    onTogglePin = onToggleQuickDrawerPin,
+                    drawerWidth = QuickDrawerOverlayWidth,
+                    endPadding = cutoutEndPadding,
+                    showHandle = false,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .graphicsLayer { translationX = closedDrawerTranslationPx },
+                )
             }
             if (quickDrawerMode == QuickDrawerMode.CLOSED) {
                 QuickDrawerHandle(
                     expanded = false,
-                    onClick = onOpenQuickDrawer,
-                    onSwipeIn = onOpenQuickDrawer,
+                    onClick = { openQuickDrawerFromClosed() },
+                    onSwipeIn = { openQuickDrawerFromClosed() },
+                    onDragOffset = {
+                        closedDrawerDragging = true
+                        closedDrawerDragOffsetPx = it.coerceIn(-drawerTravelPx, 0f)
+                    },
+                    onDragEnd = { totalX ->
+                        closedDrawerDragging = false
+                        if (totalX < -drawerSnapThresholdPx) {
+                            val releaseTranslationPx = (drawerTravelPx + totalX.coerceIn(-drawerTravelPx, 0f))
+                                .coerceIn(0f, drawerTravelPx)
+                            openQuickDrawerFromClosed(releaseTranslationPx)
+                        } else {
+                            closedDrawerDragOffsetPx = 0f
+                        }
+                    },
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .padding(end = drawerSafeEndPadding),
@@ -425,34 +525,42 @@ private fun TankobunScaffold(
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = onCloseQuickDrawer,
+                            onClick = { closeQuickDrawerFromOverlay() },
                         ),
                 )
             }
             AnimatedVisibility(
                 visible = quickDrawerMode == QuickDrawerMode.OVERLAY,
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = cutoutEndPadding),
-                enter = slideInHorizontally(
-                    initialOffsetX = { it },
-                    animationSpec = tween(durationMillis = 320),
-                ) + fadeIn(tween(160)),
-                exit = slideOutHorizontally(
-                    targetOffsetX = { it },
-                    animationSpec = tween(durationMillis = 260),
-                ) + fadeOut(tween(120)),
+                    .align(Alignment.CenterEnd),
+                enter = fadeIn(tween(120)),
+                exit = fadeOut(tween(120)),
             ) {
                 QuickDrawer(
                     state = state,
                     viewModel = viewModel,
                     selectedMedia = selectedMedia,
                     pinned = false,
-                    onClose = onCloseQuickDrawer,
+                    onClose = { closeQuickDrawerFromOverlay() },
                     onTogglePin = onToggleQuickDrawerPin,
+                    drawerWidth = QuickDrawerOverlayWidth,
+                    endPadding = cutoutEndPadding,
+                    onHandleDragOffset = {
+                        overlayDrawerDragging = true
+                        overlayDrawerDragOffsetPx = it.coerceIn(0f, drawerTravelPx)
+                    },
+                    onHandleDragEnd = { totalX ->
+                        overlayDrawerDragging = false
+                        if (totalX > drawerSnapThresholdPx) {
+                            closeQuickDrawerFromOverlay()
+                        } else {
+                            overlayDrawerDragOffsetPx = 0f
+                        }
+                    },
+                    handleDragLocally = false,
                     modifier = Modifier
                         .fillMaxHeight()
-                        .width(340.dp),
+                        .graphicsLayer { translationX = overlayDrawerOffsetPx },
                 )
             }
             if (state.busy) {
@@ -466,6 +574,8 @@ private suspend fun PointerInputScope.detectQuickDrawerHandleSwipe(
     expanded: Boolean,
     onSwipeIn: () -> Unit,
     onSwipeOut: () -> Unit,
+    onDragOffset: (Float) -> Unit,
+    onDragEnd: (Float) -> Unit,
 ) {
     awaitEachGesture {
         awaitFirstDown(requireUnconsumed = false)
@@ -483,14 +593,12 @@ private suspend fun PointerInputScope.detectQuickDrawerHandleSwipe(
             }
             if (swipingHorizontally) {
                 change.consume()
+                onDragOffset(totalX)
             }
         } while (event.changes.any { it.pressed })
 
         if (swipingHorizontally) {
-            when {
-                expanded && totalX > 48f -> onSwipeOut()
-                !expanded && totalX < -48f -> onSwipeIn()
-            }
+            onDragEnd(totalX)
         }
     }
 }
@@ -518,9 +626,6 @@ private fun TankobunTopBar(
     title: String,
     showBack: Boolean,
     onBack: () -> Unit,
-    onSync: () -> Unit,
-    onSearch: () -> Unit,
-    onOpenQuickDrawer: () -> Unit,
 ) {
     val startInset = displayCutoutStartPadding()
     val endInset = displayCutoutEndPadding()
@@ -551,15 +656,6 @@ private fun TankobunTopBar(
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleLarge,
             )
-            IconButton(onClick = onSync) {
-                Icon(Icons.Default.Refresh, contentDescription = "Sync")
-            }
-            IconButton(onClick = onSearch) {
-                Icon(Icons.Default.Search, contentDescription = "Search")
-            }
-            IconButton(onClick = onOpenQuickDrawer) {
-                Icon(Icons.AutoMirrored.Filled.MenuOpen, contentDescription = "Quick drawer")
-            }
         }
     }
 }
@@ -572,9 +668,9 @@ private fun TankobunBottomNavigationBar(
 ) {
     NavigationBar(
         modifier = modifier,
-        containerColor = LocalTankobunTokens.current.elevatedSurface,
+        containerColor = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        tonalElevation = 2.dp,
+        tonalElevation = 0.dp,
     ) {
         listOf(
             Triple("Library", Icons.AutoMirrored.Filled.LibraryBooks, 0),
@@ -599,7 +695,22 @@ private fun QuickDrawerHandle(
     modifier: Modifier = Modifier,
     onSwipeIn: () -> Unit = onClick,
     onSwipeOut: () -> Unit = onClick,
+    dragLocally: Boolean = true,
+    onDragOffset: (Float) -> Unit = {},
+    onDragEnd: (Float) -> Unit = { totalX ->
+        when {
+            expanded && totalX > 48f -> onSwipeOut()
+            !expanded && totalX < -48f -> onSwipeIn()
+        }
+    },
 ) {
+    var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+    var handleDragging by remember { mutableStateOf(false) }
+    val handleDragOffsetPx by animateFloatAsState(
+        targetValue = dragOffsetPx,
+        animationSpec = tween(durationMillis = if (handleDragging) 0 else QuickDrawerSnapMillis),
+        label = "Quick drawer handle drag",
+    )
     val handleWidth by animateDpAsState(
         targetValue = if (expanded) 40.dp else 36.dp,
         animationSpec = tween(durationMillis = 220),
@@ -610,38 +721,41 @@ private fun QuickDrawerHandle(
         animationSpec = tween(durationMillis = 220),
         label = "Quick drawer handle height",
     )
-    val handleShape = if (expanded) {
-        RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp)
-    } else {
-        RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
-    }
-    Surface(
+    val handleShape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
+    Box(
         modifier = modifier
             .width(handleWidth)
             .height(handleHeight)
-            .clip(handleShape)
+            .graphicsLayer { translationX = if (dragLocally) handleDragOffsetPx else 0f }
             .pointerInput(expanded) {
                 detectQuickDrawerHandleSwipe(
                     expanded = expanded,
                     onSwipeIn = onSwipeIn,
                     onSwipeOut = onSwipeOut,
+                    onDragOffset = {
+                        handleDragging = true
+                        if (dragLocally) {
+                            dragOffsetPx = if (expanded) it.coerceAtLeast(0f) else it.coerceAtMost(0f)
+                        }
+                        onDragOffset(it)
+                    },
+                    onDragEnd = {
+                        handleDragging = false
+                        if (dragLocally) dragOffsetPx = 0f
+                        onDragEnd(it)
+                    },
                 )
             }
             .clickable(onClick = onClick),
-        shape = handleShape,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.86f),
-        tonalElevation = if (expanded) 3.dp else 2.dp,
-        shadowElevation = if (expanded) 3.dp else 1.dp,
+        contentAlignment = Alignment.Center,
     ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Surface(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(if (expanded) 42.dp else 36.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.52f),
-            ) {}
-        }
+        Surface(
+            modifier = Modifier
+                .width(4.dp)
+                .height(if (expanded) 42.dp else 36.dp),
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.52f),
+        ) {}
     }
 }
 
@@ -653,150 +767,141 @@ private fun QuickDrawer(
     pinned: Boolean,
     onClose: () -> Unit,
     onTogglePin: () -> Unit,
+    drawerWidth: Dp,
+    endPadding: Dp,
+    showHandle: Boolean = !pinned,
+    onHandleDragOffset: (Float) -> Unit = {},
+    onHandleDragEnd: (Float) -> Unit = {},
+    handleDragLocally: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier) {
+    val handleSlotWidth = if (pinned) 0.dp else QuickDrawerHandleSlotWidth
+    Box(modifier = modifier.width(handleSlotWidth + drawerWidth + endPadding)) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .width(drawerWidth + endPadding)
+                .fillMaxHeight(),
             shape = if (pinned) RoundedCornerShape(0.dp) else RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
-            tonalElevation = if (pinned) 1.dp else 10.dp,
+            tonalElevation = 0.dp,
             shadowElevation = if (pinned) 0.dp else 10.dp,
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Quick Drawer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(
-                            if (pinned) "Pinned utility panel" else "Resume, sources, sync",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    TextButton(onClick = onTogglePin) {
-                        Text(if (pinned) "Unpin" else "Pin")
-                    }
-                }
-
-                QuickDrawerSection(title = "Continue Reading") {
-                    val progress = state.latestProgress
-                    val chapter = progress?.let { saved -> state.sourceChapters.firstOrNull { it.url == saved.chapterUrl } }
-                    if (chapter != null) {
-                        Text(chapter.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            "Page ${progress.pageIndex + 1}/${progress.totalPages} / chapter ${progress.chapterNumber.takeIf { it > 0 } ?: "?"}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Button(onClick = { viewModel.openChapter(chapter) }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Resume")
+            Box(Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .width(drawerWidth)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Quick Actions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         }
-                    } else {
+                        IconButton(onClick = onTogglePin) {
+                            Icon(
+                                imageVector = if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                contentDescription = if (pinned) "Unpin quick actions" else "Pin quick actions",
+                                tint = if (pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    QuickDrawerSection(title = "Sync") {
                         Text(
-                            selectedMedia?.let { "Open a chapter to create a resume point." } ?: "Open a title to see resume actions here.",
-                            style = MaterialTheme.typography.bodyMedium,
+                            state.librarySyncedAtEpochMillis.takeIf { it > 0 }?.let { "Library cache: ${cacheAgeLabel(it)}" }
+                                ?: "Library has not synced yet.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        Button(onClick = viewModel::refreshLibrary, enabled = state.loggedIn, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Sync AniList")
+                        }
                     }
-                }
 
-            QuickDrawerSection(title = "Source Health") {
-                val source = state.selectedSource
-                val manga = state.selectedSourceManga
-                Text(
-                    manga?.title ?: "No source selected",
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    listOfNotNull(
-                        source?.let { "${it.name} (${it.lang})" },
-                        state.sourceChapters.takeIf { it.isNotEmpty() }?.let { "${it.size} chapters cached" },
-                    ).ifEmpty { listOf("Find a readable source from the manga page.") }.joinToString(" / "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (selectedMedia != null) {
-                    OutlinedButton(onClick = viewModel::openSourcePicker, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.Link, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (manga == null) "Find source" else "Change source")
+                    if (selectedMedia != null) {
+                        QuickDrawerSection(title = "AniList") {
+                            AniListTrackingSection(state, viewModel, selectedMedia)
+                        }
                     }
-                }
-            }
 
-            QuickDrawerSection(title = "Downloads") {
-                if (state.downloads.isEmpty()) {
-                    Text("No downloads queued.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    state.downloads.take(4).forEach { job ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(job.chapterName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(
-                                    job.state.name.lowercase(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                    QuickDrawerSection(title = "Continue Reading") {
+                        if (state.recentReadingProgress.isNotEmpty()) {
+                            state.recentReadingProgress.forEach { item ->
+                                RecentReadingAction(item = item, onClick = { viewModel.openRecentProgress(item) })
+                            }
+                        } else {
+                            Text(
+                                "Start reading a manga from your Reading list to create resume points.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    QuickDrawerSection(title = "Downloads") {
+                        if (state.downloads.isEmpty()) {
+                            Text("No downloads queued.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else {
+                            state.downloads.take(4).forEach { job ->
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(job.chapterName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            job.state.name.lowercase(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
-
-            if (selectedMedia != null) {
-                QuickDrawerSection(title = "AniList") {
-                    AniListTrackingSection(state, viewModel, selectedMedia)
-                }
-
-                if (state.sourceMatches.isNotEmpty()) {
-                    QuickDrawerSection(title = "Source Matches") {
-                        state.sourceMatches.take(3).forEach { match ->
-                            val count = state.sourceMatchChapterCounts[sourceMatchKey(match.source.id, match.manga.url)] ?: 0
-                            Text(
-                                "${match.source.name} / ${count.takeIf { it > 0 } ?: "?"} chapters / ${(match.score * 100).toInt()}%",
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-
-            QuickDrawerSection(title = "Sync") {
-                Text(
-                    state.librarySyncedAtEpochMillis.takeIf { it > 0 }?.let { "Library cache: ${cacheAgeLabel(it)}" }
-                        ?: "Library has not synced yet.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Button(onClick = viewModel::refreshLibrary, enabled = state.loggedIn, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Sync AniList")
-                }
-            }
         }
-        }
-        if (!pinned) {
+        if (!pinned && showHandle) {
             QuickDrawerHandle(
                 expanded = true,
                 onClick = onClose,
                 onSwipeOut = onClose,
+                dragLocally = handleDragLocally,
+                onDragOffset = onHandleDragOffset,
+                onDragEnd = onHandleDragEnd,
                 modifier = Modifier.align(Alignment.CenterStart),
             )
+        }
+    }
+}
+
+@Composable
+private fun RecentReadingAction(item: RecentReadingProgress, onClick: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        Text(
+            item.media.title.userPreferred,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            listOf(
+                item.chapter?.name ?: item.progress.chapterNumber.takeIf { it > 0 }?.let { "Chapter $it" } ?: "Saved chapter",
+                "Page ${item.progress.pageIndex + 1}/${item.progress.totalPages}",
+            ).joinToString(" / "),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text(if (item.chapter == null) "Open manga" else "Resume")
         }
     }
 }
@@ -2651,43 +2756,33 @@ private fun mangaInfoPill(label: String, value: String) {
 @Composable
 private fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("AniList", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            AssistChip(
-                onClick = {},
-                label = {
-                    Text(state.selectedListEntry?.status?.displayName() ?: "Not tracked")
-                },
-            )
-        }
+        AniListStatusSelector(
+            selected = state.trackingStatus,
+            onSelected = viewModel::setTrackingStatus,
+        )
 
-        FlowRowCompat {
-            trackingStatuses().forEach { status ->
-                FilterChip(
-                    selected = state.trackingStatus == status,
-                    onClick = { viewModel.setTrackingStatus(status) },
-                    label = { Text(status.displayName()) },
-                )
-            }
-        }
+        AniListCustomListSelector(
+            availableLists = (state.anilistCustomLists + state.trackingCustomLists).distinctBy { it.lowercase() },
+            selectedLists = state.trackingCustomLists,
+            onListSelected = viewModel::setTrackingCustomListSelected,
+            onAddList = viewModel::addTrackingCustomList,
+        )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedTextField(
                 value = state.trackingProgress,
                 onValueChange = viewModel::setTrackingProgress,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 label = { Text("Progress") },
                 suffix = { Text("/ ${media.chapters ?: "?"}") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
-            OutlinedTextField(
+            AniListScoreInput(
+                scoreFormat = state.anilistScoreFormat,
                 value = state.trackingScore,
                 onValueChange = viewModel::setTrackingScore,
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                label = { Text("Score") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
             )
         }
 
@@ -2698,15 +2793,6 @@ private fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewMo
             minLines = 2,
             maxLines = 4,
             label = { Text("Notes") },
-        )
-
-        OutlinedTextField(
-            value = state.trackingCustomLists,
-            onValueChange = viewModel::setTrackingCustomLists,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("Custom lists") },
-            placeholder = { Text("Favorites, To buy") },
         )
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -2725,6 +2811,244 @@ private fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewMo
             )
         }
     }
+}
+
+@Composable
+private fun AniListStatusSelector(selected: MediaStatus, onSelected: (MediaStatus) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
+            Text(selected.displayName(), modifier = Modifier.weight(1f))
+            Icon(Icons.Default.ExpandMore, contentDescription = null)
+        }
+        AnimatedVisibility(visible = expanded) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp,
+                shadowElevation = 2.dp,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                ) {
+                    trackingStatuses().forEach { status ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    onSelected(status)
+                                    expanded = false
+                                }
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text(
+                                status.displayName(),
+                                modifier = Modifier.weight(1f),
+                                fontWeight = if (status == selected) FontWeight.Bold else FontWeight.Normal,
+                            )
+                            if (status == selected) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AniListCustomListSelector(
+    availableLists: List<String>,
+    selectedLists: Set<String>,
+    onListSelected: (String, Boolean) -> Unit,
+    onAddList: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var newListName by remember { mutableStateOf("") }
+    val selectedLabel = selectedLists
+        .sortedWith(String.CASE_INSENSITIVE_ORDER)
+        .takeIf { it.isNotEmpty() }
+        ?.joinToString(", ")
+        ?: "Custom lists"
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
+            Text(selectedLabel, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Icon(Icons.Default.ExpandMore, contentDescription = null)
+        }
+        AnimatedVisibility(visible = expanded) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp,
+                shadowElevation = 2.dp,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                ) {
+                    if (availableLists.isEmpty()) {
+                        Text(
+                            "No custom lists yet.",
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 220.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        availableLists.forEach { listName ->
+                            val selected = selectedLists.any { it.equals(listName, ignoreCase = true) }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { onListSelected(listName, !selected) }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Checkbox(checked = selected, onCheckedChange = { onListSelected(listName, it) })
+                                Text(
+                                    listName,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = newListName,
+                            onValueChange = { newListName = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text("New list") },
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Spacer(Modifier.weight(1f))
+                            TextButton(
+                                onClick = {
+                                    onAddList(newListName)
+                                    newListName = ""
+                                },
+                                enabled = newListName.isNotBlank(),
+                            ) {
+                                Text("Add")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AniListScoreInput(
+    scoreFormat: AnilistScoreFormat,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when (scoreFormat) {
+        AnilistScoreFormat.POINT_5 -> StarScoreInput(value, onValueChange, modifier)
+        AnilistScoreFormat.POINT_3 -> MoodScoreInput(value, onValueChange, modifier)
+        else -> OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = modifier,
+            singleLine = true,
+            label = { Text(scoreFormat.scoreLabel()) },
+            suffix = { Text(scoreFormat.scoreSuffix()) },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = if (scoreFormat == AnilistScoreFormat.POINT_10_DECIMAL) {
+                    KeyboardType.Decimal
+                } else {
+                    KeyboardType.Number
+                },
+            ),
+        )
+    }
+}
+
+@Composable
+private fun StarScoreInput(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    val selected = value.toDoubleOrNull()?.roundToInt() ?: 0
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Score", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            (1..5).forEach { star ->
+                IconButton(
+                    onClick = { onValueChange(if (selected == star) "" else star.toString()) },
+                    modifier = Modifier.size(34.dp),
+                ) {
+                    Icon(
+                        if (star <= selected) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = "$star star score",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoodScoreInput(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    val selected = value.toDoubleOrNull()?.roundToInt() ?: 0
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(1 to ":(", 2 to ":|", 3 to ":)").forEach { (score, label) ->
+            FilterChip(
+                selected = selected == score,
+                onClick = { onValueChange(if (selected == score) "" else score.toString()) },
+                label = { Text(label) },
+            )
+        }
+    }
+}
+
+private fun AnilistScoreFormat.scoreLabel(): String = when (this) {
+    AnilistScoreFormat.POINT_100 -> "Score"
+    AnilistScoreFormat.POINT_10_DECIMAL -> "Score"
+    AnilistScoreFormat.POINT_10 -> "Score"
+    AnilistScoreFormat.POINT_5 -> "Score"
+    AnilistScoreFormat.POINT_3 -> "Score"
+}
+
+private fun AnilistScoreFormat.scoreSuffix(): String = when (this) {
+    AnilistScoreFormat.POINT_100 -> "/ 100"
+    AnilistScoreFormat.POINT_10_DECIMAL,
+    AnilistScoreFormat.POINT_10 -> "/ 10"
+    AnilistScoreFormat.POINT_5 -> "/ 5"
+    AnilistScoreFormat.POINT_3 -> "/ 3"
 }
 
 @Composable

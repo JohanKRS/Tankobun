@@ -2,6 +2,7 @@ package com.tankobun.app
 
 import android.content.Context
 import com.tankobun.core.model.AnilistMediaTag
+import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.ReaderMode
 import java.util.Base64
 import java.util.Locale
@@ -165,6 +166,35 @@ class SettingsStore(context: Context) {
         preferences.edit().putString(KEY_VIEWER_NAME, name).apply()
     }
 
+    fun anilistScoreFormat(): AnilistScoreFormat =
+        preferences.getString(KEY_ANILIST_SCORE_FORMAT, null)
+            ?.let { stored -> runCatching { AnilistScoreFormat.valueOf(stored) }.getOrNull() }
+            ?: AnilistScoreFormat.POINT_100
+
+    fun saveAnilistScoreFormat(format: AnilistScoreFormat) {
+        preferences.edit().putString(KEY_ANILIST_SCORE_FORMAT, format.name).apply()
+    }
+
+    fun anilistCustomLists(): List<String> =
+        preferences.getString(KEY_ANILIST_CUSTOM_LISTS, "").orEmpty()
+            .lineSequence()
+            .mapNotNull { encoded -> runCatching { decodePart(encoded) }.getOrNull() }
+            .filter { it.isNotBlank() }
+            .distinctBy { it.lowercase(Locale.ROOT) }
+            .toList()
+
+    fun saveAnilistCustomLists(lists: List<String>) {
+        preferences.edit()
+            .putString(
+                KEY_ANILIST_CUSTOM_LISTS,
+                lists.map { it.trim() }
+                    .filter { it.isNotBlank() }
+                    .distinctBy { it.lowercase(Locale.ROOT) }
+                    .joinToString("\n", transform = ::encodePart),
+            )
+            .apply()
+    }
+
     fun librarySyncedAtEpochMillis(): Long =
         preferences.getLong(KEY_LIBRARY_SYNCED_AT, 0L)
 
@@ -189,6 +219,8 @@ class SettingsStore(context: Context) {
         const val KEY_SOURCE_LANGUAGES = "source.languages"
         const val KEY_DISABLED_SOURCE_KEYS = "source.disabled.keys"
         const val KEY_VIEWER_NAME = "anilist.viewer.name"
+        const val KEY_ANILIST_SCORE_FORMAT = "anilist.score.format"
+        const val KEY_ANILIST_CUSTOM_LISTS = "anilist.custom.lists"
         const val KEY_LIBRARY_SYNCED_AT = "anilist.library.synced.at"
     }
 }

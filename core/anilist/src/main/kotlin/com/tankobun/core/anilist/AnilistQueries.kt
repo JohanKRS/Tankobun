@@ -9,6 +9,9 @@ object AnilistQueries {
             avatar { large }
             mediaListOptions {
               scoreFormat
+              mangaList {
+                customLists
+              }
             }
           }
         }
@@ -134,7 +137,7 @@ object AnilistQueries {
     """
 
     const val MediaDetails = """
-        query MediaDetails(${'$'}id: Int!, ${'$'}recommendationsPage: Int!, ${'$'}recommendationsPerPage: Int!) {
+        query MediaDetails(${'$'}id: Int!, ${'$'}scoreFormat: ScoreFormat, ${'$'}recommendationsPage: Int!, ${'$'}recommendationsPerPage: Int!) {
           Media(id: ${'$'}id, type: MANGA) {
             id
             idMal
@@ -177,7 +180,7 @@ object AnilistQueries {
               mediaId
               status
               progress
-              score
+              score(format: ${'$'}scoreFormat)
               notes
               private
               customLists(asArray: true)
@@ -255,7 +258,7 @@ object AnilistQueries {
     """
 
     const val MangaListCollectionByUserId = """
-        query MangaListCollectionByUserId(${'$'}userId: Int!) {
+        query MangaListCollectionByUserId(${'$'}userId: Int!, ${'$'}scoreFormat: ScoreFormat) {
           MediaListCollection(userId: ${'$'}userId, type: MANGA) {
             lists {
               name
@@ -265,7 +268,7 @@ object AnilistQueries {
                 mediaId
                 status
                 progress
-                score
+                score(format: ${'$'}scoreFormat)
                 notes
                 private
                 customLists(asArray: true)
@@ -298,7 +301,7 @@ object AnilistQueries {
     """
 
     const val MangaListCollectionByUserName = """
-        query MangaListCollectionByUserName(${'$'}userName: String!) {
+        query MangaListCollectionByUserName(${'$'}userName: String!, ${'$'}scoreFormat: ScoreFormat) {
           MediaListCollection(userName: ${'$'}userName, type: MANGA) {
             lists {
               name
@@ -308,7 +311,7 @@ object AnilistQueries {
                 mediaId
                 status
                 progress
-                score
+                score(format: ${'$'}scoreFormat)
                 notes
                 private
                 customLists(asArray: true)
@@ -348,7 +351,8 @@ object AnilistQueries {
           ${'$'}score: Float,
           ${'$'}notes: String,
           ${'$'}private: Boolean,
-          ${'$'}customLists: [String]
+          ${'$'}customLists: [String],
+          ${'$'}scoreFormat: ScoreFormat
         ) {
           SaveMediaListEntry(
             mediaId: ${'$'}mediaId,
@@ -363,11 +367,23 @@ object AnilistQueries {
             mediaId
             status
             progress
-            score
+            score(format: ${'$'}scoreFormat)
             notes
             private
             customLists(asArray: true)
             updatedAt
+          }
+        }
+    """
+
+    const val UpdateMangaCustomLists = """
+        mutation UpdateMangaCustomLists(${'$'}customLists: [String]) {
+          UpdateUser(mangaListOptions: { customLists: ${'$'}customLists }) {
+            mediaListOptions {
+              mangaList {
+                customLists
+              }
+            }
           }
         }
     """
