@@ -4,37 +4,106 @@
 
 # Tankobun
 
-Tankobun is an Android manga reader built around an AniList-first flow. It is meant to feel like a personal reading shelf: sign in with AniList, browse or open a manga, choose a source, read in paged or webtoon mode, and keep progress synced without fuss.
+Tankobun is an Android reading and tracking app built around an AniList-first workflow.
 
-## What It Does
+It is designed as a personal reading shelf: sign in with AniList, browse your lists, open a manga entry, choose a user-installed source when available, read in paged or webtoon mode, and keep your progress organized.
 
-- AniList login, library sync, tracking edits, custom lists, scoring, and queued progress sync.
-- Library and browse views with configurable layouts, cover framing, filtering, and tablet-friendly navigation.
-- Source selection through user-installed Tachiyomi-compatible extensions.
-- Paged and webtoon reader modes with local caching, downloads, and respectful download throttling.
-- Quick Actions drawer for sync, AniList tracking, continue reading, and downloads.
-- MyAnimeList-format XML backups for AniList lists, with in-app restore and scheduled backups.
+Tankobun is not a content service, content host, extension repository, or manga source.
 
-## Sources And Content
+## What Tankobun Does
 
-Tankobun does not host, upload, provide, or bundle manga/chapter content. It also does not ship with an extension repository URL. If you want source extensions, add a repository index URL in Settings and install the extensions yourself.
+- AniList login and user-authorized library sync.
+- Manga list browsing, status management, scoring, custom lists, and progress updates.
+- Reader interface with paged and webtoon modes.
+- Local reading state, caching, and optional offline storage for user-selected sources.
+- Source selection through extensions installed by the user.
+- MyAnimeList-compatible XML backup export for AniList lists.
+- In-app restore tools for supported backup files.
 
-Source compatibility follows the extension format used by Tachiyomi and the broader Tachiyomi/Mihon ecosystem. Credit belongs to the extension creators and maintainers who build and maintain those source integrations. Please respect source terms, creators, publishers, and local laws.
+## Sources, Extensions, and Content
+
+Tankobun does not host, upload, index, provide, sell, bundle, or distribute manga, chapters, scanlations, extensions, source APKs, or extension repository URLs.
+
+Tankobun does not include a default extension repository. It does not recommend source repositories, source websites, or places to obtain manga content.
+
+Any source extension used with Tankobun must be added and installed by the user. The user is solely responsible for choosing which extensions, repositories, websites, or services they use, and for making sure their use complies with applicable laws, site terms, publisher rights, and creator rights.
+
+Tankobun is only a reader/tracking client. It does not grant permission to access, copy, download, or redistribute any third-party content.
+
+## APK Releases
+
+APK files, when published in this repository, are provided only as convenience builds of this open-source project.
+
+The APK does not include manga content, source extensions, source repositories, or content feeds. Installing the APK does not provide access to any manga source by itself.
+
+Tankobun is not distributed through Google Play. Android may show warnings when installing APKs from outside an app store. Install only if you understand and accept the risks of sideloading Android applications.
+
+## Support Policy
+
+Please do not open issues, discussions, pull requests, or support requests asking for:
+
+- Extension repository URLs.
+- Recommendations for manga sources.
+- Help accessing specific manga websites.
+- Help bypassing paywalls, subscriptions, login requirements, DRM, region restrictions, blocks, or other access controls.
+- Help downloading, copying, or redistributing copyrighted content without permission.
+
+Requests of that kind may be closed or removed without response.
+
+Bug reports and feature requests about the app itself are welcome.
 
 ## AniList
 
-Tankobun is not affiliated with AniList. AniList data is accessed through the user-authorized AniList API, and any AniList names, marks, or services belong to AniList and their owners.
+Tankobun uses the AniList API with user authorization.
 
-The backup feature exports manga lists as MyAnimeList-compatible XML because AniList supports importing that format. Backups can be restored from AniList's web import page or directly inside Tankobun.
+Tankobun is not affiliated with, endorsed by, sponsored by, or officially supported by AniList. AniList names, marks, data, and services belong to AniList and their respective owners.
 
-## Setup
+To build the app yourself, create your own AniList API client and use:
 
-1. Install Android Studio with Android 16 / API 36 support.
+```text
+tankobun://auth/anilist
+```
+
+as the redirect URL.
+
+## Extension Compatibility
+
+Tankobun can work with user-installed extensions that follow a compatible extension format used by community manga reader ecosystems.
+
+Compatibility does not mean affiliation, endorsement, or support from those projects, their maintainers, extension authors, source websites, publishers, or content providers.
+
+All extension code, source integrations, service names, trademarks, and third-party content remain the property of their respective owners.
+
+## Building
+
+1. Install Android Studio with the required Android SDK version.
 2. Copy `local.properties.example` to `local.properties`.
-3. Set `anilistClientId` to your AniList application client id.
-4. Use `tankobun://auth/anilist` as the AniList redirect URL.
-5. Build the `app` module.
+3. Add your own AniList client id:
 
-## Project Notes
+```properties
+anilistClientId=
+```
 
-This is a personal/private APK project. It is not affiliated with AniList, Tachiyomi, Mihon, Komikku, extension authors, or content providers. The repository intentionally avoids bundling source APKs, extension repositories, or content.
+4. Build the `app` module.
+
+## Privacy
+
+Tankobun is intended to run as a client-side Android app.
+
+Depending on how you use it, the app may store local app data such as reading progress, cached files, downloads, backup files, preferences, and authentication data required for AniList login.
+
+Tankobun does not operate a server controlled by this project for manga hosting, content indexing, analytics, tracking, advertising, or user profiling.
+
+Third-party services, websites, APIs, and user-installed extensions may have their own privacy policies and terms.
+
+## Disclaimer
+
+Tankobun is provided for personal and lawful use only.
+
+The author does not host, provide, endorse, verify, or control third-party manga content, source websites, extension repositories, or user-installed extensions.
+
+Users are responsible for how they configure and use the app.
+
+## License
+
+This project is licensed under the MIT License. See `LICENSE` for details.
