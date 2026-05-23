@@ -197,6 +197,8 @@ private enum class SettingsRoute {
     READER,
     DOWNLOADS,
     ANILIST,
+    BACKUPS,
+    ABOUT,
     SOURCES,
 }
 
@@ -207,6 +209,8 @@ private val SettingsDetailRoutes = listOf(
     SettingsRoute.READER,
     SettingsRoute.DOWNLOADS,
     SettingsRoute.ANILIST,
+    SettingsRoute.BACKUPS,
+    SettingsRoute.ABOUT,
     SettingsRoute.SOURCES,
 )
 
@@ -219,6 +223,8 @@ private fun SettingsRoute.settingsTitle(): String =
         SettingsRoute.READER -> "Reader"
         SettingsRoute.DOWNLOADS -> "Downloads"
         SettingsRoute.ANILIST -> "AniList"
+        SettingsRoute.BACKUPS -> "Backups"
+        SettingsRoute.ABOUT -> "About"
         SettingsRoute.SOURCES -> "Sources"
     }
 
@@ -2665,7 +2671,7 @@ private fun MediaCoverTile(
                 title = media.title.userPreferred,
                 modifier = coverModifier,
                 contentScale = if (showWholeCover) ContentScale.Fit else ContentScale.Crop,
-                imageAlignment = if (showWholeCover) Alignment.TopCenter else Alignment.Center,
+                imageAlignment = if (showWholeCover) Alignment.BottomCenter else Alignment.Center,
             )
         }
         if (supportedViewMode != MediaViewMode.COVER_GRID) {
@@ -5035,6 +5041,8 @@ private fun SettingsRouteIcon(route: SettingsRoute, selected: Boolean) {
             SettingsRoute.READER -> Icons.AutoMirrored.Filled.MenuBook
             SettingsRoute.DOWNLOADS -> Icons.Default.Download
             SettingsRoute.ANILIST -> Icons.Default.Link
+            SettingsRoute.BACKUPS -> Icons.AutoMirrored.Filled.LibraryBooks
+            SettingsRoute.ABOUT -> Icons.Default.Settings
             SettingsRoute.SOURCES -> Icons.Default.Download
         },
         contentDescription = null,
@@ -5209,7 +5217,217 @@ private fun SettingsDetailContent(
                 enabled = state.anilistAutoSyncReaderProgress,
             )
         }
+        SettingsRoute.BACKUPS -> BackupsSettingsScreen(state, viewModel, modifier)
+        SettingsRoute.ABOUT -> AboutSettingsScreen(modifier)
         SettingsRoute.SOURCES -> SourcesSettingsScreen(state, viewModel)
+    }
+}
+
+@Composable
+private fun BackupsSettingsScreen(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val backupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/xml"),
+    ) { uri ->
+        uri?.let(viewModel::saveAniListBackup)
+    }
+    val restoreLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.let(viewModel::restoreAniListBackup)
+    }
+    val folderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        uri?.let(viewModel::setScheduledBackupFolder)
+    }
+    val totalItems = state.libraryItems.size
+    val malMatchedItems = state.libraryItems.count { it.media.idMal != null }
+    val missingMalItems = totalItems - malMatchedItems
+
+    SettingsDetailPanel(
+        title = "Backups",
+        subtitle = "Save and restore your AniList manga list as MyAnimeList-compatible XML.",
+        modifier = modifier,
+    ) {
+        Text("AniList manga backup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        ElevatedCard {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("MyAnimeList XML", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            backupCoverageLabel(totalItems, malMatchedItems, missingMalItems),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        state.librarySyncedAtEpochMillis.takeIf { it > 0 }?.let {
+                            Text(
+                                "Library cache: ${cacheAgeLabel(it)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    AssistChip(
+                        onClick = {},
+                        label = { Text("$malMatchedItems / $totalItems matched") },
+                        enabled = false,
+                    )
+                }
+                Text(
+                    "You can restore this backup from AniList's web import page or directly in Tankobun.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = viewModel::refreshLibrary,
+                        enabled = state.loggedIn,
+                    ) {
+                        Text("Sync first")
+                    }
+                    Button(
+                        onClick = {
+                            backupLauncher.launch(suggestedAniListBackupFileName(state.viewerName))
+                        },
+                        enabled = totalItems > 0,
+                    ) {
+                        Text("Save backup")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            restoreLauncher.launch(arrayOf("text/xml", "application/xml", "*/*"))
+                        },
+                        enabled = state.loggedIn,
+                    ) {
+                        Text("Restore")
+                    }
+                }
+            }
+        }
+        Text("Scheduled backups", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        ElevatedCard {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    "Choose a folder and Tankobun will keep dated XML backups there.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                BackupSchedulePicker(
+                    selected = state.backupSchedule,
+                    onSelect = viewModel::setBackupSchedule,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedButton(onClick = { folderLauncher.launch(null) }) {
+                        Text(if (state.backupFolderUri == null) "Choose folder" else "Change folder")
+                    }
+                    Button(
+                        onClick = viewModel::runScheduledAniListBackupNow,
+                        enabled = state.backupFolderUri != null && totalItems > 0,
+                    ) {
+                        Text("Run now")
+                    }
+                }
+                val lastRun = state.lastScheduledBackupAtEpochMillis
+                Text(
+                    if (lastRun > 0L) "Last backup: ${cacheAgeLabel(lastRun)}" else "No scheduled backup saved yet.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackupSchedulePicker(
+    selected: BackupSchedule,
+    onSelect: (BackupSchedule) -> Unit,
+) {
+    val schedules = listOf(
+        BackupSchedule.OFF,
+        BackupSchedule.DAILY,
+        BackupSchedule.WEEKLY,
+        BackupSchedule.MONTHLY,
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        schedules.chunked(2).forEach { rowSchedules ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                rowSchedules.forEach { schedule ->
+                    FilterChip(
+                        selected = selected == schedule,
+                        onClick = { onSelect(schedule) },
+                        label = { Text(schedule.label()) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (rowSchedules.size == 1) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutSettingsScreen(modifier: Modifier = Modifier) {
+    SettingsDetailPanel(
+        title = "About",
+        subtitle = "A little context about what Tankobun is and is not.",
+        modifier = modifier,
+    ) {
+        ElevatedCard {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("Tankobun", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "Tankobun is an unofficial manga reader and is not affiliated with AniList.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "AniList data is accessed through the user-authorized AniList API. Tankobun does not host, upload, or provide manga or chapter content.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "Sources and extensions are third-party. Tankobun only works with compatible extension formats and local user configuration.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -5510,8 +5728,34 @@ private fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
             if (state.anilistAutoSaveTrackingChanges) add("Auto-save edits")
             if (state.anilistAutoSyncReaderProgress) add("Auto progress")
         }.joinToString(" / ")
+        SettingsRoute.BACKUPS -> "${state.libraryItems.count { it.media.idMal != null }} / ${state.libraryItems.size} MAL matched"
+        SettingsRoute.ABOUT -> "Credits and notices"
         SettingsRoute.SOURCES -> "${state.installedSources.size} active / ${state.allInstalledSources.size} installed"
     }
+
+private fun BackupSchedule.label(): String =
+    when (this) {
+        BackupSchedule.OFF -> "Off"
+        BackupSchedule.DAILY -> "Daily"
+        BackupSchedule.WEEKLY -> "Weekly"
+        BackupSchedule.MONTHLY -> "Monthly"
+    }
+
+private fun backupCoverageLabel(totalItems: Int, malMatchedItems: Int, missingMalItems: Int): String =
+    when {
+        totalItems == 0 -> "No cached AniList manga yet. Sync before exporting."
+        missingMalItems == 0 -> "$totalItems manga ready for MAL-ID based import."
+        else -> "$malMatchedItems manga have MAL IDs; $missingMalItems included without a MAL match."
+    }
+
+private fun suggestedAniListBackupFileName(viewerName: String?): String {
+    val userPart = viewerName
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        ?: "user"
+    return "tankobun_anilist_backup_${userPart}_${System.currentTimeMillis()}.xml"
+}
 
 private fun TankobunUiState.downloadedMediaTitle(mediaId: Int): String =
     libraryItems.firstOrNull { it.media.id == mediaId }?.media?.title?.userPreferred

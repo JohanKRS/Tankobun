@@ -1,6 +1,8 @@
 package com.tankobun.app
 
+import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.util.Log
 import com.tankobun.core.anilist.AnilistGraphQlException
 import androidx.core.content.FileProvider
@@ -53,9 +55,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Request
 import org.json.JSONObject
+import org.w3c.dom.Element
+import org.w3c.dom.Node
 import java.io.File
+import java.io.InputStream
+import java.io.OutputStreamWriter
 import java.util.Locale
 import java.util.UUID
+import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.math.roundToInt
 
 data class TankobunUiState(
@@ -69,6 +76,9 @@ data class TankobunUiState(
     val library: List<AnilistMedia> = emptyList(),
     val libraryItems: List<LibraryItem> = emptyList(),
     val librarySyncedAtEpochMillis: Long = 0L,
+    val backupFolderUri: String? = null,
+    val backupSchedule: BackupSchedule = BackupSchedule.OFF,
+    val lastScheduledBackupAtEpochMillis: Long = 0L,
     val libraryViewMode: MediaViewMode = MediaViewMode.COVER_GRID,
     val libraryCoverColumns: Int = DEFAULT_MEDIA_COVER_COLUMNS,
     val libraryShowWholeCovers: Boolean = false,
@@ -221,6 +231,22 @@ private data class InstalledExtensionVersion(
     val versionName: String,
 )
 
+private data class BackupRestoreEntry(
+    val mediaId: Int?,
+    val idMal: Int?,
+    val status: MediaStatus,
+    val progress: Int?,
+    val score: Double?,
+    val notes: String?,
+    val private: Boolean?,
+    val customLists: List<String>,
+)
+
+private data class BackupRestoreResult(
+    val restored: Int,
+    val skipped: Int,
+)
+
 class MainViewModel(
     private val container: AppContainer,
 ) : ViewModel() {
@@ -230,6 +256,7 @@ class MainViewModel(
     private val cachePolicy = CachePolicy()
     private var trackingAutoSaveJob: Job? = null
     private var pendingAniListSyncJob: Job? = null
+    private var scheduledBackupJob: Job? = null
     private val _state = MutableStateFlow(
         TankobunUiState(
             loggedIn = container.tokenStore.accessToken() != null,
@@ -238,6 +265,9 @@ class MainViewModel(
             anilistScoreFormat = container.settingsStore.anilistScoreFormat(),
             anilistCustomLists = container.settingsStore.anilistCustomLists(),
             librarySyncedAtEpochMillis = container.settingsStore.librarySyncedAtEpochMillis(),
+            backupFolderUri = container.settingsStore.backupFolderUri(),
+            backupSchedule = container.settingsStore.backupSchedule(),
+            lastScheduledBackupAtEpochMillis = container.settingsStore.lastScheduledBackupAtEpochMillis(),
             libraryViewMode = container.settingsStore.libraryViewMode(),
             libraryCoverColumns = container.settingsStore.libraryCoverColumns(),
             libraryShowWholeCovers = container.settingsStore.libraryShowWholeCovers(),
@@ -648,6 +678,7 @@ class MainViewModel(
                     )
                 }
                 loadRecentReadingProgress()
+                runScheduledAniListBackupIfDue()
             } else if (syncIfEmpty) {
                 refreshLibrary()
             }
@@ -719,6 +750,7 @@ class MainViewModel(
                 }
                 loadRecentReadingProgress()
                 processPendingAniListSync()
+                runScheduledAniListBackupIfDue()
             }.onFailure { error ->
                 Log.e(TAG, "AniList library sync failed", error)
                 _state.update {
@@ -726,6 +758,237 @@ class MainViewModel(
                 }
             }
         }
+    }
+
+    fun saveAniListBackup(uri: Uri) {
+        val snapshot = _state.value
+        val items = snapshot.libraryItems
+        if (items.isEmpty()) {
+            _state.update { it.copy(message = "Sync AniList before creating a backup") }
+            return
+        }
+
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                val xml = buildMyAnimeListBackupXml(
+                    items = items,
+                    viewerName = snapshot.viewerName,
+                    scoreFormat = snapshot.anilistScoreFormat,
+                )
+                withContext(Dispatchers.IO) {
+                    val output = container.application.contentResolver.openOutputStream(uri)
+                        ?: error("Could not open backup file")
+                    OutputStreamWriter(output, Charsets.UTF_8).use { writer ->
+                        writer.write(xml)
+                    }
+                }
+            }.onSuccess {
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = "AniList backup saved (${items.size} manga)",
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "AniList backup failed", error)
+                _state.update { it.copy(busy = false, message = error.userMessage("Backup failed")) }
+            }
+        }
+    }
+
+    fun restoreAniListBackup(uri: Uri) {
+        val token = container.tokenStore.accessToken()
+        if (token == null) {
+            _state.update { it.copy(message = "Connect AniList before restoring a backup") }
+            return
+        }
+
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                val entries = withContext(Dispatchers.IO) {
+                    val input = container.application.contentResolver.openInputStream(uri)
+                        ?: error("Could not open backup file")
+                    input.use { stream ->
+                        parseMyAnimeListBackupXml(stream, _state.value.anilistScoreFormat)
+                    }
+                }
+                check(entries.isNotEmpty()) { "No manga found in backup" }
+
+                val customLists = ensureAniListCustomLists(
+                    accessToken = token,
+                    requestedCustomLists = entries.flatMap { it.customLists },
+                )
+                var restored = 0
+                var skipped = 0
+                val now = System.currentTimeMillis()
+                entries.forEach { entry ->
+                    val media = entry.mediaId
+                        ?.let { mediaId -> container.anilistRepository.mangaById(mediaId) }
+                        ?: entry.idMal?.let { idMal -> container.anilistRepository.mangaByMalId(idMal) }
+                    if (media == null) {
+                        skipped += 1
+                    } else {
+                        val savedEntry = container.anilistRepository.saveListEntry(
+                            accessToken = token,
+                            mediaId = media.id,
+                            status = entry.status,
+                            progress = entry.progress,
+                            score = entry.score,
+                            notes = entry.notes,
+                            private = entry.private,
+                            customLists = entry.customLists,
+                            scoreFormat = _state.value.anilistScoreFormat,
+                        )
+                        container.database.mediaDao().upsertMedia(media.toEntity(now))
+                        container.database.listEntryDao().upsertEntry(savedEntry.toEntity(now))
+                        restored += 1
+                        delay(350L)
+                    }
+                }
+                BackupRestoreResult(restored = restored, skipped = skipped).also {
+                    container.settingsStore.saveAnilistCustomLists(customLists)
+                }
+            }.onSuccess { result ->
+                loadCachedLibrary()
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = buildList {
+                            add("Restored ${result.restored} manga")
+                            if (result.skipped > 0) add("${result.skipped} skipped")
+                        }.joinToString(" / "),
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "AniList backup restore failed", error)
+                _state.update { it.copy(busy = false, message = error.userMessage("Restore failed")) }
+            }
+        }
+    }
+
+    fun setScheduledBackupFolder(uri: Uri) {
+        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        runCatching {
+            container.application.contentResolver.takePersistableUriPermission(uri, flags)
+        }.onFailure { error ->
+            Log.w(TAG, "Could not persist backup folder permission", error)
+        }
+        val uriString = uri.toString()
+        container.settingsStore.saveBackupFolderUri(uriString)
+        _state.update { it.copy(backupFolderUri = uriString, message = "Backup folder selected") }
+        ScheduledBackupWork.update(container.application, _state.value.backupSchedule)
+        runScheduledAniListBackupIfDue(force = true, reportResult = true)
+    }
+
+    fun setBackupSchedule(schedule: BackupSchedule) {
+        container.settingsStore.saveBackupSchedule(schedule)
+        _state.update { it.copy(backupSchedule = schedule) }
+        ScheduledBackupWork.update(container.application, schedule)
+        runScheduledAniListBackupIfDue(force = true, reportResult = schedule != BackupSchedule.OFF)
+    }
+
+    fun runScheduledAniListBackupNow() {
+        if (_state.value.backupFolderUri == null) {
+            _state.update { it.copy(message = "Choose a backup folder first") }
+            return
+        }
+        runScheduledAniListBackupIfDue(force = true, reportResult = true)
+    }
+
+    private fun runScheduledAniListBackupIfDue(
+        force: Boolean = false,
+        reportResult: Boolean = false,
+    ) {
+        val snapshot = _state.value
+        val schedule = snapshot.backupSchedule
+        if (schedule == BackupSchedule.OFF) return
+        val folderUri = snapshot.backupFolderUri?.let(Uri::parse)
+        if (folderUri == null) {
+            if (reportResult) {
+                _state.update { it.copy(message = "Choose a backup folder first") }
+            }
+            return
+        }
+        if (snapshot.libraryItems.isEmpty()) {
+            if (reportResult) {
+                _state.update { it.copy(message = "Sync AniList before creating a backup") }
+            }
+            return
+        }
+        val now = System.currentTimeMillis()
+        if (!force && !schedule.isDue(lastRunAt = snapshot.lastScheduledBackupAtEpochMillis, now = now)) return
+        if (scheduledBackupJob?.isActive == true) return
+
+        scheduledBackupJob = viewModelScope.launch {
+            if (reportResult) {
+                _state.update { it.copy(busy = true, message = null) }
+            }
+            runCatching {
+                writeScheduledAniListBackup(folderUri = folderUri, snapshot = snapshot)
+            }.onSuccess { count ->
+                container.settingsStore.saveLastScheduledBackupAtEpochMillis(now)
+                _state.update {
+                    it.copy(
+                        lastScheduledBackupAtEpochMillis = now,
+                        busy = if (reportResult) false else it.busy,
+                        message = if (reportResult) "Scheduled backup saved ($count manga)" else it.message,
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "Scheduled AniList backup failed", error)
+                _state.update {
+                    it.copy(
+                        busy = if (reportResult) false else it.busy,
+                        message = if (reportResult) error.userMessage("Scheduled backup failed") else it.message,
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun writeScheduledAniListBackup(
+        folderUri: Uri,
+        snapshot: TankobunUiState,
+    ): Int = withContext(Dispatchers.IO) {
+        val fileUri = DocumentsContract.createDocument(
+            container.application.contentResolver,
+            folderUri,
+            "text/xml",
+            suggestedScheduledAniListBackupFileName(snapshot.viewerName),
+        ) ?: error("Could not create backup file")
+        val xml = buildMyAnimeListBackupXml(
+            items = snapshot.libraryItems,
+            viewerName = snapshot.viewerName,
+            scoreFormat = snapshot.anilistScoreFormat,
+        )
+        val output = container.application.contentResolver.openOutputStream(fileUri)
+            ?: error("Could not open backup file")
+        OutputStreamWriter(output, Charsets.UTF_8).use { writer ->
+            writer.write(xml)
+        }
+        snapshot.libraryItems.size
+    }
+
+    private suspend fun ensureAniListCustomLists(
+        accessToken: String,
+        requestedCustomLists: List<String>,
+    ): List<String> {
+        val knownCustomLists = _state.value.anilistCustomLists.normalizedCustomLists()
+        val missingCustomLists = requestedCustomLists.normalizedCustomLists().filterNot { selectedList ->
+            knownCustomLists.any { knownList -> knownList.equals(selectedList, ignoreCase = true) }
+        }
+        val nextKnownCustomLists = if (missingCustomLists.isEmpty()) {
+            knownCustomLists
+        } else {
+            container.anilistRepository.updateMangaCustomLists(
+                accessToken = accessToken,
+                customLists = (knownCustomLists + missingCustomLists).normalizedCustomLists(),
+            ).ifEmpty { (knownCustomLists + missingCustomLists).normalizedCustomLists() }
+        }
+        _state.update { it.copy(anilistCustomLists = nextKnownCustomLists) }
+        return nextKnownCustomLists
     }
 
     private fun processPendingAniListSync() {
@@ -3069,6 +3332,237 @@ private fun JSONObject.nullableStringList(name: String): List<String>? {
     }
 }
 
+internal fun buildMyAnimeListBackupXml(
+    items: List<LibraryItem>,
+    viewerName: String?,
+    scoreFormat: AnilistScoreFormat,
+): String {
+    val sortedItems = items.sortedWith(
+        compareBy<LibraryItem> { it.entry.status.malSortOrder() }
+            .thenBy { it.media.title.userPreferred.lowercase(Locale.ROOT) },
+    )
+    val counts = sortedItems
+        .groupingBy { it.entry.status.toMyAnimeListStatus() }
+        .eachCount()
+    return buildString {
+        appendLine("""<?xml version="1.0" encoding="UTF-8" ?>""")
+        appendLine()
+        appendLine("\t<!--")
+        appendLine("\t Created by Tankobun AniList backup")
+        appendLine("\t MyAnimeList-compatible manga XML for AniList import")
+        appendLine("\t AniList-only metadata is kept in XML comments where MAL has no matching field")
+        appendLine("\t-->")
+        appendLine()
+        appendLine("\t<myanimelist>")
+        appendLine()
+        appendLine("\t\t<myinfo>")
+        appendLine("\t\t\t<user_id>0</user_id>")
+        appendLine("\t\t\t<user_name>${viewerName.orEmpty().xmlEscaped()}</user_name>")
+        appendLine("\t\t\t<user_export_type>2</user_export_type>")
+        appendLine("\t\t\t<user_total_manga>${sortedItems.size}</user_total_manga>")
+        appendLine("\t\t\t<user_total_reading>${counts.getOrDefault("Reading", 0)}</user_total_reading>")
+        appendLine("\t\t\t<user_total_completed>${counts.getOrDefault("Completed", 0)}</user_total_completed>")
+        appendLine("\t\t\t<user_total_onhold>${counts.getOrDefault("On-Hold", 0)}</user_total_onhold>")
+        appendLine("\t\t\t<user_total_dropped>${counts.getOrDefault("Dropped", 0)}</user_total_dropped>")
+        appendLine("\t\t\t<user_total_plantoread>${counts.getOrDefault("Plan to Read", 0)}</user_total_plantoread>")
+        appendLine("\t\t</myinfo>")
+        appendLine()
+        sortedItems.forEach { item ->
+            appendLine()
+            appendLine("\t\t<!-- ${item.toAniListBackupComment()} -->")
+            appendLine("\t\t<manga>")
+            appendLine("\t\t\t<manga_mangadb_id>${item.media.idMal ?: 0}</manga_mangadb_id>")
+            appendLine("\t\t\t<manga_title>${item.media.title.userPreferred.cdata()}</manga_title>")
+            appendLine("\t\t\t<manga_volumes>${item.media.volumes ?: 0}</manga_volumes>")
+            appendLine("\t\t\t<manga_chapters>${item.media.chapters ?: 0}</manga_chapters>")
+            appendLine("\t\t\t<my_id>${item.entry.id}</my_id>")
+            appendLine("\t\t\t<my_read_volumes>${item.readVolumesForBackup()}</my_read_volumes>")
+            appendLine("\t\t\t<my_read_chapters>${item.entry.progress.coerceAtLeast(0)}</my_read_chapters>")
+            appendLine("\t\t\t<my_start_date>0000-00-00</my_start_date>")
+            appendLine("\t\t\t<my_finish_date>0000-00-00</my_finish_date>")
+            appendLine("\t\t\t<my_scanalation_group><![CDATA[]]></my_scanalation_group>")
+            appendLine("\t\t\t<my_score>${item.entry.score.toMyAnimeListScore(scoreFormat)}</my_score>")
+            appendLine("\t\t\t<my_storage></my_storage>")
+            appendLine("\t\t\t<my_retail_volumes>0</my_retail_volumes>")
+            appendLine("\t\t\t<my_status>${item.entry.status.toMyAnimeListStatus()}</my_status>")
+            appendLine("\t\t\t<my_comments>${item.entry.notes.orEmpty().cdata()}</my_comments>")
+            appendLine("\t\t\t<my_times_read>${if (item.entry.status == MediaStatus.REPEATING) 1 else 0}</my_times_read>")
+            appendLine("\t\t\t<my_tags>${item.entry.customLists.joinToString(", ").cdata()}</my_tags>")
+            appendLine("\t\t\t<my_priority>Low</my_priority>")
+            appendLine("\t\t\t<my_reread_value></my_reread_value>")
+            appendLine("\t\t\t<my_rereading>${if (item.entry.status == MediaStatus.REPEATING) "YES" else "NO"}</my_rereading>")
+            appendLine("\t\t\t<my_discuss>YES</my_discuss>")
+            appendLine("\t\t\t<my_sns>default</my_sns>")
+            appendLine("\t\t\t<update_on_import>1</update_on_import>")
+            appendLine("\t\t</manga>")
+        }
+        appendLine()
+        appendLine("\t</myanimelist>")
+    }
+}
+
+private fun suggestedScheduledAniListBackupFileName(viewerName: String?): String {
+    val userPart = viewerName
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        ?: "user"
+    return "tankobun_anilist_backup_${userPart}_${System.currentTimeMillis()}.xml"
+}
+
+private fun parseMyAnimeListBackupXml(
+    input: InputStream,
+    scoreFormat: AnilistScoreFormat,
+): List<BackupRestoreEntry> {
+    val document = DocumentBuilderFactory.newInstance()
+        .apply {
+            isIgnoringComments = false
+            isXIncludeAware = false
+            isExpandEntityReferences = false
+            runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+            runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+            runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+            runCatching { setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false) }
+        }
+        .newDocumentBuilder()
+        .parse(input)
+    val root = document.documentElement
+    val entries = mutableListOf<BackupRestoreEntry>()
+    var pendingAniListMediaId: Int? = null
+    var pendingPrivate: Boolean? = null
+    val children = root.childNodes
+    for (index in 0 until children.length) {
+        val node = children.item(index)
+        when (node.nodeType) {
+            Node.COMMENT_NODE -> {
+                val comment = node.nodeValue.orEmpty()
+                pendingAniListMediaId = Regex("""AniList media id:\s*(\d+)""")
+                    .find(comment)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.toIntOrNull()
+                pendingPrivate = comment.contains("private: true", ignoreCase = true).takeIf { it }
+            }
+            Node.ELEMENT_NODE -> {
+                val element = node as? Element ?: continue
+                if (element.tagName != "manga") continue
+                val idMal = element.childText("manga_mangadb_id")?.toIntOrNull()?.takeIf { it > 0 }
+                val customLists = element.childText("my_tags")
+                    .orEmpty()
+                    .split(',')
+                    .normalizedCustomLists()
+                entries += BackupRestoreEntry(
+                    mediaId = pendingAniListMediaId,
+                    idMal = idMal,
+                    status = element.childText("my_status").toMediaStatusFromMyAnimeList(),
+                    progress = element.childText("my_read_chapters")?.toIntOrNull()?.coerceAtLeast(0),
+                    score = element.childText("my_score")
+                        ?.toIntOrNull()
+                        ?.toAniListScoreFromMyAnimeList(scoreFormat),
+                    notes = element.childText("my_comments")?.trim()?.ifBlank { null },
+                    private = pendingPrivate,
+                    customLists = customLists,
+                )
+                pendingAniListMediaId = null
+                pendingPrivate = null
+            }
+        }
+    }
+    return entries
+}
+
+private fun Element.childText(tagName: String): String? {
+    val nodes = getElementsByTagName(tagName)
+    if (nodes.length == 0) return null
+    return nodes.item(0)?.textContent?.trim()
+}
+
+private fun LibraryItem.toAniListBackupComment(): String =
+    buildList {
+        add("AniList media id: ${media.id}")
+        add("AniList list entry id: ${entry.id}")
+        media.siteUrl?.takeIf { it.isNotBlank() }?.let { add("AniList URL: $it") }
+        if (media.idMal == null) add("No MAL id; this entry may need manual matching on import")
+        if (entry.private) add("private: true")
+        if (entry.customLists.isNotEmpty()) add("custom lists: ${entry.customLists.joinToString(", ")}")
+        media.format?.takeIf { it.isNotBlank() }?.let { add("format: $it") }
+    }.joinToString("; ").xmlCommentEscaped()
+
+private fun LibraryItem.readVolumesForBackup(): Int {
+    val volumes = media.volumes ?: 0
+    return if (entry.status == MediaStatus.COMPLETED) volumes.coerceAtLeast(0) else 0
+}
+
+private fun MediaStatus.toMyAnimeListStatus(): String =
+    when (this) {
+        MediaStatus.CURRENT,
+        MediaStatus.REPEATING -> "Reading"
+        MediaStatus.PLANNING,
+        MediaStatus.UNKNOWN -> "Plan to Read"
+        MediaStatus.COMPLETED -> "Completed"
+        MediaStatus.DROPPED -> "Dropped"
+        MediaStatus.PAUSED -> "On-Hold"
+    }
+
+private fun String?.toMediaStatusFromMyAnimeList(): MediaStatus =
+    when (this?.trim()?.lowercase(Locale.ROOT)) {
+        "reading" -> MediaStatus.CURRENT
+        "completed" -> MediaStatus.COMPLETED
+        "on-hold", "on hold" -> MediaStatus.PAUSED
+        "dropped" -> MediaStatus.DROPPED
+        "plan to read", "plantoread" -> MediaStatus.PLANNING
+        else -> MediaStatus.PLANNING
+    }
+
+private fun MediaStatus.malSortOrder(): Int =
+    when (this) {
+        MediaStatus.CURRENT -> 0
+        MediaStatus.REPEATING -> 1
+        MediaStatus.COMPLETED -> 2
+        MediaStatus.PAUSED -> 3
+        MediaStatus.DROPPED -> 4
+        MediaStatus.PLANNING -> 5
+        MediaStatus.UNKNOWN -> 6
+    }
+
+private fun Int.toAniListScoreFromMyAnimeList(format: AnilistScoreFormat): Double? {
+    val value = takeIf { it > 0 }?.coerceIn(0, 10) ?: return null
+    return when (format) {
+        AnilistScoreFormat.POINT_100 -> (value * 10).toDouble()
+        AnilistScoreFormat.POINT_10_DECIMAL,
+        AnilistScoreFormat.POINT_10 -> value.toDouble()
+        AnilistScoreFormat.POINT_5 -> (value / 2.0).roundToInt().coerceIn(0, 5).toDouble()
+        AnilistScoreFormat.POINT_3 -> (value * 3.0 / 10.0).roundToInt().coerceIn(0, 3).toDouble()
+    }
+}
+
+private fun Double?.toMyAnimeListScore(format: AnilistScoreFormat): Int {
+    val value = this ?: return 0
+    val score = when (format) {
+        AnilistScoreFormat.POINT_100 -> value / 10.0
+        AnilistScoreFormat.POINT_10_DECIMAL,
+        AnilistScoreFormat.POINT_10 -> value
+        AnilistScoreFormat.POINT_5 -> value * 2.0
+        AnilistScoreFormat.POINT_3 -> value * (10.0 / 3.0)
+    }
+    return score.roundToInt().coerceIn(0, 10)
+}
+
+private fun String.cdata(): String =
+    "<![CDATA[${replace("]]>", "]]]]><![CDATA[>")}]]>"
+
+private fun String.xmlEscaped(): String =
+    replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
+
+private fun String.xmlCommentEscaped(): String =
+    replace("--", "- -")
+        .replace("<", "(")
+        .replace(">", ")")
+
 internal fun List<SourceChapter>.nextInReadingOrderAfter(chapter: SourceChapter): SourceChapter? {
     if (chapter.chapterNumber > 0f) {
         return filter { it.chapterNumber > chapter.chapterNumber }
@@ -3146,6 +3640,17 @@ private fun Iterable<String>.normalizedCustomLists(): List<String> =
     map { it.trim() }
         .filter { it.isNotBlank() }
         .distinctBy { it.lowercase(Locale.ROOT) }
+
+private fun BackupSchedule.isDue(lastRunAt: Long, now: Long): Boolean {
+    if (this == BackupSchedule.OFF) return false
+    if (lastRunAt <= 0L) return true
+    return now - lastRunAt >= when (this) {
+        BackupSchedule.OFF -> Long.MAX_VALUE
+        BackupSchedule.DAILY -> 24L * 60L * 60L * 1_000L
+        BackupSchedule.WEEKLY -> 7L * 24L * 60L * 60L * 1_000L
+        BackupSchedule.MONTHLY -> 30L * 24L * 60L * 60L * 1_000L
+    }
+}
 
 private fun String.filteredScoreInput(format: AnilistScoreFormat): String {
     val allowDecimal = format == AnilistScoreFormat.POINT_10_DECIMAL

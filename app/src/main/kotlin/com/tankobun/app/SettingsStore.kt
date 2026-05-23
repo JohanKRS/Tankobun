@@ -134,6 +134,29 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean(KEY_ANILIST_SYNC_MANUAL_READ_PROGRESS, enabled).apply()
     }
 
+    fun backupFolderUri(): String? =
+        preferences.getString(KEY_BACKUP_FOLDER_URI, null)
+
+    fun saveBackupFolderUri(uri: String?) {
+        preferences.edit().putString(KEY_BACKUP_FOLDER_URI, uri).apply()
+    }
+
+    fun backupSchedule(): BackupSchedule =
+        preferences.getString(KEY_BACKUP_SCHEDULE, null)
+            ?.let { stored -> runCatching { BackupSchedule.valueOf(stored) }.getOrNull() }
+            ?: BackupSchedule.OFF
+
+    fun saveBackupSchedule(schedule: BackupSchedule) {
+        preferences.edit().putString(KEY_BACKUP_SCHEDULE, schedule.name).apply()
+    }
+
+    fun lastScheduledBackupAtEpochMillis(): Long =
+        preferences.getLong(KEY_BACKUP_LAST_RUN_AT, 0L)
+
+    fun saveLastScheduledBackupAtEpochMillis(value: Long) {
+        preferences.edit().putLong(KEY_BACKUP_LAST_RUN_AT, value).apply()
+    }
+
     fun anilistTags(): List<AnilistMediaTag> =
         preferences.getString(KEY_ANILIST_TAGS, "").orEmpty()
             .lineSequence()
@@ -254,6 +277,9 @@ class SettingsStore(context: Context) {
         const val KEY_ANILIST_AUTO_SAVE_TRACKING_CHANGES = "anilist.auto.save.tracking.changes"
         const val KEY_ANILIST_AUTO_SYNC_READER_PROGRESS = "anilist.auto.sync.reader.progress"
         const val KEY_ANILIST_SYNC_MANUAL_READ_PROGRESS = "anilist.sync.manual.read.progress"
+        const val KEY_BACKUP_FOLDER_URI = "backup.folder.uri"
+        const val KEY_BACKUP_SCHEDULE = "backup.schedule"
+        const val KEY_BACKUP_LAST_RUN_AT = "backup.last.run.at"
         const val KEY_ANILIST_TAGS = "anilist.tags"
         const val KEY_ANILIST_TAGS_CACHED_AT = "anilist.tags.cached.at"
         const val KEY_SOURCE_LANGUAGES = "source.languages"
@@ -295,6 +321,13 @@ enum class MediaViewMode {
     MASONRY,
     JUSTIFIED,
     LIST,
+}
+
+enum class BackupSchedule {
+    OFF,
+    DAILY,
+    WEEKLY,
+    MONTHLY,
 }
 
 fun MediaViewMode.supportedMediaViewMode(): MediaViewMode =

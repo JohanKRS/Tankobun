@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.work.runtime)
 
     debugImplementation(libs.compose.ui.tooling)
 }

@@ -44,6 +44,7 @@ class TankobunApplication : Application() {
         super.onCreate()
         TankobunInjektRegistry.registerApplication(this)
         container
+        ScheduledBackupWork.sync(this, container.settingsStore.backupSchedule())
     }
 }
 

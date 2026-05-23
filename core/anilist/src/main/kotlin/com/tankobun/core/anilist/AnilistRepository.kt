@@ -10,6 +10,7 @@ import com.tankobun.core.model.MediaStatus
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -114,6 +115,30 @@ class AnilistRepository(
         return AnilistJsonMapper.mediaTags(data)
             .distinctBy { it.name.lowercase() }
             .sortedWith(compareBy<AnilistMediaTag> { it.category.orEmpty() }.thenBy { it.name })
+    }
+
+    suspend fun mangaById(mediaId: Int): AnilistMedia? {
+        val data = graphQlClient.execute(
+            query = AnilistQueries.MangaById,
+            variables = buildJsonObject {
+                put("id", mediaId)
+            },
+        )
+        val media = data["Media"] ?: return null
+        if (media is JsonNull) return null
+        return AnilistJsonMapper.media(media)
+    }
+
+    suspend fun mangaByMalId(idMal: Int): AnilistMedia? {
+        val data = graphQlClient.execute(
+            query = AnilistQueries.MangaByMalId,
+            variables = buildJsonObject {
+                put("idMal", idMal)
+            },
+        )
+        val media = data["Media"] ?: return null
+        if (media is JsonNull) return null
+        return AnilistJsonMapper.media(media)
     }
 
     private suspend fun fallbackSearchManga(query: String): List<AnilistMedia> {
@@ -237,7 +262,7 @@ class AnilistRepository(
                 if (score != null) put("score", score)
                 if (notes != null) put("notes", notes)
                 if (private != null) put("private", private)
-                if (!customLists.isNullOrEmpty()) {
+                if (customLists != null) {
                     put("customLists", buildJsonArray { customLists.forEach { add(it) } })
                 }
                 put("scoreFormat", scoreFormat.name)

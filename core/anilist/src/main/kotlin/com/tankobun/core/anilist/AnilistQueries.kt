@@ -74,6 +74,58 @@ object AnilistQueries {
         }
     """
 
+    const val MangaById = """
+        query MangaById(${'$'}id: Int!) {
+          Media(id: ${'$'}id, type: MANGA) {
+            id
+            idMal
+            title { romaji english native userPreferred }
+            description(asHtml: false)
+            coverImage { extraLarge large color }
+            bannerImage
+            chapters
+            volumes
+            format
+            status
+            averageScore
+            popularity
+            startDate { year }
+            endDate { year }
+            siteUrl
+            genres
+            synonyms
+            isAdult
+            updatedAt
+          }
+        }
+    """
+
+    const val MangaByMalId = """
+        query MangaByMalId(${'$'}idMal: Int!) {
+          Media(idMal: ${'$'}idMal, type: MANGA) {
+            id
+            idMal
+            title { romaji english native userPreferred }
+            description(asHtml: false)
+            coverImage { extraLarge large color }
+            bannerImage
+            chapters
+            volumes
+            format
+            status
+            averageScore
+            popularity
+            startDate { year }
+            endDate { year }
+            siteUrl
+            genres
+            synonyms
+            isAdult
+            updatedAt
+          }
+        }
+    """
+
     const val MediaTags = """
         query MediaTags {
           MediaTagCollection {
