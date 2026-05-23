@@ -15,7 +15,7 @@ Tankobun is not a content service, content host, extension repository, or manga 
 - AniList login and user-authorized library sync.
 - Manga list browsing, status management, scoring, custom lists, and progress updates.
 - Reader interface with paged and webtoon modes.
-- Local reading state, caching, and optional offline storage for user-selected sources.
+- Local reading state, caching, and optional offline storage for user-selected sources where permitted by the source and applicable law.
 - Source selection through extensions installed by the user.
 - MyAnimeList-compatible XML backup export for AniList lists.
 - In-app restore tools for supported backup files.
@@ -32,7 +32,7 @@ Tankobun is only a reader/tracking client. It does not grant permission to acces
 
 ## APK Releases
 
-APK files, when published in this repository, are provided only as convenience builds of this open-source project.
+APK files, when published in this repository, are provided only as convenience builds of this project’s source code.
 
 The APK does not include manga content, source extensions, source repositories, or content feeds. Installing the APK does not provide access to any manga source by itself.
 
