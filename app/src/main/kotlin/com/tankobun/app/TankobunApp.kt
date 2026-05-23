@@ -254,6 +254,12 @@ private enum class ReaderPanAxis {
     WEBTOON,
 }
 
+private data class WebtoonReaderPageItem(
+    val chapter: SourceChapter,
+    val page: ReaderPage,
+    val pageIndex: Int,
+)
+
 private const val SOURCE_LANGUAGE_FILTER_ACTIVE = "__active__"
 private const val SOURCE_LANGUAGE_FILTER_ALL = "__all__"
 private const val LIBRARY_SORT_LIST_ORDER = "LIST_ORDER"
@@ -4053,12 +4059,34 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     val pageCount = state.readerPages.size
     val lastPageIndex = (pageCount - 1).coerceAtLeast(0)
     val nextChapter = state.nextReaderChapter()
+    val webtoonPageItems = remember(
+        state.readerPreviousSegment,
+        chapter,
+        state.readerPages,
+        state.readerNextSegment,
+    ) {
+        buildList {
+            state.readerPreviousSegment?.let { segment ->
+                segment.pages.forEachIndexed { index, page ->
+                    add(WebtoonReaderPageItem(segment.chapter, page, index))
+                }
+            }
+            state.readerPages.forEachIndexed { index, page ->
+                add(WebtoonReaderPageItem(chapter, page, index))
+            }
+            state.readerNextSegment?.let { segment ->
+                segment.pages.forEachIndexed { index, page ->
+                    add(WebtoonReaderPageItem(segment.chapter, page, index))
+                }
+            }
+        }
+    }
+    val currentWebtoonStartIndex = state.readerPreviousSegment?.pages?.size ?: 0
     val canGoForward = state.currentPageIndex < lastPageIndex || nextChapter != null
     var scrubberValue by remember(chapter.url, pageCount) {
         mutableStateOf(state.currentPageIndex.coerceIn(0, lastPageIndex).toFloat())
     }
-    var webtoonUserNavigated by remember(chapter.url) { mutableStateOf(false) }
-    var autoOpenedNextChapter by remember(chapter.url) { mutableStateOf(false) }
+    var scrubberSeeking by remember(chapter.url) { mutableStateOf(false) }
     val displayedPageIndex = scrubberValue.roundToInt().coerceIn(0, lastPageIndex)
     fun cancelFling() {
         flingJob?.cancel()
@@ -4181,7 +4209,7 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
         viewModel.setReaderPage(targetIndex)
         if (state.readerMode == ReaderMode.WEBTOON) {
             coroutineScope.launch {
-                webtoonListState.animateScrollToItem(targetIndex)
+                webtoonListState.animateScrollToItem(currentWebtoonStartIndex + targetIndex)
             }
         }
     }
@@ -4202,39 +4230,42 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
         onDispose { stopReaderMotion() }
     }
 
-    LaunchedEffect(chapter.url, state.currentPageIndex, pageCount) {
-        scrubberValue = state.currentPageIndex.coerceIn(0, lastPageIndex).toFloat()
+    LaunchedEffect(chapter.url, state.currentPageIndex, pageCount, scrubberSeeking) {
+        if (!scrubberSeeking) {
+            scrubberValue = state.currentPageIndex.coerceIn(0, lastPageIndex).toFloat()
+        }
     }
 
-    LaunchedEffect(chapter.url, state.readerMode, pageCount) {
+    LaunchedEffect(scrubberSeeking, scrubberValue) {
+        if (scrubberSeeking) {
+            delay(420L)
+            scrubberSeeking = false
+        }
+    }
+
+    LaunchedEffect(
+        chapter.url,
+        state.readerMode,
+        pageCount,
+        state.readerPreviousSegment?.chapter?.url,
+        state.readerPreviousSegment?.pages?.size,
+    ) {
         if (state.readerMode == ReaderMode.WEBTOON && state.currentPageIndex > 0) {
-            webtoonListState.scrollToItem(state.currentPageIndex.coerceIn(0, lastPageIndex))
+            webtoonListState.scrollToItem(currentWebtoonStartIndex + state.currentPageIndex.coerceIn(0, lastPageIndex))
+        } else if (state.readerMode == ReaderMode.WEBTOON && currentWebtoonStartIndex > 0) {
+            webtoonListState.scrollToItem(currentWebtoonStartIndex)
         }
     }
 
-    LaunchedEffect(chapter.url, state.readerMode, pageCount) {
+    LaunchedEffect(chapter.url, state.readerMode, webtoonPageItems) {
         if (state.readerMode == ReaderMode.WEBTOON) {
-            snapshotFlow { webtoonListState.firstVisibleItemIndex.coerceIn(0, lastPageIndex) }
-                .distinctUntilChanged()
-                .collect { viewModel.setReaderPage(it) }
-        }
-    }
-
-    LaunchedEffect(chapter.url, state.readerMode, pageCount, webtoonUserNavigated, autoOpenedNextChapter) {
-        if (state.readerMode == ReaderMode.WEBTOON && webtoonUserNavigated && !autoOpenedNextChapter) {
             snapshotFlow {
-                val layoutInfo = webtoonListState.layoutInfo
-                val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-                layoutInfo.totalItemsCount > 0 &&
-                    lastVisibleIndex >= layoutInfo.totalItemsCount - 1 &&
-                    !webtoonListState.canScrollForward
+                webtoonPageItems.getOrNull(webtoonListState.firstVisibleItemIndex)
             }
                 .distinctUntilChanged()
-                .collect { atEnd ->
-                    if (atEnd) {
-                        autoOpenedNextChapter = true
-                        viewModel.setReaderPage(lastPageIndex)
-                        viewModel.openNextChapter()
+                .collect { item ->
+                    if (item != null && !scrubberSeeking) {
+                        viewModel.setWebtoonReaderPosition(item.chapter.url, item.pageIndex)
                     }
                 }
         }
@@ -4289,7 +4320,6 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                             scaleProvider = { readerScale },
                             panAxis = ReaderPanAxis.WEBTOON,
                             onGestureStart = {
-                                webtoonUserNavigated = true
                                 stopReaderMotion()
                             },
                             onGestureEnd = { velocity, width, height ->
@@ -4322,13 +4352,21 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(pageGap),
             ) {
-                itemsIndexed(state.readerPages, key = { _, page -> "${page.index}:${page.imageUrl}" }) { _, page ->
+                itemsIndexed(
+                    webtoonPageItems,
+                    key = { _, item -> "${item.chapter.url}:${item.page.index}:${item.page.imageUrl}" },
+                ) { _, item ->
                     AsyncImage(
-                        model = readerImageRequest(page),
-                        contentDescription = chapter.name,
+                        model = readerImageRequest(item.page),
+                        contentDescription = item.chapter.name,
                         modifier = Modifier.fillMaxWidth(),
                         contentScale = ContentScale.FillWidth,
                     )
+                }
+                if (nextChapter != null && state.readerNextSegment == null) {
+                    item(key = "next:${nextChapter.url}") {
+                        WebtoonNextChapterFooter(nextChapter = nextChapter)
+                    }
                 }
             }
         } else {
@@ -4481,9 +4519,24 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                                     Slider(
                                         value = scrubberValue.coerceIn(0f, lastPageIndex.toFloat()),
                                         onValueChange = {
-                                            scrubberValue = it.coerceIn(0f, lastPageIndex.toFloat())
+                                            val nextValue = it.coerceIn(0f, lastPageIndex.toFloat())
+                                            val nextIndex = nextValue.roundToInt().coerceIn(0, lastPageIndex)
+                                            scrubberSeeking = true
+                                            scrubberValue = nextValue
+                                            if (nextIndex != state.currentPageIndex) {
+                                                resetZoom()
+                                                viewModel.setReaderPage(nextIndex)
+                                                if (state.readerMode == ReaderMode.WEBTOON) {
+                                                    coroutineScope.launch {
+                                                        webtoonListState.scrollToItem(currentWebtoonStartIndex + nextIndex)
+                                                    }
+                                                }
+                                            }
                                         },
-                                        onValueChangeFinished = { commitScrubbedPage() },
+                                        onValueChangeFinished = {
+                                            scrubberSeeking = false
+                                            commitScrubbedPage()
+                                        },
                                         valueRange = 0f..lastPageIndex.toFloat(),
                                         modifier = Modifier.fillMaxWidth(),
                                     )
@@ -4553,6 +4606,31 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WebtoonNextChapterFooter(nextChapter: SourceChapter) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 112.dp)
+            .padding(vertical = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(22.dp),
+            strokeWidth = 2.dp,
+            color = Color.White.copy(alpha = 0.86f),
+        )
+        Text(
+            "Loading ${nextChapter.name}",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.72f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
