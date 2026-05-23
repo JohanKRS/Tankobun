@@ -15,9 +15,10 @@ import androidx.room.TypeConverters
         SourceChapterEntity::class,
         ReadingProgressEntity::class,
         DownloadJobEntity::class,
+        DownloadPageEntity::class,
         SyncMutationEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(TankobunTypeConverters::class)
@@ -31,5 +32,6 @@ abstract class TankobunDatabase : RoomDatabase() {
     abstract fun chapterDao(): ChapterDao
     abstract fun progressDao(): ProgressDao
     abstract fun downloadDao(): DownloadDao
+    abstract fun downloadPageDao(): DownloadPageDao
     abstract fun syncMutationDao(): SyncMutationDao
 }

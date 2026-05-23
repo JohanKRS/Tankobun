@@ -157,6 +157,23 @@ data class DownloadJobEntity(
     val updatedAtEpochMillis: Long,
 )
 
+@Entity(
+    tableName = "download_pages",
+    primaryKeys = ["jobId", "pageIndex"],
+    indices = [Index("mediaId", "chapterUrl"), Index("chapterUrl")],
+)
+data class DownloadPageEntity(
+    val jobId: String,
+    val mediaId: Int,
+    val sourceId: Long,
+    val mangaUrl: String,
+    val chapterUrl: String,
+    val pageIndex: Int,
+    val imageUrl: String,
+    val filePath: String,
+    val updatedAtEpochMillis: Long,
+)
+
 @Entity(tableName = "sync_mutations")
 data class SyncMutationEntity(
     @PrimaryKey val id: String,

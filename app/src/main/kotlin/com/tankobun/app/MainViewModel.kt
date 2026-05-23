@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.tankobun.core.anilist.AnilistOAuth
 import com.tankobun.core.database.toEntity
 import com.tankobun.core.database.toModel
+import com.tankobun.core.database.toReaderPage
 import com.tankobun.core.database.AnilistSearchResultEntity
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
@@ -218,6 +219,14 @@ class MainViewModel(
     val state: StateFlow<TankobunUiState> = _state
 
     init {
+        viewModelScope.launch {
+            container.database.downloadDao().observeDownloads().collect { rows ->
+                _state.update { it.copy(downloads = rows.map { row -> row.toModel() }) }
+            }
+        }
+        viewModelScope.launch {
+            container.downloadCoordinator.schedulePending()
+        }
         refreshInstalledSources()
         if (_state.value.extensionRepositoryUrl.isNotBlank()) {
             refreshExtensionIndex(silent = true)
@@ -2184,12 +2193,32 @@ class MainViewModel(
         val source = state.installedSources.firstOrNull { it.id == chapter.sourceId }
             ?: state.allInstalledSources.firstOrNull { it.id == chapter.sourceId }
             ?: state.selectedSource?.takeIf { it.id == chapter.sourceId }
-            ?: run {
-                _state.update { it.copy(message = "Source is not installed") }
-                return
-            }
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
+            val cachedPages = cachedDownloadedPages(media.id, chapter)
+            if (cachedPages.isNotEmpty()) {
+                val savedProgress = if (startFromSavedProgress) {
+                    container.database.progressDao().progressForChapter(media.id, chapter.url)
+                } else {
+                    null
+                }
+                val startPageIndex = savedProgress?.pageIndex?.coerceIn(0, cachedPages.lastIndex.coerceAtLeast(0)) ?: 0
+                _state.update {
+                    it.copy(
+                        activeChapter = chapter,
+                        readerPages = cachedPages,
+                        currentPageIndex = startPageIndex,
+                        busy = false,
+                        message = "Opened downloaded ${chapter.name}",
+                    )
+                }
+                saveReaderProgress()
+                return@launch
+            }
+            if (source == null) {
+                _state.update { it.copy(busy = false, message = "Source is not installed") }
+                return@launch
+            }
             runCatching {
                 container.sourceHost.pages(source, chapter)
             }.onSuccess { pages ->
@@ -2215,6 +2244,14 @@ class MainViewModel(
                 _state.update { it.copy(busy = false, message = error.message ?: "Reader failed") }
             }
         }
+    }
+
+    private suspend fun cachedDownloadedPages(mediaId: Int, chapter: SourceChapter): List<ReaderPage> {
+        container.database.downloadDao().completedForChapter(mediaId, chapter.url) ?: return emptyList()
+        return container.database.downloadPageDao()
+            .pagesForChapter(mediaId, chapter.url)
+            .filter { File(it.filePath).isFile }
+            .map { it.toReaderPage() }
     }
 
     fun openRecentProgress(item: RecentReadingProgress) {
@@ -2368,23 +2405,105 @@ class MainViewModel(
     fun enqueueDownload(chapter: SourceChapter) {
         val media = _state.value.selectedMedia ?: return
         val now = System.currentTimeMillis()
-        val job = DownloadJob(
-            id = UUID.randomUUID().toString(),
-            mediaId = media.id,
-            sourceId = chapter.sourceId,
-            mangaUrl = chapter.mangaUrl,
-            chapterUrl = chapter.url,
-            chapterName = chapter.name,
-            state = DownloadState.QUEUED,
-            pageCount = 0,
-            completedPages = 0,
-            retryCount = 0,
-            createdAtEpochMillis = now,
-            updatedAtEpochMillis = now,
-        )
         viewModelScope.launch {
-            container.database.downloadDao().upsertDownload(job.toEntity())
-            _state.update { it.copy(downloads = it.downloads + job, message = "Queued ${chapter.name}") }
+            val existing = container.database.downloadDao().latestForChapter(media.id, chapter.url)?.toModel()
+            if (existing != null) {
+                when (existing.state) {
+                    DownloadState.QUEUED,
+                    DownloadState.RUNNING -> {
+                        _state.update { it.copy(message = "${chapter.name} is already queued") }
+                    }
+
+                    DownloadState.COMPLETE -> {
+                        _state.update { it.copy(message = "${chapter.name} is already downloaded") }
+                    }
+
+                    DownloadState.PAUSED -> {
+                        container.downloadCoordinator.resume(existing.id)
+                        _state.update { it.copy(message = "Resumed ${chapter.name}") }
+                    }
+
+                    DownloadState.FAILED -> {
+                        container.downloadCoordinator.retry(existing.id)
+                        _state.update { it.copy(message = "Retrying ${chapter.name}") }
+                    }
+                }
+                return@launch
+            }
+            val job = DownloadJob(
+                id = UUID.randomUUID().toString(),
+                mediaId = media.id,
+                sourceId = chapter.sourceId,
+                mangaUrl = chapter.mangaUrl,
+                chapterUrl = chapter.url,
+                chapterName = chapter.name,
+                state = DownloadState.QUEUED,
+                pageCount = 0,
+                completedPages = 0,
+                retryCount = 0,
+                createdAtEpochMillis = now,
+                updatedAtEpochMillis = now,
+            )
+            container.downloadCoordinator.enqueue(job)
+            _state.update { it.copy(message = "Queued ${chapter.name}") }
+        }
+    }
+
+    fun pauseDownload(jobId: String) {
+        viewModelScope.launch {
+            container.downloadCoordinator.pause(jobId)
+            _state.update { it.copy(message = "Paused download") }
+        }
+    }
+
+    fun resumeDownload(jobId: String) {
+        viewModelScope.launch {
+            container.downloadCoordinator.resume(jobId)
+            _state.update { it.copy(message = "Resumed download") }
+        }
+    }
+
+    fun retryDownload(jobId: String) {
+        viewModelScope.launch {
+            container.downloadCoordinator.retry(jobId)
+            _state.update { it.copy(message = "Retrying download") }
+        }
+    }
+
+    fun removeDownload(jobId: String) {
+        viewModelScope.launch {
+            container.downloadCoordinator.remove(jobId)
+            _state.update { it.copy(message = "Removed download") }
+        }
+    }
+
+    fun retryFailedDownloads() {
+        val failed = _state.value.downloads.filter { it.state == DownloadState.FAILED }
+        viewModelScope.launch {
+            failed.forEach { container.downloadCoordinator.retry(it.id) }
+            if (failed.isNotEmpty()) {
+                _state.update { it.copy(message = "Retrying ${failed.size} failed downloads") }
+            }
+        }
+    }
+
+    fun pauseActiveDownloads() {
+        val active = _state.value.downloads.filter { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }
+        viewModelScope.launch {
+            active.forEach { container.downloadCoordinator.pause(it.id) }
+            if (active.isNotEmpty()) {
+                _state.update { it.copy(message = "Paused ${active.size} downloads") }
+            }
+        }
+    }
+
+    fun resumePausedDownloads() {
+        val paused = _state.value.downloads.filter { it.state == DownloadState.PAUSED }
+        viewModelScope.launch {
+            paused.forEach { container.downloadCoordinator.resume(it.id) }
+            if (paused.isNotEmpty()) {
+                _state.update { it.copy(message = "Resumed ${paused.size} downloads") }
+            }
         }
     }
 

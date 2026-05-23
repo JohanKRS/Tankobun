@@ -12,7 +12,7 @@ object DatabaseFactory {
             TankobunDatabase::class.java,
             "tankobun.db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
     }
 
@@ -61,6 +61,29 @@ object DatabaseFactory {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `staff` TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `tags` TEXT NOT NULL DEFAULT ''")
+        }
+    }
+
+    private val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `download_pages` (
+                    `jobId` TEXT NOT NULL,
+                    `mediaId` INTEGER NOT NULL,
+                    `sourceId` INTEGER NOT NULL,
+                    `mangaUrl` TEXT NOT NULL,
+                    `chapterUrl` TEXT NOT NULL,
+                    `pageIndex` INTEGER NOT NULL,
+                    `imageUrl` TEXT NOT NULL,
+                    `filePath` TEXT NOT NULL,
+                    `updatedAtEpochMillis` INTEGER NOT NULL,
+                    PRIMARY KEY(`jobId`, `pageIndex`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_download_pages_mediaId_chapterUrl` ON `download_pages` (`mediaId`, `chapterUrl`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_download_pages_chapterUrl` ON `download_pages` (`chapterUrl`)")
         }
     }
 }

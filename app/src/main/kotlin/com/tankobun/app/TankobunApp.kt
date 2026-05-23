@@ -74,12 +74,16 @@ import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
@@ -167,6 +171,8 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistScoreFormat
+import com.tankobun.core.model.DownloadJob
+import com.tankobun.core.model.DownloadState
 import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.ReaderPage
@@ -489,7 +495,7 @@ private fun TankobunScaffold(
                         when (selectedTab) {
                             0 -> LibraryScreen(state, viewModel)
                             1 -> BrowseScreen(state, viewModel)
-                            2 -> DownloadsScreen(state)
+                            2 -> DownloadsScreen(state, viewModel)
                             3 -> SettingsScreen(
                                 state = state,
                                 viewModel = viewModel,
@@ -4380,7 +4386,7 @@ private fun Velocity.readerVelocityForAxis(axis: ReaderPanAxis): Velocity = when
 @Composable
 private fun readerImageRequest(page: ReaderPage): ImageRequest {
     val context = LocalContext.current
-    return remember(page.imageUrl, page.headers) {
+    return remember(page.imageUrl, page.cachedFilePath, page.headers) {
         val headers = NetworkHeaders.Builder().apply {
             page.headers.forEach { (name, value) ->
                 if (name.isNotBlank() && value.isNotBlank()) {
@@ -4390,7 +4396,7 @@ private fun readerImageRequest(page: ReaderPage): ImageRequest {
         }.build()
 
         ImageRequest.Builder(context)
-            .data(page.imageUrl)
+            .data(page.cachedFilePath ?: page.imageUrl)
             .httpHeaders(headers)
             .listener(
                 onError = { _, result ->
@@ -4406,27 +4412,159 @@ private fun readerImageRequest(page: ReaderPage): ImageRequest {
 }
 
 @Composable
-private fun DownloadsScreen(state: TankobunUiState) {
-    Column(
+private fun DownloadsScreen(state: TankobunUiState, viewModel: MainViewModel) {
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Downloads", style = MaterialTheme.typography.titleLarge)
-        if (state.downloads.isEmpty()) {
-            Text("No downloads yet.")
-        } else {
-            state.downloads.forEach { job ->
-                ElevatedCard {
-                    ListItem(
-                        headlineContent = { Text(job.chapterName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = { Text(job.state.name.lowercase()) },
-                    )
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Downloads",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    state.downloadSummaryLabel(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (state.downloads.any { it.state == DownloadState.FAILED || it.state == DownloadState.PAUSED || it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }) {
+            item {
+                FlowRowCompat {
+                    if (state.downloads.any { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }) {
+                        OutlinedButton(onClick = viewModel::pauseActiveDownloads) {
+                            Icon(Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Pause active")
+                        }
+                    }
+                    if (state.downloads.any { it.state == DownloadState.PAUSED }) {
+                        Button(onClick = viewModel::resumePausedDownloads) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Resume paused")
+                        }
+                    }
+                    if (state.downloads.any { it.state == DownloadState.FAILED }) {
+                        Button(onClick = viewModel::retryFailedDownloads) {
+                            Icon(Icons.Default.Replay, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Retry failed")
+                        }
+                    }
                 }
             }
         }
+        if (state.downloads.isEmpty()) {
+            item {
+                Text("No downloads yet.")
+            }
+        } else {
+            items(state.downloads, key = { it.id }) { job ->
+                DownloadJobRow(
+                    job = job,
+                    onPause = { viewModel.pauseDownload(job.id) },
+                    onResume = { viewModel.resumeDownload(job.id) },
+                    onRetry = { viewModel.retryDownload(job.id) },
+                    onRemove = { viewModel.removeDownload(job.id) },
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun DownloadJobRow(
+    job: DownloadJob,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onRetry: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    ElevatedCard {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            ListItem(
+                headlineContent = { Text(job.chapterName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                supportingContent = {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            job.downloadStatusLine(),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (job.pageCount > 0 && job.state != DownloadState.COMPLETE) {
+                            LinearProgressIndicator(
+                                progress = { (job.completedPages.toFloat() / job.pageCount).coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                },
+                trailingContent = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        when (job.state) {
+                            DownloadState.QUEUED,
+                            DownloadState.RUNNING -> IconButton(onClick = onPause) {
+                                Icon(Icons.Default.Pause, contentDescription = "Pause download")
+                            }
+
+                            DownloadState.PAUSED -> IconButton(onClick = onResume) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "Resume download")
+                            }
+
+                            DownloadState.FAILED -> IconButton(onClick = onRetry) {
+                                Icon(Icons.Default.Replay, contentDescription = "Retry download")
+                            }
+
+                            DownloadState.COMPLETE -> Unit
+                        }
+                        IconButton(onClick = onRemove) {
+                            Icon(Icons.Default.Delete, contentDescription = "Remove download")
+                        }
+                    }
+                },
+            )
+        }
+    }
+}
+
+private fun DownloadJob.downloadStatusLine(): String {
+    val status = when (state) {
+        DownloadState.QUEUED -> "Queued"
+        DownloadState.RUNNING -> "Downloading"
+        DownloadState.PAUSED -> "Paused"
+        DownloadState.COMPLETE -> "Complete"
+        DownloadState.FAILED -> "Failed"
+    }
+    val progress = when {
+        pageCount > 0 -> " / $completedPages of $pageCount pages"
+        completedPages > 0 -> " / $completedPages pages"
+        else -> ""
+    }
+    val retries = retryCount.takeIf { it > 0 }?.let { " / $it retries" }.orEmpty()
+    return "$status$progress$retries"
+}
+
+private fun TankobunUiState.downloadSummaryLabel(): String {
+    if (downloads.isEmpty()) return "0 jobs"
+    val running = downloads.count { it.state == DownloadState.RUNNING }
+    val queued = downloads.count { it.state == DownloadState.QUEUED }
+    val complete = downloads.count { it.state == DownloadState.COMPLETE }
+    val failed = downloads.count { it.state == DownloadState.FAILED }
+    val paused = downloads.count { it.state == DownloadState.PAUSED }
+    return listOfNotNull(
+        running.takeIf { it > 0 }?.let { "$it running" },
+        queued.takeIf { it > 0 }?.let { "$it queued" },
+        paused.takeIf { it > 0 }?.let { "$it paused" },
+        failed.takeIf { it > 0 }?.let { "$it failed" },
+        complete.takeIf { it > 0 }?.let { "$it complete" },
+    ).joinToString(" / ")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

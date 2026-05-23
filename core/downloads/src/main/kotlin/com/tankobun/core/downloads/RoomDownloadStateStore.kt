@@ -44,4 +44,9 @@ class RoomDownloadStateStore(
             ),
         )
     }
+
+    override suspend fun shouldContinue(jobId: String): Boolean {
+        val state = downloadDao.getDownload(jobId)?.state ?: return false
+        return state == DownloadState.QUEUED || state == DownloadState.RUNNING
+    }
 }

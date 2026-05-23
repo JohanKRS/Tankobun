@@ -6,6 +6,7 @@ import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistTitle
 import com.tankobun.core.model.DownloadJob
 import com.tankobun.core.model.ReadingProgress
+import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.SourceBinding
 import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceSearchResult
@@ -152,6 +153,30 @@ fun ReadingProgressEntity.toModel(): ReadingProgress =
 
 fun DownloadJob.toEntity(): DownloadJobEntity =
     DownloadJobEntity(id, mediaId, sourceId, mangaUrl, chapterUrl, chapterName, state, pageCount, completedPages, retryCount, createdAtEpochMillis, updatedAtEpochMillis)
+
+fun DownloadJobEntity.toModel(): DownloadJob =
+    DownloadJob(id, mediaId, sourceId, mangaUrl, chapterUrl, chapterName, state, pageCount, completedPages, retryCount, createdAtEpochMillis, updatedAtEpochMillis)
+
+fun ReaderPage.toDownloadPageEntity(job: DownloadJob, filePath: String, updatedAtEpochMillis: Long): DownloadPageEntity =
+    DownloadPageEntity(
+        jobId = job.id,
+        mediaId = job.mediaId,
+        sourceId = job.sourceId,
+        mangaUrl = job.mangaUrl,
+        chapterUrl = job.chapterUrl,
+        pageIndex = index,
+        imageUrl = imageUrl,
+        filePath = filePath,
+        updatedAtEpochMillis = updatedAtEpochMillis,
+    )
+
+fun DownloadPageEntity.toReaderPage(): ReaderPage =
+    ReaderPage(
+        index = pageIndex,
+        imageUrl = imageUrl,
+        cachedFilePath = filePath,
+        headers = emptyMap(),
+    )
 
 fun SyncMutation.toEntity(): SyncMutationEntity =
     SyncMutationEntity(id, type, mediaId, payloadJson, attempts, nextAttemptAtEpochMillis, createdAtEpochMillis)

@@ -194,11 +194,35 @@ interface DownloadDao {
     @Query("SELECT * FROM download_jobs WHERE id = :id")
     suspend fun getDownload(id: String): DownloadJobEntity?
 
+    @Query("SELECT * FROM download_jobs WHERE mediaId = :mediaId AND chapterUrl = :chapterUrl ORDER BY updatedAtEpochMillis DESC LIMIT 1")
+    suspend fun latestForChapter(mediaId: Int, chapterUrl: String): DownloadJobEntity?
+
+    @Query("SELECT * FROM download_jobs WHERE mediaId = :mediaId AND chapterUrl = :chapterUrl AND state = 'COMPLETE' ORDER BY updatedAtEpochMillis DESC LIMIT 1")
+    suspend fun completedForChapter(mediaId: Int, chapterUrl: String): DownloadJobEntity?
+
+    @Query("SELECT * FROM download_jobs WHERE state IN ('QUEUED', 'RUNNING') ORDER BY createdAtEpochMillis ASC")
+    suspend fun pendingDownloads(): List<DownloadJobEntity>
+
     @Upsert
     suspend fun upsertDownload(job: DownloadJobEntity)
 
     @Query("UPDATE download_jobs SET state = :state, updatedAtEpochMillis = :updatedAt WHERE id = :id")
     suspend fun updateState(id: String, state: com.tankobun.core.model.DownloadState, updatedAt: Long)
+
+    @Query("DELETE FROM download_jobs WHERE id = :id")
+    suspend fun deleteDownload(id: String)
+}
+
+@Dao
+interface DownloadPageDao {
+    @Query("SELECT * FROM download_pages WHERE mediaId = :mediaId AND chapterUrl = :chapterUrl ORDER BY pageIndex ASC")
+    suspend fun pagesForChapter(mediaId: Int, chapterUrl: String): List<DownloadPageEntity>
+
+    @Upsert
+    suspend fun upsertPage(page: DownloadPageEntity)
+
+    @Query("DELETE FROM download_pages WHERE jobId = :jobId")
+    suspend fun deletePagesForJob(jobId: String)
 }
 
 @Dao
