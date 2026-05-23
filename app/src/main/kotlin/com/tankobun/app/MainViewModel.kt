@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tankobun.core.anilist.AnilistOAuth
+import com.tankobun.core.database.SyncMutationEntity
 import com.tankobun.core.database.toEntity
 import com.tankobun.core.database.toModel
 import com.tankobun.core.database.toReaderPage
@@ -19,7 +20,6 @@ import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.reader.ReaderProgressCalculator
 import com.tankobun.core.reader.ReaderSession
-import com.tankobun.core.sync.SyncMutationFactory
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.CachePolicy
 import com.tankobun.core.model.DownloadJob
@@ -33,7 +33,11 @@ import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceManga
 import com.tankobun.core.model.SourceSearchResult
+import com.tankobun.core.model.SyncMutationType
+import com.tankobun.core.sync.SyncBackoff
+import com.tankobun.core.sync.SyncMutationFactory
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +52,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Request
+import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 import java.util.UUID
@@ -123,6 +128,9 @@ data class TankobunUiState(
     val downloads: List<DownloadJob> = emptyList(),
     val downloadStorageSummary: DownloadStorageSummary = DownloadStorageSummary(),
     val keepNextTenDownloads: Boolean = false,
+    val anilistAutoSaveTrackingChanges: Boolean = false,
+    val anilistAutoSyncReaderProgress: Boolean = true,
+    val anilistSyncManualReadProgress: Boolean = true,
     val selectingDownloadChapters: Boolean = false,
     val selectedDownloadChapterUrls: Set<String> = emptySet(),
     val selectedSourceId: Long? = null,
@@ -218,7 +226,10 @@ class MainViewModel(
 ) : ViewModel() {
     private val progressCalculator = ReaderProgressCalculator()
     private val syncMutationFactory = SyncMutationFactory()
+    private val syncBackoff = SyncBackoff()
     private val cachePolicy = CachePolicy()
+    private var trackingAutoSaveJob: Job? = null
+    private var pendingAniListSyncJob: Job? = null
     private val _state = MutableStateFlow(
         TankobunUiState(
             loggedIn = container.tokenStore.accessToken() != null,
@@ -243,6 +254,9 @@ class MainViewModel(
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
             readerFitWidth = container.settingsStore.readerFitWidth(),
             keepNextTenDownloads = container.settingsStore.keepNextTenDownloads(),
+            anilistAutoSaveTrackingChanges = container.settingsStore.anilistAutoSaveTrackingChanges(),
+            anilistAutoSyncReaderProgress = container.settingsStore.anilistAutoSyncReaderProgress(),
+            anilistSyncManualReadProgress = container.settingsStore.anilistSyncManualReadProgress(),
         ),
     )
     val state: StateFlow<TankobunUiState> = _state
@@ -269,6 +283,7 @@ class MainViewModel(
         }
         if (_state.value.loggedIn) {
             loadCachedLibrary(syncIfEmpty = true)
+            processPendingAniListSync()
         }
     }
 
@@ -703,12 +718,161 @@ class MainViewModel(
                     )
                 }
                 loadRecentReadingProgress()
+                processPendingAniListSync()
             }.onFailure { error ->
                 Log.e(TAG, "AniList library sync failed", error)
                 _state.update {
                     it.copy(busy = false, message = error.userMessage("Library sync failed"))
                 }
             }
+        }
+    }
+
+    private fun processPendingAniListSync() {
+        val token = container.tokenStore.accessToken() ?: return
+        if (!_state.value.anilistAutoSyncReaderProgress) return
+        if (pendingAniListSyncJob?.isActive == true) return
+        pendingAniListSyncJob = viewModelScope.launch {
+            val dao = container.database.syncMutationDao()
+            val mutations = dao.dueMutations(System.currentTimeMillis())
+            mutations.forEach { mutation ->
+                runCatching {
+                    processAniListSyncMutation(token, mutation)
+                }.onSuccess {
+                    dao.deleteMutation(mutation)
+                }.onFailure { error ->
+                    Log.w(TAG, "Queued AniList sync failed for ${mutation.mediaId}", error)
+                    val now = System.currentTimeMillis()
+                    dao.upsertMutation(
+                        mutation.copy(
+                            attempts = mutation.attempts + 1,
+                            nextAttemptAtEpochMillis = now + syncBackoff.nextDelayMillis(mutation.attempts),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun processAniListSyncMutation(token: String, mutation: SyncMutationEntity) {
+        when (mutation.type) {
+            SyncMutationType.SAVE_MEDIA_LIST_ENTRY -> {
+                val payload = JSONObject(mutation.payloadJson)
+                val entry = container.anilistRepository.saveListEntry(
+                    accessToken = token,
+                    mediaId = mutation.mediaId,
+                    status = payload.nullableString("status")?.let { status ->
+                        runCatching { MediaStatus.valueOf(status) }.getOrNull()
+                    },
+                    progress = payload.nullableInt("progress"),
+                    score = payload.nullableDouble("score"),
+                    notes = payload.nullableString("notes"),
+                    private = payload.nullableBoolean("private"),
+                    customLists = payload.nullableStringList("customLists"),
+                    scoreFormat = _state.value.anilistScoreFormat,
+                )
+                val now = System.currentTimeMillis()
+                val media = container.database.mediaDao().cachedMedia(mutation.mediaId)?.toModel()
+                    ?: _state.value.selectedMedia?.takeIf { it.id == mutation.mediaId }
+                container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+                applySyncedListEntry(media, entry, updateTrackingForm = false)
+            }
+            SyncMutationType.DELETE_MEDIA_LIST_ENTRY -> {
+                Log.w(TAG, "Ignoring unsupported queued AniList delete for ${mutation.mediaId}")
+            }
+        }
+    }
+
+    private suspend fun syncAniListProgressFromChapter(
+        media: AnilistMedia,
+        chapterProgress: Int,
+        triggeredByManualRead: Boolean,
+    ) {
+        if (chapterProgress <= 0) return
+        val snapshot = _state.value
+        if (!snapshot.anilistAutoSyncReaderProgress) return
+        if (triggeredByManualRead && !snapshot.anilistSyncManualReadProgress) return
+        val trackedProgress = snapshot.trackingProgress.toIntOrNull()
+            ?: snapshot.selectedListEntry?.progress
+            ?: 0
+        if (snapshot.selectedMedia?.id == media.id && chapterProgress <= trackedProgress) return
+
+        val now = System.currentTimeMillis()
+        val token = container.tokenStore.accessToken()
+        if (token == null) {
+            queueAniListProgressMutation(media.id, chapterProgress, now)
+            return
+        }
+
+        runCatching {
+            container.anilistRepository.saveListEntry(
+                accessToken = token,
+                mediaId = media.id,
+                status = null,
+                progress = chapterProgress,
+                score = null,
+                notes = null,
+                private = null,
+                customLists = null,
+                scoreFormat = snapshot.anilistScoreFormat,
+            )
+        }.onSuccess { entry ->
+            container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+            applySyncedListEntry(media, entry, updateTrackingForm = false)
+        }.onFailure { error ->
+            Log.w(TAG, "AniList progress sync failed for ${media.id}", error)
+            queueAniListProgressMutation(media.id, chapterProgress, now)
+        }
+    }
+
+    private suspend fun queueAniListProgressMutation(mediaId: Int, progress: Int, nowMillis: Long) {
+        val mutation = syncMutationFactory.saveMediaListEntry(
+            mediaId = mediaId,
+            progress = progress,
+            nowMillis = nowMillis,
+        )
+        container.database.syncMutationDao().upsertMutation(mutation.toEntity())
+    }
+
+    private fun applySyncedListEntry(
+        media: AnilistMedia?,
+        entry: AnilistListEntry,
+        updateTrackingForm: Boolean,
+    ) {
+        _state.update { state ->
+            val existingMedia = media
+                ?: state.libraryItems.firstOrNull { it.media.id == entry.mediaId }?.media
+                ?: state.selectedMedia?.takeIf { it.id == entry.mediaId }
+            val nextItems = if (existingMedia == null) {
+                state.libraryItems
+            } else {
+                (state.libraryItems.filterNot { item -> item.media.id == entry.mediaId } + LibraryItem(existingMedia, entry))
+                    .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
+            }
+            val selected = state.selectedMedia?.id == entry.mediaId
+            state.copy(
+                library = nextItems.map { it.media },
+                libraryItems = nextItems,
+                selectedListEntry = if (selected) entry else state.selectedListEntry,
+                trackingStatus = if (selected && updateTrackingForm) entry.status else state.trackingStatus,
+                trackingProgress = if (selected) {
+                    if (updateTrackingForm) {
+                        entry.progress.toString()
+                    } else {
+                        maxOf(state.trackingProgress.toIntOrNull() ?: 0, entry.progress).toString()
+                    }
+                } else {
+                    state.trackingProgress
+                },
+                trackingScore = if (selected && updateTrackingForm) {
+                    entry.score.formatTrackingScore(state.anilistScoreFormat)
+                } else {
+                    state.trackingScore
+                },
+                trackingNotes = if (selected && updateTrackingForm) entry.notes.orEmpty() else state.trackingNotes,
+                trackingPrivate = if (selected && updateTrackingForm) entry.private else state.trackingPrivate,
+                trackingCustomLists = if (selected && updateTrackingForm) entry.customLists.toSet() else state.trackingCustomLists,
+            )
         }
     }
 
@@ -1053,24 +1217,46 @@ class MainViewModel(
         _state.update { it.copy(readerFitWidth = enabled) }
     }
 
+    fun setAnilistAutoSaveTrackingChanges(enabled: Boolean) {
+        container.settingsStore.saveAnilistAutoSaveTrackingChanges(enabled)
+        _state.update { it.copy(anilistAutoSaveTrackingChanges = enabled) }
+        if (enabled) scheduleTrackingAutoSave()
+    }
+
+    fun setAnilistAutoSyncReaderProgress(enabled: Boolean) {
+        container.settingsStore.saveAnilistAutoSyncReaderProgress(enabled)
+        _state.update { it.copy(anilistAutoSyncReaderProgress = enabled) }
+        if (enabled) processPendingAniListSync()
+    }
+
+    fun setAnilistSyncManualReadProgress(enabled: Boolean) {
+        container.settingsStore.saveAnilistSyncManualReadProgress(enabled)
+        _state.update { it.copy(anilistSyncManualReadProgress = enabled) }
+    }
+
     fun setTrackingStatus(status: MediaStatus) {
         _state.update { it.copy(trackingStatus = status) }
+        scheduleTrackingAutoSave()
     }
 
     fun setTrackingProgress(progress: String) {
         _state.update { it.copy(trackingProgress = progress.filter { char -> char.isDigit() }.take(5)) }
+        scheduleTrackingAutoSave()
     }
 
     fun setTrackingScore(score: String) {
         _state.update { it.copy(trackingScore = score.filteredScoreInput(it.anilistScoreFormat)) }
+        scheduleTrackingAutoSave()
     }
 
     fun setTrackingNotes(notes: String) {
         _state.update { it.copy(trackingNotes = notes) }
+        scheduleTrackingAutoSave()
     }
 
     fun setTrackingPrivate(private: Boolean) {
         _state.update { it.copy(trackingPrivate = private) }
+        scheduleTrackingAutoSave()
     }
 
     fun setTrackingCustomListSelected(name: String, selected: Boolean) {
@@ -1085,6 +1271,7 @@ class MainViewModel(
                 },
             )
         }
+        scheduleTrackingAutoSave()
     }
 
     fun addTrackingCustomList(name: String) {
@@ -1099,13 +1286,30 @@ class MainViewModel(
                 trackingCustomLists = it.trackingCustomLists + normalizedName,
             )
         }
+        scheduleTrackingAutoSave()
+    }
+
+    private fun scheduleTrackingAutoSave() {
+        val snapshot = _state.value
+        if (!snapshot.anilistAutoSaveTrackingChanges || !snapshot.loggedIn || snapshot.selectedMedia == null) return
+        trackingAutoSaveJob?.cancel()
+        trackingAutoSaveJob = viewModelScope.launch {
+            delay(TRACKING_AUTO_SAVE_DELAY_MILLIS)
+            saveTracking(autoSave = true)
+        }
     }
 
     fun saveTracking() {
+        saveTracking(autoSave = false)
+    }
+
+    private fun saveTracking(autoSave: Boolean) {
         val media = _state.value.selectedMedia ?: return
         val token = container.tokenStore.accessToken()
         if (token == null) {
-            _state.update { it.copy(message = "Connect AniList to track this manga") }
+            if (!autoSave) {
+                _state.update { it.copy(message = "Connect AniList to track this manga") }
+            }
             return
         }
 
@@ -1116,7 +1320,9 @@ class MainViewModel(
         val customLists = snapshot.trackingCustomLists.normalizedCustomLists()
 
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
+            if (!autoSave) {
+                _state.update { it.copy(busy = true, message = null) }
+            }
             runCatching {
                 val knownCustomLists = snapshot.anilistCustomLists.normalizedCustomLists()
                 val missingCustomLists = customLists.filterNot { selectedList ->
@@ -1162,13 +1368,18 @@ class MainViewModel(
                         trackingNotes = entry.notes.orEmpty(),
                         trackingPrivate = entry.private,
                         trackingCustomLists = entry.customLists.toSet(),
-                        busy = false,
-                        message = "AniList tracking saved",
+                        busy = if (autoSave) it.busy else false,
+                        message = if (autoSave) it.message else "AniList tracking saved",
                     )
                 }
             }.onFailure { error ->
                 Log.e(TAG, "AniList tracking save failed for ${media.id}", error)
-                _state.update { it.copy(busy = false, message = error.userMessage("Tracking save failed")) }
+                _state.update {
+                    it.copy(
+                        busy = if (autoSave) it.busy else false,
+                        message = error.userMessage(if (autoSave) "Tracking auto-save failed" else "Tracking save failed"),
+                    )
+                }
             }
         }
     }
@@ -2419,12 +2630,11 @@ class MainViewModel(
                     ?: 0
                 val chapterProgress = chapter.chapterNumber.toInt()
                 if (chapterProgress > trackedProgress) {
-                    val mutation = syncMutationFactory.saveMediaListEntry(
-                        mediaId = media.id,
-                        progress = chapterProgress,
-                        nowMillis = now,
+                    syncAniListProgressFromChapter(
+                        media = media,
+                        chapterProgress = chapterProgress,
+                        triggeredByManualRead = true,
                     )
-                    container.database.syncMutationDao().upsertMutation(mutation.toEntity())
                 }
             } else {
                 progressDao.deleteProgressForChapter(media.id, chapter.url)
@@ -2800,12 +3010,11 @@ class MainViewModel(
                 ensureNextTenDownloads()
             }
             if (progress.completed && chapter.chapterNumber > 0) {
-                val mutation = syncMutationFactory.saveMediaListEntry(
-                    mediaId = media.id,
-                    progress = chapter.chapterNumber.toInt(),
-                    nowMillis = System.currentTimeMillis(),
+                syncAniListProgressFromChapter(
+                    media = media,
+                    chapterProgress = chapter.chapterNumber.toInt(),
+                    triggeredByManualRead = false,
                 )
-                container.database.syncMutationDao().upsertMutation(mutation.toEntity())
             }
         }
     }
@@ -2833,6 +3042,30 @@ class MainViewModel(
         private const val SOURCE_FALLBACK_CANDIDATES_PER_SOURCE = 5
         private const val SOURCE_MAX_CANDIDATES_PER_SOURCE = 40
         private const val SOURCE_STRONG_MATCH_SCORE = 0.9
+        private const val TRACKING_AUTO_SAVE_DELAY_MILLIS = 1_200L
+    }
+}
+
+private fun JSONObject.nullableString(name: String): String? =
+    if (!has(name) || isNull(name)) null else optString(name)
+
+private fun JSONObject.nullableInt(name: String): Int? =
+    if (!has(name) || isNull(name)) null else optInt(name)
+
+private fun JSONObject.nullableDouble(name: String): Double? =
+    if (!has(name) || isNull(name)) null else optDouble(name)
+
+private fun JSONObject.nullableBoolean(name: String): Boolean? =
+    if (!has(name) || isNull(name)) null else optBoolean(name)
+
+private fun JSONObject.nullableStringList(name: String): List<String>? {
+    if (!has(name) || isNull(name)) return null
+    val array = optJSONArray(name) ?: return null
+    return buildList {
+        for (index in 0 until array.length()) {
+            val value = array.optString(index).trim()
+            if (value.isNotBlank()) add(value)
+        }
     }
 }
 

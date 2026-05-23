@@ -5187,6 +5187,27 @@ private fun SettingsDetailContent(
                     }
                 }
             }
+            Text("Sync behavior", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            SettingsToggleRow(
+                title = "Auto-save tracking edits",
+                subtitle = "Status, score, progress, notes, privacy, and custom lists save after a short pause.",
+                checked = state.anilistAutoSaveTrackingChanges,
+                onCheckedChange = viewModel::setAnilistAutoSaveTrackingChanges,
+                enabled = state.loggedIn,
+            )
+            SettingsToggleRow(
+                title = "Update progress from reading",
+                subtitle = "Completed chapters move AniList progress to that chapter number.",
+                checked = state.anilistAutoSyncReaderProgress,
+                onCheckedChange = viewModel::setAnilistAutoSyncReaderProgress,
+            )
+            SettingsToggleRow(
+                title = "Include manual read marks",
+                subtitle = "Mark-as-read actions can also move AniList progress forward.",
+                checked = state.anilistSyncManualReadProgress,
+                onCheckedChange = viewModel::setAnilistSyncManualReadProgress,
+                enabled = state.anilistAutoSyncReaderProgress,
+            )
         }
         SettingsRoute.SOURCES -> SourcesSettingsScreen(state, viewModel)
     }
@@ -5424,6 +5445,45 @@ private fun CutoutLayoutToggle(
     }
 }
 
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
+) {
+    ElevatedCard {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = enabled) { onCheckedChange(!checked) }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                enabled = enabled,
+            )
+        }
+    }
+}
+
 private fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
     when (this) {
         SettingsRoute.MAIN -> "Settings"
@@ -5442,8 +5502,14 @@ private fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
             if (state.readerFitWidth) add("Fit width")
         }.joinToString(" / ")
         SettingsRoute.DOWNLOADS -> state.downloadStorageSummary.totalBytes.formatFileSize()
-        SettingsRoute.ANILIST -> state.viewerName?.let { "Signed in as $it" }
-            ?: if (state.clientConfigured) "Ready to connect" else "Client setup needed"
+        SettingsRoute.ANILIST -> buildList {
+            add(
+                state.viewerName?.let { "Signed in as $it" }
+                    ?: if (state.clientConfigured) "Ready to connect" else "Client setup needed",
+            )
+            if (state.anilistAutoSaveTrackingChanges) add("Auto-save edits")
+            if (state.anilistAutoSyncReaderProgress) add("Auto progress")
+        }.joinToString(" / ")
         SettingsRoute.SOURCES -> "${state.installedSources.size} active / ${state.allInstalledSources.size} installed"
     }
 

@@ -113,6 +113,27 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean(KEY_KEEP_NEXT_TEN_DOWNLOADS, enabled).apply()
     }
 
+    fun anilistAutoSaveTrackingChanges(): Boolean =
+        preferences.getBoolean(KEY_ANILIST_AUTO_SAVE_TRACKING_CHANGES, false)
+
+    fun saveAnilistAutoSaveTrackingChanges(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_ANILIST_AUTO_SAVE_TRACKING_CHANGES, enabled).apply()
+    }
+
+    fun anilistAutoSyncReaderProgress(): Boolean =
+        preferences.getBoolean(KEY_ANILIST_AUTO_SYNC_READER_PROGRESS, true)
+
+    fun saveAnilistAutoSyncReaderProgress(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_ANILIST_AUTO_SYNC_READER_PROGRESS, enabled).apply()
+    }
+
+    fun anilistSyncManualReadProgress(): Boolean =
+        preferences.getBoolean(KEY_ANILIST_SYNC_MANUAL_READ_PROGRESS, true)
+
+    fun saveAnilistSyncManualReadProgress(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_ANILIST_SYNC_MANUAL_READ_PROGRESS, enabled).apply()
+    }
+
     fun anilistTags(): List<AnilistMediaTag> =
         preferences.getString(KEY_ANILIST_TAGS, "").orEmpty()
             .lineSequence()
@@ -230,6 +251,9 @@ class SettingsStore(context: Context) {
         const val KEY_READER_PAGE_GAP_LEVEL = "reader.page.gap.level"
         const val KEY_READER_FIT_WIDTH = "reader.fit.width"
         const val KEY_KEEP_NEXT_TEN_DOWNLOADS = "downloads.keep.next.ten"
+        const val KEY_ANILIST_AUTO_SAVE_TRACKING_CHANGES = "anilist.auto.save.tracking.changes"
+        const val KEY_ANILIST_AUTO_SYNC_READER_PROGRESS = "anilist.auto.sync.reader.progress"
+        const val KEY_ANILIST_SYNC_MANUAL_READ_PROGRESS = "anilist.sync.manual.read.progress"
         const val KEY_ANILIST_TAGS = "anilist.tags"
         const val KEY_ANILIST_TAGS_CACHED_AT = "anilist.tags.cached.at"
         const val KEY_SOURCE_LANGUAGES = "source.languages"
