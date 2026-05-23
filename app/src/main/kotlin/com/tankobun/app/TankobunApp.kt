@@ -4046,8 +4046,12 @@ private fun ChapterDownloadIndicator(
 private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     val chapter = state.activeChapter ?: return
     if (state.readerPages.isEmpty()) return
-    var controlsVisible by remember(chapter.url) { mutableStateOf(false) }
-    val transformKey = "${chapter.url}:${state.readerMode}:${if (state.readerMode == ReaderMode.PAGED) state.currentPageIndex else "webtoon"}"
+    var controlsVisible by remember { mutableStateOf(false) }
+    val transformKey = if (state.readerMode == ReaderMode.WEBTOON) {
+        "${state.selectedMedia?.id}:${state.selectedSourceId}:webtoon"
+    } else {
+        "${chapter.url}:${state.readerMode}:${state.currentPageIndex}"
+    }
     var readerScale by remember(transformKey) { mutableStateOf(1f) }
     var readerOffset by remember(transformKey) { mutableStateOf(Offset.Zero) }
     val coroutineScope = rememberCoroutineScope()
@@ -4087,6 +4091,8 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
         mutableStateOf(state.currentPageIndex.coerceIn(0, lastPageIndex).toFloat())
     }
     var scrubberSeeking by remember(chapter.url) { mutableStateOf(false) }
+    var webtoonInitialScrollDoneFor by remember { mutableStateOf<String?>(null) }
+    var preserveWebtoonScrollOnChapterChange by remember { mutableStateOf(false) }
     val displayedPageIndex = scrubberValue.roundToInt().coerceIn(0, lastPageIndex)
     fun cancelFling() {
         flingJob?.cancel()
@@ -4246,14 +4252,25 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     LaunchedEffect(
         chapter.url,
         state.readerMode,
-        pageCount,
-        state.readerPreviousSegment?.chapter?.url,
-        state.readerPreviousSegment?.pages?.size,
     ) {
         if (state.readerMode == ReaderMode.WEBTOON && state.currentPageIndex > 0) {
-            webtoonListState.scrollToItem(currentWebtoonStartIndex + state.currentPageIndex.coerceIn(0, lastPageIndex))
-        } else if (state.readerMode == ReaderMode.WEBTOON && currentWebtoonStartIndex > 0) {
-            webtoonListState.scrollToItem(currentWebtoonStartIndex)
+            if (preserveWebtoonScrollOnChapterChange) {
+                preserveWebtoonScrollOnChapterChange = false
+                webtoonInitialScrollDoneFor = chapter.url
+            } else if (webtoonInitialScrollDoneFor != chapter.url) {
+                webtoonInitialScrollDoneFor = chapter.url
+                webtoonListState.scrollToItem(currentWebtoonStartIndex + state.currentPageIndex.coerceIn(0, lastPageIndex))
+            }
+        } else if (state.readerMode == ReaderMode.WEBTOON) {
+            if (preserveWebtoonScrollOnChapterChange) {
+                preserveWebtoonScrollOnChapterChange = false
+                webtoonInitialScrollDoneFor = chapter.url
+            } else if (webtoonInitialScrollDoneFor != chapter.url) {
+                webtoonInitialScrollDoneFor = chapter.url
+                if (currentWebtoonStartIndex > 0) {
+                    webtoonListState.scrollToItem(currentWebtoonStartIndex)
+                }
+            }
         }
     }
 
@@ -4265,6 +4282,9 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                 .distinctUntilChanged()
                 .collect { item ->
                     if (item != null && !scrubberSeeking) {
+                        if (item.chapter.url != chapter.url) {
+                            preserveWebtoonScrollOnChapterChange = true
+                        }
                         viewModel.setWebtoonReaderPosition(item.chapter.url, item.pageIndex)
                     }
                 }
@@ -4461,11 +4481,6 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        Text(
-                            "$zoomPercent%",
-                            color = Color.White.copy(alpha = 0.78f),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
                     }
                 }
                 Spacer(Modifier.weight(1f))
@@ -4560,46 +4575,58 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                             }
                         }
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            FilterChip(
-                                selected = state.readerMode == ReaderMode.PAGED,
-                                onClick = {
-                                    resetZoom()
-                                    viewModel.setReaderMode(ReaderMode.PAGED)
-                                },
-                                label = { Text("Paged") },
-                            )
-                            FilterChip(
-                                selected = state.readerMode == ReaderMode.WEBTOON,
-                                onClick = {
-                                    resetZoom()
-                                    viewModel.setReaderMode(ReaderMode.WEBTOON)
-                                },
-                                label = { Text("Webtoon") },
-                            )
-                            FilterChip(
-                                selected = state.readerFitWidth,
-                                enabled = state.readerMode == ReaderMode.PAGED,
-                                onClick = {
-                                    viewModel.setReaderFitWidth(!state.readerFitWidth)
-                                    resetZoom()
-                                },
-                                label = { Text("Fit width") },
-                            )
-                            FilterChip(
-                                selected = state.readerPageGapLevel > 0,
-                                onClick = { viewModel.setReaderPageGapLevel((state.readerPageGapLevel + 1) % 4) },
-                                label = { Text(readerGapLabel(state.readerPageGapLevel)) },
-                            )
-                            FilterChip(
-                                selected = readerScale > 1.05f,
-                                onClick = { resetZoom() },
-                                label = { Text("Reset zoom") },
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                FilterChip(
+                                    selected = state.readerMode == ReaderMode.PAGED,
+                                    onClick = {
+                                        resetZoom()
+                                        viewModel.setReaderMode(ReaderMode.PAGED)
+                                    },
+                                    label = { Text("Paged") },
+                                )
+                                FilterChip(
+                                    selected = state.readerMode == ReaderMode.WEBTOON,
+                                    onClick = {
+                                        resetZoom()
+                                        viewModel.setReaderMode(ReaderMode.WEBTOON)
+                                    },
+                                    label = { Text("Webtoon") },
+                                )
+                                FilterChip(
+                                    selected = state.readerFitWidth,
+                                    enabled = state.readerMode == ReaderMode.PAGED,
+                                    onClick = {
+                                        viewModel.setReaderFitWidth(!state.readerFitWidth)
+                                        resetZoom()
+                                    },
+                                    label = { Text("Fit width") },
+                                )
+                                FilterChip(
+                                    selected = state.readerPageGapLevel > 0,
+                                    onClick = { viewModel.setReaderPageGapLevel((state.readerPageGapLevel + 1) % 4) },
+                                    label = { Text(readerGapLabel(state.readerPageGapLevel)) },
+                                )
+                                FilterChip(
+                                    selected = readerScale > 1.05f,
+                                    onClick = { resetZoom() },
+                                    label = { Text("Reset zoom") },
+                                )
+                            }
+                            Text(
+                                "zoom: $zoomPercent%",
+                                color = Color.White.copy(alpha = 0.78f),
+                                style = MaterialTheme.typography.labelLarge,
+                                maxLines = 1,
                             )
                         }
                     }
