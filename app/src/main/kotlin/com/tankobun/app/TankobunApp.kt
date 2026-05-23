@@ -36,6 +36,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -99,6 +101,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -1216,13 +1219,7 @@ private fun LibraryFilterBar(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             shape = RoundedCornerShape(18.dp),
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        FlowRowCompat {
             BrowseFilterPill(
                 label = "Format",
                 value = formatOptions.labelFor(format),
@@ -1254,7 +1251,11 @@ private fun LibraryFilterBar(
                     .clip(RoundedCornerShape(16.dp))
                     .background(LocalTankobunTokens.current.elevatedSurface),
             ) {
-                Icon(Icons.Default.Tune, contentDescription = "Library options")
+                Icon(
+                    Icons.Default.Tune,
+                    contentDescription = "Library options",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
             }
             if (controlsActive) {
                 TextButton(onClick = onReset) {
@@ -1667,13 +1668,7 @@ private fun BrowseFilterBar(
             keyboardActions = KeyboardActions(onSearch = { viewModel.searchAniList() }),
             shape = RoundedCornerShape(18.dp),
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        FlowRowCompat {
             BrowseFilterPill(
                 label = "Genres",
                 value = if (state.browseGenres.isEmpty()) "Any" else state.browseGenres.size.toString(),
@@ -1723,7 +1718,11 @@ private fun BrowseFilterBar(
                     .clip(RoundedCornerShape(16.dp))
                     .background(LocalTankobunTokens.current.elevatedSurface),
             ) {
-                Icon(Icons.Default.Tune, contentDescription = "Browse options")
+                Icon(
+                    Icons.Default.Tune,
+                    contentDescription = "Browse options",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
             }
         }
     }
@@ -1739,6 +1738,7 @@ private fun BrowseFilterPill(
     FilterChip(
         selected = selected,
         onClick = onClick,
+        colors = tankobunFilterChipColors(),
         label = {
             Text(
                 if (selected) "$label: $value" else label,
@@ -2136,6 +2136,7 @@ private fun BrowseGenreDialog(
                         FilterChip(
                             selected = genre in state.browseGenres,
                             onClick = { viewModel.setBrowseGenre(genre, genre !in state.browseGenres) },
+                            colors = tankobunFilterChipColors(),
                             label = {
                                 Text(genre, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             },
@@ -2221,6 +2222,7 @@ private fun BrowseTagDialog(
                             FilterChip(
                                 selected = tag.name in state.browseTags,
                                 onClick = { viewModel.setBrowseTag(tag.name, tag.name !in state.browseTags) },
+                                colors = tankobunFilterChipColors(),
                                 label = {
                                     Text(
                                         tag.name,
@@ -2329,6 +2331,7 @@ private fun LibraryOptionsDialog(
                         FilterChip(
                             selected = sort == option.value,
                             onClick = { onSortChange(option.value) },
+                            colors = tankobunFilterChipColors(),
                             label = { Text(option.label) },
                         )
                     }
@@ -2386,6 +2389,7 @@ private fun BrowseAdvancedDialog(
                         FilterChip(
                             selected = state.browseSort == option.value,
                             onClick = { option.value?.let(viewModel::setBrowseSort) },
+                            colors = tankobunFilterChipColors(),
                             label = { Text(option.label) },
                         )
                     }
@@ -2436,6 +2440,7 @@ private fun CoverColumnsRow(
             FilterChip(
                 selected = selectedColumns == count,
                 onClick = { onSelect(count) },
+                colors = tankobunFilterChipColors(),
                 label = { Text(count.toString()) },
                 modifier = modifier,
             )
@@ -2452,11 +2457,13 @@ private fun CoverFramingRow(
         FilterChip(
             selected = !showWholeCover,
             onClick = { onShowWholeCoverChange(false) },
+            colors = tankobunFilterChipColors(),
             label = { Text("Fill frame") },
         )
         FilterChip(
             selected = showWholeCover,
             onClick = { onShowWholeCoverChange(true) },
+            colors = tankobunFilterChipColors(),
             label = { Text("Show whole cover") },
         )
     }
@@ -2583,6 +2590,7 @@ private fun MediaViewModeRow(
             FilterChip(
                 selected = selectedMode == mode,
                 onClick = { onSelect(mode) },
+                colors = tankobunFilterChipColors(),
                 label = { Text(label) },
             )
         }
@@ -2671,8 +2679,12 @@ private fun MediaCoverTile(
         Surface(
             shape = RoundedCornerShape(8.dp),
             color = if (showWholeCover) Color.Transparent else MaterialTheme.colorScheme.surface,
-            tonalElevation = 1.dp,
-            shadowElevation = if (pressed) 1.dp else 3.dp,
+            tonalElevation = if (showWholeCover) 0.dp else 1.dp,
+            shadowElevation = when {
+                showWholeCover -> 0.dp
+                pressed -> 1.dp
+                else -> 3.dp
+            },
         ) {
             CoverImage(
                 url = media.coverImage,
@@ -3008,56 +3020,96 @@ private fun MangaHeroSection(media: AnilistMedia) {
         color = LocalTankobunTokens.current.elevatedSurface,
         tonalElevation = 1.dp,
     ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            CoverImage(
-                url = media.coverImage,
-                title = media.title.userPreferred,
-                modifier = Modifier
-                    .width(250.dp)
-                    .aspectRatio(2f / 3f),
-                contentScale = ContentScale.Fit,
-                imageAlignment = Alignment.TopCenter,
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    media.title.userPreferred,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    listOfNotNull(
-                        media.format.mediaFormatLabel(),
-                        media.status.statusLabel(),
-                        media.chapters?.let { "$it chapters" },
-                        media.volumes?.let { "$it volumes" },
-                        media.averageScore?.let { "$it% score" },
-                    ).joinToString(" / "),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                FlowRowCompat {
-                    mangaInfoPill("Author", media.staff.authorLabel())
-                    mangaInfoPill("Published", media.publishingYearLabel())
-                    media.popularity?.let { mangaInfoPill("Readers", it.formatCompact()) }
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val compact = maxWidth < 620.dp
+            if (compact) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CoverImage(
+                        url = media.coverImage,
+                        title = media.title.userPreferred,
+                        modifier = Modifier
+                            .fillMaxWidth(0.72f)
+                            .widthIn(max = 260.dp)
+                            .aspectRatio(2f / 3f),
+                        contentScale = ContentScale.Fit,
+                        imageAlignment = Alignment.TopCenter,
+                    )
+                    MangaHeroInfo(
+                        media = media,
+                        compact = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
-                Text(
-                    media.description?.replace(Regex("<[^>]*>"), "").orEmpty(),
-                    maxLines = 8,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val tags = media.tags.ifEmpty { media.genres }
-                if (tags.isNotEmpty()) {
-                    FlowRowCompat {
-                        tags.take(10).forEach { tag ->
-                            AssistChip(onClick = {}, label = { Text(tag) })
-                        }
-                    }
+            } else {
+                Row(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    CoverImage(
+                        url = media.coverImage,
+                        title = media.title.userPreferred,
+                        modifier = Modifier
+                            .width(250.dp)
+                            .aspectRatio(2f / 3f),
+                        contentScale = ContentScale.Fit,
+                        imageAlignment = Alignment.TopCenter,
+                    )
+                    MangaHeroInfo(
+                        media = media,
+                        compact = false,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MangaHeroInfo(
+    media: AnilistMedia,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 12.dp),
+    ) {
+        Text(
+            media.title.userPreferred,
+            style = if (compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            listOfNotNull(
+                media.format.mediaFormatLabel(),
+                media.status.statusLabel(),
+                media.chapters?.let { "$it chapters" },
+                media.volumes?.let { "$it volumes" },
+                media.averageScore?.let { "$it% score" },
+            ).joinToString(" / "),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRowCompat {
+            mangaInfoPill("Author", media.staff.authorLabel())
+            mangaInfoPill("Published", media.publishingYearLabel())
+            media.popularity?.let { mangaInfoPill("Readers", it.formatCompact()) }
+        }
+        Text(
+            media.description?.replace(Regex("<[^>]*>"), "").orEmpty(),
+            maxLines = if (compact) 5 else 8,
+            overflow = TextOverflow.Ellipsis,
+        )
+        val tags = media.tags.ifEmpty { media.genres }
+        if (tags.isNotEmpty()) {
+            FlowRowCompat {
+                tags.take(if (compact) 6 else 10).forEach { tag ->
+                    AssistChip(onClick = {}, label = { Text(tag) })
                 }
             }
         }
@@ -3357,6 +3409,7 @@ private fun MoodScoreInput(value: String, onValueChange: (String) -> Unit, modif
             FilterChip(
                 selected = selected == score,
                 onClick = { onValueChange(if (selected == score) "" else score.toString()) },
+                colors = tankobunFilterChipColors(),
                 label = { Text(label) },
             )
         }
@@ -4640,6 +4693,7 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                                         resetZoom()
                                         viewModel.setReaderMode(ReaderMode.PAGED)
                                     },
+                                    colors = tankobunFilterChipColors(),
                                     label = { Text("Paged") },
                                 )
                                 FilterChip(
@@ -4648,6 +4702,7 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                                         resetZoom()
                                         viewModel.setReaderMode(ReaderMode.WEBTOON)
                                     },
+                                    colors = tankobunFilterChipColors(),
                                     label = { Text("Webtoon") },
                                 )
                                 FilterChip(
@@ -4657,16 +4712,19 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
                                         viewModel.setReaderFitWidth(!state.readerFitWidth)
                                         resetZoom()
                                     },
+                                    colors = tankobunFilterChipColors(),
                                     label = { Text("Fit width") },
                                 )
                                 FilterChip(
                                     selected = state.readerPageGapLevel > 0,
                                     onClick = { viewModel.setReaderPageGapLevel((state.readerPageGapLevel + 1) % 4) },
+                                    colors = tankobunFilterChipColors(),
                                     label = { Text(readerGapLabel(state.readerPageGapLevel)) },
                                 )
                                 FilterChip(
                                     selected = readerScale > 1.05f,
                                     onClick = { resetZoom() },
+                                    colors = tankobunFilterChipColors(),
                                     label = { Text("Reset zoom") },
                                 )
                             }
@@ -5276,12 +5334,14 @@ private fun SettingsDetailContent(
                 FilterChip(
                     selected = state.readerMode == ReaderMode.PAGED,
                     onClick = { viewModel.setReaderMode(ReaderMode.PAGED) },
+                    colors = tankobunFilterChipColors(),
                     label = { Text("Paged") },
                     leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
                 )
                 FilterChip(
                     selected = state.readerMode == ReaderMode.WEBTOON,
                     onClick = { viewModel.setReaderMode(ReaderMode.WEBTOON) },
+                    colors = tankobunFilterChipColors(),
                     label = { Text("Webtoon") },
                 )
             }
@@ -5291,12 +5351,14 @@ private fun SettingsDetailContent(
                     FilterChip(
                         selected = state.readerPageGapLevel == level,
                         onClick = { viewModel.setReaderPageGapLevel(level) },
+                        colors = tankobunFilterChipColors(),
                         label = { Text(readerGapLabel(level)) },
                     )
                 }
                 FilterChip(
                     selected = state.readerFitWidth,
                     onClick = { viewModel.setReaderFitWidth(!state.readerFitWidth) },
+                    colors = tankobunFilterChipColors(),
                     label = { Text("Fit paged width") },
                 )
             }
@@ -5538,6 +5600,7 @@ private fun BackupSchedulePicker(
                     FilterChip(
                         selected = selected == schedule,
                         onClick = { onSelect(schedule) },
+                        colors = tankobunFilterChipColors(),
                         label = { Text(schedule.label()) },
                         modifier = Modifier.weight(1f),
                     )
@@ -6345,11 +6408,13 @@ private fun SourceLanguageFilters(
             FilterChip(
                 selected = selectedFilter == SOURCE_LANGUAGE_FILTER_ACTIVE,
                 onClick = { onSelectFilter(SOURCE_LANGUAGE_FILTER_ACTIVE) },
+                colors = tankobunFilterChipColors(),
                 label = { Text("$activeLabel $activeCount") },
             )
             FilterChip(
                 selected = selectedFilter == SOURCE_LANGUAGE_FILTER_ALL,
                 onClick = { onSelectFilter(SOURCE_LANGUAGE_FILTER_ALL) },
+                colors = tankobunFilterChipColors(),
                 label = { Text("All $allCount") },
             )
             languageOptions.forEach { language ->
@@ -6357,6 +6422,7 @@ private fun SourceLanguageFilters(
                 FilterChip(
                     selected = selectedFilter == language,
                     onClick = { onSelectFilter(language) },
+                    colors = tankobunFilterChipColors(),
                     label = { Text("${sourceLanguageDisplay(language)} $count") },
                 )
             }
@@ -7008,15 +7074,30 @@ private fun ThemeSwatches(colors: List<Color>) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FlowRowCompat(content: @Composable () -> Unit) {
-    Row(
+    FlowRow(
         modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
+            .fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         content()
     }
 }
+
+@Composable
+private fun tankobunFilterChipColors() = FilterChipDefaults.filterChipColors(
+    containerColor = MaterialTheme.colorScheme.surface,
+    labelColor = MaterialTheme.colorScheme.onSurface,
+    iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
+    disabledLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+)

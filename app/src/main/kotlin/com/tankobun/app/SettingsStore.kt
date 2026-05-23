@@ -9,6 +9,7 @@ import java.util.Locale
 
 class SettingsStore(context: Context) {
     private val preferences = context.getSharedPreferences("tankobun_settings", Context.MODE_PRIVATE)
+    private val resources = context.resources
 
     fun extensionRepositoryUrl(): String =
         preferences.getString(KEY_EXTENSION_REPOSITORY_URL, "").orEmpty()
@@ -44,7 +45,7 @@ class SettingsStore(context: Context) {
     }
 
     fun libraryCoverColumns(): Int =
-        preferences.getInt(KEY_LIBRARY_COVER_COLUMNS, DEFAULT_MEDIA_COVER_COLUMNS)
+        preferences.getInt(KEY_LIBRARY_COVER_COLUMNS, defaultMediaCoverColumns())
             .supportedCoverColumns()
 
     fun saveLibraryCoverColumns(count: Int) {
@@ -69,7 +70,7 @@ class SettingsStore(context: Context) {
     }
 
     fun browseCoverColumns(): Int =
-        preferences.getInt(KEY_BROWSE_COVER_COLUMNS, DEFAULT_MEDIA_COVER_COLUMNS)
+        preferences.getInt(KEY_BROWSE_COVER_COLUMNS, defaultMediaCoverColumns())
             .supportedCoverColumns()
 
     fun saveBrowseCoverColumns(count: Int) {
@@ -260,6 +261,13 @@ class SettingsStore(context: Context) {
         preferences.edit().putLong(KEY_LIBRARY_SYNCED_AT, value).apply()
     }
 
+    private fun defaultMediaCoverColumns(): Int =
+        if (resources.configuration.smallestScreenWidthDp in 1 until PHONE_TABLET_BREAKPOINT_DP) {
+            2
+        } else {
+            DEFAULT_MEDIA_COVER_COLUMNS
+        }
+
     private companion object {
         const val KEY_EXTENSION_REPOSITORY_URL = "extension.repository.url"
         const val KEY_THEME_MODE = "theme.mode"
@@ -288,6 +296,7 @@ class SettingsStore(context: Context) {
         const val KEY_ANILIST_SCORE_FORMAT = "anilist.score.format"
         const val KEY_ANILIST_CUSTOM_LISTS = "anilist.custom.lists"
         const val KEY_LIBRARY_SYNCED_AT = "anilist.library.synced.at"
+        const val PHONE_TABLET_BREAKPOINT_DP = 600
     }
 }
 
@@ -313,6 +322,7 @@ enum class TankobunThemeMode {
     NEON_KOI,
     MOON_JELLY,
     INKBERRY_FIZZ,
+    CHARCOAL_GOLD,
 }
 
 enum class MediaViewMode {

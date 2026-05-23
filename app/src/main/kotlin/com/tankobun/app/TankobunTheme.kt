@@ -93,6 +93,13 @@ fun tankobunThemeChoices(): List<TankobunThemeChoice> = listOf(
         swatches = listOf(Color(0xFF130D10), Color(0xFFFF7A88), Color(0xFFFFB078)),
     ),
     TankobunThemeChoice(
+        mode = TankobunThemeMode.CHARCOAL_GOLD,
+        name = "Charcoal Gold",
+        description = "Matte charcoal with warm gold ink",
+        dark = true,
+        swatches = listOf(Color(0xFF11100E), Color(0xFFE8B44D), Color(0xFF3A3428)),
+    ),
+    TankobunThemeChoice(
         mode = TankobunThemeMode.STARRY_INK,
         name = "Starry Ink",
         description = "Blue-black pages",
@@ -351,6 +358,36 @@ private fun themeSpecFor(mode: TankobunThemeMode): TankobunThemeSpec = when (mod
             readerOverlay = Color(0xCC030704),
             drawerHandle = Color(0x331F8F87),
             coverScrim = Color(0x22000000),
+        ),
+    )
+    TankobunThemeMode.CHARCOAL_GOLD -> TankobunThemeSpec(
+        colors = darkColorScheme(
+            primary = Color(0xFFE8B44D),
+            onPrimary = Color(0xFF2A1C00),
+            secondary = Color(0xFFD8C49A),
+            onSecondary = Color(0xFF2A2112),
+            tertiary = Color(0xFFFFD98A),
+            onTertiary = Color(0xFF302000),
+            background = Color(0xFF11100E),
+            onBackground = Color(0xFFF7EFE0),
+            surface = Color(0xFF1B1915),
+            onSurface = Color(0xFFF7EFE0),
+            surfaceVariant = Color(0xFF3A3428),
+            onSurfaceVariant = Color(0xFFE0D3B8),
+            primaryContainer = Color(0xFF5A4113),
+            onPrimaryContainer = Color(0xFFFFE2A4),
+            secondaryContainer = Color(0xFF403727),
+            onSecondaryContainer = Color(0xFFF4E3C2),
+            error = Color(0xFFFFB4AB),
+            onError = Color(0xFF690005),
+        ),
+        tokens = TankobunThemeTokens(
+            appBackdrop = Color(0xFF11100E),
+            elevatedSurface = Color(0xFF1B1915),
+            softAccent = Color(0xFF29251D),
+            readerOverlay = Color(0xDD000000),
+            drawerHandle = Color(0x66E8B44D),
+            coverScrim = Color(0x4D000000),
         ),
     )
     TankobunThemeMode.STARRY_INK -> TankobunThemeSpec(
