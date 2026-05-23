@@ -104,6 +104,12 @@ The author does not host, provide, endorse, verify, or control third-party manga
 
 Users are responsible for how they configure and use the app.
 
+## Name and Branding
+
+The Tankobun name, icon, and project branding identify this project. Forks, modified builds, and redistributed APKs must not imply endorsement, affiliation, or official support from the original author.
+
+If you distribute a modified version, please use a clearly different app name, package name, and icon.
+
 ## License
 
 This project is licensed under the MIT License. See `LICENCE.md` for details.
