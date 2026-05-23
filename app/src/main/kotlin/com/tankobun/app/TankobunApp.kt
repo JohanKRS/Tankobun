@@ -2,6 +2,7 @@ package com.tankobun.app
 
 import android.content.Context
 import android.content.Intent
+import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
@@ -9,6 +10,10 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
+import android.view.View
+import android.view.WindowInsets as AndroidWindowInsets
+import android.view.WindowInsetsController
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,6 +27,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -57,11 +63,13 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -126,6 +134,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -151,9 +160,12 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -204,6 +216,8 @@ private enum class SettingsRoute {
     ABOUT,
     SOURCES,
 }
+
+private const val TankobunGithubUrl = "https://github.com/JohanKRS/Tankobun"
 
 private val SettingsDetailRoutes = listOf(
     SettingsRoute.APPEARANCE,
@@ -288,6 +302,10 @@ fun TankobunApp(viewModel: MainViewModel) {
     var quickDrawerMode by remember { mutableStateOf(QuickDrawerMode.CLOSED) }
     val selectedMedia = state.selectedMedia
     val readerOpen = state.activeChapter != null && state.readerPages.isNotEmpty()
+    val appStatusBarVisible = state.showAppStatusBar && !readerOpen
+    val useDarkStatusBarIcons = state.themeMode.useDarkStatusBarIcons(isSystemInDarkTheme())
+
+    StatusBarVisibilityEffect(visible = appStatusBarVisible, useDarkIcons = useDarkStatusBarIcons)
 
     BackHandler(enabled = readerOpen) {
         viewModel.closeReader()
@@ -328,6 +346,7 @@ fun TankobunApp(viewModel: MainViewModel) {
                 settingsRoute = settingsRoute,
                 onOpenSettingsRoute = { settingsRoute = it },
                 quickDrawerMode = quickDrawerMode,
+                showStatusBar = state.showAppStatusBar,
                 onOpenQuickDrawer = { quickDrawerMode = QuickDrawerMode.OVERLAY },
                 onCloseQuickDrawer = { quickDrawerMode = QuickDrawerMode.CLOSED },
                 onToggleQuickDrawerPin = {
@@ -354,6 +373,67 @@ fun TankobunApp(viewModel: MainViewModel) {
     }
 }
 
+@Composable
+private fun StatusBarVisibilityEffect(visible: Boolean, useDarkIcons: Boolean) {
+    val view = LocalView.current
+    SideEffect {
+        val window = (view.context as? Activity)?.window ?: return@SideEffect
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.decorView.windowInsetsController?.let { controller ->
+                controller.setSystemBarsAppearance(
+                    if (useDarkIcons) WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS else 0,
+                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
+                )
+                if (visible) {
+                    controller.show(AndroidWindowInsets.Type.statusBars())
+                } else {
+                    controller.hide(AndroidWindowInsets.Type.statusBars())
+                    controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            if (visible) {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val lightStatusFlag = WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
+                    window.addFlags(lightStatusFlag)
+                    window.decorView.systemUiVisibility = if (useDarkIcons) {
+                        window.decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                    } else {
+                        window.decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+                    }
+                }
+            } else {
+                window.setFlags(
+                    WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                    WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                )
+            }
+        }
+    }
+}
+
+private fun TankobunThemeMode.useDarkStatusBarIcons(systemDark: Boolean): Boolean =
+    when (this) {
+        TankobunThemeMode.SYSTEM -> !systemDark
+        TankobunThemeMode.LIGHT,
+        TankobunThemeMode.BUNNY_MOCHI,
+        TankobunThemeMode.PEACH_SODA,
+        TankobunThemeMode.MATCHA_MILK,
+        TankobunThemeMode.SAKURA_MINT,
+        TankobunThemeMode.CLOUDBERRY_POP,
+        TankobunThemeMode.YUZU_GARDEN -> true
+        TankobunThemeMode.DARK,
+        TankobunThemeMode.MIDNIGHT_RAMEN,
+        TankobunThemeMode.STARRY_INK,
+        TankobunThemeMode.PLUM_NIGHT,
+        TankobunThemeMode.NEON_KOI,
+        TankobunThemeMode.MOON_JELLY,
+        TankobunThemeMode.INKBERRY_FIZZ,
+        TankobunThemeMode.CHARCOAL_GOLD -> false
+    }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TankobunScaffold(
@@ -365,6 +445,7 @@ private fun TankobunScaffold(
     settingsRoute: SettingsRoute,
     onOpenSettingsRoute: (SettingsRoute) -> Unit,
     quickDrawerMode: QuickDrawerMode,
+    showStatusBar: Boolean,
     onOpenQuickDrawer: () -> Unit,
     onCloseQuickDrawer: () -> Unit,
     onToggleQuickDrawerPin: () -> Unit,
@@ -466,6 +547,7 @@ private fun TankobunScaffold(
                     ?: if (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN) settingsRoute.settingsTitle() else "Tankobun",
                 showBack = selectedMedia != null || (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN),
                 ignoreDisplayCutout = ignoreDisplayCutout,
+                showStatusBar = showStatusBar,
                 onBack = {
                     if (selectedMedia != null) {
                         viewModel.clearSelectedMedia()
@@ -754,28 +836,49 @@ private fun TankobunTopBar(
     title: String,
     showBack: Boolean,
     ignoreDisplayCutout: Boolean,
+    showStatusBar: Boolean,
     onBack: () -> Unit,
 ) {
+    val configuration = LocalConfiguration.current
+    val compact = configuration.smallestScreenWidthDp in 1 until 600
     val startInset = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout)
     val endInset = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout)
+    val statusBarInset = if (showStatusBar) {
+        WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    } else {
+        0.dp
+    }
+    val barHeight = if (compact) 48.dp else 72.dp
+    val horizontalPadding = if (compact) 10.dp else 18.dp
+    val iconSize = if (compact) 18.dp else 24.dp
+    val logoSize = if (compact) 36.dp else 56.dp
+    val spacing = if (compact) 7.dp else 12.dp
     Surface(color = LocalTankobunTokens.current.elevatedSurface, tonalElevation = 1.dp) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(72.dp)
-                .padding(start = 18.dp + startInset, end = 18.dp + endInset),
+                .height(barHeight + statusBarInset)
+                .padding(
+                    start = horizontalPadding + startInset,
+                    top = statusBarInset,
+                    end = horizontalPadding + endInset,
+                ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(spacing),
         ) {
             if (showBack) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                IconButton(onClick = onBack, modifier = Modifier.size(if (compact) 36.dp else 48.dp)) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        modifier = Modifier.size(iconSize),
+                    )
                 }
             }
             Image(
                 painter = painterResource(R.drawable.ic_launcher_foreground),
                 contentDescription = null,
-                modifier = Modifier.size(56.dp),
+                modifier = Modifier.size(logoSize),
             )
             Text(
                 title,
@@ -783,7 +886,7 @@ private fun TankobunTopBar(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleLarge,
+                style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleLarge,
             )
         }
     }
@@ -1079,48 +1182,51 @@ private fun LibraryScreen(state: TankobunUiState, viewModel: MainViewModel) {
         sort = LIBRARY_SORT_LIST_ORDER
     }
 
-    Column(
+    val libraryHeader: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            LibraryFilterBar(
+                query = query,
+                onQueryChange = { query = it },
+                format = format,
+                publishingStatus = publishingStatus,
+                year = year,
+                sort = sort,
+                formatOptions = formatOptions,
+                statusOptions = statusOptions,
+                yearOptions = yearOptions,
+                onOpenPicker = { picker = it },
+                onOpenOptions = { optionsOpen = true },
+                onReset = resetLibraryControls,
+            )
+
+            state.message?.let {
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(it, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+                }
+            }
+
+            if (!state.loggedIn) {
+                LibraryConnectPrompt(
+                    clientConfigured = state.clientConfigured,
+                    onConnect = {
+                        viewModel.loginUrl()?.let { url ->
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        }
+                    },
+                )
+            }
+        }
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        LibraryFilterBar(
-            query = query,
-            onQueryChange = { query = it },
-            format = format,
-            publishingStatus = publishingStatus,
-            year = year,
-            sort = sort,
-            formatOptions = formatOptions,
-            statusOptions = statusOptions,
-            yearOptions = yearOptions,
-            onOpenPicker = { picker = it },
-            onOpenOptions = { optionsOpen = true },
-            onReset = resetLibraryControls,
-        )
-
-        state.message?.let {
-            Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                shape = RoundedCornerShape(8.dp),
-            ) {
-                Text(it, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
-            }
-        }
-
-        if (!state.loggedIn) {
-            LibraryConnectPrompt(
-                clientConfigured = state.clientConfigured,
-                onConnect = {
-                    viewModel.loginUrl()?.let { url ->
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                    }
-                },
-            )
-        }
-
         LibraryPager(
             sections = sections,
             query = query,
@@ -1131,7 +1237,8 @@ private fun LibraryScreen(state: TankobunUiState, viewModel: MainViewModel) {
             viewMode = state.libraryViewMode,
             coverColumns = state.libraryCoverColumns,
             showWholeCovers = state.libraryShowWholeCovers,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxSize(),
+            header = libraryHeader,
             onSelectMedia = viewModel::selectMedia,
         )
     }
@@ -1247,13 +1354,14 @@ private fun LibraryFilterBar(
             IconButton(
                 onClick = onOpenOptions,
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(LocalTankobunTokens.current.elevatedSurface),
             ) {
                 Icon(
                     Icons.Default.Tune,
                     contentDescription = "Library options",
+                    modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
@@ -1321,11 +1429,20 @@ private fun LibraryPager(
     coverColumns: Int,
     showWholeCovers: Boolean,
     modifier: Modifier,
+    header: @Composable () -> Unit,
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
     if (sections.isEmpty()) {
-        Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.TopStart) {
-            Text("No manga in your AniList library yet.")
+        LazyColumn(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item(key = "library-header") {
+                header()
+            }
+            item(key = "library-empty") {
+                Text("No manga in your AniList library yet.")
+            }
         }
         return
     }
@@ -1383,6 +1500,7 @@ private fun LibraryPager(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = 12.dp),
+                header = header,
                 emptyMessage = if (filtersActive) {
                     "No titles match these library filters."
                 } else {
@@ -1537,14 +1655,8 @@ private fun BrowseScreen(state: TankobunUiState, viewModel: MainViewModel) {
     var tagsOpen by remember { mutableStateOf(false) }
     var advancedOpen by remember { mutableStateOf(false) }
     val controlsActive = state.browseControlsActive()
-
-    Box(Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
+    val browseHeader: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             BrowseFilterBar(
                 state = state,
                 viewModel = viewModel,
@@ -1563,18 +1675,28 @@ private fun BrowseScreen(state: TankobunUiState, viewModel: MainViewModel) {
                     Text(it, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
                 }
             }
+        }
+    }
 
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(18.dp),
+        ) {
             if (controlsActive || state.browseSearched) {
                 BrowseResults(
                     state = state,
                     viewModel = viewModel,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxSize(),
+                    header = browseHeader,
                 )
             } else {
                 BrowseLanding(
                     state = state,
                     viewModel = viewModel,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxSize(),
+                    header = browseHeader,
                 )
             }
         }
@@ -1714,13 +1836,14 @@ private fun BrowseFilterBar(
             IconButton(
                 onClick = onOpenAdvanced,
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(LocalTankobunTokens.current.elevatedSurface),
             ) {
                 Icon(
                     Icons.Default.Tune,
                     contentDescription = "Browse options",
+                    modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
@@ -1738,10 +1861,12 @@ private fun BrowseFilterPill(
     FilterChip(
         selected = selected,
         onClick = onClick,
+        modifier = Modifier.heightIn(min = 32.dp),
         colors = tankobunFilterChipColors(),
         label = {
             Text(
                 if (selected) "$label: $value" else label,
+                style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -1754,11 +1879,15 @@ private fun BrowseLanding(
     state: TankobunUiState,
     viewModel: MainViewModel,
     modifier: Modifier,
+    header: @Composable () -> Unit,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(34.dp),
     ) {
+        item(key = "browse-header") {
+            header()
+        }
         item {
             BrowseMangaShelf(
                 title = "TRENDING NOW",
@@ -2069,9 +2198,12 @@ private fun BrowseResults(
     state: TankobunUiState,
     viewModel: MainViewModel,
     modifier: Modifier,
+    header: @Composable () -> Unit,
 ) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    val resultsHeader: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            header()
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     if (state.searchQuery.isBlank()) "Browse Manga" else "Search Results",
@@ -2090,20 +2222,22 @@ private fun BrowseResults(
                 Text("Reset")
             }
         }
-        MediaCollection(
-            media = state.searchResults,
-            viewMode = state.browseViewMode,
-            coverColumns = state.browseCoverColumns,
-            showWholeCovers = state.browseShowWholeCovers,
-            modifier = Modifier.weight(1f),
-            onSelectMedia = viewModel::selectMedia,
-            emptyMessage = if (state.busy) {
-                "Searching AniList..."
-            } else {
-                "No AniList manga found for these filters."
-            },
-        )
     }
+    }
+    MediaCollection(
+        media = state.searchResults,
+        viewMode = state.browseViewMode,
+        coverColumns = state.browseCoverColumns,
+        showWholeCovers = state.browseShowWholeCovers,
+        modifier = modifier.fillMaxWidth(),
+        header = resultsHeader,
+        onSelectMedia = viewModel::selectMedia,
+        emptyMessage = if (state.busy) {
+            "Searching AniList..."
+        } else {
+            "No AniList manga found for these filters."
+        },
+    )
 }
 
 @Composable
@@ -2606,11 +2740,22 @@ private fun MediaCollection(
     showWholeCovers: Boolean,
     onSelectMedia: (AnilistMedia) -> Unit,
     modifier: Modifier = Modifier,
+    header: (@Composable () -> Unit)? = null,
     emptyMessage: String = "No manga here yet.",
 ) {
     if (media.isEmpty()) {
-        Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.TopStart) {
-            Text(emptyMessage)
+        LazyColumn(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            header?.let { headerContent ->
+                item(key = "media-header") {
+                    headerContent()
+                }
+            }
+            item(key = "media-empty") {
+                Text(emptyMessage)
+            }
         }
         return
     }
@@ -2621,6 +2766,13 @@ private fun MediaCollection(
             modifier = modifier,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            header?.let { headerContent ->
+                item(key = "media-header") {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        headerContent()
+                    }
+                }
+            }
             items(media, key = { it.id }) { item ->
                 MediaRow(media = item, onClick = { onSelectMedia(item) })
             }
@@ -2631,6 +2783,14 @@ private fun MediaCollection(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            header?.let { headerContent ->
+                item(
+                    key = "media-header",
+                    span = { GridItemSpan(maxLineSpan) },
+                ) {
+                    headerContent()
+                }
+            }
             gridItems(media, key = { it.id }) { item ->
                 MediaCoverTile(
                     media = item,
@@ -5280,6 +5440,13 @@ private fun SettingsDetailContent(
                 selected = state.themeMode,
                 onSelect = viewModel::setThemeMode,
             )
+            Text("System UI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            SettingsToggleRow(
+                title = "Show Android status bar",
+                subtitle = "Keep the phone status bar visible in the app. The reader still hides it.",
+                checked = state.showAppStatusBar,
+                onCheckedChange = viewModel::setShowAppStatusBar,
+            )
             if (deviceHasDisplayCutout) {
                 Text("Layout", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 CutoutLayoutToggle(
@@ -5615,6 +5782,7 @@ private fun BackupSchedulePicker(
 
 @Composable
 private fun AboutSettingsScreen(modifier: Modifier = Modifier) {
+    val uriHandler = LocalUriHandler.current
     SettingsDetailPanel(
         title = "About",
         subtitle = "A little context about what Tankobun is and is not.",
@@ -5628,6 +5796,19 @@ private fun AboutSettingsScreen(modifier: Modifier = Modifier) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text("Tankobun", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    onClick = { uriHandler.openUri(TankobunGithubUrl) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Link, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("GitHub repository")
+                }
                 Text(
                     "Tankobun is an unofficial manga reader and is not affiliated with AniList.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -7080,8 +7261,8 @@ private fun FlowRowCompat(content: @Composable () -> Unit) {
     FlowRow(
         modifier = Modifier
             .fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         content()
     }

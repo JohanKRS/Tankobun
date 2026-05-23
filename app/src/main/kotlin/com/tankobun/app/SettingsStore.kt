@@ -34,6 +34,13 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean(KEY_IGNORE_DISPLAY_CUTOUT, enabled).apply()
     }
 
+    fun showAppStatusBar(): Boolean =
+        preferences.getBoolean(KEY_SHOW_APP_STATUS_BAR, true)
+
+    fun saveShowAppStatusBar(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_SHOW_APP_STATUS_BAR, enabled).apply()
+    }
+
     fun libraryViewMode(): MediaViewMode =
         preferences.getString(KEY_LIBRARY_VIEW_MODE, null)
             ?.let { stored -> runCatching { MediaViewMode.valueOf(stored) }.getOrNull() }
@@ -272,6 +279,7 @@ class SettingsStore(context: Context) {
         const val KEY_EXTENSION_REPOSITORY_URL = "extension.repository.url"
         const val KEY_THEME_MODE = "theme.mode"
         const val KEY_IGNORE_DISPLAY_CUTOUT = "layout.ignore.display.cutout"
+        const val KEY_SHOW_APP_STATUS_BAR = "layout.show.app.status.bar"
         const val KEY_LIBRARY_VIEW_MODE = "library.view.mode"
         const val KEY_LIBRARY_COVER_COLUMNS = "library.cover.columns"
         const val KEY_LIBRARY_SHOW_WHOLE_COVERS = "library.show.whole.covers"
