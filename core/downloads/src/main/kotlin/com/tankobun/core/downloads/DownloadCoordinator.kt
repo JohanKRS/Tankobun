@@ -17,6 +17,9 @@ class DownloadCoordinator(
     context: Context,
     private val downloadDao: DownloadDao,
     private val downloadPageDao: DownloadPageDao,
+    private val deleteFilesForJobs: suspend (List<String>) -> Unit = {},
+    private val deleteFilesForMedia: suspend (Int) -> Unit = {},
+    private val deleteAllFiles: suspend () -> Unit = {},
     private val nowMillis: () -> Long = { System.currentTimeMillis() },
 ) {
     private val workManager = WorkManager.getInstance(context)
@@ -48,6 +51,7 @@ class DownloadCoordinator(
 
     suspend fun retry(jobId: String) {
         val job = downloadDao.getDownload(jobId) ?: return
+        deleteFilesForJobs(listOf(jobId))
         downloadPageDao.deletePagesForJob(jobId)
         downloadDao.upsertDownload(
             job.copy(
@@ -62,8 +66,25 @@ class DownloadCoordinator(
 
     suspend fun remove(jobId: String) {
         workManager.cancelUniqueWork(workName(jobId))
+        deleteFilesForJobs(listOf(jobId))
         downloadPageDao.deletePagesForJob(jobId)
         downloadDao.deleteDownload(jobId)
+    }
+
+    suspend fun removeMedia(mediaId: Int) {
+        val jobs = downloadDao.downloadsForMedia(mediaId)
+        jobs.forEach { workManager.cancelUniqueWork(workName(it.id)) }
+        deleteFilesForMedia(mediaId)
+        downloadPageDao.deletePagesForMedia(mediaId)
+        downloadDao.deleteDownloadsForMedia(mediaId)
+    }
+
+    suspend fun removeAll() {
+        val jobs = downloadDao.allDownloads()
+        jobs.forEach { workManager.cancelUniqueWork(workName(it.id)) }
+        deleteAllFiles()
+        downloadPageDao.deleteAllPages()
+        downloadDao.deleteAllDownloads()
     }
 
     private fun schedule(jobId: String) {

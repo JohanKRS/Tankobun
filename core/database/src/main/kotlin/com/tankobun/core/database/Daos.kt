@@ -194,6 +194,12 @@ interface DownloadDao {
     @Query("SELECT * FROM download_jobs WHERE id = :id")
     suspend fun getDownload(id: String): DownloadJobEntity?
 
+    @Query("SELECT * FROM download_jobs")
+    suspend fun allDownloads(): List<DownloadJobEntity>
+
+    @Query("SELECT * FROM download_jobs WHERE mediaId = :mediaId")
+    suspend fun downloadsForMedia(mediaId: Int): List<DownloadJobEntity>
+
     @Query("SELECT * FROM download_jobs WHERE mediaId = :mediaId AND chapterUrl = :chapterUrl ORDER BY updatedAtEpochMillis DESC LIMIT 1")
     suspend fun latestForChapter(mediaId: Int, chapterUrl: String): DownloadJobEntity?
 
@@ -211,18 +217,39 @@ interface DownloadDao {
 
     @Query("DELETE FROM download_jobs WHERE id = :id")
     suspend fun deleteDownload(id: String)
+
+    @Query("DELETE FROM download_jobs WHERE mediaId = :mediaId")
+    suspend fun deleteDownloadsForMedia(mediaId: Int)
+
+    @Query("DELETE FROM download_jobs")
+    suspend fun deleteAllDownloads()
 }
 
 @Dao
 interface DownloadPageDao {
+    @Query("SELECT * FROM download_pages")
+    suspend fun allPages(): List<DownloadPageEntity>
+
     @Query("SELECT * FROM download_pages WHERE mediaId = :mediaId AND chapterUrl = :chapterUrl ORDER BY pageIndex ASC")
     suspend fun pagesForChapter(mediaId: Int, chapterUrl: String): List<DownloadPageEntity>
+
+    @Query("SELECT * FROM download_pages WHERE jobId = :jobId ORDER BY pageIndex ASC")
+    suspend fun pagesForJob(jobId: String): List<DownloadPageEntity>
+
+    @Query("SELECT * FROM download_pages WHERE mediaId = :mediaId ORDER BY chapterUrl ASC, pageIndex ASC")
+    suspend fun pagesForMedia(mediaId: Int): List<DownloadPageEntity>
 
     @Upsert
     suspend fun upsertPage(page: DownloadPageEntity)
 
     @Query("DELETE FROM download_pages WHERE jobId = :jobId")
     suspend fun deletePagesForJob(jobId: String)
+
+    @Query("DELETE FROM download_pages WHERE mediaId = :mediaId")
+    suspend fun deletePagesForMedia(mediaId: Int)
+
+    @Query("DELETE FROM download_pages")
+    suspend fun deleteAllPages()
 }
 
 @Dao

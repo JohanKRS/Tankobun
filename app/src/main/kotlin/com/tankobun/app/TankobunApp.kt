@@ -184,6 +184,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -194,6 +195,7 @@ private enum class SettingsRoute {
     LIBRARY,
     BROWSE,
     READER,
+    DOWNLOADS,
     ANILIST,
     SOURCES,
 }
@@ -203,6 +205,7 @@ private val SettingsDetailRoutes = listOf(
     SettingsRoute.LIBRARY,
     SettingsRoute.BROWSE,
     SettingsRoute.READER,
+    SettingsRoute.DOWNLOADS,
     SettingsRoute.ANILIST,
     SettingsRoute.SOURCES,
 )
@@ -214,6 +217,7 @@ private fun SettingsRoute.settingsTitle(): String =
         SettingsRoute.LIBRARY -> "Library"
         SettingsRoute.BROWSE -> "Browse"
         SettingsRoute.READER -> "Reader"
+        SettingsRoute.DOWNLOADS -> "Downloads"
         SettingsRoute.ANILIST -> "AniList"
         SettingsRoute.SOURCES -> "Sources"
     }
@@ -2749,22 +2753,68 @@ private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, 
             }
 
             item {
+                var downloadActionsOpen by remember { mutableStateOf(false) }
                 Text("Chapters", style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(8.dp))
                 if (state.selectedSourceManga == null) {
                     Text("Choose a source first.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        val readingActionChapter = state.primaryReadingActionChapter()
-                        if (readingActionChapter != null) {
-                            Button(onClick = { viewModel.openChapter(readingActionChapter) }) {
-                                Text(if (state.latestProgress == null) "Start reading" else "Resume")
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            val readingActionChapter = state.primaryReadingActionChapter()
+                            if (readingActionChapter != null) {
+                                Button(onClick = { viewModel.openChapter(readingActionChapter) }) {
+                                    Text(if (state.latestProgress == null) "Start reading" else "Resume")
+                                }
+                            }
+                            OutlinedButton(onClick = viewModel::loadChaptersForCurrentMatch) {
+                                Text(if (state.sourceChapters.isEmpty()) "Load chapters" else "Refresh chapters")
+                            }
+                            Spacer(Modifier.weight(1f))
+                            OutlinedButton(
+                                onClick = { downloadActionsOpen = true },
+                                enabled = state.sourceChapters.isNotEmpty(),
+                            ) {
+                                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Download")
                             }
                         }
-                        OutlinedButton(onClick = viewModel::loadChaptersForCurrentMatch) {
-                            Text(if (state.sourceChapters.isEmpty()) "Load chapters" else "Refresh chapters")
+                        if (state.selectingDownloadChapters) {
+                            ChapterManualDownloadBar(
+                                selectedCount = state.selectedDownloadChapterUrls.size,
+                                onDownloadSelected = viewModel::downloadSelectedChapters,
+                                onCancel = viewModel::cancelManualDownloadSelection,
+                            )
                         }
                     }
+                }
+                if (downloadActionsOpen) {
+                    ChapterDownloadActionsDialog(
+                        keepNextTenDownloads = state.keepNextTenDownloads,
+                        onDismiss = { downloadActionsOpen = false },
+                        onDownloadAll = {
+                            downloadActionsOpen = false
+                            viewModel.downloadAllChapters()
+                        },
+                        onDownloadUnread = {
+                            downloadActionsOpen = false
+                            viewModel.downloadUnreadChapters()
+                        },
+                        onDownloadNextTen = {
+                            downloadActionsOpen = false
+                            viewModel.downloadNextTenChapters()
+                        },
+                        onKeepNextTenChange = viewModel::setKeepNextTenDownloads,
+                        onSelectManually = {
+                            downloadActionsOpen = false
+                            viewModel.startManualDownloadSelection()
+                        },
+                    )
                 }
             }
 
@@ -2778,6 +2828,10 @@ private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, 
                         chapter = chapter,
                         viewModel = viewModel,
                         read = chapter.isReadBy(state.chapterProgress),
+                        download = state.downloadForChapter(chapter),
+                        selectingForDownload = state.selectingDownloadChapters,
+                        selectedForDownload = chapter.url in state.selectedDownloadChapterUrls,
+                        onToggleDownloadSelection = { viewModel.toggleDownloadChapterSelection(chapter) },
                     )
                 }
             }
@@ -2785,6 +2839,149 @@ private fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, 
 
         if (state.sourcePickerOpen) {
             SourcePickerDialog(state, viewModel, media)
+        }
+    }
+}
+
+@Composable
+private fun ChapterManualDownloadBar(
+    selectedCount: Int,
+    onDownloadSelected: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.70f),
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                "$selectedCount selected",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            TextButton(onClick = onCancel) {
+                Text("Cancel")
+            }
+            Button(
+                onClick = onDownloadSelected,
+                enabled = selectedCount > 0,
+            ) {
+                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Download")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChapterDownloadActionsDialog(
+    keepNextTenDownloads: Boolean,
+    onDismiss: () -> Unit,
+    onDownloadAll: () -> Unit,
+    onDownloadUnread: () -> Unit,
+    onDownloadNextTen: () -> Unit,
+    onKeepNextTenChange: (Boolean) -> Unit,
+    onSelectManually: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.widthIn(max = 440.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = LocalTankobunTokens.current.elevatedSurface,
+            tonalElevation = 3.dp,
+        ) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                DialogHeader(title = "Download Chapters", onDismiss = onDismiss)
+                ChapterDownloadActionRow(
+                    title = "All chapters",
+                    subtitle = "Queue every chapter from this source.",
+                    onClick = onDownloadAll,
+                )
+                ChapterDownloadActionRow(
+                    title = "Unread only",
+                    subtitle = "Skip chapters already marked as read.",
+                    onClick = onDownloadUnread,
+                )
+                ChapterDownloadActionRow(
+                    title = "Next 10",
+                    subtitle = "Queue the next unread chapters from your current progress.",
+                    onClick = onDownloadNextTen,
+                )
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onKeepNextTenChange(!keepNextTenDownloads) }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("Always keep next 10", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(
+                                "Automatically queue the next unread batch as you move through chapters.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = keepNextTenDownloads,
+                            onCheckedChange = onKeepNextTenChange,
+                        )
+                    }
+                }
+                ChapterDownloadActionRow(
+                    title = "Select manually",
+                    subtitle = "Choose chapters directly from the list.",
+                    onClick = onSelectManually,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChapterDownloadActionRow(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = Color.Transparent,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(onClick = onClick)
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -3678,14 +3875,25 @@ private fun TankobunUiState.nextReaderChapter(): SourceChapter? =
 private fun SourceChapter.isReadBy(progressByChapter: Map<String, ReadingProgress>): Boolean =
     progressByChapter[url]?.completed == true
 
+private fun TankobunUiState.downloadForChapter(chapter: SourceChapter): DownloadJob? {
+    val mediaId = selectedMedia?.id ?: return null
+    return downloads
+        .filter { it.mediaId == mediaId && it.sourceId == chapter.sourceId && it.chapterUrl == chapter.url }
+        .maxByOrNull { it.updatedAtEpochMillis }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChapterRow(
     chapter: SourceChapter,
     viewModel: MainViewModel,
     read: Boolean,
+    download: DownloadJob?,
+    selectingForDownload: Boolean,
+    selectedForDownload: Boolean,
+    onToggleDownloadSelection: () -> Unit,
 ) {
-    key(chapter.url, read) {
+    key(chapter.url, read, download?.state, download?.completedPages, download?.pageCount, selectingForDownload, selectedForDownload) {
         val dismissState = rememberSwipeToDismissBoxState(
             confirmValueChange = { value ->
                 when (value) {
@@ -3700,29 +3908,124 @@ private fun ChapterRow(
             },
             positionalThreshold = { distance -> distance * 0.32f },
         )
-        SwipeToDismissBox(
-            state = dismissState,
-            enableDismissFromStartToEnd = true,
-            enableDismissFromEndToStart = true,
-            backgroundContent = {},
-        ) {
+        @Composable
+        fun ChapterCard() {
             ElevatedCard(
-                onClick = { viewModel.openChapter(chapter) },
+                onClick = {
+                    if (selectingForDownload) {
+                        onToggleDownloadSelection()
+                    } else {
+                        viewModel.openChapter(chapter)
+                    }
+                },
                 modifier = Modifier.graphicsLayer {
                     alpha = if (read) 0.70f else 1f
                 },
             ) {
                 ListItem(
+                    leadingContent = if (selectingForDownload) {
+                        {
+                            Checkbox(
+                                checked = selectedForDownload,
+                                onCheckedChange = { onToggleDownloadSelection() },
+                            )
+                        }
+                    } else {
+                        null
+                    },
                     headlineContent = {
                         Text(chapter.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     },
                     trailingContent = {
-                        IconButton(onClick = { viewModel.enqueueDownload(chapter) }) {
-                            Icon(Icons.Default.Download, contentDescription = "Download")
-                        }
+                        ChapterDownloadIndicator(
+                            download = download,
+                            onDownload = { viewModel.enqueueDownload(chapter) },
+                            onResume = { download?.let { viewModel.resumeDownload(it.id) } },
+                            onRetry = { download?.let { viewModel.retryDownload(it.id) } },
+                        )
                     },
                 )
             }
+        }
+        if (selectingForDownload) {
+            ChapterCard()
+        } else {
+            SwipeToDismissBox(
+                state = dismissState,
+                enableDismissFromStartToEnd = true,
+                enableDismissFromEndToStart = true,
+                backgroundContent = {},
+            ) {
+                ChapterCard()
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChapterDownloadIndicator(
+    download: DownloadJob?,
+    onDownload: () -> Unit,
+    onResume: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    when {
+        download == null -> IconButton(onClick = onDownload) {
+            Icon(Icons.Default.Download, contentDescription = "Download")
+        }
+
+        download.state == DownloadState.COMPLETE -> Surface(
+            modifier = Modifier.size(40.dp),
+            shape = RoundedCornerShape(999.dp),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+            contentColor = MaterialTheme.colorScheme.primary,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = "Downloaded",
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+
+        download.state == DownloadState.QUEUED || download.state == DownloadState.RUNNING -> {
+            val progress = remember(download.completedPages, download.pageCount) {
+                if (download.pageCount > 0) {
+                    (download.completedPages.toFloat() / download.pageCount).coerceIn(0f, 1f)
+                } else {
+                    null
+                }
+            }
+            Box(
+                modifier = Modifier.size(40.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (progress == null) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
+                    )
+                } else {
+                    CircularProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
+                    )
+                }
+            }
+        }
+
+        download.state == DownloadState.PAUSED -> IconButton(onClick = onResume) {
+            Icon(Icons.Default.PlayArrow, contentDescription = "Resume download")
+        }
+
+        download.state == DownloadState.FAILED -> IconButton(onClick = onRetry) {
+            Icon(Icons.Default.Replay, contentDescription = "Retry download")
         }
     }
 }
@@ -4730,6 +5033,7 @@ private fun SettingsRouteIcon(route: SettingsRoute, selected: Boolean) {
             SettingsRoute.LIBRARY -> Icons.AutoMirrored.Filled.LibraryBooks
             SettingsRoute.BROWSE -> Icons.Default.Explore
             SettingsRoute.READER -> Icons.AutoMirrored.Filled.MenuBook
+            SettingsRoute.DOWNLOADS -> Icons.Default.Download
             SettingsRoute.ANILIST -> Icons.Default.Link
             SettingsRoute.SOURCES -> Icons.Default.Download
         },
@@ -4836,6 +5140,7 @@ private fun SettingsDetailContent(
                 )
             }
         }
+        SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(state, viewModel, modifier)
         SettingsRoute.ANILIST -> SettingsDetailPanel(
             title = "AniList",
             subtitle = "Manage sync and account connection.",
@@ -4884,6 +5189,183 @@ private fun SettingsDetailContent(
             }
         }
         SettingsRoute.SOURCES -> SourcesSettingsScreen(state, viewModel)
+    }
+}
+
+@Composable
+private fun DownloadsSettingsScreen(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    modifier: Modifier = Modifier,
+) {
+    var pendingDelete by remember { mutableStateOf<PendingDownloadDelete?>(null) }
+    SettingsDetailPanel(
+        title = "Downloads",
+        subtitle = "Review local chapter storage and remove downloaded manga.",
+        modifier = modifier,
+    ) {
+        val summary = state.downloadStorageSummary
+        ElevatedCard {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Local storage", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "${summary.items.size} manga / ${summary.items.sumOf { it.chapterCount }} chapters",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    summary.totalBytes.formatFileSize(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+
+        if (summary.items.isEmpty()) {
+            Text("No downloaded chapters yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "By manga",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                OutlinedButton(
+                    onClick = {
+                        pendingDelete = PendingDownloadDelete(
+                            mediaId = null,
+                            title = "All downloads",
+                            detail = summary.totalBytes.formatFileSize(),
+                        )
+                    },
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Delete all")
+                }
+            }
+            summary.items.forEach { item ->
+                val title = state.downloadedMediaTitle(item.mediaId)
+                DownloadStorageRow(
+                    title = title,
+                    item = item,
+                    onDelete = {
+                        pendingDelete = PendingDownloadDelete(
+                            mediaId = item.mediaId,
+                            title = title,
+                            detail = item.bytes.formatFileSize(),
+                        )
+                    },
+                )
+            }
+        }
+    }
+    pendingDelete?.let { target ->
+        DeleteDownloadsDialog(
+            target = target,
+            onDismiss = { pendingDelete = null },
+            onConfirm = {
+                if (target.mediaId == null) {
+                    viewModel.removeAllDownloads()
+                } else {
+                    viewModel.removeDownloadsForMedia(target.mediaId)
+                }
+                pendingDelete = null
+            },
+        )
+    }
+}
+
+private data class PendingDownloadDelete(
+    val mediaId: Int?,
+    val title: String,
+    val detail: String,
+)
+
+@Composable
+private fun DeleteDownloadsDialog(
+    target: PendingDownloadDelete,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.widthIn(max = 420.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = LocalTankobunTokens.current.elevatedSurface,
+            tonalElevation = 3.dp,
+        ) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text("Delete downloads?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    "${target.title} / ${target.detail}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel")
+                    }
+                    Button(onClick = onConfirm) {
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Delete")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadStorageRow(
+    title: String,
+    item: DownloadStorageItem,
+    onDelete: () -> Unit,
+) {
+    ElevatedCard {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    item.downloadStorageDetailLine(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                item.bytes.formatFileSize(),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete downloads for $title")
+            }
+        }
     }
 }
 
@@ -4959,10 +5441,43 @@ private fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
             add(readerGapLabel(state.readerPageGapLevel))
             if (state.readerFitWidth) add("Fit width")
         }.joinToString(" / ")
+        SettingsRoute.DOWNLOADS -> state.downloadStorageSummary.totalBytes.formatFileSize()
         SettingsRoute.ANILIST -> state.viewerName?.let { "Signed in as $it" }
             ?: if (state.clientConfigured) "Ready to connect" else "Client setup needed"
         SettingsRoute.SOURCES -> "${state.installedSources.size} active / ${state.allInstalledSources.size} installed"
     }
+
+private fun TankobunUiState.downloadedMediaTitle(mediaId: Int): String =
+    libraryItems.firstOrNull { it.media.id == mediaId }?.media?.title?.userPreferred
+        ?: library.firstOrNull { it.id == mediaId }?.title?.userPreferred
+        ?: selectedMedia?.takeIf { it.id == mediaId }?.title?.userPreferred
+        ?: "Manga $mediaId"
+
+private fun DownloadStorageItem.downloadStorageDetailLine(): String =
+    buildList {
+        add("$chapterCount ${if (chapterCount == 1) "chapter" else "chapters"}")
+        if (completedChapterCount > 0) {
+            add("$completedChapterCount complete")
+        }
+        if (activeChapterCount > 0) {
+            add("$activeChapterCount active")
+        }
+        if (pageCount > 0) {
+            add("$pageCount pages")
+        }
+    }.joinToString(" / ")
+
+private fun Long.formatFileSize(): String {
+    if (this < 1024L) return "$this B"
+    val units = listOf("KB", "MB", "GB", "TB")
+    var value = toDouble() / 1024.0
+    var unitIndex = 0
+    while (value >= 1024.0 && unitIndex < units.lastIndex) {
+        value /= 1024.0
+        unitIndex += 1
+    }
+    return "%.1f %s".format(Locale.US, value, units[unitIndex])
+}
 
 private fun MediaViewMode.mediaViewLabel(): String =
     when (supportedMediaViewMode()) {

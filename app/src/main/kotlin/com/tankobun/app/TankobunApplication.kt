@@ -81,6 +81,9 @@ class AppContainer(application: Application) {
         context = application,
         downloadDao = database.downloadDao(),
         downloadPageDao = database.downloadPageDao(),
+        deleteFilesForJobs = { jobIds -> deleteDownloadedFilesForJobs(jobIds) },
+        deleteFilesForMedia = { mediaId -> deleteDownloadedFilesForMedia(mediaId) },
+        deleteAllFiles = { deleteAllDownloadedFiles() },
     )
     private val downloadSemaphores = ConcurrentHashMap<Long, Semaphore>()
     private val downloadRateLimiters = ConcurrentHashMap<Long, RespectfulRateLimiter>()
@@ -164,8 +167,8 @@ class AppContainer(application: Application) {
     private suspend fun writeDownloadedPage(job: DownloadJob, page: ReaderPage, bytes: ByteArray): String =
         withContext(Dispatchers.IO) {
             val chapterDir = File(
-                application.filesDir,
-                "downloads/${job.mediaId}/${job.sourceId}/${stableFileKey(job.chapterUrl)}",
+                downloadsRoot(),
+                "${job.mediaId}/${job.sourceId}/${stableFileKey(job.chapterUrl)}",
             ).also { it.mkdirs() }
             val file = File(chapterDir, "${page.index.toString().padStart(4, '0')}.${pageFileExtension(page.imageUrl)}")
             val partial = File(chapterDir, "${file.name}.part")
@@ -182,6 +185,50 @@ class AppContainer(application: Application) {
             )
             filePath
         }
+
+    private suspend fun deleteDownloadedFilesForJobs(jobIds: List<String>) =
+        withContext(Dispatchers.IO) {
+            val paths = jobIds.flatMap { jobId ->
+                database.downloadPageDao().pagesForJob(jobId).map { it.filePath }
+            }
+            deleteDownloadedFiles(paths)
+        }
+
+    private suspend fun deleteDownloadedFilesForMedia(mediaId: Int) =
+        withContext(Dispatchers.IO) {
+            deleteDownloadedFiles(database.downloadPageDao().pagesForMedia(mediaId).map { it.filePath })
+        }
+
+    private suspend fun deleteAllDownloadedFiles() =
+        withContext(Dispatchers.IO) {
+            downloadsRoot().deleteRecursively()
+            downloadsRoot().mkdirs()
+        }
+
+    private fun deleteDownloadedFiles(paths: List<String>) {
+        val root = downloadsRoot().canonicalFile
+        val rootPath = root.path + File.separator
+        paths.forEach { path ->
+            val file = runCatching { File(path).canonicalFile }.getOrNull() ?: return@forEach
+            if (!file.path.startsWith(rootPath) || !file.exists()) return@forEach
+            file.delete()
+            deleteEmptyDownloadParents(file.parentFile, root)
+        }
+    }
+
+    private fun deleteEmptyDownloadParents(start: File?, root: File) {
+        var parent = start
+        while (parent != null && parent != root) {
+            val canonical = runCatching { parent.canonicalFile }.getOrNull() ?: return
+            if (!canonical.path.startsWith(root.path + File.separator)) return
+            if (canonical.list()?.isNotEmpty() == true) return
+            if (!canonical.delete()) return
+            parent = canonical.parentFile
+        }
+    }
+
+    private fun downloadsRoot(): File =
+        File(application.filesDir, "downloads").also { it.mkdirs() }
 
     private fun resolveInstalledSource(sourceId: Long): SourceDescriptor? {
         extensionScanner.installedExtensions().forEach { extension ->

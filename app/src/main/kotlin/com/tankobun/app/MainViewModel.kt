@@ -121,6 +121,10 @@ data class TankobunUiState(
     val readerPages: List<ReaderPage> = emptyList(),
     val currentPageIndex: Int = 0,
     val downloads: List<DownloadJob> = emptyList(),
+    val downloadStorageSummary: DownloadStorageSummary = DownloadStorageSummary(),
+    val keepNextTenDownloads: Boolean = false,
+    val selectingDownloadChapters: Boolean = false,
+    val selectedDownloadChapterUrls: Set<String> = emptySet(),
     val selectedSourceId: Long? = null,
     val readerMode: ReaderMode = ReaderMode.PAGED,
     val readerPageGapLevel: Int = 0,
@@ -160,6 +164,30 @@ data class RecentReadingProgress(
     val progress: ReadingProgress,
     val chapter: SourceChapter?,
 )
+
+data class DownloadStorageSummary(
+    val totalBytes: Long = 0L,
+    val items: List<DownloadStorageItem> = emptyList(),
+)
+
+data class DownloadStorageItem(
+    val mediaId: Int,
+    val bytes: Long,
+    val chapterCount: Int,
+    val completedChapterCount: Int,
+    val activeChapterCount: Int,
+    val pageCount: Int,
+)
+
+private data class BulkDownloadResult(
+    val queued: Int = 0,
+    val resumed: Int = 0,
+    val retried: Int = 0,
+    val skipped: Int = 0,
+) {
+    val changed: Int
+        get() = queued + resumed + retried
+}
 
 private data class VerifiedSourceMatches(
     val matches: List<SourceSearchResult>,
@@ -214,6 +242,7 @@ class MainViewModel(
             readerMode = container.settingsStore.readerMode(),
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
             readerFitWidth = container.settingsStore.readerFitWidth(),
+            keepNextTenDownloads = container.settingsStore.keepNextTenDownloads(),
         ),
     )
     val state: StateFlow<TankobunUiState> = _state
@@ -221,7 +250,14 @@ class MainViewModel(
     init {
         viewModelScope.launch {
             container.database.downloadDao().observeDownloads().collect { rows ->
-                _state.update { it.copy(downloads = rows.map { row -> row.toModel() }) }
+                val downloads = rows.map { row -> row.toModel() }
+                val storageSummary = buildDownloadStorageSummary(downloads)
+                _state.update {
+                    it.copy(
+                        downloads = downloads,
+                        downloadStorageSummary = storageSummary,
+                    )
+                }
             }
         }
         viewModelScope.launch {
@@ -942,6 +978,8 @@ class MainViewModel(
                 activeChapter = null,
                 readerPages = emptyList(),
                 currentPageIndex = 0,
+                selectingDownloadChapters = false,
+                selectedDownloadChapterUrls = emptySet(),
                 message = null,
             )
         }
@@ -963,6 +1001,8 @@ class MainViewModel(
                 activeChapter = null,
                 readerPages = emptyList(),
                 currentPageIndex = 0,
+                selectingDownloadChapters = false,
+                selectedDownloadChapterUrls = emptySet(),
             )
         }
     }
@@ -989,6 +1029,8 @@ class MainViewModel(
                 activeChapter = null,
                 readerPages = emptyList(),
                 currentPageIndex = 0,
+                selectingDownloadChapters = false,
+                selectedDownloadChapterUrls = emptySet(),
                 message = null,
             )
         }
@@ -2175,10 +2217,18 @@ class MainViewModel(
                         selectedSourceManga = detailedManga,
                         sourceChapters = chapters,
                         chapterProgress = chapterProgress,
+                        selectingDownloadChapters = false,
+                        selectedDownloadChapterUrls = emptySet(),
                         busy = false,
                         sourceMatchChapterCounts = it.sourceMatchChapterCounts + (sourceMatchKey(source.id, detailedManga.url) to chapters.size),
                         message = if (chapters.isEmpty()) "No chapters found" else "Loaded ${chapters.size} chapters",
                     )
+                }
+                if (_state.value.keepNextTenDownloads) {
+                    val result = ensureNextTenDownloads()
+                    if (result.changed > 0) {
+                        _state.update { it.copy(message = "Loaded ${chapters.size} chapters / queued ${result.changed} next chapters") }
+                    }
                 }
             }.onFailure { error ->
                 Log.w(TAG, "Chapter load failed for ${source.name}/${manga.title}", error)
@@ -2399,54 +2449,196 @@ class MainViewModel(
                 }
             }
             loadRecentReadingProgress()
+            if (_state.value.keepNextTenDownloads) {
+                ensureNextTenDownloads()
+            }
         }
     }
 
     fun enqueueDownload(chapter: SourceChapter) {
-        val media = _state.value.selectedMedia ?: return
-        val now = System.currentTimeMillis()
         viewModelScope.launch {
-            val existing = container.database.downloadDao().latestForChapter(media.id, chapter.url)?.toModel()
-            if (existing != null) {
-                when (existing.state) {
-                    DownloadState.QUEUED,
-                    DownloadState.RUNNING -> {
-                        _state.update { it.copy(message = "${chapter.name} is already queued") }
-                    }
-
-                    DownloadState.COMPLETE -> {
-                        _state.update { it.copy(message = "${chapter.name} is already downloaded") }
-                    }
-
-                    DownloadState.PAUSED -> {
-                        container.downloadCoordinator.resume(existing.id)
-                        _state.update { it.copy(message = "Resumed ${chapter.name}") }
-                    }
-
-                    DownloadState.FAILED -> {
-                        container.downloadCoordinator.retry(existing.id)
-                        _state.update { it.copy(message = "Retrying ${chapter.name}") }
+            val media = _state.value.selectedMedia ?: return@launch
+            val result = enqueueChapterDownloads(media.id, listOf(chapter))
+            val message = when {
+                result.queued > 0 -> "Queued ${chapter.name}"
+                result.resumed > 0 -> "Resumed ${chapter.name}"
+                result.retried > 0 -> "Retrying ${chapter.name}"
+                else -> {
+                    val existing = container.database.downloadDao().latestForChapter(media.id, chapter.url)?.toModel()
+                    when (existing?.state) {
+                        DownloadState.COMPLETE -> "${chapter.name} is already downloaded"
+                        DownloadState.QUEUED,
+                        DownloadState.RUNNING -> "${chapter.name} is already queued"
+                        else -> "${chapter.name} is already in downloads"
                     }
                 }
+            }
+            _state.update { it.copy(message = message) }
+        }
+    }
+
+    fun downloadAllChapters() {
+        val chapters = _state.value.sourceChapters
+        enqueueVisibleChapterDownloads(chapters, "all chapters")
+    }
+
+    fun downloadUnreadChapters() {
+        val snapshot = _state.value
+        val chapters = snapshot.sourceChapters.filterNot { snapshot.chapterProgress[it.url]?.completed == true }
+        enqueueVisibleChapterDownloads(chapters, "unread chapters")
+    }
+
+    fun downloadNextTenChapters() {
+        val chapters = nextTenDownloadCandidates(_state.value)
+        enqueueVisibleChapterDownloads(chapters, "next 10 chapters")
+    }
+
+    fun setKeepNextTenDownloads(enabled: Boolean) {
+        container.settingsStore.saveKeepNextTenDownloads(enabled)
+        _state.update { it.copy(keepNextTenDownloads = enabled) }
+        if (enabled) {
+            viewModelScope.launch {
+                val result = ensureNextTenDownloads()
+                _state.update {
+                    it.copy(
+                        message = if (result.changed > 0) {
+                            "Keeping next 10 ready: queued ${result.changed}"
+                        } else {
+                            "Next 10 are already ready"
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    fun startManualDownloadSelection() {
+        _state.update {
+            it.copy(
+                selectingDownloadChapters = true,
+                selectedDownloadChapterUrls = emptySet(),
+            )
+        }
+    }
+
+    fun cancelManualDownloadSelection() {
+        _state.update {
+            it.copy(
+                selectingDownloadChapters = false,
+                selectedDownloadChapterUrls = emptySet(),
+            )
+        }
+    }
+
+    fun toggleDownloadChapterSelection(chapter: SourceChapter) {
+        _state.update {
+            val selected = it.selectedDownloadChapterUrls
+            it.copy(
+                selectedDownloadChapterUrls = if (chapter.url in selected) {
+                    selected - chapter.url
+                } else {
+                    selected + chapter.url
+                },
+            )
+        }
+    }
+
+    fun downloadSelectedChapters() {
+        val snapshot = _state.value
+        val chapters = snapshot.sourceChapters.filter { it.url in snapshot.selectedDownloadChapterUrls }
+        enqueueVisibleChapterDownloads(chapters, "selected chapters") {
+            it.copy(
+                selectingDownloadChapters = false,
+                selectedDownloadChapterUrls = emptySet(),
+            )
+        }
+    }
+
+    private fun enqueueVisibleChapterDownloads(
+        chapters: List<SourceChapter>,
+        label: String,
+        stateAfterMessage: (TankobunUiState) -> TankobunUiState = { it },
+    ) {
+        viewModelScope.launch {
+            val media = _state.value.selectedMedia ?: return@launch
+            val distinctChapters = chapters.distinctBy { "${it.sourceId}:${it.url}" }
+            if (distinctChapters.isEmpty()) {
+                _state.update { stateAfterMessage(it).copy(message = "No $label to download") }
                 return@launch
             }
-            val job = DownloadJob(
-                id = UUID.randomUUID().toString(),
-                mediaId = media.id,
-                sourceId = chapter.sourceId,
-                mangaUrl = chapter.mangaUrl,
-                chapterUrl = chapter.url,
-                chapterName = chapter.name,
-                state = DownloadState.QUEUED,
-                pageCount = 0,
-                completedPages = 0,
-                retryCount = 0,
-                createdAtEpochMillis = now,
-                updatedAtEpochMillis = now,
-            )
-            container.downloadCoordinator.enqueue(job)
-            _state.update { it.copy(message = "Queued ${chapter.name}") }
+            val result = enqueueChapterDownloads(media.id, distinctChapters)
+            _state.update {
+                stateAfterMessage(it).copy(
+                    message = bulkDownloadMessage(label, result),
+                )
+            }
         }
+    }
+
+    private suspend fun ensureNextTenDownloads(): BulkDownloadResult {
+        val snapshot = _state.value
+        val media = snapshot.selectedMedia ?: return BulkDownloadResult()
+        return enqueueChapterDownloads(media.id, nextTenDownloadCandidates(snapshot), retryFailed = false)
+    }
+
+    private suspend fun enqueueChapterDownloads(
+        mediaId: Int,
+        chapters: List<SourceChapter>,
+        retryFailed: Boolean = true,
+    ): BulkDownloadResult {
+        var queued = 0
+        var resumed = 0
+        var retried = 0
+        var skipped = 0
+        chapters.distinctBy { "${it.sourceId}:${it.url}" }.forEach { chapter ->
+            val existing = container.database.downloadDao().latestForChapter(mediaId, chapter.url)?.toModel()
+            when (existing?.state) {
+                DownloadState.QUEUED,
+                DownloadState.RUNNING,
+                DownloadState.COMPLETE -> skipped += 1
+
+                DownloadState.PAUSED -> {
+                    container.downloadCoordinator.resume(existing.id)
+                    resumed += 1
+                }
+
+                DownloadState.FAILED -> {
+                    if (retryFailed) {
+                        container.downloadCoordinator.retry(existing.id)
+                        retried += 1
+                    } else {
+                        skipped += 1
+                    }
+                }
+
+                null -> {
+                    val now = System.currentTimeMillis()
+                    container.downloadCoordinator.enqueue(
+                        DownloadJob(
+                            id = UUID.randomUUID().toString(),
+                            mediaId = mediaId,
+                            sourceId = chapter.sourceId,
+                            mangaUrl = chapter.mangaUrl,
+                            chapterUrl = chapter.url,
+                            chapterName = chapter.name,
+                            state = DownloadState.QUEUED,
+                            pageCount = 0,
+                            completedPages = 0,
+                            retryCount = 0,
+                            createdAtEpochMillis = now,
+                            updatedAtEpochMillis = now,
+                        ),
+                    )
+                    queued += 1
+                }
+            }
+        }
+        return BulkDownloadResult(
+            queued = queued,
+            resumed = resumed,
+            retried = retried,
+            skipped = skipped,
+        )
     }
 
     fun pauseDownload(jobId: String) {
@@ -2473,7 +2665,25 @@ class MainViewModel(
     fun removeDownload(jobId: String) {
         viewModelScope.launch {
             container.downloadCoordinator.remove(jobId)
+            refreshDownloadState()
             _state.update { it.copy(message = "Removed download") }
+        }
+    }
+
+    fun removeDownloadsForMedia(mediaId: Int) {
+        viewModelScope.launch {
+            val title = _state.value.mediaTitle(mediaId)
+            container.downloadCoordinator.removeMedia(mediaId)
+            refreshDownloadState()
+            _state.update { it.copy(message = "Removed downloads for $title") }
+        }
+    }
+
+    fun removeAllDownloads() {
+        viewModelScope.launch {
+            container.downloadCoordinator.removeAll()
+            refreshDownloadState()
+            _state.update { it.copy(message = "Removed all downloads") }
         }
     }
 
@@ -2507,6 +2717,59 @@ class MainViewModel(
         }
     }
 
+    private suspend fun refreshDownloadState() {
+        val downloads = container.database.downloadDao().allDownloads().map { it.toModel() }
+        val storageSummary = buildDownloadStorageSummary(downloads)
+        _state.update {
+            it.copy(
+                downloads = downloads,
+                downloadStorageSummary = storageSummary,
+            )
+        }
+    }
+
+    private suspend fun buildDownloadStorageSummary(downloads: List<DownloadJob>): DownloadStorageSummary =
+        withContext(Dispatchers.IO) {
+            val pages = container.database.downloadPageDao().allPages()
+            val bytesByMedia = mutableMapOf<Int, Long>()
+            val pageCountByMedia = mutableMapOf<Int, Int>()
+            pages.forEach { page ->
+                val file = File(page.filePath)
+                val bytes = if (file.exists()) file.length().coerceAtLeast(0L) else 0L
+                bytesByMedia[page.mediaId] = bytesByMedia.getOrDefault(page.mediaId, 0L) + bytes
+                pageCountByMedia[page.mediaId] = pageCountByMedia.getOrDefault(page.mediaId, 0) + 1
+            }
+            val jobsByMedia = downloads.groupBy { it.mediaId }
+            val mediaIds = (bytesByMedia.keys + jobsByMedia.keys).toSet()
+            val items = mediaIds
+                .map { mediaId ->
+                    val jobs = jobsByMedia[mediaId].orEmpty()
+                    val chapterUrls = jobs.map { it.chapterUrl }.distinct()
+                    DownloadStorageItem(
+                        mediaId = mediaId,
+                        bytes = bytesByMedia.getOrDefault(mediaId, 0L),
+                        chapterCount = chapterUrls.size,
+                        completedChapterCount = jobs
+                            .filter { it.state == DownloadState.COMPLETE }
+                            .map { it.chapterUrl }
+                            .distinct()
+                            .size,
+                        activeChapterCount = jobs
+                            .filter { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING || it.state == DownloadState.PAUSED }
+                            .map { it.chapterUrl }
+                            .distinct()
+                            .size,
+                        pageCount = pageCountByMedia.getOrDefault(mediaId, 0),
+                    )
+                }
+                .filter { it.bytes > 0L || it.chapterCount > 0 }
+                .sortedWith(compareByDescending<DownloadStorageItem> { it.bytes }.thenBy { it.mediaId })
+            DownloadStorageSummary(
+                totalBytes = items.sumOf { it.bytes },
+                items = items,
+            )
+        }
+
     private fun saveReaderProgress() {
         val media = _state.value.selectedMedia ?: return
         val chapter = _state.value.activeChapter ?: return
@@ -2533,6 +2796,9 @@ class MainViewModel(
                 }
             }
             loadRecentReadingProgress()
+            if (_state.value.keepNextTenDownloads) {
+                ensureNextTenDownloads()
+            }
             if (progress.completed && chapter.chapterNumber > 0) {
                 val mutation = syncMutationFactory.saveMediaListEntry(
                     mediaId = media.id,
@@ -2600,6 +2866,7 @@ private fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
     "$sourceId:$mangaUrl"
 
 private const val SOURCE_READABLE_MATCH_SCORE = 0.9
+private const val NEXT_DOWNLOAD_WINDOW_SIZE = 10
 private const val BROWSE_SORT_SEARCH_MATCH = "SEARCH_MATCH"
 private const val BROWSE_TRENDING_CACHE_KEY = "browse:section:trending"
 private const val BROWSE_POPULAR_CACHE_KEY = "browse:section:popular"
@@ -2683,6 +2950,53 @@ private fun Double?.formatTrackingScore(format: AnilistScoreFormat): String {
         AnilistScoreFormat.POINT_5,
         AnilistScoreFormat.POINT_3 -> value.roundToInt().toString()
     }
+}
+
+private fun TankobunUiState.mediaTitle(mediaId: Int): String =
+    libraryItems.firstOrNull { it.media.id == mediaId }?.media?.title?.userPreferred
+        ?: library.firstOrNull { it.id == mediaId }?.title?.userPreferred
+        ?: selectedMedia?.takeIf { it.id == mediaId }?.title?.userPreferred
+        ?: "Manga $mediaId"
+
+private fun nextTenDownloadCandidates(state: TankobunUiState): List<SourceChapter> {
+    val chapters = state.sourceChapters.readingOrder()
+    if (chapters.isEmpty()) return emptyList()
+    val progress = state.latestProgress
+    val startIndex = if (progress == null) {
+        0
+    } else {
+        val exactIndex = chapters.indexOfFirst { it.url == progress.chapterUrl }
+        when {
+            exactIndex >= 0 && progress.completed -> exactIndex + 1
+            exactIndex >= 0 -> exactIndex
+            progress.chapterNumber > 0f -> chapters.indexOfFirst { it.chapterNumber >= progress.chapterNumber }
+                .takeIf { it >= 0 } ?: 0
+            else -> 0
+        }
+    }.coerceIn(0, chapters.size)
+
+    return chapters
+        .drop(startIndex)
+        .filterNot { state.chapterProgress[it.url]?.completed == true }
+        .take(NEXT_DOWNLOAD_WINDOW_SIZE)
+}
+
+private fun List<SourceChapter>.readingOrder(): List<SourceChapter> =
+    if (any { it.chapterNumber > 0f }) {
+        sortedWith(compareBy<SourceChapter> { it.chapterNumber.takeIf { number -> number > 0f } ?: Float.MAX_VALUE }
+            .thenBy { it.name })
+    } else {
+        asReversed()
+    }
+
+private fun bulkDownloadMessage(label: String, result: BulkDownloadResult): String {
+    if (result.changed == 0) return "No new $label to download"
+    val parts = buildList {
+        if (result.queued > 0) add("queued ${result.queued}")
+        if (result.resumed > 0) add("resumed ${result.resumed}")
+        if (result.retried > 0) add("retrying ${result.retried}")
+    }
+    return "${parts.joinToString(" / ")} $label"
 }
 
 private fun List<AnilistRecommendation>.recommendationPageCount(): Int =

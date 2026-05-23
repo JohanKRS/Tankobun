@@ -106,6 +106,13 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean(KEY_READER_FIT_WIDTH, enabled).apply()
     }
 
+    fun keepNextTenDownloads(): Boolean =
+        preferences.getBoolean(KEY_KEEP_NEXT_TEN_DOWNLOADS, false)
+
+    fun saveKeepNextTenDownloads(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_KEEP_NEXT_TEN_DOWNLOADS, enabled).apply()
+    }
+
     fun anilistTags(): List<AnilistMediaTag> =
         preferences.getString(KEY_ANILIST_TAGS, "").orEmpty()
             .lineSequence()
@@ -222,6 +229,7 @@ class SettingsStore(context: Context) {
         const val KEY_READER_MODE = "reader.mode"
         const val KEY_READER_PAGE_GAP_LEVEL = "reader.page.gap.level"
         const val KEY_READER_FIT_WIDTH = "reader.fit.width"
+        const val KEY_KEEP_NEXT_TEN_DOWNLOADS = "downloads.keep.next.ten"
         const val KEY_ANILIST_TAGS = "anilist.tags"
         const val KEY_ANILIST_TAGS_CACHED_AT = "anilist.tags.cached.at"
         const val KEY_SOURCE_LANGUAGES = "source.languages"
