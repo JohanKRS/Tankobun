@@ -146,10 +146,10 @@ fun SourceChapterEntity.toModel(): SourceChapter =
     )
 
 fun ReadingProgress.toEntity(): ReadingProgressEntity =
-    ReadingProgressEntity(mediaId, chapterUrl, chapterNumber, pageIndex, totalPages, readerMode, completed, updatedAtEpochMillis)
+    ReadingProgressEntity(mediaId, chapterUrl, chapterNumber, pageIndex, pageScrollOffset, totalPages, readerMode, completed, updatedAtEpochMillis)
 
 fun ReadingProgressEntity.toModel(): ReadingProgress =
-    ReadingProgress(mediaId, chapterUrl, chapterNumber, pageIndex, totalPages, readerMode, completed, updatedAtEpochMillis)
+    ReadingProgress(mediaId, chapterUrl, chapterNumber, pageIndex, pageScrollOffset, totalPages, readerMode, completed, updatedAtEpochMillis)
 
 fun DownloadJob.toEntity(): DownloadJobEntity =
     DownloadJobEntity(id, mediaId, sourceId, mangaUrl, chapterUrl, chapterName, state, pageCount, completedPages, retryCount, createdAtEpochMillis, updatedAtEpochMillis)

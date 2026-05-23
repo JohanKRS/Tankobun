@@ -120,7 +120,7 @@ class AppContainer(application: Application) {
         }
         semaphore.withPermit {
             DownloadTaskRunner(
-                pageFetcher = sourcePageFetcher(source, chapter),
+                pageFetcher = sourcePageFetcher(source, chapter, job),
                 pageStorage = filePageStorage(),
                 stateStore = RoomDownloadStateStore(database.downloadDao()),
                 sourceRateLimiter = limiter,
@@ -132,13 +132,14 @@ class AppContainer(application: Application) {
     private fun sourcePageFetcher(
         source: SourceDescriptor,
         chapter: SourceChapter,
+        downloadJob: DownloadJob,
     ): DownloadPageFetcher =
         object : DownloadPageFetcher {
             override suspend fun pages(job: DownloadJob): List<ReaderPage> =
                 sourceHost.pages(source, chapter)
 
             override suspend fun bytes(page: ReaderPage): ByteArray =
-                downloadPageBytes(page)
+                downloadPageBytes(downloadJob, chapter, page)
         }
 
     private fun filePageStorage(): DownloadPageStorage =
@@ -147,8 +148,15 @@ class AppContainer(application: Application) {
                 writeDownloadedPage(job, page, bytes)
         }
 
-    private suspend fun downloadPageBytes(page: ReaderPage): ByteArray =
+    private suspend fun downloadPageBytes(
+        job: DownloadJob,
+        chapter: SourceChapter,
+        page: ReaderPage,
+    ): ByteArray =
         withContext(Dispatchers.IO) {
+            ReaderPageCache.cachedBytes(application, job.mediaId, chapter, page)?.let { bytes ->
+                return@withContext bytes
+            }
             val request = Request.Builder()
                 .url(page.imageUrl)
                 .apply {
@@ -161,7 +169,9 @@ class AppContainer(application: Application) {
                 if (!response.isSuccessful) {
                     error("Page ${page.index + 1} failed: HTTP ${response.code}")
                 }
-                response.body.bytes()
+                response.body.bytes().also { bytes ->
+                    ReaderPageCache.writePage(application, job.mediaId, chapter, page, bytes)
+                }
             }
         }
 

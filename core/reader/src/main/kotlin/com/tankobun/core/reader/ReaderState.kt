@@ -11,6 +11,7 @@ data class ReaderSession(
     val pages: List<ReaderPage>,
     val mode: ReaderMode,
     val currentPageIndex: Int,
+    val currentPageScrollOffset: Int = 0,
 ) {
     val canGoForward: Boolean get() = currentPageIndex < pages.lastIndex
     val canGoBack: Boolean get() = currentPageIndex > 0
@@ -34,6 +35,7 @@ class ReaderProgressCalculator {
             chapterUrl = session.chapter.url,
             chapterNumber = session.chapter.chapterNumber,
             pageIndex = session.currentPageIndex,
+            pageScrollOffset = session.currentPageScrollOffset.coerceAtLeast(0),
             totalPages = session.pages.size,
             readerMode = session.mode,
             completed = completed,

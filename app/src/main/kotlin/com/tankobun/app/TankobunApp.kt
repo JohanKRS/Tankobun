@@ -967,7 +967,7 @@ private fun QuickDrawer(
                             }
                         } else {
                             Text(
-                                "Start reading a manga from your Reading list to create resume points.",
+                                "Start reading any manga to create resume points.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1465,6 +1465,8 @@ private data class BrowseOption(
 )
 
 private const val BROWSE_SORT_SEARCH_MATCH_UI = "SEARCH_MATCH"
+private const val WEBTOON_RESTORE_MAX_ATTEMPTS = 18
+private const val WEBTOON_RESTORE_RETRY_DELAY_MILLIS = 80L
 
 private val BrowseGenres = listOf(
     "Action",
@@ -3874,15 +3876,34 @@ private fun CoverImage(
 }
 
 private fun TankobunUiState.primaryReadingActionChapter(): SourceChapter? =
-    latestProgress
-        ?.let { progress -> sourceChapters.firstOrNull { it.url == progress.chapterUrl } }
-        ?: sourceChapters
-            .filter { it.chapterNumber > 0f }
-            .minByOrNull { it.chapterNumber }
-        ?: sourceChapters.lastOrNull()
+    latestProgress?.let { progress ->
+        val exactChapter = sourceChapters.firstOrNull { it.url == progress.chapterUrl }
+        if (exactChapter != null) exactChapter else {
+            sourceChapters.chapterNearProgress(progress)
+        }
+    } ?: sourceChapters.firstInReadingOrder()
 
 private fun TankobunUiState.nextReaderChapter(): SourceChapter? =
     sourceChapters.nextInReadingOrderAfter(activeChapter ?: return null)
+
+private fun List<SourceChapter>.chapterNearProgress(progress: ReadingProgress): SourceChapter? {
+    val chapterNumber = progress.chapterNumber
+    if (chapterNumber > 0f) {
+        val nextChapter = if (progress.completed) {
+            filter { it.chapterNumber > chapterNumber }.minByOrNull { it.chapterNumber }
+        } else {
+            filter { it.chapterNumber >= chapterNumber }.minByOrNull { it.chapterNumber }
+        }
+        if (nextChapter != null) return nextChapter
+        return minByOrNull { abs((it.chapterNumber.takeIf { number -> number > 0f } ?: chapterNumber) - chapterNumber) }
+    }
+    return firstInReadingOrder()
+}
+
+private fun List<SourceChapter>.firstInReadingOrder(): SourceChapter? =
+    filter { it.chapterNumber > 0f }
+        .minByOrNull { it.chapterNumber }
+        ?: lastOrNull()
 
 private fun SourceChapter.isReadBy(progressByChapter: Map<String, ReadingProgress>): Boolean =
     progressByChapter[url]?.completed == true
@@ -4093,6 +4114,7 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     var scrubberSeeking by remember(chapter.url) { mutableStateOf(false) }
     var webtoonInitialScrollDoneFor by remember { mutableStateOf<String?>(null) }
     var preserveWebtoonScrollOnChapterChange by remember { mutableStateOf(false) }
+    var suppressWebtoonPositionUpdates by remember { mutableStateOf(false) }
     val displayedPageIndex = scrubberValue.roundToInt().coerceIn(0, lastPageIndex)
     fun cancelFling() {
         flingJob?.cancel()
@@ -4252,24 +4274,44 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     LaunchedEffect(
         chapter.url,
         state.readerMode,
+        currentWebtoonStartIndex,
     ) {
-        if (state.readerMode == ReaderMode.WEBTOON && state.currentPageIndex > 0) {
+        if (state.readerMode == ReaderMode.WEBTOON) {
             if (preserveWebtoonScrollOnChapterChange) {
                 preserveWebtoonScrollOnChapterChange = false
                 webtoonInitialScrollDoneFor = chapter.url
-            } else if (webtoonInitialScrollDoneFor != chapter.url) {
-                webtoonInitialScrollDoneFor = chapter.url
-                webtoonListState.scrollToItem(currentWebtoonStartIndex + state.currentPageIndex.coerceIn(0, lastPageIndex))
-            }
-        } else if (state.readerMode == ReaderMode.WEBTOON) {
-            if (preserveWebtoonScrollOnChapterChange) {
-                preserveWebtoonScrollOnChapterChange = false
-                webtoonInitialScrollDoneFor = chapter.url
-            } else if (webtoonInitialScrollDoneFor != chapter.url) {
-                webtoonInitialScrollDoneFor = chapter.url
-                if (currentWebtoonStartIndex > 0) {
-                    webtoonListState.scrollToItem(currentWebtoonStartIndex)
+                suppressWebtoonPositionUpdates = false
+            } else {
+                val targetIndex = currentWebtoonStartIndex + state.currentPageIndex.coerceIn(0, lastPageIndex)
+                val targetScrollOffset = state.currentPageScrollOffset.coerceAtLeast(0)
+                suppressWebtoonPositionUpdates = true
+                webtoonInitialScrollDoneFor = null
+                webtoonListState.scrollToItem(targetIndex, 0)
+                var restored = false
+                var attempts = 0
+                while (!restored && attempts < WEBTOON_RESTORE_MAX_ATTEMPTS) {
+                    withFrameNanos { }
+                    val targetItemInfo = webtoonListState.layoutInfo.visibleItemsInfo
+                        .firstOrNull { it.index == targetIndex }
+                    when {
+                        targetItemInfo == null -> webtoonListState.scrollToItem(targetIndex, 0)
+                        targetItemInfo.size > 0 -> {
+                            webtoonListState.scrollToItem(
+                                index = targetIndex,
+                                scrollOffset = targetScrollOffset.coerceAtMost((targetItemInfo.size - 1).coerceAtLeast(0)),
+                            )
+                            restored = true
+                        }
+                    }
+                    attempts += 1
+                    if (!restored) delay(WEBTOON_RESTORE_RETRY_DELAY_MILLIS)
                 }
+                if (!restored) {
+                    webtoonListState.scrollToItem(targetIndex, 0)
+                }
+                withFrameNanos { }
+                webtoonInitialScrollDoneFor = chapter.url
+                suppressWebtoonPositionUpdates = false
             }
         }
     }
@@ -4278,14 +4320,20 @@ private fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
         if (state.readerMode == ReaderMode.WEBTOON) {
             snapshotFlow {
                 webtoonPageItems.getOrNull(webtoonListState.firstVisibleItemIndex)
+                    ?.let { it to webtoonListState.firstVisibleItemScrollOffset }
             }
                 .distinctUntilChanged()
-                .collect { item ->
-                    if (item != null && !scrubberSeeking) {
+                .collect { visiblePage ->
+                    val (item, scrollOffset) = visiblePage ?: return@collect
+                    if (
+                        !scrubberSeeking &&
+                        !suppressWebtoonPositionUpdates &&
+                        webtoonInitialScrollDoneFor == chapter.url
+                    ) {
                         if (item.chapter.url != chapter.url) {
                             preserveWebtoonScrollOnChapterChange = true
                         }
-                        viewModel.setWebtoonReaderPosition(item.chapter.url, item.pageIndex)
+                        viewModel.setWebtoonReaderPosition(item.chapter.url, item.pageIndex, scrollOffset)
                     }
                 }
         }

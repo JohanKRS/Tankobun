@@ -165,6 +165,7 @@ data class ReadingProgress(
     val chapterUrl: String,
     val chapterNumber: Float,
     val pageIndex: Int,
+    val pageScrollOffset: Int,
     val totalPages: Int,
     val readerMode: ReaderMode,
     val completed: Boolean,

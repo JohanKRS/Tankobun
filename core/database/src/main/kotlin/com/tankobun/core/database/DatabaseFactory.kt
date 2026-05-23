@@ -12,7 +12,7 @@ object DatabaseFactory {
             TankobunDatabase::class.java,
             "tankobun.db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .build()
     }
 
@@ -84,6 +84,12 @@ object DatabaseFactory {
             )
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_download_pages_mediaId_chapterUrl` ON `download_pages` (`mediaId`, `chapterUrl`)")
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_download_pages_chapterUrl` ON `download_pages` (`chapterUrl`)")
+        }
+    }
+
+    private val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `reader_progress` ADD COLUMN `pageScrollOffset` INTEGER NOT NULL DEFAULT 0")
         }
     }
 }
