@@ -416,20 +416,10 @@ internal fun LibraryFilterBar(
                 selected = sort != LIBRARY_SORT_LIST_ORDER,
                 onClick = onOpenOptions,
             )
-            IconButton(
+            BrowseIconFilterPill(
+                contentDescription = "Library options",
                 onClick = onOpenOptions,
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(LocalTankobunTokens.current.elevatedSurface),
-            ) {
-                Icon(
-                    Icons.Default.Tune,
-                    contentDescription = "Library options",
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
+            )
             if (controlsActive) {
                 TextButton(onClick = onReset) {
                     Text("Reset")

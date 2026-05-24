@@ -487,20 +487,10 @@ internal fun BrowseFilterBar(
                 selected = state.browseSort != BROWSE_SORT_SEARCH_MATCH_UI,
                 onClick = onOpenAdvanced,
             )
-            IconButton(
+            BrowseIconFilterPill(
+                contentDescription = "Browse options",
                 onClick = onOpenAdvanced,
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(LocalTankobunTokens.current.elevatedSurface),
-            ) {
-                Icon(
-                    Icons.Default.Tune,
-                    contentDescription = "Browse options",
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
+            )
         }
     }
 }
@@ -523,6 +513,26 @@ internal fun BrowseFilterPill(
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+        },
+    )
+}
+
+@Composable
+internal fun BrowseIconFilterPill(
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    FilterChip(
+        selected = false,
+        onClick = onClick,
+        modifier = Modifier.heightIn(min = 32.dp),
+        colors = tankobunFilterChipColors(),
+        label = {
+            Icon(
+                Icons.Default.Tune,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(18.dp),
             )
         },
     )
