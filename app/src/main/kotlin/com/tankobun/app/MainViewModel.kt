@@ -1,8 +1,40 @@
 package com.tankobun.app
 
+import com.tankobun.app.backup.AniListBackupService
+import com.tankobun.app.backup.isDue
+import com.tankobun.app.logic.BROWSE_MANHWA_CACHE_KEY
+import com.tankobun.app.logic.BROWSE_POPULAR_CACHE_KEY
+import com.tankobun.app.logic.BROWSE_SORT_SEARCH_MATCH
+import com.tankobun.app.logic.BROWSE_TOP_MANGA_CACHE_KEY
+import com.tankobun.app.logic.BROWSE_TRENDING_CACHE_KEY
+import com.tankobun.app.logic.RECOMMENDATIONS_PAGE_SIZE
+import com.tankobun.app.logic.browseCacheKey
+import com.tankobun.app.logic.effectiveBrowseSort
+import com.tankobun.app.logic.filteredScoreInput
+import com.tankobun.app.logic.formatTrackingScore
+import com.tankobun.app.logic.hasBrowseFilters
+import com.tankobun.app.logic.hasBrowseQueryOrFilters
+import com.tankobun.app.logic.languageSortPriority
+import com.tankobun.app.logic.nextInReadingOrderAfter
+import com.tankobun.app.logic.nextTenDownloadCandidates
+import com.tankobun.app.logic.normalizedLanguage
+import com.tankobun.app.logic.normalizedCustomLists
+import com.tankobun.app.logic.preferredVisibleSources
+import com.tankobun.app.logic.previousInReadingOrderBefore
+import com.tankobun.app.logic.recommendationPageCount
+import com.tankobun.app.logic.sourceSettingsKey
+import com.tankobun.app.logic.toAniListScore
+import com.tankobun.app.logic.visibleSources
+import com.tankobun.app.state.DownloadStorageItem
+import com.tankobun.app.state.DownloadStorageSummary
+import com.tankobun.app.state.ExtensionInstallRequest
+import com.tankobun.app.state.LibraryItem
+import com.tankobun.app.state.ReaderChapterSegment
+import com.tankobun.app.state.RecentReadingProgress
+import com.tankobun.app.state.TankobunUiState
+
 import android.content.Intent
 import android.net.Uri
-import android.provider.DocumentsContract
 import android.util.Log
 import com.tankobun.core.anilist.AnilistGraphQlException
 import androidx.core.content.FileProvider
@@ -55,157 +87,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Request
 import org.json.JSONObject
-import org.w3c.dom.Element
-import org.w3c.dom.Node
 import java.io.File
-import java.io.InputStream
-import java.io.OutputStreamWriter
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import javax.xml.parsers.DocumentBuilderFactory
-import kotlin.math.roundToInt
-
-data class TankobunUiState(
-    val loggedIn: Boolean = false,
-    val clientConfigured: Boolean = false,
-    val themeMode: TankobunThemeMode = TankobunThemeMode.SYSTEM,
-    val ignoreDisplayCutout: Boolean = false,
-    val showAppStatusBar: Boolean = true,
-    val viewerName: String? = null,
-    val anilistScoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
-    val anilistCustomLists: List<String> = emptyList(),
-    val library: List<AnilistMedia> = emptyList(),
-    val libraryItems: List<LibraryItem> = emptyList(),
-    val librarySyncedAtEpochMillis: Long = 0L,
-    val backupFolderUri: String? = null,
-    val backupSchedule: BackupSchedule = BackupSchedule.OFF,
-    val lastScheduledBackupAtEpochMillis: Long = 0L,
-    val libraryViewMode: MediaViewMode = MediaViewMode.COVER_GRID,
-    val libraryCoverColumns: Int = DEFAULT_MEDIA_COVER_COLUMNS,
-    val libraryShowWholeCovers: Boolean = false,
-    val browseViewMode: MediaViewMode = MediaViewMode.COVER_GRID,
-    val browseCoverColumns: Int = DEFAULT_MEDIA_COVER_COLUMNS,
-    val browseShowWholeCovers: Boolean = false,
-    val searchQuery: String = "",
-    val searchResults: List<AnilistMedia> = emptyList(),
-    val browseSearched: Boolean = false,
-    val browseGenres: Set<String> = emptySet(),
-    val browseTags: Set<String> = emptySet(),
-    val browseAvailableTags: List<AnilistMediaTag> = emptyList(),
-    val browseFormat: String? = null,
-    val browsePublishingStatus: String? = null,
-    val browseCountryOfOrigin: String? = null,
-    val browseYear: Int? = null,
-    val browseSort: String = BROWSE_SORT_SEARCH_MATCH,
-    val browseTrending: List<AnilistMedia> = emptyList(),
-    val browsePopular: List<AnilistMedia> = emptyList(),
-    val browsePopularManhwa: List<AnilistMedia> = emptyList(),
-    val browseTopManga: List<AnilistMedia> = emptyList(),
-    val browseLandingLoaded: Boolean = false,
-    val selectedMedia: AnilistMedia? = null,
-    val selectedListEntry: AnilistListEntry? = null,
-    val selectedRecommendations: List<AnilistRecommendation> = emptyList(),
-    val selectedRecommendationsPage: Int = 0,
-    val selectedRecommendationsHasMore: Boolean = false,
-    val recommendationsLoading: Boolean = false,
-    val trackingStatus: MediaStatus = MediaStatus.PLANNING,
-    val trackingProgress: String = "0",
-    val trackingScore: String = "",
-    val trackingNotes: String = "",
-    val trackingPrivate: Boolean = false,
-    val trackingCustomLists: Set<String> = emptySet(),
-    val allInstalledSources: List<SourceDescriptor> = emptyList(),
-    val installedSources: List<SourceDescriptor> = emptyList(),
-    val sourceLanguages: Set<String> = defaultSourceLanguages(),
-    val disabledSourceKeys: Set<String> = emptySet(),
-    val extensionRepositoryUrl: String = "",
-    val availableExtensions: List<ExtensionIndexEntry> = emptyList(),
-    val installingExtensionPackageName: String? = null,
-    val extensionInstallRequest: ExtensionInstallRequest? = null,
-    val sourceMatches: List<SourceSearchResult> = emptyList(),
-    val sourceMatchChapterCounts: Map<String, Int> = emptyMap(),
-    val sourcePickerOpen: Boolean = false,
-    val sourcePickerLoading: Boolean = false,
-    val sourcePickerMessage: String? = null,
-    val sourcePickerDiagnostics: List<String> = emptyList(),
-    val selectedSourceManga: SourceManga? = null,
-    val sourceChapters: List<SourceChapter> = emptyList(),
-    val latestProgress: ReadingProgress? = null,
-    val chapterProgress: Map<String, ReadingProgress> = emptyMap(),
-    val recentReadingProgress: List<RecentReadingProgress> = emptyList(),
-    val activeChapter: SourceChapter? = null,
-    val readerPages: List<ReaderPage> = emptyList(),
-    val readerPreviousSegment: ReaderChapterSegment? = null,
-    val readerNextSegment: ReaderChapterSegment? = null,
-    val currentPageIndex: Int = 0,
-    val currentPageScrollOffset: Int = 0,
-    val downloads: List<DownloadJob> = emptyList(),
-    val downloadStorageSummary: DownloadStorageSummary = DownloadStorageSummary(),
-    val keepNextTenDownloads: Boolean = false,
-    val anilistAutoSaveTrackingChanges: Boolean = false,
-    val anilistAutoSyncReaderProgress: Boolean = true,
-    val anilistSyncManualReadProgress: Boolean = true,
-    val selectingDownloadChapters: Boolean = false,
-    val selectedDownloadChapterUrls: Set<String> = emptySet(),
-    val selectedSourceId: Long? = null,
-    val readerMode: ReaderMode = ReaderMode.PAGED,
-    val readerPageGapLevel: Int = 0,
-    val readerFitWidth: Boolean = false,
-    val busy: Boolean = false,
-    val message: String? = null,
-) {
-    val selectedSource: SourceDescriptor?
-        get() = installedSources.firstOrNull { it.id == selectedSourceId }
-            ?: allInstalledSources.firstOrNull { it.id == selectedSourceId }
-
-    val librarySections: List<LibrarySection>
-        get() = libraryItems.toLibrarySections()
-}
-
-data class ExtensionInstallRequest(
-    val packageName: String,
-    val name: String,
-    val apkUri: String,
-    val expectedVersionCode: Int,
-    val expectedVersionName: String,
-)
-
-data class LibraryItem(
-    val media: AnilistMedia,
-    val entry: AnilistListEntry,
-)
-
-data class LibrarySection(
-    val key: String,
-    val title: String,
-    val items: List<LibraryItem>,
-)
-
-data class RecentReadingProgress(
-    val media: AnilistMedia,
-    val progress: ReadingProgress,
-    val chapter: SourceChapter?,
-)
-
-data class ReaderChapterSegment(
-    val chapter: SourceChapter,
-    val pages: List<ReaderPage>,
-)
-
-data class DownloadStorageSummary(
-    val totalBytes: Long = 0L,
-    val items: List<DownloadStorageItem> = emptyList(),
-)
-
-data class DownloadStorageItem(
-    val mediaId: Int,
-    val bytes: Long,
-    val chapterCount: Int,
-    val completedChapterCount: Int,
-    val activeChapterCount: Int,
-    val pageCount: Int,
-)
 
 private data class BulkDownloadResult(
     val queued: Int = 0,
@@ -246,21 +131,6 @@ private enum class ReaderSegmentDirection {
     NEXT,
 }
 
-private data class BackupRestoreEntry(
-    val mediaId: Int?,
-    val idMal: Int?,
-    val status: MediaStatus,
-    val progress: Int?,
-    val score: Double?,
-    val notes: String?,
-    val private: Boolean?,
-    val customLists: List<String>,
-)
-
-private data class BackupRestoreResult(
-    val restored: Int,
-    val skipped: Int,
-)
 
 class MainViewModel(
     private val container: AppContainer,
@@ -269,6 +139,7 @@ class MainViewModel(
     private val syncMutationFactory = SyncMutationFactory()
     private val syncBackoff = SyncBackoff()
     private val cachePolicy = CachePolicy()
+    private val backupService = AniListBackupService(container)
     private var trackingAutoSaveJob: Job? = null
     private var pendingAniListSyncJob: Job? = null
     private var scheduledBackupJob: Job? = null
@@ -795,18 +666,12 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                val xml = buildMyAnimeListBackupXml(
+                backupService.saveBackup(
+                    uri = uri,
                     items = items,
                     viewerName = snapshot.viewerName,
                     scoreFormat = snapshot.anilistScoreFormat,
                 )
-                withContext(Dispatchers.IO) {
-                    val output = container.application.contentResolver.openOutputStream(uri)
-                        ?: error("Could not open backup file")
-                    OutputStreamWriter(output, Charsets.UTF_8).use { writer ->
-                        writer.write(xml)
-                    }
-                }
             }.onSuccess {
                 _state.update {
                     it.copy(
@@ -831,53 +696,18 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                val entries = withContext(Dispatchers.IO) {
-                    val input = container.application.contentResolver.openInputStream(uri)
-                        ?: error("Could not open backup file")
-                    input.use { stream ->
-                        parseMyAnimeListBackupXml(stream, _state.value.anilistScoreFormat)
-                    }
-                }
-                check(entries.isNotEmpty()) { "No manga found in backup" }
-
-                val customLists = ensureAniListCustomLists(
+                backupService.restoreBackup(
+                    uri = uri,
                     accessToken = token,
-                    requestedCustomLists = entries.flatMap { it.customLists },
+                    scoreFormat = _state.value.anilistScoreFormat,
+                    knownCustomLists = _state.value.anilistCustomLists,
                 )
-                var restored = 0
-                var skipped = 0
-                val now = System.currentTimeMillis()
-                entries.forEach { entry ->
-                    val media = entry.mediaId
-                        ?.let { mediaId -> container.anilistRepository.mangaById(mediaId) }
-                        ?: entry.idMal?.let { idMal -> container.anilistRepository.mangaByMalId(idMal) }
-                    if (media == null) {
-                        skipped += 1
-                    } else {
-                        val savedEntry = container.anilistRepository.saveListEntry(
-                            accessToken = token,
-                            mediaId = media.id,
-                            status = entry.status,
-                            progress = entry.progress,
-                            score = entry.score,
-                            notes = entry.notes,
-                            private = entry.private,
-                            customLists = entry.customLists,
-                            scoreFormat = _state.value.anilistScoreFormat,
-                        )
-                        container.database.mediaDao().upsertMedia(media.toEntity(now))
-                        container.database.listEntryDao().upsertEntry(savedEntry.toEntity(now))
-                        restored += 1
-                        delay(350L)
-                    }
-                }
-                BackupRestoreResult(restored = restored, skipped = skipped).also {
-                    container.settingsStore.saveAnilistCustomLists(customLists)
-                }
             }.onSuccess { result ->
+                container.settingsStore.saveAnilistCustomLists(result.customLists)
                 loadCachedLibrary()
                 _state.update {
                     it.copy(
+                        anilistCustomLists = result.customLists,
                         busy = false,
                         message = buildList {
                             add("Restored ${result.restored} manga")
@@ -950,7 +780,7 @@ class MainViewModel(
                 _state.update { it.copy(busy = true, message = null) }
             }
             runCatching {
-                writeScheduledAniListBackup(folderUri = folderUri, snapshot = snapshot)
+                backupService.writeScheduledBackup(folderUri = folderUri, snapshot = snapshot)
             }.onSuccess { count ->
                 container.settingsStore.saveLastScheduledBackupAtEpochMillis(now)
                 _state.update {
@@ -970,49 +800,6 @@ class MainViewModel(
                 }
             }
         }
-    }
-
-    private suspend fun writeScheduledAniListBackup(
-        folderUri: Uri,
-        snapshot: TankobunUiState,
-    ): Int = withContext(Dispatchers.IO) {
-        val fileUri = DocumentsContract.createDocument(
-            container.application.contentResolver,
-            folderUri,
-            "text/xml",
-            suggestedScheduledAniListBackupFileName(snapshot.viewerName),
-        ) ?: error("Could not create backup file")
-        val xml = buildMyAnimeListBackupXml(
-            items = snapshot.libraryItems,
-            viewerName = snapshot.viewerName,
-            scoreFormat = snapshot.anilistScoreFormat,
-        )
-        val output = container.application.contentResolver.openOutputStream(fileUri)
-            ?: error("Could not open backup file")
-        OutputStreamWriter(output, Charsets.UTF_8).use { writer ->
-            writer.write(xml)
-        }
-        snapshot.libraryItems.size
-    }
-
-    private suspend fun ensureAniListCustomLists(
-        accessToken: String,
-        requestedCustomLists: List<String>,
-    ): List<String> {
-        val knownCustomLists = _state.value.anilistCustomLists.normalizedCustomLists()
-        val missingCustomLists = requestedCustomLists.normalizedCustomLists().filterNot { selectedList ->
-            knownCustomLists.any { knownList -> knownList.equals(selectedList, ignoreCase = true) }
-        }
-        val nextKnownCustomLists = if (missingCustomLists.isEmpty()) {
-            knownCustomLists
-        } else {
-            container.anilistRepository.updateMangaCustomLists(
-                accessToken = accessToken,
-                customLists = (knownCustomLists + missingCustomLists).normalizedCustomLists(),
-            ).ifEmpty { (knownCustomLists + missingCustomLists).normalizedCustomLists() }
-        }
-        _state.update { it.copy(anilistCustomLists = nextKnownCustomLists) }
-        return nextKnownCustomLists
     }
 
     private fun processPendingAniListSync() {
@@ -3630,257 +3417,6 @@ private fun JSONObject.nullableStringList(name: String): List<String>? {
     }
 }
 
-internal fun buildMyAnimeListBackupXml(
-    items: List<LibraryItem>,
-    viewerName: String?,
-    scoreFormat: AnilistScoreFormat,
-): String {
-    val sortedItems = items.sortedWith(
-        compareBy<LibraryItem> { it.entry.status.malSortOrder() }
-            .thenBy { it.media.title.userPreferred.lowercase(Locale.ROOT) },
-    )
-    val counts = sortedItems
-        .groupingBy { it.entry.status.toMyAnimeListStatus() }
-        .eachCount()
-    return buildString {
-        appendLine("""<?xml version="1.0" encoding="UTF-8" ?>""")
-        appendLine()
-        appendLine("\t<!--")
-        appendLine("\t Created by Tankobun AniList backup")
-        appendLine("\t MyAnimeList-compatible manga XML for AniList import")
-        appendLine("\t AniList-only metadata is kept in XML comments where MAL has no matching field")
-        appendLine("\t-->")
-        appendLine()
-        appendLine("\t<myanimelist>")
-        appendLine()
-        appendLine("\t\t<myinfo>")
-        appendLine("\t\t\t<user_id>0</user_id>")
-        appendLine("\t\t\t<user_name>${viewerName.orEmpty().xmlEscaped()}</user_name>")
-        appendLine("\t\t\t<user_export_type>2</user_export_type>")
-        appendLine("\t\t\t<user_total_manga>${sortedItems.size}</user_total_manga>")
-        appendLine("\t\t\t<user_total_reading>${counts.getOrDefault("Reading", 0)}</user_total_reading>")
-        appendLine("\t\t\t<user_total_completed>${counts.getOrDefault("Completed", 0)}</user_total_completed>")
-        appendLine("\t\t\t<user_total_onhold>${counts.getOrDefault("On-Hold", 0)}</user_total_onhold>")
-        appendLine("\t\t\t<user_total_dropped>${counts.getOrDefault("Dropped", 0)}</user_total_dropped>")
-        appendLine("\t\t\t<user_total_plantoread>${counts.getOrDefault("Plan to Read", 0)}</user_total_plantoread>")
-        appendLine("\t\t</myinfo>")
-        appendLine()
-        sortedItems.forEach { item ->
-            appendLine()
-            appendLine("\t\t<!-- ${item.toAniListBackupComment()} -->")
-            appendLine("\t\t<manga>")
-            appendLine("\t\t\t<manga_mangadb_id>${item.media.idMal ?: 0}</manga_mangadb_id>")
-            appendLine("\t\t\t<manga_title>${item.media.title.userPreferred.cdata()}</manga_title>")
-            appendLine("\t\t\t<manga_volumes>${item.media.volumes ?: 0}</manga_volumes>")
-            appendLine("\t\t\t<manga_chapters>${item.media.chapters ?: 0}</manga_chapters>")
-            appendLine("\t\t\t<my_id>${item.entry.id}</my_id>")
-            appendLine("\t\t\t<my_read_volumes>${item.readVolumesForBackup()}</my_read_volumes>")
-            appendLine("\t\t\t<my_read_chapters>${item.entry.progress.coerceAtLeast(0)}</my_read_chapters>")
-            appendLine("\t\t\t<my_start_date>0000-00-00</my_start_date>")
-            appendLine("\t\t\t<my_finish_date>0000-00-00</my_finish_date>")
-            appendLine("\t\t\t<my_scanalation_group><![CDATA[]]></my_scanalation_group>")
-            appendLine("\t\t\t<my_score>${item.entry.score.toMyAnimeListScore(scoreFormat)}</my_score>")
-            appendLine("\t\t\t<my_storage></my_storage>")
-            appendLine("\t\t\t<my_retail_volumes>0</my_retail_volumes>")
-            appendLine("\t\t\t<my_status>${item.entry.status.toMyAnimeListStatus()}</my_status>")
-            appendLine("\t\t\t<my_comments>${item.entry.notes.orEmpty().cdata()}</my_comments>")
-            appendLine("\t\t\t<my_times_read>${if (item.entry.status == MediaStatus.REPEATING) 1 else 0}</my_times_read>")
-            appendLine("\t\t\t<my_tags>${item.entry.customLists.joinToString(", ").cdata()}</my_tags>")
-            appendLine("\t\t\t<my_priority>Low</my_priority>")
-            appendLine("\t\t\t<my_reread_value></my_reread_value>")
-            appendLine("\t\t\t<my_rereading>${if (item.entry.status == MediaStatus.REPEATING) "YES" else "NO"}</my_rereading>")
-            appendLine("\t\t\t<my_discuss>YES</my_discuss>")
-            appendLine("\t\t\t<my_sns>default</my_sns>")
-            appendLine("\t\t\t<update_on_import>1</update_on_import>")
-            appendLine("\t\t</manga>")
-        }
-        appendLine()
-        appendLine("\t</myanimelist>")
-    }
-}
-
-private fun suggestedScheduledAniListBackupFileName(viewerName: String?): String {
-    val userPart = viewerName
-        ?.trim()
-        ?.takeIf { it.isNotBlank() }
-        ?.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        ?: "user"
-    return "tankobun_anilist_backup_${userPart}_${System.currentTimeMillis()}.xml"
-}
-
-private fun parseMyAnimeListBackupXml(
-    input: InputStream,
-    scoreFormat: AnilistScoreFormat,
-): List<BackupRestoreEntry> {
-    val document = DocumentBuilderFactory.newInstance()
-        .apply {
-            isIgnoringComments = false
-            isXIncludeAware = false
-            isExpandEntityReferences = false
-            runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-            runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-            runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
-            runCatching { setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false) }
-        }
-        .newDocumentBuilder()
-        .parse(input)
-    val root = document.documentElement
-    val entries = mutableListOf<BackupRestoreEntry>()
-    var pendingAniListMediaId: Int? = null
-    var pendingPrivate: Boolean? = null
-    val children = root.childNodes
-    for (index in 0 until children.length) {
-        val node = children.item(index)
-        when (node.nodeType) {
-            Node.COMMENT_NODE -> {
-                val comment = node.nodeValue.orEmpty()
-                pendingAniListMediaId = Regex("""AniList media id:\s*(\d+)""")
-                    .find(comment)
-                    ?.groupValues
-                    ?.getOrNull(1)
-                    ?.toIntOrNull()
-                pendingPrivate = comment.contains("private: true", ignoreCase = true).takeIf { it }
-            }
-            Node.ELEMENT_NODE -> {
-                val element = node as? Element ?: continue
-                if (element.tagName != "manga") continue
-                val idMal = element.childText("manga_mangadb_id")?.toIntOrNull()?.takeIf { it > 0 }
-                val customLists = element.childText("my_tags")
-                    .orEmpty()
-                    .split(',')
-                    .normalizedCustomLists()
-                entries += BackupRestoreEntry(
-                    mediaId = pendingAniListMediaId,
-                    idMal = idMal,
-                    status = element.childText("my_status").toMediaStatusFromMyAnimeList(),
-                    progress = element.childText("my_read_chapters")?.toIntOrNull()?.coerceAtLeast(0),
-                    score = element.childText("my_score")
-                        ?.toIntOrNull()
-                        ?.toAniListScoreFromMyAnimeList(scoreFormat),
-                    notes = element.childText("my_comments")?.trim()?.ifBlank { null },
-                    private = pendingPrivate,
-                    customLists = customLists,
-                )
-                pendingAniListMediaId = null
-                pendingPrivate = null
-            }
-        }
-    }
-    return entries
-}
-
-private fun Element.childText(tagName: String): String? {
-    val nodes = getElementsByTagName(tagName)
-    if (nodes.length == 0) return null
-    return nodes.item(0)?.textContent?.trim()
-}
-
-private fun LibraryItem.toAniListBackupComment(): String =
-    buildList {
-        add("AniList media id: ${media.id}")
-        add("AniList list entry id: ${entry.id}")
-        media.siteUrl?.takeIf { it.isNotBlank() }?.let { add("AniList URL: $it") }
-        if (media.idMal == null) add("No MAL id; this entry may need manual matching on import")
-        if (entry.private) add("private: true")
-        if (entry.customLists.isNotEmpty()) add("custom lists: ${entry.customLists.joinToString(", ")}")
-        media.format?.takeIf { it.isNotBlank() }?.let { add("format: $it") }
-    }.joinToString("; ").xmlCommentEscaped()
-
-private fun LibraryItem.readVolumesForBackup(): Int {
-    val volumes = media.volumes ?: 0
-    return if (entry.status == MediaStatus.COMPLETED) volumes.coerceAtLeast(0) else 0
-}
-
-private fun MediaStatus.toMyAnimeListStatus(): String =
-    when (this) {
-        MediaStatus.CURRENT,
-        MediaStatus.REPEATING -> "Reading"
-        MediaStatus.PLANNING,
-        MediaStatus.UNKNOWN -> "Plan to Read"
-        MediaStatus.COMPLETED -> "Completed"
-        MediaStatus.DROPPED -> "Dropped"
-        MediaStatus.PAUSED -> "On-Hold"
-    }
-
-private fun String?.toMediaStatusFromMyAnimeList(): MediaStatus =
-    when (this?.trim()?.lowercase(Locale.ROOT)) {
-        "reading" -> MediaStatus.CURRENT
-        "completed" -> MediaStatus.COMPLETED
-        "on-hold", "on hold" -> MediaStatus.PAUSED
-        "dropped" -> MediaStatus.DROPPED
-        "plan to read", "plantoread" -> MediaStatus.PLANNING
-        else -> MediaStatus.PLANNING
-    }
-
-private fun MediaStatus.malSortOrder(): Int =
-    when (this) {
-        MediaStatus.CURRENT -> 0
-        MediaStatus.REPEATING -> 1
-        MediaStatus.COMPLETED -> 2
-        MediaStatus.PAUSED -> 3
-        MediaStatus.DROPPED -> 4
-        MediaStatus.PLANNING -> 5
-        MediaStatus.UNKNOWN -> 6
-    }
-
-private fun Int.toAniListScoreFromMyAnimeList(format: AnilistScoreFormat): Double? {
-    val value = takeIf { it > 0 }?.coerceIn(0, 10) ?: return null
-    return when (format) {
-        AnilistScoreFormat.POINT_100 -> (value * 10).toDouble()
-        AnilistScoreFormat.POINT_10_DECIMAL,
-        AnilistScoreFormat.POINT_10 -> value.toDouble()
-        AnilistScoreFormat.POINT_5 -> (value / 2.0).roundToInt().coerceIn(0, 5).toDouble()
-        AnilistScoreFormat.POINT_3 -> (value * 3.0 / 10.0).roundToInt().coerceIn(0, 3).toDouble()
-    }
-}
-
-private fun Double?.toMyAnimeListScore(format: AnilistScoreFormat): Int {
-    val value = this ?: return 0
-    val score = when (format) {
-        AnilistScoreFormat.POINT_100 -> value / 10.0
-        AnilistScoreFormat.POINT_10_DECIMAL,
-        AnilistScoreFormat.POINT_10 -> value
-        AnilistScoreFormat.POINT_5 -> value * 2.0
-        AnilistScoreFormat.POINT_3 -> value * (10.0 / 3.0)
-    }
-    return score.roundToInt().coerceIn(0, 10)
-}
-
-private fun String.cdata(): String =
-    "<![CDATA[${replace("]]>", "]]]]><![CDATA[>")}]]>"
-
-private fun String.xmlEscaped(): String =
-    replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
-        .replace("'", "&apos;")
-
-private fun String.xmlCommentEscaped(): String =
-    replace("--", "- -")
-        .replace("<", "(")
-        .replace(">", ")")
-
-internal fun List<SourceChapter>.nextInReadingOrderAfter(chapter: SourceChapter): SourceChapter? {
-    if (chapter.chapterNumber > 0f) {
-        return filter { it.chapterNumber > chapter.chapterNumber }
-            .minByOrNull { it.chapterNumber }
-    }
-
-    val currentIndex = indexOfFirst { it.sourceId == chapter.sourceId && it.url == chapter.url }
-    return if (currentIndex > 0) this[currentIndex - 1] else null
-}
-
-internal fun List<SourceChapter>.previousInReadingOrderBefore(chapter: SourceChapter): SourceChapter? {
-    if (chapter.chapterNumber > 0f) {
-        return filter { it.chapterNumber < chapter.chapterNumber }
-            .maxByOrNull { it.chapterNumber }
-    }
-
-    val currentIndex = indexOfFirst { it.sourceId == chapter.sourceId && it.url == chapter.url }
-    return if (currentIndex >= 0 && currentIndex < lastIndex) this[currentIndex + 1] else null
-}
-
 private fun TankobunUiState.readerSourceForChapter(chapter: SourceChapter): SourceDescriptor? =
     installedSources.firstOrNull { it.id == chapter.sourceId }
         ?: allInstalledSources.firstOrNull { it.id == chapter.sourceId }
@@ -3907,138 +3443,15 @@ private fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
 
 private const val SOURCE_READABLE_MATCH_SCORE = 0.9
 private const val NEXT_DOWNLOAD_WINDOW_SIZE = 10
-private const val BROWSE_SORT_SEARCH_MATCH = "SEARCH_MATCH"
-private const val BROWSE_TRENDING_CACHE_KEY = "browse:section:trending"
-private const val BROWSE_POPULAR_CACHE_KEY = "browse:section:popular"
-private const val BROWSE_MANHWA_CACHE_KEY = "browse:section:popular-manhwa"
-private const val BROWSE_TOP_MANGA_CACHE_KEY = "browse:section:top-100:v2"
-private const val RECOMMENDATIONS_PAGE_SIZE = 18
 
-private fun TankobunUiState.hasBrowseFilters(): Boolean =
-    browseGenres.isNotEmpty() ||
-        browseTags.isNotEmpty() ||
-        browseFormat != null ||
-        browsePublishingStatus != null ||
-        browseCountryOfOrigin != null ||
-        browseYear != null
 
-private fun TankobunUiState.hasBrowseQueryOrFilters(): Boolean =
-    searchQuery.trim().isNotBlank() ||
-        hasBrowseFilters() ||
-        browseSort != BROWSE_SORT_SEARCH_MATCH
 
-private fun TankobunUiState.effectiveBrowseSort(): String =
-    if (browseSort == BROWSE_SORT_SEARCH_MATCH && searchQuery.isBlank()) {
-        "TRENDING_DESC"
-    } else {
-        browseSort
-    }
-
-private fun TankobunUiState.browseCacheKey(): String = buildString {
-    append("browse:")
-    append("q=").append(searchQuery.normalizedSearchKey())
-    append("|genres=").append(browseGenres.sorted().joinToString(",") { it.normalizedSearchKey() })
-    append("|tags=").append(browseTags.sorted().joinToString(",") { it.normalizedSearchKey() })
-    append("|format=").append(browseFormat.orEmpty())
-    append("|status=").append(browsePublishingStatus.orEmpty())
-    append("|country=").append(browseCountryOfOrigin.orEmpty())
-    append("|year=").append(browseYear?.toString().orEmpty())
-    append("|sort=").append(effectiveBrowseSort())
-}
-
-private fun String.normalizedSearchKey(): String =
-    trim().lowercase(Locale.ROOT)
-
-private fun Iterable<String>.normalizedCustomLists(): List<String> =
-    map { it.trim() }
-        .filter { it.isNotBlank() }
-        .distinctBy { it.lowercase(Locale.ROOT) }
-
-private fun BackupSchedule.isDue(lastRunAt: Long, now: Long): Boolean {
-    if (this == BackupSchedule.OFF) return false
-    if (lastRunAt <= 0L) return true
-    return now - lastRunAt >= when (this) {
-        BackupSchedule.OFF -> Long.MAX_VALUE
-        BackupSchedule.DAILY -> 24L * 60L * 60L * 1_000L
-        BackupSchedule.WEEKLY -> 7L * 24L * 60L * 60L * 1_000L
-        BackupSchedule.MONTHLY -> 30L * 24L * 60L * 60L * 1_000L
-    }
-}
-
-private fun String.filteredScoreInput(format: AnilistScoreFormat): String {
-    val allowDecimal = format == AnilistScoreFormat.POINT_10_DECIMAL
-    var hasDecimal = false
-    return buildString {
-        this@filteredScoreInput.forEach { char ->
-            when {
-                char.isDigit() -> append(char)
-                allowDecimal && char == '.' && !hasDecimal -> {
-                    append(char)
-                    hasDecimal = true
-                }
-            }
-        }
-    }.take(if (allowDecimal) 4 else 3)
-}
-
-private fun String.toAniListScore(format: AnilistScoreFormat): Double? {
-    val value = trim().toDoubleOrNull() ?: return null
-    return when (format) {
-        AnilistScoreFormat.POINT_100 -> value.coerceIn(0.0, 100.0).roundToInt().toDouble()
-        AnilistScoreFormat.POINT_10_DECIMAL -> (value.coerceIn(0.0, 10.0) * 10).roundToInt() / 10.0
-        AnilistScoreFormat.POINT_10 -> value.coerceIn(0.0, 10.0).roundToInt().toDouble()
-        AnilistScoreFormat.POINT_5 -> value.coerceIn(0.0, 5.0).roundToInt().toDouble()
-        AnilistScoreFormat.POINT_3 -> value.coerceIn(0.0, 3.0).roundToInt().toDouble()
-    }
-}
-
-private fun Double?.formatTrackingScore(format: AnilistScoreFormat): String {
-    val value = this ?: return ""
-    return when (format) {
-        AnilistScoreFormat.POINT_10_DECIMAL -> "%.1f".format(Locale.US, value)
-        AnilistScoreFormat.POINT_100,
-        AnilistScoreFormat.POINT_10,
-        AnilistScoreFormat.POINT_5,
-        AnilistScoreFormat.POINT_3 -> value.roundToInt().toString()
-    }
-}
 
 private fun TankobunUiState.mediaTitle(mediaId: Int): String =
     libraryItems.firstOrNull { it.media.id == mediaId }?.media?.title?.userPreferred
         ?: library.firstOrNull { it.id == mediaId }?.title?.userPreferred
         ?: selectedMedia?.takeIf { it.id == mediaId }?.title?.userPreferred
         ?: "Manga $mediaId"
-
-private fun nextTenDownloadCandidates(state: TankobunUiState): List<SourceChapter> {
-    val chapters = state.sourceChapters.readingOrder()
-    if (chapters.isEmpty()) return emptyList()
-    val progress = state.latestProgress
-    val startIndex = if (progress == null) {
-        0
-    } else {
-        val exactIndex = chapters.indexOfFirst { it.url == progress.chapterUrl }
-        when {
-            exactIndex >= 0 && progress.completed -> exactIndex + 1
-            exactIndex >= 0 -> exactIndex
-            progress.chapterNumber > 0f -> chapters.indexOfFirst { it.chapterNumber >= progress.chapterNumber }
-                .takeIf { it >= 0 } ?: 0
-            else -> 0
-        }
-    }.coerceIn(0, chapters.size)
-
-    return chapters
-        .drop(startIndex)
-        .filterNot { state.chapterProgress[it.url]?.completed == true }
-        .take(NEXT_DOWNLOAD_WINDOW_SIZE)
-}
-
-private fun List<SourceChapter>.readingOrder(): List<SourceChapter> =
-    if (any { it.chapterNumber > 0f }) {
-        sortedWith(compareBy<SourceChapter> { it.chapterNumber.takeIf { number -> number > 0f } ?: Float.MAX_VALUE }
-            .thenBy { it.name })
-    } else {
-        asReversed()
-    }
 
 private fun bulkDownloadMessage(label: String, result: BulkDownloadResult): String {
     if (result.changed == 0) return "No new $label to download"
@@ -4049,67 +3462,3 @@ private fun bulkDownloadMessage(label: String, result: BulkDownloadResult): Stri
     }
     return "${parts.joinToString(" / ")} $label"
 }
-
-private fun List<AnilistRecommendation>.recommendationPageCount(): Int =
-    if (isEmpty()) 0 else ((size - 1) / RECOMMENDATIONS_PAGE_SIZE) + 1
-
-private fun List<LibraryItem>.toLibrarySections(): List<LibrarySection> {
-    val statusSections = listOf(
-        MediaStatus.CURRENT to "Reading",
-        MediaStatus.PLANNING to "Plan to Read",
-        MediaStatus.COMPLETED to "Completed",
-        MediaStatus.PAUSED to "Paused",
-        MediaStatus.DROPPED to "Dropped",
-        MediaStatus.REPEATING to "Rereading",
-        MediaStatus.UNKNOWN to "Other",
-    ).mapNotNull { (status, title) ->
-        val items = filter { it.entry.status == status }
-        if (items.isEmpty()) null else LibrarySection(status.name, title, items)
-    }
-
-    val customSections = flatMap { item ->
-        item.entry.customLists.map { customList -> customList to item }
-    }
-        .groupBy({ it.first }, { it.second })
-        .toSortedMap(String.CASE_INSENSITIVE_ORDER)
-        .map { (name, items) -> LibrarySection("custom:$name", name, items.distinctBy { it.media.id }) }
-
-    return statusSections + customSections
-}
-
-private fun List<SourceDescriptor>.visibleSources(): List<SourceDescriptor> =
-    distinctBy { "${it.packageName}:${it.id}:${it.name}:${it.lang}" }
-        .sortedWith(compareBy<SourceDescriptor> { it.normalizedLanguage() }
-            .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
-            .thenBy(String.CASE_INSENSITIVE_ORDER) { it.lang })
-
-private fun List<SourceDescriptor>.preferredVisibleSources(
-    preferredLanguages: Set<String>,
-    disabledSourceKeys: Set<String> = emptySet(),
-): List<SourceDescriptor> {
-    val preferredSources = filter {
-        val language = it.normalizedLanguage()
-        language in preferredLanguages || language == UNIVERSAL_SOURCE_LANGUAGE
-    }
-    return (preferredSources.ifEmpty { this })
-        .filterNot { it.sourceSettingsKey() in disabledSourceKeys }
-        .distinctBy { "${it.packageName}:${it.id}:${it.name}:${it.lang}" }
-        .sortedWith(compareBy<SourceDescriptor> { it.languageSortPriority(preferredLanguages) }
-            .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
-            .thenBy(String.CASE_INSENSITIVE_ORDER) { it.lang })
-}
-
-private fun SourceDescriptor.languageSortPriority(preferredLanguages: Set<String>): Int =
-    when (normalizedLanguage()) {
-        "en" -> 0
-        Locale.getDefault().language.lowercase(Locale.ROOT) -> 1
-        Locale.getDefault().toLanguageTag().lowercase(Locale.ROOT) -> 1
-        "all" -> 2
-        else -> if (normalizedLanguage() in preferredLanguages) 3 else 4
-    }
-
-private fun SourceDescriptor.normalizedLanguage(): String =
-    lang.lowercase(Locale.ROOT).replace('_', '-')
-
-internal fun SourceDescriptor.sourceSettingsKey(): String =
-    "$packageName:$id"

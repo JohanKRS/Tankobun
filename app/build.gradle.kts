@@ -63,4 +63,6 @@ dependencies {
     implementation(libs.androidx.work.runtime)
 
     debugImplementation(libs.compose.ui.tooling)
+
+    testImplementation(libs.junit)
 }
