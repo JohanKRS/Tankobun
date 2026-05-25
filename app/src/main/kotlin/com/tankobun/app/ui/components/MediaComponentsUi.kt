@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -264,11 +265,18 @@ internal fun MediaCollection(
     onSelectMedia: (AnilistMedia) -> Unit,
     modifier: Modifier = Modifier,
     header: (@Composable () -> Unit)? = null,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     emptyMessage: String = "No manga here yet.",
 ) {
+    val configuration = LocalConfiguration.current
+    val supportedCoverColumns = coverColumns
+        .supportedCoverColumns()
+        .coerceAtMost(if (configuration.smallestScreenWidthDp in 1 until 600) 4 else 8)
+
     if (media.isEmpty()) {
         LazyColumn(
             modifier = modifier.fillMaxWidth(),
+            contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             header?.let { headerContent ->
@@ -287,6 +295,7 @@ internal fun MediaCollection(
     when (supportedViewMode) {
         MediaViewMode.LIST -> LazyColumn(
             modifier = modifier,
+            contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             header?.let { headerContent ->
@@ -301,8 +310,9 @@ internal fun MediaCollection(
             }
         }
         else -> LazyVerticalGrid(
-            columns = GridCells.Fixed(coverColumns.supportedCoverColumns()),
+            columns = GridCells.Fixed(supportedCoverColumns),
             modifier = modifier,
+            contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {

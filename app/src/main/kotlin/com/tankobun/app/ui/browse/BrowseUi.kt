@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -333,26 +334,26 @@ internal fun BrowseScreen(state: TankobunUiState, viewModel: MainViewModel) {
     }
 
     Box(Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(18.dp),
-        ) {
-            if (controlsActive || state.browseSearched) {
+        if (controlsActive || state.browseSearched) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 18.dp),
+            ) {
                 BrowseResults(
                     state = state,
                     viewModel = viewModel,
                     modifier = Modifier.fillMaxSize(),
                     header = browseHeader,
                 )
-            } else {
-                BrowseLanding(
-                    state = state,
-                    viewModel = viewModel,
-                    modifier = Modifier.fillMaxSize(),
-                    header = browseHeader,
-                )
             }
+        } else {
+            BrowseLanding(
+                state = state,
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxSize(),
+                header = browseHeader,
+            )
         }
 
         if (genresOpen) {
@@ -547,10 +548,13 @@ internal fun BrowseLanding(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(vertical = BrowseLandingContentPadding),
         verticalArrangement = Arrangement.spacedBy(34.dp),
     ) {
         item(key = "browse-header") {
-            header()
+            Box(Modifier.padding(horizontal = BrowseLandingContentPadding)) {
+                header()
+            }
         }
         item {
             BrowseMangaShelf(
@@ -577,14 +581,19 @@ internal fun BrowseLanding(
             )
         }
         item {
-            BrowseTopMangaSection(
-                media = state.browseTopManga,
-                onViewAll = { viewModel.viewAllBrowseSection("SCORE_DESC") },
-                onSelectMedia = viewModel::selectMedia,
-            )
+            Box(Modifier.padding(horizontal = BrowseLandingContentPadding)) {
+                BrowseTopMangaSection(
+                    media = state.browseTopManga,
+                    onViewAll = { viewModel.viewAllBrowseSection("SCORE_DESC") },
+                    onSelectMedia = viewModel::selectMedia,
+                )
+            }
         }
     }
 }
+
+private val BrowseLandingContentPadding = 18.dp
+private val BrowseShelfTitleHeight = 48.dp
 
 @Composable
 internal fun BrowseMangaShelf(
@@ -594,7 +603,10 @@ internal fun BrowseMangaShelf(
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.padding(horizontal = BrowseLandingContentPadding),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 title,
                 modifier = Modifier.weight(1f),
@@ -609,10 +621,14 @@ internal fun BrowseMangaShelf(
         if (media.isEmpty()) {
             Text(
                 "Cached discovery will appear here after AniList responds.",
+                modifier = Modifier.padding(horizontal = BrowseLandingContentPadding),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = BrowseLandingContentPadding),
+                horizontalArrangement = Arrangement.spacedBy(28.dp),
+            ) {
                 items(media, key = { it.id }) { item ->
                     BrowseShelfTile(media = item, onClick = { onSelectMedia(item) })
                 }
@@ -642,7 +658,11 @@ internal fun BrowseShelfTile(media: AnilistMedia, onClick: () -> Unit) {
                     .aspectRatio(2f / 3f),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+        Row(
+            modifier = Modifier.height(BrowseShelfTitleHeight),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
             Surface(
                 modifier = Modifier
                     .padding(top = 5.dp)
@@ -703,57 +723,71 @@ internal fun BrowseTopMangaSection(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun BrowseRankedMangaRow(rank: Int, media: AnilistMedia, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Text(
-            "#$rank",
-            modifier = Modifier.width(72.dp),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        ElevatedCard(
-            onClick = onClick,
-            modifier = Modifier.weight(1f),
-        ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                if (maxWidth < 720.dp) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        if (maxWidth < 520.dp) {
+            ElevatedCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        ) {
-                            BrowseRankCover(media)
-                            BrowseRankTitle(media = media, modifier = Modifier.weight(1f))
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            BrowseRankMeta(
-                                primary = media.averageScore?.let { "$it%" } ?: "-",
-                                secondary = media.popularity?.let { "${it.formatCompact()} users" } ?: "users unknown",
-                                modifier = Modifier.weight(1f),
-                            )
-                            BrowseRankMeta(
-                                primary = media.format.mediaFormatLabel(),
-                                secondary = media.chapters?.let { "$it chapters" } ?: media.status.statusLabel(),
-                                modifier = Modifier.weight(1f),
-                            )
-                            BrowseRankMeta(
-                                primary = media.publishingYearLabel(),
-                                secondary = media.status.statusLabel(),
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
+                        Text(
+                            "#$rank",
+                            modifier = Modifier.width(42.dp),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        BrowseRankCover(media)
+                        BrowseRankTitle(
+                            media = media,
+                            modifier = Modifier.weight(1f),
+                            titleMaxLines = 2,
+                        )
                     }
-                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        BrowseRankMeta(
+                            primary = media.averageScore?.let { "$it%" } ?: "-",
+                            secondary = media.popularity?.let { "${it.formatCompact()} users" } ?: "users unknown",
+                            modifier = Modifier.weight(1f),
+                        )
+                        BrowseRankMeta(
+                            primary = media.format.mediaFormatLabel(),
+                            secondary = media.chapters?.let { "$it chapters" } ?: media.status.statusLabel(),
+                            modifier = Modifier.weight(1f),
+                        )
+                        BrowseRankMeta(
+                            primary = media.publishingYearLabel(),
+                            secondary = media.status.statusLabel(),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(
+                    "#$rank",
+                    modifier = Modifier.width(72.dp),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ElevatedCard(
+                    onClick = onClick,
+                    modifier = Modifier.weight(1f),
+                ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -798,7 +832,7 @@ internal fun BrowseRankCover(media: AnilistMedia) {
 }
 
 @Composable
-internal fun BrowseRankTitle(media: AnilistMedia, modifier: Modifier = Modifier) {
+internal fun BrowseRankTitle(media: AnilistMedia, modifier: Modifier = Modifier, titleMaxLines: Int = 1) {
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -808,7 +842,7 @@ internal fun BrowseRankTitle(media: AnilistMedia, modifier: Modifier = Modifier)
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
+            maxLines = titleMaxLines,
             overflow = TextOverflow.Ellipsis,
         )
         Row(
@@ -895,6 +929,7 @@ internal fun BrowseResults(
         showWholeCovers = state.browseShowWholeCovers,
         modifier = modifier.fillMaxWidth(),
         header = resultsHeader,
+        contentPadding = PaddingValues(vertical = 18.dp),
         onSelectMedia = viewModel::selectMedia,
         emptyMessage = if (state.busy) {
             "Searching AniList..."
@@ -913,22 +948,22 @@ internal fun BrowseGenreDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.82f)
-                .fillMaxHeight(0.72f),
+                .fillMaxWidth(0.94f)
+                .fillMaxHeight(0.78f),
             shape = RoundedCornerShape(12.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
             tonalElevation = 6.dp,
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 DialogHeader(title = "Genres", onDismiss = onDismiss)
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(150.dp),
+                    columns = GridCells.Adaptive(128.dp),
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     gridItems(BrowseGenres, key = { it }) { genre ->
                         FilterChip(
@@ -976,15 +1011,15 @@ internal fun BrowseTagDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.86f)
-                .fillMaxHeight(0.78f),
+                .fillMaxWidth(0.94f)
+                .fillMaxHeight(0.82f),
             shape = RoundedCornerShape(18.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
             tonalElevation = 6.dp,
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 DialogHeader(title = "Tags", onDismiss = onDismiss)
                 OutlinedTextField(
@@ -1011,7 +1046,7 @@ internal fun BrowseTagDialog(
                     }
                 } else {
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(142.dp),
+                        columns = GridCells.Adaptive(128.dp),
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1063,10 +1098,11 @@ internal fun BrowseOptionDialog(
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
             modifier = Modifier
-                .width(380.dp)
+                .fillMaxWidth(0.94f)
+                .widthIn(max = 560.dp)
                 .heightIn(max = 640.dp),
             shape = RoundedCornerShape(18.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
@@ -1075,8 +1111,8 @@ internal fun BrowseOptionDialog(
             Column(
                 modifier = Modifier
                     .verticalScroll(rememberScrollState())
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 DialogHeader(title = title, onDismiss = onDismiss)
                 options.forEach { option ->
@@ -1113,14 +1149,19 @@ internal fun LibraryOptionsDialog(
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
-            modifier = Modifier.fillMaxWidth(0.72f),
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .widthIn(max = 560.dp)
+                .heightIn(max = 680.dp),
             shape = RoundedCornerShape(12.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
             tonalElevation = 6.dp,
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 DialogHeader(title = "Library Options", onDismiss = onDismiss)
                 Text("Sort", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -1171,14 +1212,19 @@ internal fun BrowseAdvancedDialog(
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
-            modifier = Modifier.fillMaxWidth(0.72f),
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .widthIn(max = 560.dp)
+                .heightIn(max = 680.dp),
             shape = RoundedCornerShape(12.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
             tonalElevation = 6.dp,
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 DialogHeader(title = "Browse Options", onDismiss = onDismiss)
                 Text("Sort", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -1232,9 +1278,11 @@ internal fun CoverColumnsRow(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val selectedColumns = selected.supportedCoverColumns()
+    val configuration = LocalConfiguration.current
+    val maxColumns = if (configuration.smallestScreenWidthDp in 1 until 600) 4 else 8
+    val selectedColumns = selected.supportedCoverColumns().coerceAtMost(maxColumns)
     FlowRowCompat {
-        (2..8).forEach { count ->
+        (2..maxColumns).forEach { count ->
             FilterChip(
                 selected = selectedColumns == count,
                 onClick = { onSelect(count) },

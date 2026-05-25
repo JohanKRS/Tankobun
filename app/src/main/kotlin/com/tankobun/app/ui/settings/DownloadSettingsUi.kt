@@ -330,14 +330,22 @@ internal fun DeleteDownloadsDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
-            modifier = Modifier.widthIn(max = 420.dp),
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .widthIn(max = 520.dp)
+                .heightIn(max = 520.dp),
             shape = RoundedCornerShape(16.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
             tonalElevation = 3.dp,
         ) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(
+                Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Text("Delete downloads?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
                     "${target.title} / ${target.detail}",

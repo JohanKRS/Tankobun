@@ -362,6 +362,9 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
                 onSelectTab = {
                     selectedTab = it
                     settingsRoute = SettingsRoute.MAIN
+                    if (selectedMedia != null) {
+                        viewModel.clearSelectedMedia()
+                    }
                 },
                 selectedMedia = selectedMedia,
                 settingsRoute = settingsRoute,
@@ -579,21 +582,19 @@ internal fun TankobunScaffold(
             )
         },
         bottomBar = {
-            if (selectedMedia == null) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = LocalTankobunTokens.current.elevatedSurface,
-                    tonalElevation = 2.dp,
-                ) {
-                    TankobunBottomNavigationBar(
-                        selectedTab = selectedTab,
-                        onSelectTab = onSelectTab,
-                        modifier = Modifier.padding(
-                            start = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout),
-                            end = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout),
-                        ),
-                    )
-                }
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = LocalTankobunTokens.current.elevatedSurface,
+                tonalElevation = 2.dp,
+            ) {
+                TankobunBottomNavigationBar(
+                    selectedTab = selectedTab,
+                    onSelectTab = onSelectTab,
+                    modifier = Modifier.padding(
+                        start = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout),
+                        end = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout),
+                    ),
+                )
             }
         },
     ) { padding ->
