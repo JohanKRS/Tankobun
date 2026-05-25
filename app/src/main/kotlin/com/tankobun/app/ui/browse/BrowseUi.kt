@@ -952,6 +952,7 @@ internal fun BrowseGenreDialog(
                 .fillMaxHeight(0.78f),
             shape = RoundedCornerShape(12.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 6.dp,
         ) {
             Column(
@@ -1015,6 +1016,7 @@ internal fun BrowseTagDialog(
                 .fillMaxHeight(0.82f),
             shape = RoundedCornerShape(18.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 6.dp,
         ) {
             Column(
@@ -1106,6 +1108,7 @@ internal fun BrowseOptionDialog(
                 .heightIn(max = 640.dp),
             shape = RoundedCornerShape(18.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 6.dp,
         ) {
             Column(
@@ -1155,6 +1158,7 @@ internal fun LibraryOptionsDialog(
                 .heightIn(max = 680.dp),
             shape = RoundedCornerShape(12.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 6.dp,
         ) {
             Column(
@@ -1218,6 +1222,7 @@ internal fun BrowseAdvancedDialog(
                 .heightIn(max = 680.dp),
             shape = RoundedCornerShape(12.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 6.dp,
         ) {
             Column(

@@ -258,6 +258,7 @@ internal fun SettingsScreen(
                         .fillMaxHeight(),
                     shape = RoundedCornerShape(12.dp),
                     color = LocalTankobunTokens.current.elevatedSurface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
                     tonalElevation = 1.dp,
                 ) {
                     SettingsDetailContent(
@@ -311,6 +312,7 @@ internal fun SettingsIndexPane(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 1.dp,
         ) {
             Column(Modifier.padding(vertical = 6.dp)) {

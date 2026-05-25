@@ -321,10 +321,17 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var settingsRoute by remember { mutableStateOf(SettingsRoute.MAIN) }
     var quickDrawerMode by remember { mutableStateOf(QuickDrawerMode.CLOSED) }
+    val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
     val selectedMedia = state.selectedMedia
     val readerOpen = state.activeChapter != null && state.readerPages.isNotEmpty()
     val appStatusBarVisible = state.showAppStatusBar && !readerOpen
     val useDarkStatusBarIcons = state.themeMode.useDarkStatusBarIcons(isSystemInDarkTheme())
+
+    LaunchedEffect(compactLayout, quickDrawerMode) {
+        if (compactLayout && quickDrawerMode == QuickDrawerMode.PINNED) {
+            quickDrawerMode = QuickDrawerMode.OVERLAY
+        }
+    }
 
     StatusBarVisibilityEffect(visible = appStatusBarVisible, useDarkIcons = useDarkStatusBarIcons)
 
@@ -585,6 +592,7 @@ internal fun TankobunScaffold(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = LocalTankobunTokens.current.elevatedSurface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 tonalElevation = 2.dp,
             ) {
                 TankobunBottomNavigationBar(
@@ -875,7 +883,11 @@ internal fun TankobunTopBar(
     val iconSize = if (compact) 18.dp else 24.dp
     val logoSize = if (compact) 36.dp else 56.dp
     val spacing = if (compact) 7.dp else 12.dp
-    Surface(color = LocalTankobunTokens.current.elevatedSurface, tonalElevation = 1.dp) {
+    Surface(
+        color = LocalTankobunTokens.current.elevatedSurface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 1.dp,
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1035,6 +1047,7 @@ internal fun QuickDrawer(
     modifier: Modifier = Modifier,
 ) {
     val handleSlotWidth = if (pinned) 0.dp else QuickDrawerHandleSlotWidth
+    val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
     Box(modifier = modifier.width(handleSlotWidth + drawerWidth + endPadding)) {
         Surface(
             modifier = Modifier
@@ -1043,6 +1056,7 @@ internal fun QuickDrawer(
                 .fillMaxHeight(),
             shape = RoundedCornerShape(0.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 0.dp,
             shadowElevation = if (pinned) 0.dp else 10.dp,
         ) {
@@ -1060,12 +1074,14 @@ internal fun QuickDrawer(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Quick Actions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         }
-                        IconButton(onClick = onTogglePin) {
-                            Icon(
-                                imageVector = if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                                contentDescription = if (pinned) "Unpin quick actions" else "Pin quick actions",
-                                tint = if (pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        if (!compactLayout) {
+                            IconButton(onClick = onTogglePin) {
+                                Icon(
+                                    imageVector = if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                    contentDescription = if (pinned) "Unpin quick actions" else "Pin quick actions",
+                                    tint = if (pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
 

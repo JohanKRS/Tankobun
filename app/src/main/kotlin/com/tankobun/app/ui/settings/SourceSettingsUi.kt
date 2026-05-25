@@ -532,6 +532,7 @@ internal fun SourceSettingsSummary(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         color = LocalTankobunTokens.current.elevatedSurface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 1.dp,
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -774,6 +775,7 @@ internal fun ExtensionRepositoryRow(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         color = LocalTankobunTokens.current.elevatedSurface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 1.dp,
     ) {
         Row(

@@ -271,36 +271,20 @@ internal fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel,
             item {
                 Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
                     var downloadActionsOpen by remember { mutableStateOf(false) }
-                    Text("Chapters", style = MaterialTheme.typography.titleLarge)
+                    DetailSectionTitle("Chapters")
                     Spacer(Modifier.height(8.dp))
                     if (state.selectedSourceManga == null) {
                         Text("Choose a source first.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                val readingActionChapter = state.primaryReadingActionChapter()
-                                if (readingActionChapter != null) {
-                                    Button(onClick = { viewModel.openChapter(readingActionChapter) }) {
-                                        Text(if (state.latestProgress == null) "Start reading" else "Resume")
-                                    }
-                                }
-                                OutlinedButton(onClick = viewModel::loadChaptersForCurrentMatch) {
-                                    Text(if (state.sourceChapters.isEmpty()) "Load chapters" else "Refresh chapters")
-                                }
-                                Spacer(Modifier.weight(1f))
-                                OutlinedButton(
-                                    onClick = { downloadActionsOpen = true },
-                                    enabled = state.sourceChapters.isNotEmpty(),
-                                ) {
-                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Download")
-                                }
-                            }
+                            ChapterActionsBar(
+                                readingActionChapter = state.primaryReadingActionChapter(),
+                                hasProgress = state.latestProgress != null,
+                                hasChapters = state.sourceChapters.isNotEmpty(),
+                                onOpenChapter = viewModel::openChapter,
+                                onLoadChapters = viewModel::loadChaptersForCurrentMatch,
+                                onOpenDownloadActions = { downloadActionsOpen = true },
+                            )
                             if (state.selectingDownloadChapters) {
                                 ChapterManualDownloadBar(
                                     selectedCount = state.selectedDownloadChapterUrls.size,
@@ -369,6 +353,79 @@ internal fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel,
 private val MediaDetailContentPadding = 16.dp
 
 @Composable
+internal fun DetailSectionTitle(text: String, modifier: Modifier = Modifier) {
+    val compact = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
+    Text(
+        text,
+        modifier = modifier,
+        style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ChapterActionsBar(
+    readingActionChapter: SourceChapter?,
+    hasProgress: Boolean,
+    hasChapters: Boolean,
+    onOpenChapter: (SourceChapter) -> Unit,
+    onLoadChapters: () -> Unit,
+    onOpenDownloadActions: () -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 430.dp
+        val startReadingButton: @Composable () -> Unit = {
+            if (readingActionChapter != null) {
+                Button(onClick = { onOpenChapter(readingActionChapter) }) {
+                    Text(if (hasProgress) "Resume" else "Start reading")
+                }
+            }
+        }
+        val refreshButton: @Composable () -> Unit = {
+            OutlinedButton(onClick = onLoadChapters) {
+                Text(if (hasChapters) "Refresh chapters" else "Load chapters")
+            }
+        }
+        val downloadButton: @Composable () -> Unit = {
+            OutlinedButton(
+                onClick = onOpenDownloadActions,
+                enabled = hasChapters,
+            ) {
+                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Download")
+            }
+        }
+
+        if (compact) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                startReadingButton()
+                refreshButton()
+                downloadButton()
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                startReadingButton()
+                refreshButton()
+                Spacer(Modifier.weight(1f))
+                downloadButton()
+            }
+        }
+    }
+}
+
+@Composable
 internal fun ChapterManualDownloadBar(
     selectedCount: Int,
     onDownloadSelected: () -> Unit,
@@ -424,6 +481,7 @@ internal fun ChapterDownloadActionsDialog(
                 .heightIn(max = 640.dp),
             shape = RoundedCornerShape(16.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 3.dp,
         ) {
             Column(
@@ -525,6 +583,7 @@ internal fun MangaHeroSection(media: AnilistMedia) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         color = LocalTankobunTokens.current.elevatedSurface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 1.dp,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -588,7 +647,7 @@ internal fun MangaHeroInfo(
     ) {
         Text(
             media.title.userPreferred,
-            style = if (compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium,
+            style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
         )
         Text(
@@ -599,7 +658,7 @@ internal fun MangaHeroInfo(
                 media.volumes?.let { "$it volumes" },
                 media.averageScore?.let { "$it% score" },
             ).joinToString(" / "),
-            style = MaterialTheme.typography.bodyMedium,
+            style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         FlowRowCompat {
@@ -611,15 +670,41 @@ internal fun MangaHeroInfo(
             media.description?.replace(Regex("<[^>]*>"), "").orEmpty(),
             maxLines = if (compact) 5 else 8,
             overflow = TextOverflow.Ellipsis,
+            style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
         )
         val tags = media.tags.ifEmpty { media.genres }
         if (tags.isNotEmpty()) {
             FlowRowCompat {
                 tags.take(if (compact) 6 else 10).forEach { tag ->
-                    AssistChip(onClick = {}, label = { Text(tag) })
+                    mangaTagPill(tag = tag, compact = compact)
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun mangaTagPill(tag: String, compact: Boolean) {
+    Surface(
+        shape = RoundedCornerShape(7.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 1.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+        ),
+    ) {
+        Text(
+            tag,
+            modifier = Modifier.padding(
+                horizontal = if (compact) 8.dp else 10.dp,
+                vertical = if (compact) 4.dp else 6.dp,
+            ),
+            style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -948,21 +1033,45 @@ internal fun RecommendationsSection(
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                "Recommendations",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                "${recommendations.size} shown",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (hasMore) {
-                TextButton(onClick = onLoadMore, enabled = !loadingMore) {
-                    Text(if (loadingMore) "Loading" else "Load more")
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = MediaDetailContentPadding),
+        ) {
+            val compact = maxWidth < 430.dp
+            if (compact) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    DetailSectionTitle("Recommendations")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "${recommendations.size} shown",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        if (hasMore) {
+                            TextButton(onClick = onLoadMore, enabled = !loadingMore) {
+                                Text(if (loadingMore) "Loading" else "Load more")
+                            }
+                        }
+                    }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DetailSectionTitle("Recommendations", modifier = Modifier.weight(1f))
+                    Text(
+                        "${recommendations.size} shown",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (hasMore) {
+                        TextButton(onClick = onLoadMore, enabled = !loadingMore) {
+                            Text(if (loadingMore) "Loading" else "Load more")
+                        }
+                    }
                 }
             }
         }
@@ -1100,18 +1209,40 @@ internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewMod
     val latestProgress = state.latestProgress
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Source", style = MaterialTheme.typography.titleLarge)
+        DetailSectionTitle("Source")
         if (selectedManga == null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = viewModel::openSourcePicker) {
-                    Icon(Icons.Default.Search, contentDescription = null)
-                    Spacer(Modifier.size(8.dp))
-                    Text("Find source")
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val compact = maxWidth < 430.dp
+                if (compact) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = viewModel::openSourcePicker,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = null)
+                            Spacer(Modifier.size(8.dp))
+                            Text("Find source")
+                        }
+                        Text(
+                            if (state.allInstalledSources.isEmpty()) "Install source extensions in Settings." else "No source selected.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Button(onClick = viewModel::openSourcePicker) {
+                            Icon(Icons.Default.Search, contentDescription = null)
+                            Spacer(Modifier.size(8.dp))
+                            Text("Find source")
+                        }
+                        Text(
+                            if (state.allInstalledSources.isEmpty()) "Install source extensions in Settings." else "No source selected.",
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-                Text(
-                    if (state.allInstalledSources.isEmpty()) "Install source extensions in Settings." else "No source selected.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         } else {
             ElevatedCard {
@@ -1412,10 +1543,11 @@ internal fun CoverImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     imageAlignment: Alignment = Alignment.Center,
+    cornerRadius: Dp = 8.dp,
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(cornerRadius))
             .then(
                 if (url.isNullOrBlank()) {
                     Modifier.background(MaterialTheme.colorScheme.surfaceVariant)

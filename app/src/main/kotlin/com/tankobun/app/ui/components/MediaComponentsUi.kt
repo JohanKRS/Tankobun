@@ -355,6 +355,7 @@ internal fun MediaCoverTile(
     val coverModifier = Modifier
         .fillMaxWidth()
         .aspectRatio(2f / 3f)
+    val coverCornerRadius = if (showWholeCover) 0.dp else 8.dp
 
     Column(
         modifier = modifier
@@ -370,7 +371,7 @@ internal fun MediaCoverTile(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(coverCornerRadius),
             color = if (showWholeCover) Color.Transparent else MaterialTheme.colorScheme.surface,
             tonalElevation = if (showWholeCover) 0.dp else 1.dp,
             shadowElevation = when {
@@ -385,6 +386,7 @@ internal fun MediaCoverTile(
                 modifier = coverModifier,
                 contentScale = if (showWholeCover) ContentScale.Fit else ContentScale.Crop,
                 imageAlignment = if (showWholeCover) Alignment.BottomCenter else Alignment.Center,
+                cornerRadius = coverCornerRadius,
             )
         }
         if (supportedViewMode != MediaViewMode.COVER_GRID) {

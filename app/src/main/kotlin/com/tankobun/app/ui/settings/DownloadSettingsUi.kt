@@ -338,6 +338,7 @@ internal fun DeleteDownloadsDialog(
                 .heightIn(max = 520.dp),
             shape = RoundedCornerShape(16.dp),
             color = LocalTankobunTokens.current.elevatedSurface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 3.dp,
         ) {
             Column(
