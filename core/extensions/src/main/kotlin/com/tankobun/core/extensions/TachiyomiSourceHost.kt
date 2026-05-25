@@ -90,8 +90,19 @@ class TachiyomiSourceHost(
 
         runSourceAction(source, catalogueSource, "search") {
             val filters = catalogueSource.getFilterList()
-            catalogueSource.fetchSearchManga(page, query, filters).toBlocking().first().mangas.map { manga ->
-                manga.toSourceManga(catalogueSource.id)
+            runCatching {
+                catalogueSource.searchManga(page, query, filters)
+            }.getOrElse { error ->
+                if (filters.isEmpty() || !error.isFilterCompatibilityError()) {
+                    throw error
+                }
+                logSourceFailure(
+                    action = "searchWithDefaultFilters",
+                    packageName = source.packageName,
+                    source = catalogueSource,
+                    error = error,
+                )
+                catalogueSource.searchManga(page, query, FilterList())
             }
         }
     }
@@ -305,6 +316,26 @@ private suspend fun <T> runSourceAction(
             error,
         )
     }
+
+private fun CatalogueSource.searchManga(
+    page: Int,
+    query: String,
+    filters: FilterList,
+): List<SourceManga> =
+    fetchSearchManga(page, query, filters).toBlocking().first().mangas.map { manga ->
+        manga.toSourceManga(id)
+    }
+
+private fun Throwable.isFilterCompatibilityError(): Boolean {
+    var current: Throwable? = this
+    while (current != null) {
+        if (current.message?.contains("Unknown filter", ignoreCase = true) == true) {
+            return true
+        }
+        current = current.cause
+    }
+    return false
+}
 
 private fun logSourceFailure(
     action: String,

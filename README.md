@@ -113,3 +113,9 @@ If you distribute a modified version, please use a clearly different app name, p
 ## License
 
 This project is licensed under the MIT License. See `LICENCE.md` for details.
+
+## Third-Party Notices
+
+Some extension compatibility behavior is adapted from the Mihon/Tachiyomi-compatible
+network and extension host ecosystem under the Apache License 2.0. See `NOTICE.md`
+for attribution and license details.

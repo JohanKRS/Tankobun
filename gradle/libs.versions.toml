@@ -14,6 +14,7 @@ work = "2.11.0"
 datastore = "1.1.7"
 securityCrypto = "1.1.0-alpha07"
 preference = "1.2.1"
+graphics = "1.1.0"
 okhttp = "5.1.0"
 coil = "3.3.0"
 apollo = "4.4.3"
@@ -38,6 +39,7 @@ androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 androidx-preference = { module = "androidx.preference:preference-ktx", version.ref = "preference" }
+androidx-graphics-path = { module = "androidx.graphics:graphics-path", version.ref = "graphics" }
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
 compose-ui = { module = "androidx.compose.ui:ui" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
@@ -47,6 +49,7 @@ compose-material-icons = { module = "androidx.compose.material:material-icons-ex
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+okhttp-brotli = { module = "com.squareup.okhttp3:okhttp-brotli", version.ref = "okhttp" }
 rxjava = { module = "io.reactivex:rxjava", version.ref = "rxjava" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "mockwebserver" }

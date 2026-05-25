@@ -17,6 +17,7 @@ dependencies {
     implementation(project(":core:network"))
     implementation(libs.androidx.preference)
     implementation(libs.okhttp)
+    implementation(libs.okhttp.brotli)
     implementation(libs.rxjava)
     implementation(libs.jsoup)
     implementation(libs.kotlinx.coroutines.android)

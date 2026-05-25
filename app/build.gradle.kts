@@ -32,6 +32,12 @@ android {
         buildConfig = true
         compose = true
     }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 dependencies {
@@ -59,6 +65,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.graphics.path)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.work.runtime)
 
