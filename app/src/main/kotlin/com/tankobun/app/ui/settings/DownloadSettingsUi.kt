@@ -532,7 +532,7 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
             if (state.anilistAutoSyncReaderProgress) add("Auto progress")
         }.joinToString(" / ")
         SettingsRoute.BACKUPS -> "${state.libraryItems.count { it.media.idMal != null }} / ${state.libraryItems.size} MAL matched"
-        SettingsRoute.ABOUT -> "Credits and notices"
+        SettingsRoute.ABOUT -> "Tutorial and notices"
         SettingsRoute.SOURCES -> "${state.installedSources.size} active / ${state.allInstalledSources.size} installed"
     }
 

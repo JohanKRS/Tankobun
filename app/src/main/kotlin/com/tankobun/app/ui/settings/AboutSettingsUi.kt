@@ -226,7 +226,10 @@ import com.tankobun.app.ui.settings.*
 import com.tankobun.app.ui.shell.*
 
 @Composable
-internal fun AboutSettingsScreen(modifier: Modifier = Modifier) {
+internal fun AboutSettingsScreen(
+    onReplayOnboarding: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val uriHandler = LocalUriHandler.current
     SettingsDetailPanel(
         title = "About",
@@ -253,6 +256,14 @@ internal fun AboutSettingsScreen(modifier: Modifier = Modifier) {
                     Icon(Icons.Default.Link, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("GitHub repository")
+                }
+                OutlinedButton(
+                    onClick = onReplayOnboarding,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Replay, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Replay tutorial")
                 }
                 Text(
                     "Tankobun is an unofficial manga reader and is not affiliated with AniList.",

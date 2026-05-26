@@ -400,6 +400,9 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
             if (readerOpen) {
                 FullScreenReader(state, viewModel)
             }
+            if (state.onboardingVisible && !readerOpen) {
+                OnboardingDialog(onDismiss = viewModel::dismissOnboarding)
+            }
         }
     }
 }

@@ -580,7 +580,10 @@ internal fun SettingsDetailContent(
             )
         }
         SettingsRoute.BACKUPS -> BackupsSettingsScreen(state, viewModel, modifier)
-        SettingsRoute.ABOUT -> AboutSettingsScreen(modifier)
+        SettingsRoute.ABOUT -> AboutSettingsScreen(
+            onReplayOnboarding = viewModel::showOnboarding,
+            modifier = modifier,
+        )
         SettingsRoute.SOURCES -> SourcesSettingsScreen(state, viewModel)
     }
 }

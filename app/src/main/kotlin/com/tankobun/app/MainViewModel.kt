@@ -172,6 +172,7 @@ class MainViewModel(
             themeMode = container.settingsStore.themeMode(),
             ignoreDisplayCutout = container.settingsStore.ignoreDisplayCutout(),
             showAppStatusBar = container.settingsStore.showAppStatusBar(),
+            onboardingVisible = !container.settingsStore.onboardingCompleted(),
             readerMode = container.settingsStore.readerMode(),
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
             readerFitWidth = container.settingsStore.readerFitWidth(),
@@ -243,6 +244,15 @@ class MainViewModel(
                 message = "Signed out",
             )
         }
+    }
+
+    fun showOnboarding() {
+        _state.update { it.copy(onboardingVisible = true) }
+    }
+
+    fun dismissOnboarding() {
+        container.settingsStore.saveOnboardingCompleted(true)
+        _state.update { it.copy(onboardingVisible = false) }
     }
 
     fun refreshInstalledSources() {

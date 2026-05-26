@@ -28,6 +28,7 @@ data class TankobunUiState(
     val themeMode: TankobunThemeMode = TankobunThemeMode.SYSTEM,
     val ignoreDisplayCutout: Boolean = false,
     val showAppStatusBar: Boolean = true,
+    val onboardingVisible: Boolean = false,
     val viewerName: String? = null,
     val anilistScoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
     val anilistCustomLists: List<String> = emptyList(),
