@@ -8,17 +8,18 @@ import eu.kanade.tachiyomi.AppInfo
 import eu.kanade.tachiyomi.network.NetworkHelper
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
-import uy.kohesive.injekt.api.FullTypeReference
 import uy.kohesive.injekt.api.InjektScope
+import uy.kohesive.injekt.api.TypeReference
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 
+@Suppress("UNCHECKED_CAST")
 object Injekt : InjektScope {
-    override fun getInstance(type: Type): Any = TankobunInjektRegistry.getInstance(type)
+    override fun <R : Any> getInstance(type: Type): R = TankobunInjektRegistry.getInstance(type) as R
 
     fun <T : Any> get(type: Class<T>): T = TankobunInjektRegistry.getInstance(type) as T
 
-    fun <T : Any> get(forType: FullTypeReference<T>): T = TankobunInjektRegistry.getInstance(forType.type) as T
+    fun <T : Any> get(forType: TypeReference<T>): T = TankobunInjektRegistry.getInstance(forType.type) as T
 }
 
 fun getInjekt(): InjektScope = Injekt
@@ -27,7 +28,18 @@ inline fun <reified T : Any> InjektScope.get(): T = getInstance(T::class.java) a
 
 inline fun <reified T : Any> Injekt.get(): T = get(T::class.java)
 
-fun <T : Any> InjektScope.get(forType: FullTypeReference<T>): T = getInstance(forType.type) as T
+fun <T : Any> InjektScope.get(forType: TypeReference<T>): T = getInstance(forType.type)
+
+fun <T : Any> InjektScope.getOrNull(forType: TypeReference<T>): T? = getInstanceOrNull(forType.type)
+
+fun <T : Any> InjektScope.getOrElse(forType: TypeReference<T>, default: T): T =
+    getInstanceOrElse(forType.type, default)
+
+fun <T : Any> InjektScope.getOrElse(forType: TypeReference<T>, default: () -> T): T =
+    getInstanceOrElse(forType.type, default)
+
+fun <T : Any> InjektScope.get(forType: TypeReference<T>, key: Any): T =
+    getKeyedInstance(forType.type, key)
 
 inline fun <reified T : Any> injectLazy(): Lazy<T> = lazy { Injekt.get<T>() }
 

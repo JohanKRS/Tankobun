@@ -21,6 +21,7 @@ class SettingsStore(context: Context) {
     fun themeMode(): TankobunThemeMode =
         preferences.getString(KEY_THEME_MODE, null)
             ?.let { stored -> runCatching { TankobunThemeMode.valueOf(stored) }.getOrNull() }
+            ?.let { mode -> if (mode == TankobunThemeMode.MIDNIGHT_RAMEN) TankobunThemeMode.NEON_KOI else mode }
             ?: TankobunThemeMode.SYSTEM
 
     fun saveThemeMode(mode: TankobunThemeMode) {

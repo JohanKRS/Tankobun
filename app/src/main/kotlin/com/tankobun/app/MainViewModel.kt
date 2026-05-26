@@ -144,6 +144,8 @@ class MainViewModel(
     private var pendingAniListSyncJob: Job? = null
     private var scheduledBackupJob: Job? = null
     private var readerAdjacentLoadJob: Job? = null
+    private var sourcePickerJob: Job? = null
+    private var sourcePickerRequestId: Long = 0L
     private var lastReaderProgressSavedAtEpochMillis: Long = 0L
     private val readerPageCacheJobs = ConcurrentHashMap<String, Job>()
     private val _state = MutableStateFlow(
@@ -1777,14 +1779,35 @@ class MainViewModel(
     }
 
     fun closeSourcePicker() {
+        cancelSourcePickerJob()
         _state.update {
             it.copy(
+                busy = false,
                 sourcePickerOpen = false,
                 sourcePickerLoading = false,
                 sourcePickerMessage = null,
                 sourcePickerDiagnostics = emptyList(),
             )
         }
+    }
+
+    private fun beginSourcePickerJob(): Long {
+        sourcePickerJob?.cancel()
+        sourcePickerRequestId += 1
+        return sourcePickerRequestId
+    }
+
+    private fun cancelSourcePickerJob() {
+        sourcePickerRequestId += 1
+        sourcePickerJob?.cancel()
+        sourcePickerJob = null
+    }
+
+    private fun isActiveSourcePickerRequest(requestId: Long, mediaId: Int): Boolean {
+        val snapshot = _state.value
+        return requestId == sourcePickerRequestId &&
+            snapshot.sourcePickerOpen &&
+            snapshot.selectedMedia?.id == mediaId
     }
 
     fun bindSelectedSource() {
@@ -1798,25 +1821,25 @@ class MainViewModel(
 
     fun bindSource(source: SourceDescriptor) {
         val media = _state.value.selectedMedia ?: return
-        viewModelScope.launch {
+        val requestId = beginSourcePickerJob()
+        sourcePickerJob = viewModelScope.launch {
             _state.update {
                 it.copy(
-                    busy = true,
                     sourcePickerLoading = true,
                     sourcePickerMessage = "Searching ${source.name}...",
                     sourcePickerDiagnostics = emptyList(),
                     message = null,
                 )
             }
-            runCatching {
+            try {
                 val now = System.currentTimeMillis()
                 val matches = searchSourceMatches(media, source, now)
                     .filter { it.isReadableMatchCandidate() }
                 val verified = firstReadableMatch(source, matches, now)
                     ?: error("No readable manga found on ${source.name}")
+                if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 saveSourceBinding(verified.match)
-                verified.match
-            }.onSuccess { match ->
+                val match = verified.match
                 _state.update {
                     it.copy(
                         sourceMatches = (listOf(match) + it.sourceMatches).distinctBy { result ->
@@ -1831,7 +1854,9 @@ class MainViewModel(
                     )
                 }
                 loadChapters(match.source, match.manga)
-            }.onFailure { error ->
+            } catch (error: Throwable) {
+                if (error is CancellationException) return@launch
+                if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 Log.w(TAG, "Selected source binding failed for ${source.name}", error)
                 _state.update {
                     it.copy(
@@ -1840,6 +1865,10 @@ class MainViewModel(
                         sourcePickerMessage = sourcePickerErrorMessage(source.name, error),
                         message = null,
                     )
+                }
+            } finally {
+                if (sourcePickerRequestId == requestId) {
+                    sourcePickerJob = null
                 }
             }
         }
@@ -1863,6 +1892,7 @@ class MainViewModel(
                     container.sourceHost.search(source, query)
                 } ?: throw SourceQueryTimeoutException(query)
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 failedQueries += 1
                 lastSearchError = error
                 stopSourceSearch = isFatalSourceSearchError(error)
@@ -2089,6 +2119,10 @@ class MainViewModel(
         return when {
             isMissingSourceCompatibilityClass(error) ->
                 "$sourceName needs a compatibility library that was missing from the app. Update the app and try again."
+            isDirectUrlRequiredError(error) ->
+                "$sourceName needs a direct source URL instead of a title search. Paste a supported URL or choose another source."
+            isUnexpectedSourceResponseError(error) ->
+                "$sourceName returned data the extension could not parse. Try updating that extension or choose another source."
             detail.contains("syntax error in regexp pattern", ignoreCase = true) ->
                 "$sourceName failed while parsing source data. The extension reported a regexp error; try another source or update that extension."
             detail.contains("timeout", ignoreCase = true) || detail.contains("timed out", ignoreCase = true) ->
@@ -2103,6 +2137,8 @@ class MainViewModel(
         val detail = errorDetail(error) ?: error.javaClass.simpleName
         return when {
             isMissingSourceCompatibilityClass(error) -> "missing compatibility class"
+            isDirectUrlRequiredError(error) -> "requires a direct URL"
+            isUnexpectedSourceResponseError(error) -> "unexpected source response"
             detail.contains("HTTP error", ignoreCase = true) -> detail
             detail.contains("syntax error in regexp pattern", ignoreCase = true) -> "regexp parse error"
             detail.contains("timeout", ignoreCase = true) -> "timed out"
@@ -2126,9 +2162,22 @@ class MainViewModel(
                 cause.message?.contains("OkioStreamsKt", ignoreCase = true) == true
         }
 
+    private fun isDirectUrlRequiredError(error: Throwable): Boolean =
+        errorDetails(error).any { detail ->
+            detail.contains("enter a valid", ignoreCase = true) &&
+                detail.contains("url", ignoreCase = true)
+        }
+
+    private fun isUnexpectedSourceResponseError(error: Throwable): Boolean =
+        generateSequence(error) { it.cause }.any { cause ->
+            cause.javaClass.name == "kotlinx.serialization.MissingFieldException"
+        }
+
     private fun isFatalSourceSearchError(error: Throwable): Boolean {
         val details = errorDetails(error).joinToString(separator = "\n")
         return isMissingSourceCompatibilityClass(error) ||
+            isDirectUrlRequiredError(error) ||
+            isUnexpectedSourceResponseError(error) ||
             details.contains("HTTP error 401", ignoreCase = true) ||
             details.contains("HTTP error 403", ignoreCase = true)
     }
@@ -2140,27 +2189,27 @@ class MainViewModel(
             _state.update { it.copy(sourcePickerMessage = "Enable or install a source extension first") }
             return
         }
-        viewModelScope.launch {
+        val requestId = beginSourcePickerJob()
+        sourcePickerJob = viewModelScope.launch {
             _state.update {
                 it.copy(
-                    busy = true,
                     sourcePickerLoading = true,
                     sourcePickerMessage = "Searching enabled sources...",
                     sourcePickerDiagnostics = emptyList(),
                     message = null,
                 )
             }
-            runCatching {
+            try {
                 val now = System.currentTimeMillis()
-                cachedVerifiedMatches(media.id, sources, now)
+                val verified = cachedVerifiedMatches(media.id, sources, now)
                     .takeIf { !forceRefresh && it.matches.isNotEmpty() }
-                    ?: searchVerifiedMatches(media, sources, now).also { verified ->
+                    ?: searchVerifiedMatches(media, sources, now, requestId).also { verified ->
                         container.database.sourceSearchDao().clearForMedia(media.id)
                         if (verified.matches.isNotEmpty()) {
                             container.database.sourceSearchDao().upsertResults(verified.matches.map { it.toEntity() })
                         }
                     }
-            }.onSuccess { verified ->
+                if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 _state.update {
                     val selectedMatches = it.sourceMatches.filter { match ->
                         it.selectedSourceId == match.source.id &&
@@ -2182,7 +2231,9 @@ class MainViewModel(
                         message = null,
                     )
                 }
-            }.onFailure { error ->
+            } catch (error: Throwable) {
+                if (error is CancellationException) return@launch
+                if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 _state.update {
                     it.copy(
                         busy = false,
@@ -2190,6 +2241,10 @@ class MainViewModel(
                         sourcePickerMessage = sourcePickerErrorMessage("source search", error),
                         message = null,
                     )
+                }
+            } finally {
+                if (sourcePickerRequestId == requestId) {
+                    sourcePickerJob = null
                 }
             }
         }
@@ -2255,6 +2310,7 @@ class MainViewModel(
         media: AnilistMedia,
         sources: List<SourceDescriptor>,
         now: Long,
+        requestId: Long,
     ): VerifiedSourceMatches = supervisorScope {
         val semaphore = Semaphore(SOURCE_SEARCH_CONCURRENCY)
         val verified = sources
@@ -2271,15 +2327,15 @@ class MainViewModel(
                                 .take(SOURCE_CANDIDATES_TO_VERIFY)
                             when {
                                 searchResults == null -> {
-                                    publishSourcePickerDiagnostic(media.id, source, "search timed out")
+                                    publishSourcePickerDiagnostic(requestId, media.id, source, "search timed out")
                                     null
                                 }
                                 searchResults.isEmpty() -> {
-                                    publishSourcePickerDiagnostic(media.id, source, "no search results")
+                                    publishSourcePickerDiagnostic(requestId, media.id, source, "no search results")
                                     null
                                 }
                                 candidates.isEmpty() -> {
-                                    publishSourcePickerDiagnostic(media.id, source, "no confident title match")
+                                    publishSourcePickerDiagnostic(requestId, media.id, source, "no confident title match")
                                     null
                                 }
                                 else -> {
@@ -2287,9 +2343,9 @@ class MainViewModel(
                                         firstReadableMatch(source, candidates, now)
                                     }
                                     if (readable == null) {
-                                        publishSourcePickerDiagnostic(media.id, source, "no readable chapters")
+                                        publishSourcePickerDiagnostic(requestId, media.id, source, "no readable chapters")
                                     } else {
-                                        publishSourcePickerMatch(media.id, readable.match, readable.chapterCount)
+                                        publishSourcePickerMatch(requestId, media.id, readable.match, readable.chapterCount)
                                     }
                                     readable
                                 }
@@ -2297,7 +2353,7 @@ class MainViewModel(
                         } catch (error: Throwable) {
                             if (error is CancellationException) throw error
                             Log.w(TAG, "Source verification failed for ${source.name}", error)
-                            publishSourcePickerDiagnostic(media.id, source, sourcePickerDiagnosticDetail(error))
+                            publishSourcePickerDiagnostic(requestId, media.id, source, sourcePickerDiagnosticDetail(error))
                             null
                         }
                     }
@@ -2350,9 +2406,9 @@ class MainViewModel(
         return null
     }
 
-    private fun publishSourcePickerMatch(mediaId: Int, match: SourceSearchResult, chapterCount: Int) {
+    private fun publishSourcePickerMatch(requestId: Long, mediaId: Int, match: SourceSearchResult, chapterCount: Int) {
         _state.update {
-            if (it.selectedMedia?.id != mediaId) {
+            if (!isActiveSourcePickerRequest(requestId, mediaId)) {
                 it
             } else {
                 val nextMatches = (it.sourceMatches + match)
@@ -2368,10 +2424,10 @@ class MainViewModel(
         }
     }
 
-    private fun publishSourcePickerDiagnostic(mediaId: Int, source: SourceDescriptor, detail: String) {
+    private fun publishSourcePickerDiagnostic(requestId: Long, mediaId: Int, source: SourceDescriptor, detail: String) {
         val diagnostic = "${source.name}: $detail"
         _state.update {
-            if (it.selectedMedia?.id != mediaId) {
+            if (!isActiveSourcePickerRequest(requestId, mediaId)) {
                 it
             } else if (diagnostic in it.sourcePickerDiagnostics) {
                 it
@@ -2405,20 +2461,20 @@ class MainViewModel(
     }
 
     fun bindSourceMatch(match: SourceSearchResult) {
-        viewModelScope.launch {
+        val media = _state.value.selectedMedia ?: return
+        val requestId = beginSourcePickerJob()
+        sourcePickerJob = viewModelScope.launch {
             _state.update {
                 it.copy(
-                    busy = true,
                     sourcePickerLoading = true,
                     sourcePickerMessage = "Opening ${match.manga.title} from ${match.source.name}...",
                     message = null,
                 )
             }
-            runCatching {
+            try {
                 val resolved = match.withResolvedManga()
+                if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 saveSourceBinding(resolved)
-                resolved
-            }.onSuccess { resolved ->
                 _state.update {
                     it.copy(
                         selectedSourceId = resolved.source.id,
@@ -2430,7 +2486,9 @@ class MainViewModel(
                     )
                 }
                 loadChapters(resolved.source, resolved.manga)
-            }.onFailure { error ->
+            } catch (error: Throwable) {
+                if (error is CancellationException) return@launch
+                if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 Log.w(TAG, "Source binding failed for ${match.source.name}/${match.manga.title}", error)
                 _state.update {
                     it.copy(
@@ -2439,6 +2497,10 @@ class MainViewModel(
                         sourcePickerMessage = sourcePickerErrorMessage(match.source.name, error),
                         message = null,
                     )
+                }
+            } finally {
+                if (sourcePickerRequestId == requestId) {
+                    sourcePickerJob = null
                 }
             }
         }

@@ -86,13 +86,6 @@ fun tankobunThemeChoices(): List<TankobunThemeChoice> = listOf(
         swatches = listOf(Color(0xFFFBFDEB), Color(0xFF1F8F87), Color(0xFFE0A800)),
     ),
     TankobunThemeChoice(
-        mode = TankobunThemeMode.MIDNIGHT_RAMEN,
-        name = "Midnight Ramen",
-        description = "Cozy dark default",
-        dark = true,
-        swatches = listOf(Color(0xFF130D10), Color(0xFFFF7A88), Color(0xFFFFB078)),
-    ),
-    TankobunThemeChoice(
         mode = TankobunThemeMode.CHARCOAL_GOLD,
         name = "Charcoal Gold",
         description = "Matte charcoal with warm gold ink",
@@ -201,9 +194,9 @@ fun TankobunTheme(
 ) {
     val systemDark = isSystemInDarkTheme()
     val resolvedMode = when (themeMode) {
-        TankobunThemeMode.SYSTEM -> if (systemDark) TankobunThemeMode.MIDNIGHT_RAMEN else TankobunThemeMode.BUNNY_MOCHI
+        TankobunThemeMode.SYSTEM -> if (systemDark) TankobunThemeMode.NEON_KOI else TankobunThemeMode.BUNNY_MOCHI
         TankobunThemeMode.LIGHT -> TankobunThemeMode.BUNNY_MOCHI
-        TankobunThemeMode.DARK -> TankobunThemeMode.MIDNIGHT_RAMEN
+        TankobunThemeMode.DARK -> TankobunThemeMode.NEON_KOI
         else -> themeMode
     }
     val spec = themeSpecFor(resolvedMode)
@@ -530,10 +523,7 @@ private fun themeSpecFor(mode: TankobunThemeMode): TankobunThemeSpec = when (mod
             coverScrim = Color(0x44000000),
         ),
     )
-    TankobunThemeMode.MIDNIGHT_RAMEN, TankobunThemeMode.DARK -> TankobunThemeSpec(
-        colors = TankobunDarkColors,
-        tokens = TankobunDarkTokens,
-    )
+    TankobunThemeMode.MIDNIGHT_RAMEN, TankobunThemeMode.DARK -> themeSpecFor(TankobunThemeMode.NEON_KOI)
     TankobunThemeMode.SYSTEM, TankobunThemeMode.BUNNY_MOCHI, TankobunThemeMode.LIGHT -> TankobunThemeSpec(
         colors = TankobunLightColors,
         tokens = TankobunLightTokens,

@@ -508,7 +508,7 @@ internal fun SettingsToggleRow(
 internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
     when (this) {
         SettingsRoute.MAIN -> "Settings"
-        SettingsRoute.APPEARANCE -> tankobunThemeChoices().firstOrNull { it.mode == state.themeMode }?.name ?: "Bunny Mochi"
+        SettingsRoute.APPEARANCE -> tankobunThemeChoices().firstOrNull { it.mode == state.themeMode }?.name ?: "Neon Koi"
         SettingsRoute.LIBRARY -> state.libraryViewMode.mediaViewSettingsSummary(
             columns = state.libraryCoverColumns,
             showWholeCovers = state.libraryShowWholeCovers,

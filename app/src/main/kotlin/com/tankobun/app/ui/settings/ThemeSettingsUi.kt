@@ -236,7 +236,7 @@ internal fun ThemePicker(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
-                choices.firstOrNull { it.mode == selected }?.name ?: "Bunny Mochi",
+                choices.firstOrNull { it.mode == selected }?.name ?: "Neon Koi",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

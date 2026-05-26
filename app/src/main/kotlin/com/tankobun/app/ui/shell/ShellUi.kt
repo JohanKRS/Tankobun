@@ -759,7 +759,7 @@ internal fun TankobunScaffold(
                         .graphicsLayer { translationX = overlayDrawerTranslationPx },
                 )
             }
-            if (state.busy) {
+            if (state.busy && !(state.sourcePickerOpen && state.sourcePickerLoading)) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }
         }
