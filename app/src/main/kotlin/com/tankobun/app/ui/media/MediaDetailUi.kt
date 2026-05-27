@@ -5,6 +5,8 @@ import android.content.Intent
 import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Rect
+import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
@@ -105,6 +107,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
@@ -321,37 +324,38 @@ internal fun MangaDetailScreen(
 
             item {
                 Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                    SourceSummarySection(state, viewModel, media)
+                    SourceSummarySection(state, viewModel)
                 }
             }
 
             item {
                 Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
                     var downloadActionsOpen by remember { mutableStateOf(false) }
-                    DetailSectionTitle("Chapters")
-                    Spacer(Modifier.height(8.dp))
-                    if (state.selectedSourceManga == null) {
-                        DetailPlaceholderCard(
-                            icon = Icons.AutoMirrored.Filled.MenuBook,
-                            title = "No chapters loaded yet.",
-                            subtitle = "Select a source to view chapters.",
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            ChapterActionsBar(
-                                readingActionChapter = state.primaryReadingActionChapter(),
-                                hasProgress = state.latestProgress != null,
-                                hasChapters = state.sourceChapters.isNotEmpty(),
-                                onOpenChapter = viewModel::openChapter,
-                                onLoadChapters = viewModel::loadChaptersForCurrentMatch,
-                                onOpenDownloadActions = { downloadActionsOpen = true },
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DetailSectionTitle("Chapters")
+                        if (state.selectedSourceManga == null) {
+                            DetailPlaceholderCard(
+                                icon = Icons.AutoMirrored.Filled.MenuBook,
+                                title = "No chapters loaded yet.",
+                                subtitle = "Select a source to view chapters.",
                             )
-                            if (state.selectingDownloadChapters) {
-                                ChapterManualDownloadBar(
-                                    selectedCount = state.selectedDownloadChapterUrls.size,
-                                    onDownloadSelected = viewModel::downloadSelectedChapters,
-                                    onCancel = viewModel::cancelManualDownloadSelection,
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                ChapterActionsBar(
+                                    readingActionChapter = state.primaryReadingActionChapter(),
+                                    hasProgress = state.latestProgress != null,
+                                    hasChapters = state.sourceChapters.isNotEmpty(),
+                                    onOpenChapter = viewModel::openChapter,
+                                    onLoadChapters = viewModel::loadChaptersForCurrentMatch,
+                                    onOpenDownloadActions = { downloadActionsOpen = true },
                                 )
+                                if (state.selectingDownloadChapters) {
+                                    ChapterManualDownloadBar(
+                                        selectedCount = state.selectedDownloadChapterUrls.size,
+                                        onDownloadSelected = viewModel::downloadSelectedChapters,
+                                        onCancel = viewModel::cancelManualDownloadSelection,
+                                    )
+                                }
                             }
                         }
                     }
@@ -454,7 +458,7 @@ internal fun DetailPlaceholderCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         color = mediaDetailPanelColor(),
         contentColor = mediaDetailForegroundColor(),
         tonalElevation = 0.dp,
@@ -507,27 +511,46 @@ internal fun ChapterActionsBar(
     onOpenDownloadActions: () -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val compact = maxWidth < 430.dp
-        val compactLabelStyle = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge
+        val tight = maxWidth < 380.dp
+        val labelStyle = if (tight) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge
+        val actionShape = RoundedCornerShape(7.dp)
+        val actionHeight = 42.dp
         val startReadingButton: @Composable (Modifier) -> Unit = { modifier ->
             if (readingActionChapter != null) {
-                Button(onClick = { onOpenChapter(readingActionChapter) }, modifier = modifier.heightIn(min = 42.dp)) {
-                    Text(
-                        if (hasProgress) "Resume" else "Start reading",
-                        style = compactLabelStyle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                Button(
+                    onClick = { onOpenChapter(readingActionChapter) },
+                    modifier = modifier.height(actionHeight),
+                    shape = actionShape,
+                    contentPadding = PaddingValues(horizontal = if (tight) 0.dp else 14.dp),
+                ) {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = if (hasProgress) "Resume reading" else "Start reading",
+                        modifier = Modifier.size(18.dp),
                     )
+                    if (!tight) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            if (hasProgress) "Resume" else "Start",
+                            style = labelStyle,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
         val refreshButton: @Composable (Modifier) -> Unit = { modifier ->
-            OutlinedButton(onClick = onLoadChapters, modifier = modifier.heightIn(min = 42.dp)) {
-                Text(
-                    if (hasChapters) "Refresh chapters" else "Load chapters",
-                    style = compactLabelStyle,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+            OutlinedButton(
+                onClick = onLoadChapters,
+                modifier = modifier.size(width = actionHeight, height = actionHeight),
+                shape = actionShape,
+                contentPadding = PaddingValues(0.dp),
+            ) {
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription = if (hasChapters) "Refresh chapters" else "Load chapters",
+                    modifier = Modifier.size(19.dp),
                 )
             }
         }
@@ -535,47 +558,36 @@ internal fun ChapterActionsBar(
             OutlinedButton(
                 onClick = onOpenDownloadActions,
                 enabled = hasChapters,
-                modifier = modifier.heightIn(min = 42.dp),
+                modifier = modifier.height(actionHeight),
+                shape = actionShape,
+                contentPadding = PaddingValues(horizontal = if (tight) 0.dp else 13.dp),
             ) {
                 Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "Download",
-                    style = compactLabelStyle,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (!tight) {
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        "Download",
+                        style = labelStyle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
 
-        if (compact) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (readingActionChapter != null) {
-                        startReadingButton(Modifier.weight(1f))
-                        refreshButton(Modifier.weight(1f))
-                    } else {
-                        refreshButton(Modifier.fillMaxWidth())
-                    }
-                }
-                downloadButton(Modifier.widthIn(min = 150.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (readingActionChapter != null) {
+                startReadingButton(
+                    if (tight) Modifier.width(actionHeight) else Modifier.widthIn(min = 122.dp),
+                )
             }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                startReadingButton(Modifier)
-                refreshButton(Modifier)
-                Spacer(Modifier.weight(1f))
-                downloadButton(Modifier)
-            }
+            Spacer(Modifier.weight(1f))
+            refreshButton(Modifier)
+            downloadButton(if (tight) Modifier.width(actionHeight) else Modifier.widthIn(min = 116.dp))
         }
     }
 }
@@ -1671,10 +1683,9 @@ internal fun LoadMoreRecommendationsTile(
 }
 
 @Composable
-internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
+internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewModel) {
     val selectedManga = state.selectedSourceManga
     val selectedSource = state.selectedSource
-    val latestProgress = state.latestProgress
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         DetailSectionTitle("Source")
@@ -1690,15 +1701,12 @@ internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewMod
             )
         } else {
             SelectedSourceCard(
-                media = media,
-                mangaTitle = selectedManga.title,
-                thumbnailUrl = selectedManga.thumbnailUrl,
-                sourceLine = listOfNotNull(
-                    selectedSource?.let { "${it.name} (${it.lang})" },
-                    state.sourceChapters.takeIf { it.isNotEmpty() }?.let { "${it.size} chapters" },
-                ).joinToString(" / "),
-                progressLine = latestProgress?.let {
-                    "Last read: chapter ${it.chapterNumber.takeIf { chapter -> chapter > 0 } ?: "?"}, page ${it.pageIndex + 1}"
+                source = selectedSource,
+                sourceName = selectedSource?.let { "${it.name} (${it.lang})" } ?: "Selected source",
+                chapterLine = if (state.sourceChapters.isEmpty()) {
+                    "No chapters loaded"
+                } else {
+                    "${state.sourceChapters.size} chapters"
                 },
                 onChange = viewModel::openSourcePicker,
             )
@@ -1714,58 +1722,30 @@ internal fun SourceActionCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         color = mediaDetailPanelColor(),
         contentColor = mediaDetailForegroundColor(),
     ) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val compact = maxWidth < 340.dp
-            val contentModifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp)
-            if (compact) {
-                Column(
-                    modifier = contentModifier,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        DetailIconBadge(icon = Icons.Default.Link)
-                        SourceActionText(title = title, subtitle = subtitle, modifier = Modifier.weight(1f))
-                    }
-                    Button(
-                        onClick = onFindSource,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = mediaDetailActionColor(),
-                            contentColor = MaterialTheme.colorScheme.onSecondary,
-                        ),
-                    ) {
-                        Icon(Icons.Default.Search, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("Find source", fontWeight = FontWeight.Bold)
-                    }
-                }
-            } else {
-                Row(
-                    modifier = contentModifier,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    DetailIconBadge(icon = Icons.Default.Link)
-                    SourceActionText(title = title, subtitle = subtitle, modifier = Modifier.weight(1f))
-                    Button(
-                        onClick = onFindSource,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = mediaDetailActionColor(),
-                            contentColor = MaterialTheme.colorScheme.onSecondary,
-                        ),
-                    ) {
-                        Icon(Icons.Default.Search, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("Find source", fontWeight = FontWeight.Bold)
-                    }
-                }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 13.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DetailIconBadge(icon = Icons.Default.Link)
+            SourceActionText(title = title, subtitle = subtitle, modifier = Modifier.weight(1f))
+            OutlinedButton(
+                onClick = onFindSource,
+                modifier = Modifier.size(42.dp),
+                shape = RoundedCornerShape(7.dp),
+                contentPadding = PaddingValues(0.dp),
+            ) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = "Find source",
+                    modifier = Modifier.size(19.dp),
+                )
             }
         }
     }
@@ -1785,107 +1765,157 @@ internal fun SourceActionText(title: String, subtitle: String, modifier: Modifie
 
 @Composable
 internal fun SelectedSourceCard(
-    media: AnilistMedia,
-    mangaTitle: String,
-    thumbnailUrl: String?,
-    sourceLine: String,
-    progressLine: String?,
+    source: SourceDescriptor?,
+    sourceName: String,
+    chapterLine: String,
     onChange: () -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         color = mediaDetailPanelColor(),
         contentColor = mediaDetailForegroundColor(),
     ) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val compact = maxWidth < 430.dp
-            val coverWidth = if (compact) 48.dp else 56.dp
-            val coverHeight = if (compact) 68.dp else 78.dp
-            val cardPadding = if (compact) 12.dp else 14.dp
-            val textBlock: @Composable (Modifier) -> Unit = { modifier ->
+            val iconSize = if (compact) 48.dp else 52.dp
+            val actionSize = 42.dp
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = if (compact) 12.dp else 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PlainSourceIcon(
+                    source = source,
+                    fallbackName = sourceName,
+                    modifier = Modifier.size(iconSize),
+                )
                 Column(
-                    modifier = modifier,
-                    verticalArrangement = Arrangement.spacedBy(if (compact) 1.dp else 2.dp),
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
                 ) {
                     Text(
-                        mangaTitle,
+                        sourceName,
                         style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        sourceLine,
+                        chapterLine,
                         style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    progressLine?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
                 }
-            }
-            val changeButton: @Composable (Modifier) -> Unit = { modifier ->
-                Button(
+                OutlinedButton(
                     onClick = onChange,
-                    modifier = modifier.heightIn(min = if (compact) 42.dp else 46.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = mediaDetailActionColor(),
-                        contentColor = MaterialTheme.colorScheme.onSecondary,
-                    ),
+                    modifier = Modifier.size(actionSize),
+                    shape = RoundedCornerShape(7.dp),
+                    contentPadding = PaddingValues(0.dp),
                 ) {
-                    Text(
-                        "Change",
-                        style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                    Icon(
+                        Icons.Default.SwapHoriz,
+                        contentDescription = "Change source",
+                        modifier = Modifier.size(19.dp),
                     )
-                }
-            }
-
-            if (compact) {
-                Column(
-                    modifier = Modifier.padding(cardPadding),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        CoverImage(
-                            url = thumbnailUrl ?: media.coverImage,
-                            title = mangaTitle,
-                            modifier = Modifier.size(width = coverWidth, height = coverHeight),
-                        )
-                        textBlock(Modifier.weight(1f))
-                    }
-                    changeButton(Modifier.align(Alignment.End).widthIn(min = 108.dp))
-                }
-            } else {
-                Row(
-                    modifier = Modifier.padding(cardPadding),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CoverImage(
-                        url = thumbnailUrl ?: media.coverImage,
-                        title = mangaTitle,
-                        modifier = Modifier.size(width = coverWidth, height = coverHeight),
-                    )
-                    textBlock(Modifier.weight(1f))
-                    changeButton(Modifier.widthIn(min = 116.dp))
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun PlainSourceIcon(
+    source: SourceDescriptor?,
+    fallbackName: String,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val sourceIcon = remember(source?.packageName) {
+        source?.packageName?.let { packageName ->
+            runCatching {
+                context.packageManager.getApplicationIcon(packageName).toSourceImageBitmap()
+            }.getOrNull()
+        }
+    }
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(7.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (sourceIcon != null) {
+            Image(
+                bitmap = sourceIcon,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(7.dp),
+                color = mediaDetailAccentColor().copy(alpha = 0.16f),
+                contentColor = mediaDetailAccentColor(),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        extensionInitials(fallbackName),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun Drawable.toSourceImageBitmap(): ImageBitmap {
+    val drawable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && this is AdaptiveIconDrawable) {
+        foreground ?: this
+    } else {
+        this
+    }
+    val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 192
+    val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 192
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    drawable.setBounds(0, 0, canvas.width, canvas.height)
+    drawable.draw(canvas)
+    val visibleBounds = bitmap.visibleAlphaBounds()
+    val trimmed = if (visibleBounds != null && visibleBounds.width() > 0 && visibleBounds.height() > 0) {
+        Bitmap.createBitmap(bitmap, visibleBounds.left, visibleBounds.top, visibleBounds.width(), visibleBounds.height())
+    } else {
+        bitmap
+    }
+    return trimmed.asImageBitmap()
+}
+
+private fun Bitmap.visibleAlphaBounds(alphaThreshold: Int = 8): Rect? {
+    val pixels = IntArray(width * height)
+    getPixels(pixels, 0, width, 0, 0, width, height)
+    var left = width
+    var top = height
+    var right = -1
+    var bottom = -1
+    for (y in 0 until height) {
+        val rowOffset = y * width
+        for (x in 0 until width) {
+            val alpha = pixels[rowOffset + x] ushr 24
+            if (alpha > alphaThreshold) {
+                if (x < left) left = x
+                if (x > right) right = x
+                if (y < top) top = y
+                if (y > bottom) bottom = y
+            }
+        }
+    }
+    return if (right >= left && bottom >= top) {
+        Rect(left, top, right + 1, bottom + 1)
+    } else {
+        null
     }
 }
 
@@ -2244,6 +2274,7 @@ internal fun ChapterRow(
         @Composable
         fun ChapterCard() {
             ElevatedCard(
+                shape = RoundedCornerShape(8.dp),
                 onClick = {
                     if (selectingForDownload) {
                         onToggleDownloadSelection()

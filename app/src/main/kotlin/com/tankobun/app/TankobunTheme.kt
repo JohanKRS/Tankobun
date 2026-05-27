@@ -1,7 +1,9 @@
 package com.tankobun.app
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -10,6 +12,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 @Immutable
 data class TankobunThemeTokens(
@@ -149,6 +152,14 @@ private val TankobunDarkTokens = TankobunThemeTokens(
 
 val LocalTankobunTokens = staticCompositionLocalOf { TankobunLightTokens }
 
+private val TankobunShapes = Shapes(
+    extraSmall = RoundedCornerShape(7.dp),
+    small = RoundedCornerShape(7.dp),
+    medium = RoundedCornerShape(7.dp),
+    large = RoundedCornerShape(7.dp),
+    extraLarge = RoundedCornerShape(7.dp),
+)
+
 private val TankobunLightColors = lightColorScheme(
     primary = Color(0xFFB82235),
     onPrimary = Color.White,
@@ -203,6 +214,7 @@ fun TankobunTheme(
 
     MaterialTheme(
         colorScheme = spec.colors,
+        shapes = TankobunShapes,
         typography = MaterialTheme.typography,
     ) {
         CompositionLocalProvider(
