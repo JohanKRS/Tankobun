@@ -15,7 +15,8 @@ internal fun TankobunUiState.hasBrowseFilters(): Boolean =
         browseFormat != null ||
         browsePublishingStatus != null ||
         browseCountryOfOrigin != null ||
-        browseYear != null
+        browseYear != null ||
+        browseStaffName != null
 
 internal fun TankobunUiState.hasBrowseQueryOrFilters(): Boolean =
     searchQuery.trim().isNotBlank() ||
@@ -38,6 +39,7 @@ internal fun TankobunUiState.browseCacheKey(): String = buildString {
     append("|status=").append(browsePublishingStatus.orEmpty())
     append("|country=").append(browseCountryOfOrigin.orEmpty())
     append("|year=").append(browseYear?.toString().orEmpty())
+    append("|staff=").append(browseStaffName.orEmpty().normalizedSearchKey())
     append("|sort=").append(effectiveBrowseSort())
 }
 

@@ -188,6 +188,39 @@ object AnilistQueries {
         }
     """
 
+    const val StaffManga = """
+        query StaffManga(${'$'}search: String!, ${'$'}page: Int!, ${'$'}perPage: Int!, ${'$'}sort: [MediaSort]) {
+          Staff(search: ${'$'}search) {
+            staffMedia(type: MANGA, sort: ${'$'}sort, page: ${'$'}page, perPage: ${'$'}perPage) {
+              edges {
+                staffRole
+                node {
+                  id
+                  idMal
+                  title { romaji english native userPreferred }
+                  description(asHtml: false)
+                  coverImage { extraLarge large color }
+                  bannerImage
+                  chapters
+                  volumes
+                  format
+                  status
+                  averageScore
+                  popularity
+                  startDate { year }
+                  endDate { year }
+                  siteUrl
+                  genres
+                  synonyms
+                  isAdult
+                  updatedAt
+                }
+              }
+            }
+          }
+        }
+    """
+
     const val MediaDetails = """
         query MediaDetails(${'$'}id: Int!, ${'$'}scoreFormat: ScoreFormat, ${'$'}recommendationsPage: Int!, ${'$'}recommendationsPerPage: Int!) {
           Media(id: ${'$'}id, type: MANGA) {

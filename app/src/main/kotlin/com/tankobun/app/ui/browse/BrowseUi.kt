@@ -904,7 +904,11 @@ internal fun BrowseResults(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    if (state.searchQuery.isBlank()) "Browse Manga" else "Search Results",
+                    when {
+                        state.browseStaffName != null -> "Author Results"
+                        state.searchQuery.isBlank() -> "Browse Manga"
+                        else -> "Search Results"
+                    },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                 )
@@ -1360,11 +1364,13 @@ internal fun TankobunUiState.browseControlsActive(): Boolean =
         browsePublishingStatus != null ||
         browseCountryOfOrigin != null ||
         browseYear != null ||
+        browseStaffName != null ||
         browseSort != BROWSE_SORT_SEARCH_MATCH_UI
 
 internal fun browseSummary(state: TankobunUiState): String {
     val parts = buildList {
         state.searchQuery.trim().takeIf { it.isNotBlank() }?.let { add("Search \"$it\"") }
+        state.browseStaffName?.let { add("Author: $it") }
         if (state.browseGenres.isNotEmpty()) add(state.browseGenres.sorted().joinToString(", "))
         if (state.browseTags.isNotEmpty()) add(state.browseTags.sorted().joinToString(", "))
         state.browseFormat?.let { add(BrowseFormatOptions.labelFor(it)) }

@@ -89,6 +89,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
@@ -529,6 +530,21 @@ internal fun TankobunScaffold(
     val quickDrawerBackdropRevealFraction = maxOf(overlayDrawerRevealFraction, closedDrawerRevealFraction)
     val drawerScrimAlpha = QuickDrawerScrimAlpha * quickDrawerBackdropRevealFraction
     val drawerBackdropBlur = (QuickDrawerBackdropBlurDp * quickDrawerBackdropRevealFraction).dp
+    val mediaDetailActive = selectedMedia != null
+    val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
+    val mediaDetailTopBarInset = if (mediaDetailActive) {
+        val statusBarInset = if (showStatusBar) {
+            WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        } else {
+            0.dp
+        }
+        statusBarInset + if (compactLayout) 48.dp else 72.dp
+    } else {
+        0.dp
+    }
+    val routeBackdropColor = LocalTankobunTokens.current.appBackdrop
+    val routeBarColor = LocalTankobunTokens.current.elevatedSurface
+    val routeContentColor = MaterialTheme.colorScheme.onSurface
 
     LaunchedEffect(quickDrawerMode) {
         if (quickDrawerMode != QuickDrawerMode.OVERLAY) {
@@ -573,7 +589,7 @@ internal fun TankobunScaffold(
     }
 
     Scaffold(
-        containerColor = LocalTankobunTokens.current.appBackdrop,
+        containerColor = routeBackdropColor,
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TankobunTopBar(
@@ -582,6 +598,8 @@ internal fun TankobunScaffold(
                 showBack = selectedMedia != null || (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN),
                 ignoreDisplayCutout = ignoreDisplayCutout,
                 showStatusBar = showStatusBar,
+                mediaDetailActive = mediaDetailActive,
+                onOpenActions = if (mediaDetailActive) onOpenQuickDrawer else null,
                 onBack = {
                     if (selectedMedia != null) {
                         viewModel.clearSelectedMedia()
@@ -594,8 +612,8 @@ internal fun TankobunScaffold(
         bottomBar = {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = LocalTankobunTokens.current.elevatedSurface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
+                color = routeBarColor,
+                contentColor = routeContentColor,
                 tonalElevation = 2.dp,
             ) {
                 TankobunBottomNavigationBar(
@@ -610,9 +628,14 @@ internal fun TankobunScaffold(
         },
     ) { padding ->
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        start = padding.calculateStartPadding(LocalLayoutDirection.current),
+                        top = if (mediaDetailActive) 0.dp else padding.calculateTopPadding(),
+                        end = padding.calculateEndPadding(LocalLayoutDirection.current),
+                        bottom = padding.calculateBottomPadding(),
+                    ),
         ) {
             val handleScreenCenterOffset = (padding.calculateBottomPadding() - padding.calculateTopPadding()) / 2f
             Row(
@@ -620,11 +643,23 @@ internal fun TankobunScaffold(
                     .fillMaxSize()
                     .padding(start = cutoutStartPadding, end = cutoutEndPadding)
                     .blur(drawerBackdropBlur)
-                    .background(LocalTankobunTokens.current.appBackdrop),
+                    .background(routeBackdropColor),
             ) {
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                     if (selectedMedia != null) {
-                        MangaDetailScreen(state, viewModel, selectedMedia)
+                        MangaDetailScreen(
+                            state = state,
+                            viewModel = viewModel,
+                            media = selectedMedia,
+                            onBrowseTag = { tag ->
+                                viewModel.browseByTag(tag)
+                                onSelectTab(1)
+                            },
+                            onBrowseAuthor = { author ->
+                                viewModel.browseByAuthor(author)
+                                onSelectTab(1)
+                            },
+                        )
                     } else {
                         when (selectedTab) {
                             0 -> LibraryScreen(state, viewModel)
@@ -654,7 +689,9 @@ internal fun TankobunScaffold(
                         onTogglePin = onToggleQuickDrawerPin,
                         drawerWidth = pinnedWidth,
                         endPadding = cutoutEndPadding,
-                        modifier = Modifier.fillMaxHeight(),
+                        modifier = Modifier
+                            .padding(top = mediaDetailTopBarInset)
+                            .fillMaxHeight(),
                     )
                 }
             }
@@ -678,6 +715,7 @@ internal fun TankobunScaffold(
                     showHandle = false,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
+                        .padding(top = mediaDetailTopBarInset)
                         .fillMaxHeight()
                         .graphicsLayer { translationX = closedDrawerTranslationPx },
                 )
@@ -758,6 +796,7 @@ internal fun TankobunScaffold(
                     handleDragLocally = false,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
+                        .padding(top = mediaDetailTopBarInset)
                         .fillMaxHeight()
                         .graphicsLayer { translationX = overlayDrawerTranslationPx },
                 )
@@ -870,6 +909,8 @@ internal fun TankobunTopBar(
     showBack: Boolean,
     ignoreDisplayCutout: Boolean,
     showStatusBar: Boolean,
+    mediaDetailActive: Boolean = false,
+    onOpenActions: (() -> Unit)? = null,
     onBack: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
@@ -886,45 +927,79 @@ internal fun TankobunTopBar(
     val iconSize = if (compact) 18.dp else 24.dp
     val logoSize = if (compact) 36.dp else 56.dp
     val spacing = if (compact) 7.dp else 12.dp
+    val barColor = if (mediaDetailActive) Color.Transparent else LocalTankobunTokens.current.elevatedSurface
+    val contentColor = MaterialTheme.colorScheme.onSurface
     Surface(
-        color = LocalTankobunTokens.current.elevatedSurface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 1.dp,
+        color = barColor,
+        contentColor = contentColor,
+        tonalElevation = if (mediaDetailActive) 0.dp else 1.dp,
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(barHeight + statusBarInset)
-                .padding(
+                .height(barHeight + statusBarInset),
+        ) {
+            if (mediaDetailActive) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .blur(42.dp)
+                        .background(LocalTankobunTokens.current.appBackdrop.copy(alpha = 0.96f)),
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(LocalTankobunTokens.current.elevatedSurface.copy(alpha = 0.72f)),
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
                     start = horizontalPadding + startInset,
                     top = statusBarInset,
                     end = horizontalPadding + endInset,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing),
-        ) {
-            if (showBack) {
-                IconButton(onClick = onBack, modifier = Modifier.size(if (compact) 36.dp else 48.dp)) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        modifier = Modifier.size(iconSize),
-                    )
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing),
+            ) {
+                if (showBack) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(if (compact) 36.dp else 48.dp)) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            modifier = Modifier.size(iconSize),
+                        )
+                    }
+                }
+                Image(
+                    painter = painterResource(R.drawable.ic_launcher_foreground),
+                    contentDescription = null,
+                    modifier = Modifier.size(logoSize),
+                )
+                Text(
+                    title,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = FontWeight.Bold,
+                    style = when {
+                        mediaDetailActive && compact -> MaterialTheme.typography.titleMedium
+                        mediaDetailActive -> MaterialTheme.typography.titleLarge
+                        compact -> MaterialTheme.typography.titleSmall
+                        else -> MaterialTheme.typography.titleLarge
+                    },
+                )
+                if (onOpenActions != null) {
+                    IconButton(onClick = onOpenActions, modifier = Modifier.size(if (compact) 36.dp else 48.dp)) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = "Quick actions",
+                            modifier = Modifier.size(iconSize),
+                        )
+                    }
                 }
             }
-            Image(
-                painter = painterResource(R.drawable.ic_launcher_foreground),
-                contentDescription = null,
-                modifier = Modifier.size(logoSize),
-            )
-            Text(
-                title,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = FontWeight.Bold,
-                style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleLarge,
-            )
         }
     }
 }

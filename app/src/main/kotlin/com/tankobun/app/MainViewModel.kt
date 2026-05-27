@@ -963,12 +963,13 @@ class MainViewModel(
     }
 
     fun setSearchQuery(query: String) {
-        _state.update { it.copy(searchQuery = query) }
+        _state.update { it.copy(searchQuery = query, browseStaffName = null) }
     }
 
     fun setBrowseGenre(genre: String, selected: Boolean) {
         _state.update {
             it.copy(
+                browseStaffName = null,
                 browseGenres = if (selected) {
                     it.browseGenres + genre
                 } else {
@@ -981,6 +982,7 @@ class MainViewModel(
     fun setBrowseTag(tag: String, selected: Boolean) {
         _state.update {
             it.copy(
+                browseStaffName = null,
                 browseTags = if (selected) {
                     it.browseTags + tag
                 } else {
@@ -991,19 +993,19 @@ class MainViewModel(
     }
 
     fun setBrowseFormat(format: String?) {
-        _state.update { it.copy(browseFormat = format) }
+        _state.update { it.copy(browseFormat = format, browseStaffName = null) }
     }
 
     fun setBrowsePublishingStatus(status: String?) {
-        _state.update { it.copy(browsePublishingStatus = status) }
+        _state.update { it.copy(browsePublishingStatus = status, browseStaffName = null) }
     }
 
     fun setBrowseCountryOfOrigin(country: String?) {
-        _state.update { it.copy(browseCountryOfOrigin = country) }
+        _state.update { it.copy(browseCountryOfOrigin = country, browseStaffName = null) }
     }
 
     fun setBrowseYear(year: Int?) {
-        _state.update { it.copy(browseYear = year) }
+        _state.update { it.copy(browseYear = year, browseStaffName = null) }
     }
 
     fun setBrowseSort(sort: String) {
@@ -1022,6 +1024,7 @@ class MainViewModel(
                 browsePublishingStatus = null,
                 browseCountryOfOrigin = null,
                 browseYear = null,
+                browseStaffName = null,
                 browseSort = BROWSE_SORT_SEARCH_MATCH,
                 message = null,
             )
@@ -1041,6 +1044,7 @@ class MainViewModel(
                 browsePublishingStatus = null,
                 browseCountryOfOrigin = null,
                 browseYear = null,
+                browseStaffName = null,
                 browseSort = sort,
                 message = null,
             )
@@ -1060,6 +1064,47 @@ class MainViewModel(
                 browsePublishingStatus = null,
                 browseCountryOfOrigin = "KR",
                 browseYear = null,
+                browseStaffName = null,
+                browseSort = "POPULARITY_DESC",
+                message = null,
+            )
+        }
+        searchAniList()
+    }
+
+    fun browseByTag(tag: String) {
+        _state.update {
+            it.copy(
+                searchQuery = "",
+                searchResults = emptyList(),
+                browseSearched = false,
+                browseGenres = emptySet(),
+                browseTags = setOf(tag),
+                browseFormat = null,
+                browsePublishingStatus = null,
+                browseCountryOfOrigin = null,
+                browseYear = null,
+                browseStaffName = null,
+                browseSort = BROWSE_SORT_SEARCH_MATCH,
+                message = null,
+            )
+        }
+        searchAniList()
+    }
+
+    fun browseByAuthor(author: String) {
+        _state.update {
+            it.copy(
+                searchQuery = "",
+                searchResults = emptyList(),
+                browseSearched = false,
+                browseGenres = emptySet(),
+                browseTags = emptySet(),
+                browseFormat = null,
+                browsePublishingStatus = null,
+                browseCountryOfOrigin = null,
+                browseYear = null,
+                browseStaffName = author,
                 browseSort = "POPULARITY_DESC",
                 message = null,
             )
@@ -1132,6 +1177,7 @@ class MainViewModel(
     fun searchAniList() {
         val snapshot = _state.value
         val query = snapshot.searchQuery.trim()
+        val staffName = snapshot.browseStaffName?.trim().orEmpty()
         if (!snapshot.hasBrowseQueryOrFilters()) {
             _state.update { it.copy(searchResults = emptyList(), browseSearched = false, message = null) }
             loadBrowseLanding()
@@ -1142,7 +1188,12 @@ class MainViewModel(
             runCatching {
                 val cacheKey = snapshot.browseCacheKey()
                 cachedAnilistBrowseMedia(cacheKey) {
-                    if (!snapshot.hasBrowseFilters() && snapshot.browseSort == BROWSE_SORT_SEARCH_MATCH) {
+                    if (staffName.isNotBlank()) {
+                        container.anilistRepository.staffManga(
+                            staffName = staffName,
+                            sort = snapshot.effectiveBrowseSort(),
+                        )
+                    } else if (!snapshot.hasBrowseFilters() && snapshot.browseSort == BROWSE_SORT_SEARCH_MATCH) {
                         container.anilistRepository.searchManga(query)
                     } else {
                         container.anilistRepository.browseManga(

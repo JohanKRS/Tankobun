@@ -110,6 +110,26 @@ class AnilistRepository(
         return AnilistJsonMapper.searchPage(data)
     }
 
+    suspend fun staffManga(
+        staffName: String,
+        sort: String = "POPULARITY_DESC",
+        page: Int = 1,
+        perPage: Int = 50,
+    ): List<AnilistMedia> {
+        val normalizedStaffName = staffName.trim()
+        if (normalizedStaffName.isBlank()) return emptyList()
+        val data = graphQlClient.execute(
+            query = AnilistQueries.StaffManga,
+            variables = buildJsonObject {
+                put("search", normalizedStaffName)
+                put("page", page)
+                put("perPage", perPage)
+                put("sort", buildJsonArray { add(sort) })
+            },
+        )
+        return AnilistJsonMapper.staffMedia(data)
+    }
+
     suspend fun mediaTags(): List<AnilistMediaTag> {
         val data = graphQlClient.execute(query = AnilistQueries.MediaTags)
         return AnilistJsonMapper.mediaTags(data)

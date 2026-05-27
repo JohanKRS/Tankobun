@@ -54,6 +54,7 @@ data class TankobunUiState(
     val browsePublishingStatus: String? = null,
     val browseCountryOfOrigin: String? = null,
     val browseYear: Int? = null,
+    val browseStaffName: String? = null,
     val browseSort: String = BROWSE_SORT_SEARCH_MATCH,
     val browseTrending: List<AnilistMedia> = emptyList(),
     val browsePopular: List<AnilistMedia> = emptyList(),

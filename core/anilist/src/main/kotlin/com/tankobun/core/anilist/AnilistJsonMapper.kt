@@ -120,6 +120,24 @@ object AnilistJsonMapper {
             .map(::media)
     }
 
+    fun staffMedia(data: JsonObject): List<AnilistMedia> {
+        return data["Staff"]
+            ?.takeUnless { it is JsonNull }
+            ?.jsonObject
+            ?.get("staffMedia")
+            ?.takeUnless { it is JsonNull }
+            ?.jsonObject
+            ?.get("edges")
+            ?.jsonArray
+            .orEmpty()
+            .mapNotNull { edge ->
+                val obj = edge.jsonObject
+                if (!obj.stringOrNull("staffRole").isCreatorRole()) return@mapNotNull null
+                obj["node"]?.takeUnless { it is JsonNull }?.let(::media)
+            }
+            .distinctBy { it.id }
+    }
+
     fun mediaTags(data: JsonObject): List<AnilistMediaTag> {
         return data["MediaTagCollection"]
             ?.jsonArray
@@ -239,7 +257,8 @@ private fun String?.isCreatorRole(): Boolean {
     return normalized.contains("story") ||
         normalized.contains("art") ||
         normalized.contains("author") ||
-        normalized.contains("creator")
+        normalized.contains("creator") ||
+        normalized.contains("writer")
 }
 
 private fun JsonObject.mediaTagNames(): List<String> =

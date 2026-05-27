@@ -23,6 +23,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -83,13 +84,17 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
@@ -104,6 +109,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -136,7 +142,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -149,11 +154,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -169,11 +176,21 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -226,19 +243,59 @@ import com.tankobun.app.ui.settings.*
 import com.tankobun.app.ui.shell.*
 
 @Composable
-internal fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
-    Box(Modifier.fillMaxSize()) {
+internal fun MangaDetailScreen(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    media: AnilistMedia,
+    onBrowseTag: (String) -> Unit,
+    onBrowseAuthor: (String) -> Unit,
+) {
+    val backdrop = mediaDetailBackdropColor()
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(backdrop),
+    ) {
+        AsyncImage(
+            model = media.bannerImage ?: media.coverImage,
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(420.dp)
+                .blur(18.dp)
+                .graphicsLayer { alpha = 0.24f },
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to backdrop.copy(alpha = 0.30f),
+                        0.42f to backdrop.copy(alpha = 0.88f),
+                        1f to backdrop,
+                    ),
+                ),
+        )
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .blur(if (state.sourcePickerOpen) 8.dp else 0.dp),
-            contentPadding = PaddingValues(vertical = MediaDetailContentPadding),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(
+                top = MediaDetailTopOverlayPadding,
+                bottom = MediaDetailContentPadding + 12.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             item {
                 Column(Modifier.padding(horizontal = MediaDetailContentPadding)) {
                     Spacer(Modifier.height(4.dp))
-                    MangaHeroSection(media)
+                    MangaHeroSection(
+                        media = media,
+                        onTagClick = onBrowseTag,
+                        onAuthorClick = onBrowseAuthor,
+                    )
                 }
             }
 
@@ -274,7 +331,11 @@ internal fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel,
                     DetailSectionTitle("Chapters")
                     Spacer(Modifier.height(8.dp))
                     if (state.selectedSourceManga == null) {
-                        Text("Choose a source first.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        DetailPlaceholderCard(
+                            icon = Icons.AutoMirrored.Filled.MenuBook,
+                            title = "No chapters loaded yet.",
+                            subtitle = "Select a source to view chapters.",
+                        )
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             ChapterActionsBar(
@@ -320,12 +381,15 @@ internal fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel,
                 }
             }
 
-            if (state.sourceChapters.isEmpty()) {
+            if (state.selectedSourceManga != null && state.sourceChapters.isEmpty()) {
                 item {
-                    Text(
-                        "No chapters loaded yet.",
-                        modifier = Modifier.padding(horizontal = MediaDetailContentPadding),
-                    )
+                    Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
+                        DetailPlaceholderCard(
+                            icon = Icons.AutoMirrored.Filled.MenuBook,
+                            title = "No chapters loaded yet.",
+                            subtitle = "Load chapters from the selected source.",
+                        )
+                    }
                 }
             } else {
                 items(state.sourceChapters, key = { "${it.sourceId}:${it.url}" }) { chapter ->
@@ -350,19 +414,86 @@ internal fun MangaDetailScreen(state: TankobunUiState, viewModel: MainViewModel,
     }
 }
 
+@Composable
+internal fun mediaDetailBackdropColor(): Color = LocalTankobunTokens.current.appBackdrop
+
+@Composable
+internal fun mediaDetailPanelColor(): Color = LocalTankobunTokens.current.elevatedSurface.copy(alpha = 0.88f)
+
+@Composable
+internal fun mediaDetailForegroundColor(): Color = MaterialTheme.colorScheme.onBackground
+
+@Composable
+internal fun mediaDetailAccentColor(): Color = MaterialTheme.colorScheme.primary
+
+@Composable
+internal fun mediaDetailActionColor(): Color = MaterialTheme.colorScheme.secondary
+
 private val MediaDetailContentPadding = 16.dp
+private val MediaDetailTopOverlayPadding = 92.dp
 
 @Composable
 internal fun DetailSectionTitle(text: String, modifier: Modifier = Modifier) {
-    val compact = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
     Text(
-        text,
+        text.uppercase(Locale.getDefault()),
         modifier = modifier,
-        style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+        color = mediaDetailAccentColor(),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
+}
+
+@Composable
+internal fun DetailPlaceholderCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = mediaDetailPanelColor(),
+        contentColor = mediaDetailForegroundColor(),
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            DetailIconBadge(icon = icon)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun DetailIconBadge(icon: ImageVector, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.size(42.dp),
+        shape = RoundedCornerShape(999.dp),
+        color = mediaDetailAccentColor().copy(alpha = 0.16f),
+        contentColor = mediaDetailAccentColor(),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(21.dp))
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -602,105 +733,442 @@ internal fun ChapterDownloadActionRow(
 }
 
 @Composable
-internal fun MangaHeroSection(media: AnilistMedia) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = LocalTankobunTokens.current.elevatedSurface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 1.dp,
-    ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val compact = maxWidth < 620.dp
-            if (compact) {
+internal fun MangaHeroSection(
+    media: AnilistMedia,
+    onTagClick: (String) -> Unit,
+    onAuthorClick: (String) -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 620.dp
+        val coverWidth = if (compact) {
+            (maxWidth * 0.40f).coerceIn(122.dp, 168.dp)
+        } else {
+            (maxWidth * 0.34f).coerceIn(220.dp, 300.dp)
+        }
+        val coverHeight = coverWidth * 1.5f
+        val titleHeight = if (compact) {
+            (coverHeight * 0.62f).coerceIn(118.dp, 158.dp)
+        } else {
+            (coverHeight * 0.62f).coerceIn(180.dp, 250.dp)
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 18.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 28.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                MangaCoverFrame(
+                    media = media,
+                    modifier = Modifier.size(width = coverWidth, height = coverHeight),
+                )
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(coverHeight),
+                    verticalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    CoverImage(
-                        url = media.coverImage,
-                        title = media.title.userPreferred,
-                        modifier = Modifier
-                            .fillMaxWidth(0.72f)
-                            .widthIn(max = 260.dp)
-                            .aspectRatio(2f / 3f),
-                        contentScale = ContentScale.Fit,
-                        imageAlignment = Alignment.TopCenter,
-                    )
-                    MangaHeroInfo(
-                        media = media,
-                        compact = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            } else {
-                Row(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                ) {
-                    CoverImage(
-                        url = media.coverImage,
-                        title = media.title.userPreferred,
-                        modifier = Modifier
-                            .width(250.dp)
-                            .aspectRatio(2f / 3f),
-                        contentScale = ContentScale.Fit,
-                        imageAlignment = Alignment.TopCenter,
-                    )
-                    MangaHeroInfo(
-                        media = media,
-                        compact = false,
-                        modifier = Modifier.weight(1f),
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp)) {
+                        AutoResizingMangaTitle(
+                            title = media.title.userPreferred,
+                            compact = compact,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(titleHeight),
+                        )
+                        MangaHeroMetaLine(media)
+                    }
+                    MangaStatRow(media = media, compact = compact)
                 }
             }
+            MangaInfoRow(media = media, compact = compact, onAuthorClick = onAuthorClick)
+            MangaDescriptionAndTags(media = media, compact = compact, onTagClick = onTagClick)
         }
     }
 }
 
 @Composable
-internal fun MangaHeroInfo(
-    media: AnilistMedia,
+internal fun MangaCoverFrame(media: AnilistMedia, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = Color.Transparent,
+        shadowElevation = 8.dp,
+    ) {
+        CoverImage(
+            url = media.coverImage,
+            title = media.title.userPreferred,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            imageAlignment = Alignment.TopCenter,
+            cornerRadius = 10.dp,
+        )
+    }
+}
+
+@Composable
+internal fun AutoResizingMangaTitle(
+    title: String,
     compact: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 12.dp),
-    ) {
-        Text(
-            media.title.userPreferred,
-            style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            listOfNotNull(
-                media.format.mediaFormatLabel(),
-                media.status.statusLabel(),
-                media.chapters?.let { "$it chapters" },
-                media.volumes?.let { "$it volumes" },
-                media.averageScore?.let { "$it% score" },
-            ).joinToString(" / "),
-            style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        FlowRowCompat {
-            mangaInfoPill("Author", media.staff.authorLabel())
-            mangaInfoPill("Published", media.publishingYearLabel())
-            media.popularity?.let { mangaInfoPill("Readers", it.formatCompact()) }
+    BoxWithConstraints(modifier = modifier) {
+        val density = LocalDensity.current
+        val textMeasurer = rememberTextMeasurer()
+        val maxFontSize = if (compact) 82f else 92f
+        val minFontSize = if (compact) 16f else 22f
+        val maxLines = if (compact) 3 else 4
+        val maxWidthPx = with(density) { maxWidth.toPx() }
+        val maxHeightPx = with(density) { maxHeight.toPx() }
+        val spToPx = with(density) { 1.sp.toPx() }
+        val layout = remember(title, compact, maxWidth, maxHeight, density.fontScale) {
+            buildMangaTitleLayout(
+                title = title,
+                maxWidthPx = maxWidthPx,
+                maxHeightPx = maxHeightPx,
+                maxLines = maxLines,
+                maxFontSize = maxFontSize,
+                minFontSize = minFontSize,
+                spToPx = spToPx,
+                textMeasurer = textMeasurer,
+            )
         }
+        val style = mangaTitleTextStyle(layout.fontSize)
         Text(
-            media.description?.replace(Regex("<[^>]*>"), "").orEmpty(),
-            maxLines = if (compact) 5 else 8,
-            overflow = TextOverflow.Ellipsis,
-            style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+            layout.lines.joinToString("\n"),
+            modifier = Modifier.fillMaxSize(),
+            style = style,
+            color = mediaDetailForegroundColor(),
+            maxLines = layout.lines.size,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
         )
-        val tags = media.tags.ifEmpty { media.genres }
+    }
+}
+
+private val BebasNeueFontFamily = FontFamily(
+    Font(R.font.bebas_neue_regular, FontWeight.Normal),
+)
+
+private data class MangaTitleLayout(
+    val fontSize: Float,
+    val lines: List<String>,
+)
+
+private fun mangaTitleTextStyle(fontSize: Float): TextStyle =
+    TextStyle(
+        fontFamily = BebasNeueFontFamily,
+        fontSize = fontSize.sp,
+        lineHeight = (fontSize * MangaTitleLineHeightRatio).sp,
+        fontWeight = FontWeight.Normal,
+        letterSpacing = 0.sp,
+        hyphens = Hyphens.None,
+        lineBreak = LineBreak.Heading,
+        platformStyle = PlatformTextStyle(includeFontPadding = false),
+        lineHeightStyle = LineHeightStyle(
+            alignment = LineHeightStyle.Alignment.Center,
+            trim = LineHeightStyle.Trim.Both,
+        ),
+    )
+
+private const val MangaTitleLineHeightRatio = 0.82f
+
+@Composable
+private fun bebasNeueStatTextStyle(compact: Boolean): TextStyle =
+    (if (compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.displaySmall).copy(
+        fontFamily = BebasNeueFontFamily,
+        fontWeight = FontWeight.Normal,
+        letterSpacing = 0.sp,
+        lineHeight = if (compact) 32.sp else 44.sp,
+    )
+
+@Composable
+private fun bebasNeueChapterTitleStyle(): TextStyle =
+    MaterialTheme.typography.titleMedium.copy(
+        fontFamily = BebasNeueFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 22.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.sp,
+    )
+
+@Composable
+private fun bebasNeueRecommendationMetricStyle(): TextStyle =
+    MaterialTheme.typography.labelLarge.copy(
+        fontFamily = BebasNeueFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 18.sp,
+        lineHeight = 18.sp,
+        letterSpacing = 0.sp,
+    )
+
+private fun buildMangaTitleLayout(
+    title: String,
+    maxWidthPx: Float,
+    maxHeightPx: Float,
+    maxLines: Int,
+    maxFontSize: Float,
+    minFontSize: Float,
+    spToPx: Float,
+    textMeasurer: androidx.compose.ui.text.TextMeasurer,
+): MangaTitleLayout {
+    val words = title
+        .uppercase(Locale.getDefault())
+        .trim()
+        .split(Regex("\\s+"))
+        .filter { it.isNotBlank() }
+        .ifEmpty { listOf(title.uppercase(Locale.getDefault())) }
+    var fontSize = maxFontSize
+    while (fontSize >= minFontSize) {
+        val style = mangaTitleTextStyle(fontSize)
+        val lines = preferredTitleLinesForWidth(words, maxWidthPx, maxLines, style, textMeasurer)
+        val lineHeightPx = fontSize * MangaTitleLineHeightRatio * spToPx
+        if (lines != null && lineHeightPx * lines.size <= maxHeightPx) {
+            return MangaTitleLayout(fontSize, lines)
+        }
+        fontSize -= 1f
+    }
+    return MangaTitleLayout(minFontSize, fallbackTitleLines(words, maxLines))
+}
+
+private fun preferredTitleLinesForWidth(
+    words: List<String>,
+    maxWidthPx: Float,
+    maxLines: Int,
+    style: TextStyle,
+    textMeasurer: androidx.compose.ui.text.TextMeasurer,
+): List<String>? {
+    if (words.size == 2 && maxLines >= 2) {
+        val stacked = words.takeIf { candidate ->
+            candidate.all { measuredTitleWidth(it, style, textMeasurer) <= maxWidthPx }
+        }
+        if (stacked != null) return stacked
+    }
+    return titleLinesForWidth(words, maxWidthPx, maxLines, style, textMeasurer)
+}
+
+private fun titleLinesForWidth(
+    words: List<String>,
+    maxWidthPx: Float,
+    maxLines: Int,
+    style: TextStyle,
+    textMeasurer: androidx.compose.ui.text.TextMeasurer,
+): List<String>? {
+    val lines = mutableListOf<String>()
+    var currentLine = ""
+    words.forEach { word ->
+        val candidate = if (currentLine.isBlank()) word else "$currentLine $word"
+        if (measuredTitleWidth(candidate, style, textMeasurer) <= maxWidthPx) {
+            currentLine = candidate
+        } else {
+            if (currentLine.isBlank() || measuredTitleWidth(word, style, textMeasurer) > maxWidthPx) {
+                return null
+            }
+            lines += currentLine
+            if (lines.size == maxLines) return null
+            currentLine = word
+        }
+    }
+    if (currentLine.isNotBlank()) lines += currentLine
+    return lines.takeIf { it.size <= maxLines }
+}
+
+private fun measuredTitleWidth(
+    text: String,
+    style: TextStyle,
+    textMeasurer: androidx.compose.ui.text.TextMeasurer,
+): Int =
+    textMeasurer.measure(
+        text = AnnotatedString(text),
+        style = style,
+        softWrap = false,
+        maxLines = 1,
+    ).size.width
+
+private fun fallbackTitleLines(words: List<String>, maxLines: Int): List<String> =
+    words.take(maxLines).ifEmpty { listOf("") }
+
+@Composable
+internal fun MangaHeroMetaLine(media: AnilistMedia) {
+    Text(
+        listOfNotNull(
+            media.format.mediaFormatLabel(),
+            media.status.statusLabel(),
+        ).joinToString("  /  ").uppercase(Locale.getDefault()),
+        style = MaterialTheme.typography.labelMedium,
+        color = mediaDetailAccentColor(),
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+internal fun MangaStatRow(media: AnilistMedia, compact: Boolean) {
+    val stats = listOf(
+        (if (compact) "CH." else "Chapters") to (media.chapters?.toString() ?: "--"),
+        (if (compact) "VOL." else "Volumes") to (media.volumes?.toString() ?: "--"),
+        (if (compact) "Score" else "Score") to (media.averageScore?.let { "$it%" } ?: "--"),
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        stats.forEachIndexed { index, (label, value) ->
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    value,
+                    style = bebasNeueStatTextStyle(compact),
+                    color = mediaDetailForegroundColor(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    label.uppercase(Locale.getDefault()),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, lineHeight = 12.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (index < stats.lastIndex) {
+                Box(
+                    Modifier
+                        .padding(horizontal = if (compact) 8.dp else 14.dp)
+                        .width(1.dp)
+                        .height(if (compact) 42.dp else 50.dp)
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.36f)),
+                )
+            }
+        }
+    }
+}
+
+private data class MangaInfoItem(
+    val icon: ImageVector,
+    val label: String,
+    val value: String,
+    val onClick: (() -> Unit)? = null,
+)
+
+@Composable
+internal fun MangaInfoRow(media: AnilistMedia, compact: Boolean, onAuthorClick: (String) -> Unit) {
+    val authorName = media.staff.firstOrNull()
+    val infoItems = listOfNotNull(
+        MangaInfoItem(
+            icon = Icons.Default.Person,
+            label = "Author",
+            value = media.staff.authorLabel(),
+            onClick = authorName?.let { { onAuthorClick(it) } },
+        ),
+        MangaInfoItem(Icons.Default.CalendarMonth, if (compact) "Years" else "Published", media.publishingYearLabel(compact)),
+        media.popularity?.let { MangaInfoItem(Icons.Default.Groups, "Readers", it.formatCompact()) },
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp),
+    ) {
+        infoItems.forEachIndexed { index, item ->
+            val weight = if (compact) {
+                when (index) {
+                    0 -> 1.24f
+                    1 -> 1.08f
+                    else -> 0.92f
+                }
+            } else {
+                1f
+            }
+            MangaInfoChip(item = item, compact = compact, modifier = Modifier.weight(weight))
+        }
+    }
+}
+
+@Composable
+private fun MangaInfoChip(item: MangaInfoItem, compact: Boolean, modifier: Modifier = Modifier) {
+    val onClick = item.onClick
+    val chipModifier = if (onClick != null) {
+        modifier.clickable(onClick = onClick)
+    } else {
+        modifier
+    }
+    Surface(
+        modifier = chipModifier.heightIn(min = if (compact) 48.dp else 56.dp),
+        shape = RoundedCornerShape(11.dp),
+        color = mediaDetailPanelColor(),
+        contentColor = mediaDetailForegroundColor(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = if (compact) 8.dp else 11.dp, vertical = if (compact) 8.dp else 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 9.dp),
+        ) {
+            DetailIconBadge(icon = item.icon, modifier = Modifier.size(if (compact) 26.dp else 30.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    item.label,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = if (compact) 10.sp else 11.sp, lineHeight = 12.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    item.value,
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = if (compact) 13.sp else 14.sp, lineHeight = 15.sp),
+                    fontWeight = FontWeight.SemiBold,
+                    color = mediaDetailForegroundColor(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun MangaDescriptionAndTags(
+    media: AnilistMedia,
+    compact: Boolean,
+    onTagClick: (String) -> Unit,
+) {
+    val description = media.description.plainMediaDescription()
+    val tags = media.tags.ifEmpty { media.genres }
+    var descriptionExpanded by remember(media.id) { mutableStateOf(false) }
+    var descriptionOverflow by remember(media.id, description) { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        if (description.isNotBlank()) {
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                Text(
+                    description,
+                    maxLines = if (descriptionExpanded) Int.MAX_VALUE else if (compact) 4 else 5,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = if (compact) 15.sp else 16.sp,
+                        lineHeight = if (compact) 21.sp else 22.sp,
+                    ),
+                    color = mediaDetailForegroundColor().copy(alpha = 0.92f),
+                    onTextLayout = { descriptionOverflow = it.hasVisualOverflow },
+                )
+                if (descriptionOverflow || descriptionExpanded) {
+                    Text(
+                        if (descriptionExpanded) "Show less" else "Read more",
+                        modifier = Modifier.clickable { descriptionExpanded = !descriptionExpanded },
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontSize = if (compact) 13.sp else 14.sp,
+                            lineHeight = if (compact) 16.sp else 17.sp,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                        color = mediaDetailAccentColor(),
+                    )
+                }
+            }
+        }
         if (tags.isNotEmpty()) {
             FlowRowCompat {
-                tags.take(if (compact) 6 else 10).forEach { tag ->
-                    mangaTagPill(tag = tag, compact = compact)
+                tags.take(if (compact) 7 else 12).forEach { tag ->
+                    mangaTagPill(tag = tag, compact = compact, onClick = { onTagClick(tag) })
                 }
             }
         }
@@ -708,46 +1176,55 @@ internal fun MangaHeroInfo(
 }
 
 @Composable
-internal fun mangaTagPill(tag: String, compact: Boolean) {
+internal fun mangaTagPill(tag: String, compact: Boolean, onClick: () -> Unit) {
     Surface(
+        modifier = Modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(7.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 1.dp,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
-        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
     ) {
         Text(
             tag,
             modifier = Modifier.padding(
-                horizontal = if (compact) 8.dp else 10.dp,
-                vertical = if (compact) 4.dp else 6.dp,
+                horizontal = if (compact) 10.dp else 12.dp,
+                vertical = if (compact) 6.dp else 7.dp,
             ),
-            style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+            style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
-@Composable
-internal fun mangaInfoPill(label: String, value: String) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    ) {
-        Text(
-            "$label: $value",
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+internal fun String?.plainMediaDescription(): String =
+    this
+        ?.replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), " ")
+        ?.replace(Regex("<[^>]*>"), "")
+        ?.replace("&quot;", "\"")
+        ?.replace("&#039;", "'")
+        ?.replace("&amp;", "&")
+        ?.replace(Regex("\\s+"), " ")
+        ?.trim()
+        .orEmpty()
+
+internal fun AnilistMedia.publishingYearLabel(compact: Boolean): String =
+    when {
+        !compact -> publishingYearLabel()
+        startDateYear != null && endDateYear != null && startDateYear != endDateYear -> {
+            val startYear = startDateYear ?: return "Unknown"
+            val endYear = endDateYear ?: return "Unknown"
+            val compactEnd = if (startYear / 100 == endYear / 100) {
+                (endYear % 100).toString().padStart(2, '0')
+            } else {
+                endYear.toString()
+            }
+            "$startYear-$compactEnd"
+        }
+        startDateYear != null && status == "RELEASING" -> "Since $startDateYear"
+        startDateYear != null -> startDateYear.toString()
+        else -> "Unknown"
     }
-}
 
 @Composable
 internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
@@ -1057,47 +1534,21 @@ internal fun RecommendationsSection(
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        BoxWithConstraints(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = MediaDetailContentPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val compact = maxWidth < 430.dp
-            if (compact) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    DetailSectionTitle("Recommendations")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "${recommendations.size} shown",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.weight(1f))
-                        if (hasMore) {
-                            TextButton(onClick = onLoadMore, enabled = !loadingMore) {
-                                Text(if (loadingMore) "Loading" else "Load more")
-                            }
-                        }
-                    }
-                }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    DetailSectionTitle("Recommendations", modifier = Modifier.weight(1f))
-                    Text(
-                        "${recommendations.size} shown",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (hasMore) {
-                        TextButton(onClick = onLoadMore, enabled = !loadingMore) {
-                            Text(if (loadingMore) "Loading" else "Load more")
-                        }
-                    }
-                }
-            }
+            DetailSectionTitle("Recommendations")
+            Text(
+                "${recommendations.size} shown",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -1135,8 +1586,6 @@ internal fun RecommendationsSection(
     }
 }
 
-private val RecommendationTitleHeight = 36.dp
-
 @Composable
 internal fun RecommendationTile(
     recommendation: AnilistRecommendation,
@@ -1146,7 +1595,7 @@ internal fun RecommendationTile(
     val media = recommendation.media
     Column(
         modifier = modifier.clickable(onClick = onClick),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Surface(
             shape = RoundedCornerShape(7.dp),
@@ -1161,28 +1610,23 @@ internal fun RecommendationTile(
                     .aspectRatio(2f / 3f),
             )
         }
-        Text(
-            media.title.userPreferred,
-            modifier = Modifier.height(RecommendationTitleHeight),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                modifier = Modifier.size(8.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = media.status.statusColor(),
-            ) {}
+        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
             Text(
-                listOfNotNull(
-                    media.format.mediaFormatLabel(),
-                    recommendation.rating?.let { "$it votes" },
-                ).joinToString(" / "),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                media.title.userPreferred,
+                style = MaterialTheme.typography.labelMedium.copy(lineHeight = 16.sp),
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                media.status.statusLabel().uppercase(Locale.getDefault()),
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 10.sp,
+                    lineHeight = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+                color = mediaDetailAccentColor(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -1235,39 +1679,15 @@ internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewMod
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         DetailSectionTitle("Source")
         if (selectedManga == null) {
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val compact = maxWidth < 430.dp
-                if (compact) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = viewModel::openSourcePicker,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Default.Search, contentDescription = null)
-                            Spacer(Modifier.size(8.dp))
-                            Text("Find source")
-                        }
-                        Text(
-                            if (state.allInstalledSources.isEmpty()) "Install source extensions in Settings." else "No source selected.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
+            SourceActionCard(
+                title = "No source selected.",
+                subtitle = if (state.allInstalledSources.isEmpty()) {
+                    "Install source extensions in Settings."
                 } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Button(onClick = viewModel::openSourcePicker) {
-                            Icon(Icons.Default.Search, contentDescription = null)
-                            Spacer(Modifier.size(8.dp))
-                            Text("Find source")
-                        }
-                        Text(
-                            if (state.allInstalledSources.isEmpty()) "Install source extensions in Settings." else "No source selected.",
-                            modifier = Modifier.weight(1f),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
+                    "Choose a source to browse and read."
+                },
+                onFindSource = viewModel::openSourcePicker,
+            )
         } else {
             SelectedSourceCard(
                 media = media,
@@ -1287,6 +1707,83 @@ internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewMod
 }
 
 @Composable
+internal fun SourceActionCard(
+    title: String,
+    subtitle: String,
+    onFindSource: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = mediaDetailPanelColor(),
+        contentColor = mediaDetailForegroundColor(),
+    ) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val compact = maxWidth < 340.dp
+            val contentModifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp)
+            if (compact) {
+                Column(
+                    modifier = contentModifier,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        DetailIconBadge(icon = Icons.Default.Link)
+                        SourceActionText(title = title, subtitle = subtitle, modifier = Modifier.weight(1f))
+                    }
+                    Button(
+                        onClick = onFindSource,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = mediaDetailActionColor(),
+                            contentColor = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                        Spacer(Modifier.size(8.dp))
+                        Text("Find source", fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else {
+                Row(
+                    modifier = contentModifier,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    DetailIconBadge(icon = Icons.Default.Link)
+                    SourceActionText(title = title, subtitle = subtitle, modifier = Modifier.weight(1f))
+                    Button(
+                        onClick = onFindSource,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = mediaDetailActionColor(),
+                            contentColor = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                        Spacer(Modifier.size(8.dp))
+                        Text("Find source", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun SourceActionText(title: String, subtitle: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 internal fun SelectedSourceCard(
     media: AnilistMedia,
     mangaTitle: String,
@@ -1295,7 +1792,12 @@ internal fun SelectedSourceCard(
     progressLine: String?,
     onChange: () -> Unit,
 ) {
-    ElevatedCard {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = mediaDetailPanelColor(),
+        contentColor = mediaDetailForegroundColor(),
+    ) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val compact = maxWidth < 430.dp
             val coverWidth = if (compact) 48.dp else 56.dp
@@ -1335,6 +1837,10 @@ internal fun SelectedSourceCard(
                 Button(
                     onClick = onChange,
                     modifier = modifier.heightIn(min = if (compact) 42.dp else 46.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = mediaDetailActionColor(),
+                        contentColor = MaterialTheme.colorScheme.onSecondary,
+                    ),
                 ) {
                     Text(
                         "Change",
@@ -1761,7 +2267,12 @@ internal fun ChapterRow(
                         null
                     },
                     headlineContent = {
-                        Text(chapter.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            chapter.name,
+                            style = bebasNeueChapterTitleStyle(),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     },
                     trailingContent = {
                         ChapterDownloadIndicator(
