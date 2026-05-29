@@ -657,7 +657,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(12.dp),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
                     color = LocalTankobunTokens.current.readerOverlay,
                 ) {
                     Row(
@@ -698,7 +698,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(12.dp),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
                     color = LocalTankobunTokens.current.readerOverlay,
                 ) {
                     Column(
@@ -796,44 +796,39 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                FilterChip(
+                                TankobunChip(
                                     selected = state.readerMode == ReaderMode.PAGED,
                                     onClick = {
                                         resetZoom()
                                         viewModel.setReaderMode(ReaderMode.PAGED)
                                     },
-                                    colors = tankobunFilterChipColors(),
                                     label = { Text("Paged") },
                                 )
-                                FilterChip(
+                                TankobunChip(
                                     selected = state.readerMode == ReaderMode.WEBTOON,
                                     onClick = {
                                         resetZoom()
                                         viewModel.setReaderMode(ReaderMode.WEBTOON)
                                     },
-                                    colors = tankobunFilterChipColors(),
                                     label = { Text("Webtoon") },
                                 )
-                                FilterChip(
+                                TankobunChip(
                                     selected = state.readerFitWidth,
                                     enabled = state.readerMode == ReaderMode.PAGED,
                                     onClick = {
                                         viewModel.setReaderFitWidth(!state.readerFitWidth)
                                         resetZoom()
                                     },
-                                    colors = tankobunFilterChipColors(),
                                     label = { Text("Fit width") },
                                 )
-                                FilterChip(
+                                TankobunChip(
                                     selected = state.readerPageGapLevel > 0,
                                     onClick = { viewModel.setReaderPageGapLevel((state.readerPageGapLevel + 1) % 4) },
-                                    colors = tankobunFilterChipColors(),
                                     label = { Text(readerGapLabel(state.readerPageGapLevel)) },
                                 )
-                                FilterChip(
+                                TankobunChip(
                                     selected = readerScale > 1.05f,
                                     onClick = { resetZoom() },
-                                    colors = tankobunFilterChipColors(),
                                     label = { Text("Reset zoom") },
                                 )
                             }

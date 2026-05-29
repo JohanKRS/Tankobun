@@ -265,13 +265,7 @@ internal fun LibraryScreen(state: TankobunUiState, viewModel: MainViewModel) {
             )
 
             state.message?.let {
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Text(it, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
-                }
+                TankobunMessageBanner(it)
             }
 
             if (!state.loggedIn) {
@@ -374,24 +368,13 @@ internal fun LibraryFilterBar(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        OutlinedTextField(
+        TankobunSearchField(
             value = query,
             onValueChange = onQueryChange,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            trailingIcon = {
-                if (query.isNotBlank()) {
-                    IconButton(onClick = { onQueryChange("") }) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear library search")
-                    }
-                }
-            },
-            placeholder = { Text("Search your library") },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            shape = RoundedCornerShape(18.dp),
+            placeholder = "Search your library",
+            showSearchAction = false,
         )
-        FlowRowCompat {
+        TankobunFilterRow {
             BrowseFilterPill(
                 label = "Format",
                 value = formatOptions.labelFor(format),
@@ -434,9 +417,8 @@ internal fun LibraryConnectPrompt(
     clientConfigured: Boolean,
     onConnect: () -> Unit,
 ) {
-    Surface(
+    TankobunPanel(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
@@ -465,9 +447,7 @@ internal fun LibraryConnectPrompt(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Button(enabled = clientConfigured, onClick = onConnect) {
-                Text("Connect")
-            }
+            TankobunActionButton(label = "Connect", enabled = clientConfigured, onClick = onConnect)
         }
     }
 }
@@ -496,7 +476,7 @@ internal fun LibraryPager(
                 header()
             }
             item(key = "library-empty") {
-                Text("No manga in your AniList library yet.")
+                TankobunEmptyState(title = "No manga in your AniList library yet.")
             }
         }
         return

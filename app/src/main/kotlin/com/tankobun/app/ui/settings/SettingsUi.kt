@@ -252,13 +252,12 @@ internal fun SettingsScreen(
                         .fillMaxHeight()
                         .widthIn(min = 288.dp, max = 340.dp),
                 )
-                Surface(
+                TankobunPanel(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = LocalTankobunTokens.current.elevatedSurface,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    color = LocalTankobunStyle.current.colors.panel,
+                    contentColor = LocalTankobunStyle.current.colors.panelContent,
                     tonalElevation = 1.dp,
                 ) {
                     SettingsDetailContent(
@@ -308,22 +307,14 @@ internal fun SettingsIndexPane(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            color = LocalTankobunTokens.current.elevatedSurface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 1.dp,
-        ) {
-            Column(Modifier.padding(vertical = 6.dp)) {
-                SettingsDetailRoutes.forEach { settingsRoute ->
-                    SettingsRouteRow(
-                        route = settingsRoute,
-                        summary = settingsRoute.settingsSummary(state),
-                        selected = settingsRoute == selectedRoute,
-                        onClick = { onOpenRoute(settingsRoute) },
-                    )
-                }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            SettingsDetailRoutes.forEach { settingsRoute ->
+                SettingsRouteRow(
+                    route = settingsRoute,
+                    summary = settingsRoute.settingsSummary(state),
+                    selected = settingsRoute == selectedRoute,
+                    onClick = { onOpenRoute(settingsRoute) },
+                )
             }
         }
         Text(
@@ -347,7 +338,7 @@ internal fun SettingsRouteRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 6.dp, vertical = 2.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
             .background(rowColor)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
@@ -373,7 +364,7 @@ internal fun SettingsRouteRow(
         if (selected) {
             Surface(
                 modifier = Modifier.size(width = 4.dp, height = 28.dp),
-                shape = RoundedCornerShape(999.dp),
+                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.pill),
                 color = MaterialTheme.colorScheme.primary,
             ) {}
         }
@@ -478,34 +469,30 @@ internal fun SettingsDetailContent(
         ) {
             Text("Reading mode", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             FlowRowCompat {
-                FilterChip(
+                TankobunChip(
                     selected = state.readerMode == ReaderMode.PAGED,
                     onClick = { viewModel.setReaderMode(ReaderMode.PAGED) },
-                    colors = tankobunFilterChipColors(),
                     label = { Text("Paged") },
                     leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
                 )
-                FilterChip(
+                TankobunChip(
                     selected = state.readerMode == ReaderMode.WEBTOON,
                     onClick = { viewModel.setReaderMode(ReaderMode.WEBTOON) },
-                    colors = tankobunFilterChipColors(),
                     label = { Text("Webtoon") },
                 )
             }
             Text("Page gaps", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             FlowRowCompat {
                 (0..3).forEach { level ->
-                    FilterChip(
+                    TankobunChip(
                         selected = state.readerPageGapLevel == level,
                         onClick = { viewModel.setReaderPageGapLevel(level) },
-                        colors = tankobunFilterChipColors(),
                         label = { Text(readerGapLabel(level)) },
                     )
                 }
-                FilterChip(
+                TankobunChip(
                     selected = state.readerFitWidth,
                     onClick = { viewModel.setReaderFitWidth(!state.readerFitWidth) },
-                    colors = tankobunFilterChipColors(),
                     label = { Text("Fit paged width") },
                 )
             }
@@ -517,9 +504,8 @@ internal fun SettingsDetailContent(
             modifier = modifier,
         ) {
             Text("Connection", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Surface(
+            TankobunPanel(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 1.dp,
             ) {
@@ -549,12 +535,8 @@ internal fun SettingsDetailContent(
             }
             if (state.loggedIn) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = viewModel::refreshLibrary) {
-                        Text("Sync AniList")
-                    }
-                    OutlinedButton(onClick = viewModel::signOut) {
-                        Text("Sign out")
-                    }
+                    TankobunActionButton(label = "Sync AniList", onClick = viewModel::refreshLibrary)
+                    TankobunActionButton(label = "Sign out", onClick = viewModel::signOut, filled = false)
                 }
             }
             Text("Sync behavior", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

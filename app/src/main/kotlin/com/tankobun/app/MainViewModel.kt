@@ -1116,6 +1116,25 @@ class MainViewModel(
         if (!force && _state.value.browseLandingLoaded) return
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
+            val cachedLanding = BrowseLandingData(
+                trending = cachedBrowseMedia(BROWSE_TRENDING_CACHE_KEY),
+                popular = cachedBrowseMedia(BROWSE_POPULAR_CACHE_KEY),
+                popularManhwa = cachedBrowseMedia(BROWSE_MANHWA_CACHE_KEY),
+                topManga = cachedBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY),
+            )
+            val hasCachedLanding = cachedLanding.hasContent()
+            if (hasCachedLanding) {
+                _state.update {
+                    it.copy(
+                        browseTrending = cachedLanding.trending,
+                        browsePopular = cachedLanding.popular,
+                        browsePopularManhwa = cachedLanding.popularManhwa,
+                        browseTopManga = cachedLanding.topManga,
+                        browseLandingLoaded = true,
+                        busy = false,
+                    )
+                }
+            }
             runCatching {
                 val trending = cachedAnilistBrowseMedia(BROWSE_TRENDING_CACHE_KEY) {
                     container.anilistRepository.browseManga(sort = "TRENDING_DESC", perPage = 12)
@@ -1148,7 +1167,10 @@ class MainViewModel(
             }.onFailure { error ->
                 Log.e(TAG, "AniList browse landing failed", error)
                 _state.update {
-                    it.copy(busy = false, message = error.userMessage("Browse failed"))
+                    it.copy(
+                        busy = false,
+                        message = if (hasCachedLanding) it.message else error.userMessage("Browse failed"),
+                    )
                 }
             }
         }
@@ -1243,6 +1265,12 @@ class MainViewModel(
         )
         return results
     }
+
+    private suspend fun cachedBrowseMedia(cacheKey: String): List<AnilistMedia> =
+        container.database.searchResultDao().cachedSearchMedia(cacheKey).map { it.toModel() }
+
+    private fun BrowseLandingData.hasContent(): Boolean =
+        trending.isNotEmpty() || popular.isNotEmpty() || popularManhwa.isNotEmpty() || topManga.isNotEmpty()
 
     private suspend fun fetchTopManga(): List<AnilistMedia> {
         val firstPage = container.anilistRepository.browseManga(sort = "SCORE_DESC", page = 1, perPage = 50)

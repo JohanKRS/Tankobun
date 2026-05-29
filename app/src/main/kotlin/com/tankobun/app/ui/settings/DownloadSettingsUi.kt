@@ -238,7 +238,7 @@ internal fun DownloadsSettingsScreen(
         modifier = modifier,
     ) {
         val summary = state.downloadStorageSummary
-        ElevatedCard {
+        ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -280,6 +280,7 @@ internal fun DownloadsSettingsScreen(
                             detail = summary.totalBytes.formatFileSize(),
                         )
                     },
+                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -330,41 +331,23 @@ internal fun DeleteDownloadsDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .widthIn(max = 520.dp)
-                .heightIn(max = 520.dp),
-            shape = RoundedCornerShape(16.dp),
-            color = LocalTankobunTokens.current.elevatedSurface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 3.dp,
-        ) {
-            Column(
-                Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text("Delete downloads?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(
-                    "${target.title} / ${target.detail}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel")
-                    }
-                    Button(onClick = onConfirm) {
-                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Delete")
-                    }
-                }
+    TankobunDialog(onDismiss = onDismiss, maxWidth = 520.dp, maxHeight = 520.dp) {
+        TankobunDialogHeader(title = "Delete downloads?", onDismiss = onDismiss)
+        Text(
+            "${target.title} / ${target.detail}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
+            TankobunActionButton(
+                label = "Delete",
+                icon = Icons.Default.Delete,
+                onClick = onConfirm,
+            )
         }
     }
 }
@@ -375,7 +358,7 @@ internal fun DownloadStorageRow(
     item: DownloadStorageItem,
     onDelete: () -> Unit,
 ) {
-    ElevatedCard {
+    ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -441,7 +424,7 @@ internal fun CutoutLayoutToggle(
     ignoreDisplayCutout: Boolean,
     onIgnoreDisplayCutoutChange: (Boolean) -> Unit,
 ) {
-    ElevatedCard {
+    ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -474,7 +457,7 @@ internal fun SettingsToggleRow(
     onCheckedChange: (Boolean) -> Unit,
     enabled: Boolean = true,
 ) {
-    ElevatedCard {
+    ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

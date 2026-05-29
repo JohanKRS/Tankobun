@@ -12,7 +12,13 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @Immutable
 data class TankobunThemeTokens(
@@ -22,6 +28,85 @@ data class TankobunThemeTokens(
     val readerOverlay: Color,
     val drawerHandle: Color,
     val coverScrim: Color,
+)
+
+@Immutable
+data class TankobunStyle(
+    val colors: TankobunStyleColors,
+    val radii: TankobunRadii = TankobunRadii(),
+    val spacing: TankobunSpacing = TankobunSpacing(),
+    val sizes: TankobunSizes = TankobunSizes(),
+    val typography: TankobunTypography = TankobunTypography(),
+)
+
+@Immutable
+data class TankobunStyleColors(
+    val backdrop: Color,
+    val panel: Color,
+    val panelContent: Color,
+    val accent: Color,
+    val action: Color,
+    val actionContent: Color,
+    val mutedContent: Color,
+    val chip: Color,
+    val chipContent: Color,
+    val selectedChip: Color,
+    val selectedChipContent: Color,
+    val outline: Color,
+)
+
+@Immutable
+data class TankobunRadii(
+    val control: Dp = 7.dp,
+    val panel: Dp = 8.dp,
+    val cover: Dp = 8.dp,
+    val pill: Dp = 999.dp,
+)
+
+@Immutable
+data class TankobunSpacing(
+    val compactScreenPadding: Dp = 16.dp,
+    val expandedScreenPadding: Dp = 20.dp,
+    val section: Dp = 18.dp,
+    val item: Dp = 12.dp,
+    val dense: Dp = 8.dp,
+)
+
+@Immutable
+data class TankobunSizes(
+    val iconAction: Dp = 42.dp,
+)
+
+@Immutable
+data class TankobunTypography(
+    val displayFontFamily: FontFamily = TankobunDisplayFontFamily,
+    val sectionLabel: TextStyle = TextStyle(
+        fontFamily = TankobunDisplayFontFamily,
+        fontSize = 20.sp,
+        lineHeight = 20.sp,
+        fontWeight = FontWeight.Normal,
+        letterSpacing = 0.sp,
+    ),
+    val statNumber: TextStyle = TextStyle(
+        fontFamily = TankobunDisplayFontFamily,
+        fontSize = 34.sp,
+        lineHeight = 34.sp,
+        fontWeight = FontWeight.Normal,
+        letterSpacing = 0.sp,
+    ),
+    val chapterTitle: TextStyle = TextStyle(
+        fontFamily = TankobunDisplayFontFamily,
+        fontSize = 28.sp,
+        lineHeight = 28.sp,
+        fontWeight = FontWeight.Normal,
+        letterSpacing = 0.sp,
+    ),
+    val compactStatus: TextStyle = TextStyle(
+        fontSize = 10.sp,
+        lineHeight = 10.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 0.sp,
+    ),
 )
 
 @Immutable
@@ -36,6 +121,10 @@ data class TankobunThemeChoice(
 private data class TankobunThemeSpec(
     val colors: ColorScheme,
     val tokens: TankobunThemeTokens,
+)
+
+val TankobunDisplayFontFamily = FontFamily(
+    Font(R.font.bebas_neue_regular, FontWeight.Normal),
 )
 
 fun tankobunThemeChoices(): List<TankobunThemeChoice> = listOf(
@@ -152,6 +241,25 @@ private val TankobunDarkTokens = TankobunThemeTokens(
 
 val LocalTankobunTokens = staticCompositionLocalOf { TankobunLightTokens }
 
+val LocalTankobunStyle = staticCompositionLocalOf {
+    TankobunStyle(
+        colors = TankobunStyleColors(
+            backdrop = TankobunLightTokens.appBackdrop,
+            panel = TankobunLightTokens.elevatedSurface,
+            panelContent = TankobunLightColors.onSurface,
+            accent = TankobunLightColors.primary,
+            action = TankobunLightColors.secondary,
+            actionContent = TankobunLightColors.onSecondary,
+            mutedContent = TankobunLightColors.onSurfaceVariant,
+            chip = TankobunLightColors.surface,
+            chipContent = TankobunLightColors.onSurface,
+            selectedChip = TankobunLightColors.primaryContainer,
+            selectedChipContent = TankobunLightColors.onPrimaryContainer,
+            outline = TankobunLightColors.outline,
+        ),
+    )
+}
+
 private val TankobunShapes = Shapes(
     extraSmall = RoundedCornerShape(7.dp),
     small = RoundedCornerShape(7.dp),
@@ -217,12 +325,33 @@ fun TankobunTheme(
         shapes = TankobunShapes,
         typography = MaterialTheme.typography,
     ) {
+        val style = tankobunStyleFor(spec.colors, spec.tokens)
         CompositionLocalProvider(
             LocalTankobunTokens provides spec.tokens,
+            LocalTankobunStyle provides style,
             content = content,
         )
     }
 }
+
+@Composable
+private fun tankobunStyleFor(colors: ColorScheme, tokens: TankobunThemeTokens): TankobunStyle =
+    TankobunStyle(
+        colors = TankobunStyleColors(
+            backdrop = tokens.appBackdrop,
+            panel = tokens.elevatedSurface,
+            panelContent = colors.onSurface,
+            accent = colors.primary,
+            action = colors.secondary,
+            actionContent = colors.onSecondary,
+            mutedContent = colors.onSurfaceVariant,
+            chip = colors.surface,
+            chipContent = colors.onSurface,
+            selectedChip = colors.primaryContainer,
+            selectedChipContent = colors.onPrimaryContainer,
+            outline = colors.outline,
+        ),
+    )
 
 private fun themeSpecFor(mode: TankobunThemeMode): TankobunThemeSpec = when (mode) {
     TankobunThemeMode.PEACH_SODA -> TankobunThemeSpec(

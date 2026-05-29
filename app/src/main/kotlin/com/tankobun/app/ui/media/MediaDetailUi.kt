@@ -438,15 +438,7 @@ private val MediaDetailTopOverlayPadding = 92.dp
 
 @Composable
 internal fun DetailSectionTitle(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text.uppercase(Locale.getDefault()),
-        modifier = modifier,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.Bold,
-        color = mediaDetailAccentColor(),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
+    TankobunSectionHeader(text, modifier = modifier)
 }
 
 @Composable
@@ -458,7 +450,7 @@ internal fun DetailPlaceholderCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
         color = mediaDetailPanelColor(),
         contentColor = mediaDetailForegroundColor(),
         tonalElevation = 0.dp,
@@ -489,7 +481,7 @@ internal fun DetailPlaceholderCard(
 @Composable
 internal fun DetailIconBadge(icon: ImageVector, modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.size(42.dp),
+        modifier = modifier.size(LocalTankobunStyle.current.sizes.iconAction),
         shape = RoundedCornerShape(999.dp),
         color = mediaDetailAccentColor().copy(alpha = 0.16f),
         contentColor = mediaDetailAccentColor(),
@@ -512,66 +504,53 @@ internal fun ChapterActionsBar(
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val tight = maxWidth < 380.dp
-        val labelStyle = if (tight) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge
-        val actionShape = RoundedCornerShape(7.dp)
-        val actionHeight = 42.dp
+        val actionHeight = LocalTankobunStyle.current.sizes.iconAction
         val startReadingButton: @Composable (Modifier) -> Unit = { modifier ->
             if (readingActionChapter != null) {
-                Button(
-                    onClick = { onOpenChapter(readingActionChapter) },
-                    modifier = modifier.height(actionHeight),
-                    shape = actionShape,
-                    contentPadding = PaddingValues(horizontal = if (tight) 0.dp else 14.dp),
-                ) {
-                    Icon(
-                        Icons.Default.PlayArrow,
+                if (tight) {
+                    TankobunIconActionButton(
+                        icon = Icons.Default.PlayArrow,
                         contentDescription = if (hasProgress) "Resume reading" else "Start reading",
-                        modifier = Modifier.size(18.dp),
+                        onClick = { onOpenChapter(readingActionChapter) },
+                        modifier = modifier,
+                        filled = true,
                     )
-                    if (!tight) {
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            if (hasProgress) "Resume" else "Start",
-                            style = labelStyle,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                } else {
+                    TankobunActionButton(
+                        label = if (hasProgress) "Resume" else "Start",
+                        icon = Icons.Default.PlayArrow,
+                        onClick = { onOpenChapter(readingActionChapter) },
+                        modifier = modifier,
+                    )
                 }
             }
         }
         val refreshButton: @Composable (Modifier) -> Unit = { modifier ->
-            OutlinedButton(
+            TankobunIconActionButton(
+                icon = Icons.Default.Refresh,
+                contentDescription = if (hasChapters) "Refresh chapters" else "Load chapters",
                 onClick = onLoadChapters,
-                modifier = modifier.size(width = actionHeight, height = actionHeight),
-                shape = actionShape,
-                contentPadding = PaddingValues(0.dp),
-            ) {
-                Icon(
-                    Icons.Default.Refresh,
-                    contentDescription = if (hasChapters) "Refresh chapters" else "Load chapters",
-                    modifier = Modifier.size(19.dp),
-                )
-            }
+                modifier = modifier,
+            )
         }
         val downloadButton: @Composable (Modifier) -> Unit = { modifier ->
-            OutlinedButton(
-                onClick = onOpenDownloadActions,
-                enabled = hasChapters,
-                modifier = modifier.height(actionHeight),
-                shape = actionShape,
-                contentPadding = PaddingValues(horizontal = if (tight) 0.dp else 13.dp),
-            ) {
-                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                if (!tight) {
-                    Spacer(Modifier.width(7.dp))
-                    Text(
-                        "Download",
-                        style = labelStyle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+            if (tight) {
+                TankobunIconActionButton(
+                    icon = Icons.Default.Download,
+                    contentDescription = "Download chapters",
+                    onClick = onOpenDownloadActions,
+                    enabled = hasChapters,
+                    modifier = modifier,
+                )
+            } else {
+                TankobunActionButton(
+                    label = "Download",
+                    icon = Icons.Default.Download,
+                    onClick = onOpenDownloadActions,
+                    enabled = hasChapters,
+                    filled = false,
+                    modifier = modifier,
+                )
             }
         }
 
@@ -600,7 +579,7 @@ internal fun ChapterManualDownloadBar(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.70f),
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
@@ -621,6 +600,7 @@ internal fun ChapterManualDownloadBar(
             Button(
                 onClick = onDownloadSelected,
                 enabled = selectedCount > 0,
+                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
             ) {
                 Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -640,74 +620,56 @@ internal fun ChapterDownloadActionsDialog(
     onKeepNextTenChange: (Boolean) -> Unit,
     onSelectManually: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    TankobunDialog(onDismiss = onDismiss, maxHeight = 640.dp) {
+        TankobunDialogHeader(title = "Download Chapters", onDismiss = onDismiss)
+        ChapterDownloadActionRow(
+            title = "All chapters",
+            subtitle = "Queue every chapter from this source.",
+            onClick = onDownloadAll,
+        )
+        ChapterDownloadActionRow(
+            title = "Unread only",
+            subtitle = "Skip chapters already marked as read.",
+            onClick = onDownloadUnread,
+        )
+        ChapterDownloadActionRow(
+            title = "Next 10",
+            subtitle = "Queue the next unread chapters from your current progress.",
+            onClick = onDownloadNextTen,
+        )
         Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .widthIn(max = 560.dp)
-                .heightIn(max = 640.dp),
-            shape = RoundedCornerShape(16.dp),
-            color = LocalTankobunTokens.current.elevatedSurface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 3.dp,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp,
         ) {
-            Column(
-                Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onKeepNextTenChange(!keepNextTenDownloads) }
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                DialogHeader(title = "Download Chapters", onDismiss = onDismiss)
-                ChapterDownloadActionRow(
-                    title = "All chapters",
-                    subtitle = "Queue every chapter from this source.",
-                    onClick = onDownloadAll,
-                )
-                ChapterDownloadActionRow(
-                    title = "Unread only",
-                    subtitle = "Skip chapters already marked as read.",
-                    onClick = onDownloadUnread,
-                )
-                ChapterDownloadActionRow(
-                    title = "Next 10",
-                    subtitle = "Queue the next unread chapters from your current progress.",
-                    onClick = onDownloadNextTen,
-                )
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 1.dp,
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onKeepNextTenChange(!keepNextTenDownloads) }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text("Always keep next 10", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text(
-                                "Automatically queue the next unread batch as you move through chapters.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(
-                            checked = keepNextTenDownloads,
-                            onCheckedChange = onKeepNextTenChange,
-                        )
-                    }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("Always keep next 10", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Automatically queue the next unread batch as you move through chapters.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                ChapterDownloadActionRow(
-                    title = "Select manually",
-                    subtitle = "Choose chapters directly from the list.",
-                    onClick = onSelectManually,
+                Switch(
+                    checked = keepNextTenDownloads,
+                    onCheckedChange = onKeepNextTenChange,
                 )
             }
         }
+        ChapterDownloadActionRow(
+            title = "Select manually",
+            subtitle = "Choose chapters directly from the list.",
+            onClick = onSelectManually,
+        )
     }
 }
 
@@ -719,13 +681,13 @@ internal fun ChapterDownloadActionRow(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
         color = Color.Transparent,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
                 .clickable(onClick = onClick)
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -803,7 +765,7 @@ internal fun MangaHeroSection(
 internal fun MangaCoverFrame(media: AnilistMedia, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
         color = Color.Transparent,
         shadowElevation = 8.dp,
     ) {
@@ -845,7 +807,7 @@ internal fun AutoResizingMangaTitle(
                 textMeasurer = textMeasurer,
             )
         }
-        val style = mangaTitleTextStyle(layout.fontSize)
+        val style = tankobunMangaTitleTextStyle(layout.fontSize)
         Text(
             layout.lines.joinToString("\n"),
             modifier = Modifier.fillMaxSize(),
@@ -858,37 +820,17 @@ internal fun AutoResizingMangaTitle(
     }
 }
 
-private val BebasNeueFontFamily = FontFamily(
-    Font(R.font.bebas_neue_regular, FontWeight.Normal),
-)
-
 private data class MangaTitleLayout(
     val fontSize: Float,
     val lines: List<String>,
 )
 
-private fun mangaTitleTextStyle(fontSize: Float): TextStyle =
-    TextStyle(
-        fontFamily = BebasNeueFontFamily,
-        fontSize = fontSize.sp,
-        lineHeight = (fontSize * MangaTitleLineHeightRatio).sp,
-        fontWeight = FontWeight.Normal,
-        letterSpacing = 0.sp,
-        hyphens = Hyphens.None,
-        lineBreak = LineBreak.Heading,
-        platformStyle = PlatformTextStyle(includeFontPadding = false),
-        lineHeightStyle = LineHeightStyle(
-            alignment = LineHeightStyle.Alignment.Center,
-            trim = LineHeightStyle.Trim.Both,
-        ),
-    )
-
-private const val MangaTitleLineHeightRatio = 0.82f
+private const val MangaTitleLineHeightRatio = 0.84f
 
 @Composable
 private fun bebasNeueStatTextStyle(compact: Boolean): TextStyle =
     (if (compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.displaySmall).copy(
-        fontFamily = BebasNeueFontFamily,
+        fontFamily = TankobunDisplayFontFamily,
         fontWeight = FontWeight.Normal,
         letterSpacing = 0.sp,
         lineHeight = if (compact) 32.sp else 44.sp,
@@ -897,7 +839,7 @@ private fun bebasNeueStatTextStyle(compact: Boolean): TextStyle =
 @Composable
 private fun bebasNeueChapterTitleStyle(): TextStyle =
     MaterialTheme.typography.titleMedium.copy(
-        fontFamily = BebasNeueFontFamily,
+        fontFamily = TankobunDisplayFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 22.sp,
         lineHeight = 24.sp,
@@ -907,7 +849,7 @@ private fun bebasNeueChapterTitleStyle(): TextStyle =
 @Composable
 private fun bebasNeueRecommendationMetricStyle(): TextStyle =
     MaterialTheme.typography.labelLarge.copy(
-        fontFamily = BebasNeueFontFamily,
+        fontFamily = TankobunDisplayFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 18.sp,
         lineHeight = 18.sp,
@@ -932,7 +874,7 @@ private fun buildMangaTitleLayout(
         .ifEmpty { listOf(title.uppercase(Locale.getDefault())) }
     var fontSize = maxFontSize
     while (fontSize >= minFontSize) {
-        val style = mangaTitleTextStyle(fontSize)
+        val style = tankobunMangaTitleTextStyle(fontSize)
         val lines = preferredTitleLinesForWidth(words, maxWidthPx, maxLines, style, textMeasurer)
         val lineHeightPx = fontSize * MangaTitleLineHeightRatio * spToPx
         if (lines != null && lineHeightPx * lines.size <= maxHeightPx) {
@@ -1108,7 +1050,7 @@ private fun MangaInfoChip(item: MangaInfoItem, compact: Boolean, modifier: Modif
     }
     Surface(
         modifier = chipModifier.heightIn(min = if (compact) 48.dp else 56.dp),
-        shape = RoundedCornerShape(11.dp),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
         color = mediaDetailPanelColor(),
         contentColor = mediaDetailForegroundColor(),
     ) {
@@ -1189,24 +1131,7 @@ internal fun MangaDescriptionAndTags(
 
 @Composable
 internal fun mangaTagPill(tag: String, compact: Boolean, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(7.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
-    ) {
-        Text(
-            tag,
-            modifier = Modifier.padding(
-                horizontal = if (compact) 10.dp else 12.dp,
-                vertical = if (compact) 6.dp else 7.dp,
-            ),
-            style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
+    TankobunTag(label = tag, compact = compact, onClick = onClick)
 }
 
 internal fun String?.plainMediaDescription(): String =
@@ -1284,9 +1209,11 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
             Text("Private", style = MaterialTheme.typography.bodyMedium)
             Switch(checked = state.trackingPrivate, onCheckedChange = viewModel::setTrackingPrivate)
             Spacer(Modifier.weight(1f))
-            Button(onClick = viewModel::saveTracking, enabled = state.loggedIn) {
-                Text(if (state.selectedListEntry == null) "Track manga" else "Save AniList")
-            }
+            TankobunActionButton(
+                label = if (state.selectedListEntry == null) "Track manga" else "Save AniList",
+                onClick = viewModel::saveTracking,
+                enabled = state.loggedIn,
+            )
         }
         if (!state.loggedIn) {
             Text(
@@ -1311,7 +1238,7 @@ internal fun AniListStatusSelector(selected: MediaStatus, onSelected: (MediaStat
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 3.dp,
                 shadowElevation = 2.dp,
@@ -1325,7 +1252,7 @@ internal fun AniListStatusSelector(selected: MediaStatus, onSelected: (MediaStat
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
                                 .clickable {
                                     onSelected(status)
                                     expanded = false
@@ -1380,7 +1307,7 @@ internal fun AniListCustomListSelector(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 3.dp,
                 shadowElevation = 2.dp,
@@ -1408,7 +1335,7 @@ internal fun AniListCustomListSelector(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
                                     .clickable { onListSelected(listName, !selected) }
                                     .padding(horizontal = 10.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1511,12 +1438,11 @@ internal fun MoodScoreInput(value: String, onValueChange: (String) -> Unit, modi
     val selected = value.toDoubleOrNull()?.roundToInt() ?: 0
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf(1 to ":(", 2 to ":|", 3 to ":)").forEach { (score, label) ->
-            FilterChip(
-                selected = selected == score,
-                onClick = { onValueChange(if (selected == score) "" else score.toString()) },
-                colors = tankobunFilterChipColors(),
-                label = { Text(label) },
-            )
+                TankobunChip(
+                    selected = selected == score,
+                    onClick = { onValueChange(if (selected == score) "" else score.toString()) },
+                    label = { Text(label) },
+                )
         }
     }
 }
@@ -1610,7 +1536,7 @@ internal fun RecommendationTile(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Surface(
-            shape = RoundedCornerShape(7.dp),
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
             tonalElevation = 1.dp,
             shadowElevation = 2.dp,
         ) {
@@ -1631,17 +1557,7 @@ internal fun RecommendationTile(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                media.status.statusLabel().uppercase(Locale.getDefault()),
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
-                    lineHeight = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                ),
-                color = mediaDetailAccentColor(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            TankobunMediaStatusLabel(text = media.status.statusLabel())
         }
     }
 }
@@ -1656,7 +1572,7 @@ internal fun LoadMoreRecommendationsTile(
         modifier = modifier
             .aspectRatio(2f / 3f)
             .clickable(enabled = !loading, onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         tonalElevation = 1.dp,
@@ -1722,7 +1638,7 @@ internal fun SourceActionCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
         color = mediaDetailPanelColor(),
         contentColor = mediaDetailForegroundColor(),
     ) {
@@ -1735,18 +1651,11 @@ internal fun SourceActionCard(
         ) {
             DetailIconBadge(icon = Icons.Default.Link)
             SourceActionText(title = title, subtitle = subtitle, modifier = Modifier.weight(1f))
-            OutlinedButton(
+            TankobunIconActionButton(
+                icon = Icons.Default.Search,
+                contentDescription = "Find source",
                 onClick = onFindSource,
-                modifier = Modifier.size(42.dp),
-                shape = RoundedCornerShape(7.dp),
-                contentPadding = PaddingValues(0.dp),
-            ) {
-                Icon(
-                    Icons.Default.Search,
-                    contentDescription = "Find source",
-                    modifier = Modifier.size(19.dp),
-                )
-            }
+            )
         }
     }
 }
@@ -1772,14 +1681,13 @@ internal fun SelectedSourceCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
         color = mediaDetailPanelColor(),
         contentColor = mediaDetailForegroundColor(),
     ) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val compact = maxWidth < 430.dp
             val iconSize = if (compact) 48.dp else 52.dp
-            val actionSize = 42.dp
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1811,18 +1719,11 @@ internal fun SelectedSourceCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                OutlinedButton(
+                TankobunIconActionButton(
+                    icon = Icons.Default.SwapHoriz,
+                    contentDescription = "Change source",
                     onClick = onChange,
-                    modifier = Modifier.size(actionSize),
-                    shape = RoundedCornerShape(7.dp),
-                    contentPadding = PaddingValues(0.dp),
-                ) {
-                    Icon(
-                        Icons.Default.SwapHoriz,
-                        contentDescription = "Change source",
-                        modifier = Modifier.size(19.dp),
-                    )
-                }
+                )
             }
         }
     }
@@ -1843,7 +1744,7 @@ internal fun PlainSourceIcon(
         }
     }
     Box(
-        modifier = modifier.clip(RoundedCornerShape(7.dp)),
+        modifier = modifier.clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control)),
         contentAlignment = Alignment.Center,
     ) {
         if (sourceIcon != null) {
@@ -1856,7 +1757,7 @@ internal fun PlainSourceIcon(
         } else {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(7.dp),
+                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
                 color = mediaDetailAccentColor().copy(alpha = 0.16f),
                 contentColor = mediaDetailAccentColor(),
             ) {
@@ -1943,18 +1844,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
         onDismissRequest = viewModel::closeSourcePicker,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.96f)
-                .fillMaxHeight(0.86f),
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
+        TankobunDialogSurface(maxWidth = 720.dp, fillMaxHeightFraction = 0.86f, scrollable = false) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Find source", style = MaterialTheme.typography.headlineSmall)
@@ -1976,18 +1866,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                 }
 
                 state.sourcePickerMessage?.let { pickerMessage ->
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    ) {
-                        Text(
-                            pickerMessage,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
+                    TankobunMessageBanner(pickerMessage)
                 }
 
                 if (matches.isEmpty() && availableSources.isEmpty() && !state.sourcePickerLoading) {
@@ -2060,7 +1939,6 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
         }
     }
 }
@@ -2089,7 +1967,7 @@ internal fun SourceMatchRow(
     mediaCover: String?,
     onClick: () -> Unit,
 ) {
-    ElevatedCard(onClick = onClick) {
+    ElevatedCard(onClick = onClick, shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
         ListItem(
             headlineContent = { Text(match.manga.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = {
@@ -2121,7 +1999,7 @@ internal fun SourceCandidateRow(
     current: Boolean,
     onClick: () -> Unit,
 ) {
-    ElevatedCard(onClick = onClick) {
+    ElevatedCard(onClick = onClick, shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
         ListItem(
             headlineContent = { Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = {

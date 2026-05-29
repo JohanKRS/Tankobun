@@ -256,7 +256,7 @@ internal fun BackupsSettingsScreen(
         modifier = modifier,
     ) {
         Text("AniList manga backup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        ElevatedCard {
+        ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -298,33 +298,32 @@ internal fun BackupsSettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    OutlinedButton(
+                    TankobunActionButton(
+                        label = "Sync first",
                         onClick = viewModel::refreshLibrary,
                         enabled = state.loggedIn,
-                    ) {
-                        Text("Sync first")
-                    }
-                    Button(
+                        filled = false,
+                    )
+                    TankobunActionButton(
+                        label = "Save backup",
                         onClick = {
                             backupLauncher.launch(suggestedAniListBackupFileName(state.viewerName))
                         },
                         enabled = totalItems > 0,
-                    ) {
-                        Text("Save backup")
-                    }
-                    OutlinedButton(
+                    )
+                    TankobunActionButton(
+                        label = "Restore",
                         onClick = {
                             restoreLauncher.launch(arrayOf("text/xml", "application/xml", "*/*"))
                         },
                         enabled = state.loggedIn,
-                    ) {
-                        Text("Restore")
-                    }
+                        filled = false,
+                    )
                 }
             }
         }
         Text("Scheduled backups", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        ElevatedCard {
+        ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -345,15 +344,16 @@ internal fun BackupsSettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    OutlinedButton(onClick = { folderLauncher.launch(null) }) {
-                        Text(if (state.backupFolderUri == null) "Choose folder" else "Change folder")
-                    }
-                    Button(
+                    TankobunActionButton(
+                        label = if (state.backupFolderUri == null) "Choose folder" else "Change folder",
+                        onClick = { folderLauncher.launch(null) },
+                        filled = false,
+                    )
+                    TankobunActionButton(
+                        label = "Run now",
                         onClick = viewModel::runScheduledAniListBackupNow,
                         enabled = state.backupFolderUri != null && totalItems > 0,
-                    ) {
-                        Text("Run now")
-                    }
+                    )
                 }
                 val lastRun = state.lastScheduledBackupAtEpochMillis
                 Text(
@@ -384,10 +384,9 @@ internal fun BackupSchedulePicker(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 rowSchedules.forEach { schedule ->
-                    FilterChip(
+                    TankobunChip(
                         selected = selected == schedule,
                         onClick = { onSelect(schedule) },
-                        colors = tankobunFilterChipColors(),
                         label = { Text(schedule.label()) },
                         modifier = Modifier.weight(1f),
                     )

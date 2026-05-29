@@ -927,8 +927,8 @@ internal fun TankobunTopBar(
     val iconSize = if (compact) 18.dp else 24.dp
     val logoSize = if (compact) 36.dp else 56.dp
     val spacing = if (compact) 7.dp else 12.dp
-    val barColor = if (mediaDetailActive) Color.Transparent else LocalTankobunTokens.current.elevatedSurface
-    val contentColor = MaterialTheme.colorScheme.onSurface
+    val barColor = if (mediaDetailActive) Color.Transparent else LocalTankobunStyle.current.colors.panel
+    val contentColor = LocalTankobunStyle.current.colors.panelContent
     Surface(
         color = barColor,
         contentColor = contentColor,
@@ -944,12 +944,12 @@ internal fun TankobunTopBar(
                     modifier = Modifier
                         .matchParentSize()
                         .blur(42.dp)
-                        .background(LocalTankobunTokens.current.appBackdrop.copy(alpha = 0.96f)),
+                        .background(LocalTankobunStyle.current.colors.backdrop.copy(alpha = 0.96f)),
                 )
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .background(LocalTankobunTokens.current.elevatedSurface.copy(alpha = 0.72f)),
+                        .background(LocalTankobunStyle.current.colors.panel.copy(alpha = 0.72f)),
                 )
             }
             Row(
@@ -1012,7 +1012,7 @@ internal fun TankobunBottomNavigationBar(
 ) {
     NavigationBar(
         modifier = modifier,
-        containerColor = Color.Transparent,
+        containerColor = LocalTankobunStyle.current.colors.panel.copy(alpha = 0.92f),
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         tonalElevation = 0.dp,
     ) {
@@ -1133,8 +1133,8 @@ internal fun QuickDrawer(
                 .width(drawerWidth + endPadding)
                 .fillMaxHeight(),
             shape = RoundedCornerShape(0.dp),
-            color = LocalTankobunTokens.current.elevatedSurface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            color = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
             tonalElevation = 0.dp,
             shadowElevation = if (pinned) 0.dp else 10.dp,
         ) {
@@ -1169,11 +1169,13 @@ internal fun QuickDrawer(
                                 ?: "Library has not synced yet.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Button(onClick = viewModel::refreshLibrary, enabled = state.loggedIn, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Sync AniList")
-                        }
+                        TankobunActionButton(
+                            label = "Sync AniList",
+                            icon = Icons.Default.Refresh,
+                            enabled = state.loggedIn,
+                            onClick = viewModel::refreshLibrary,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
 
                     if (selectedMedia != null) {
@@ -1253,25 +1255,28 @@ internal fun RecentReadingAction(item: RecentReadingProgress, onClick: () -> Uni
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(if (item.chapter == null) "Open manga" else "Resume")
-        }
+        TankobunActionButton(
+            label = if (item.chapter == null) "Open manga" else "Resume",
+            icon = Icons.AutoMirrored.Filled.MenuBook,
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+            filled = false,
+        )
     }
 }
 
 @Composable
 internal fun QuickDrawerSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    TankobunPanel(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
     ) {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        content()
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            TankobunSectionHeader(title = title)
+            content()
+        }
     }
 }

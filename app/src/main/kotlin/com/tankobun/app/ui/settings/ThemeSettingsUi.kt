@@ -265,7 +265,6 @@ internal fun ThemePicker(
         }
     }
 }
-
 @Composable
 internal fun ThemeChoiceCard(
     choice: TankobunThemeChoice,
@@ -332,7 +331,6 @@ internal fun ThemeChoiceCard(
         }
     }
 }
-
 @Composable
 internal fun ThemeSwatches(colors: List<Color>) {
     Row(horizontalArrangement = Arrangement.spacedBy((-8).dp), verticalAlignment = Alignment.CenterVertically) {
@@ -347,31 +345,3 @@ internal fun ThemeSwatches(colors: List<Color>) {
         }
     }
 }
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-internal fun FlowRowCompat(content: @Composable () -> Unit) {
-    FlowRow(
-        modifier = Modifier
-            .fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        content()
-    }
-}
-
-@Composable
-internal fun tankobunFilterChipColors() = FilterChipDefaults.filterChipColors(
-    containerColor = MaterialTheme.colorScheme.surface,
-    labelColor = MaterialTheme.colorScheme.onSurface,
-    iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-    selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
-    disabledLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-)

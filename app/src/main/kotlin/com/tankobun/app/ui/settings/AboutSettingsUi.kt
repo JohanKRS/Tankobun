@@ -236,7 +236,7 @@ internal fun AboutSettingsScreen(
         subtitle = "A little context about what Tankobun is and is not.",
         modifier = modifier,
     ) {
-        ElevatedCard {
+        ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -249,22 +249,20 @@ internal fun AboutSettingsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                OutlinedButton(
+                TankobunActionButton(
+                    label = "GitHub repository",
+                    icon = Icons.Default.Link,
                     onClick = { uriHandler.openUri(TankobunGithubUrl) },
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Default.Link, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("GitHub repository")
-                }
-                OutlinedButton(
+                    filled = false,
+                )
+                TankobunActionButton(
+                    label = "Replay tutorial",
+                    icon = Icons.Default.Replay,
                     onClick = onReplayOnboarding,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Default.Replay, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Replay tutorial")
-                }
+                    filled = false,
+                )
                 Text(
                     "Tankobun is an unofficial manga reader and is not affiliated with AniList.",
                     style = MaterialTheme.typography.bodyMedium,

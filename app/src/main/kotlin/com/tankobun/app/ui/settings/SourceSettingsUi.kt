@@ -372,13 +372,7 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
         }
         state.message?.let { message ->
             item {
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Text(message, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
-                }
+                TankobunMessageBanner(message)
             }
         }
 
@@ -453,19 +447,17 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     label = { Text("User-provided repository index URL") },
+                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
                 )
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = viewModel::refreshExtensionIndex) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Load")
-                    }
-                    OutlinedButton(onClick = viewModel::refreshInstalledSources) {
-                        Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Rescan")
-                    }
+                    TankobunActionButton(label = "Load", icon = Icons.Default.Refresh, onClick = viewModel::refreshExtensionIndex)
+                    TankobunActionButton(
+                        label = "Rescan",
+                        icon = Icons.Default.Tune,
+                        onClick = viewModel::refreshInstalledSources,
+                        filled = false,
+                    )
                 }
                 if (state.availableExtensions.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
@@ -528,11 +520,10 @@ internal fun SourceSettingsSummary(
     onRefreshInstalled: () -> Unit,
     onRefreshRepository: () -> Unit,
 ) {
-    Surface(
+    TankobunPanel(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = LocalTankobunTokens.current.elevatedSurface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        color = LocalTankobunStyle.current.colors.panel,
+        contentColor = LocalTankobunStyle.current.colors.panelContent,
         tonalElevation = 1.dp,
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -545,12 +536,16 @@ internal fun SourceSettingsSummary(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = onRefreshInstalled) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Refresh installed sources")
-                }
-                IconButton(onClick = onRefreshRepository) {
-                    Icon(Icons.Default.Download, contentDescription = "Load extension repository")
-                }
+                TankobunIconActionButton(
+                    icon = Icons.Default.Refresh,
+                    contentDescription = "Refresh installed sources",
+                    onClick = onRefreshInstalled,
+                )
+                TankobunIconActionButton(
+                    icon = Icons.Default.Download,
+                    contentDescription = "Load extension repository",
+                    onClick = onRefreshRepository,
+                )
             }
             PrimaryScrollableTabRow(
                 selectedTabIndex = selectedTab,
@@ -575,22 +570,11 @@ internal fun SourceSettingsSearchField(
     selectedTab: Int,
     onQueryChange: (String) -> Unit,
 ) {
-    OutlinedTextField(
+    TankobunSearchField(
         value = query,
         onValueChange = onQueryChange,
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        label = { Text(if (selectedTab == 0) "Search installed sources" else "Search extensions") },
-        leadingIcon = {
-            Icon(Icons.Default.Search, contentDescription = null)
-        },
-        trailingIcon = {
-            if (query.isNotBlank()) {
-                IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Default.Close, contentDescription = "Clear source search")
-                }
-            }
-        },
+        placeholder = if (selectedTab == 0) "Search installed sources" else "Search extensions",
+        showSearchAction = false,
     )
 }
 
@@ -606,25 +590,22 @@ internal fun SourceLanguageFilters(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Languages", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        FlowRowCompat {
-            FilterChip(
+        TankobunFilterRow {
+            TankobunChip(
                 selected = selectedFilter == SOURCE_LANGUAGE_FILTER_ACTIVE,
                 onClick = { onSelectFilter(SOURCE_LANGUAGE_FILTER_ACTIVE) },
-                colors = tankobunFilterChipColors(),
                 label = { Text("$activeLabel $activeCount") },
             )
-            FilterChip(
+            TankobunChip(
                 selected = selectedFilter == SOURCE_LANGUAGE_FILTER_ALL,
                 onClick = { onSelectFilter(SOURCE_LANGUAGE_FILTER_ALL) },
-                colors = tankobunFilterChipColors(),
                 label = { Text("All $allCount") },
             )
             languageOptions.forEach { language ->
                 val count = languageCounts[language] ?: 0
-                FilterChip(
+                TankobunChip(
                     selected = selectedFilter == language,
                     onClick = { onSelectFilter(language) },
-                    colors = tankobunFilterChipColors(),
                     label = { Text("${sourceLanguageDisplay(language)} $count") },
                 )
             }
@@ -646,9 +627,8 @@ internal fun SourceLanguageGroupSection(
     onUninstall: (String) -> Unit,
 ) {
     val activeCount = sources.count { source -> state.sourceActive(source) }
-    Surface(
+    TankobunPanel(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
     ) {
@@ -771,11 +751,10 @@ internal fun ExtensionRepositoryRow(
     val installedVersionCode = installedSources.mapNotNull { it.versionCode }.maxOrNull()
     val installed = installedSources.isNotEmpty()
     val updateAvailable = installedVersionCode?.let { extension.versionCode > it } == true
-    Surface(
+    TankobunPanel(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = LocalTankobunTokens.current.elevatedSurface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        color = LocalTankobunStyle.current.colors.panel,
+        contentColor = LocalTankobunStyle.current.colors.panelContent,
         tonalElevation = 1.dp,
     ) {
         Row(
@@ -807,6 +786,7 @@ internal fun ExtensionRepositoryRow(
             Button(
                 enabled = !installing,
                 onClick = onInstall,
+                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
             ) {
                 if (installing) {
                     CircularProgressIndicator(

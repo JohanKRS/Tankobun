@@ -234,50 +234,39 @@ internal fun DownloadsScreen(state: TankobunUiState, viewModel: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "Downloads",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    state.downloadSummaryLabel(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            TankobunSectionHeader(title = "Downloads", trailing = state.downloadSummaryLabel())
         }
         if (state.downloads.any { it.state == DownloadState.FAILED || it.state == DownloadState.PAUSED || it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }) {
             item {
                 FlowRowCompat {
                     if (state.downloads.any { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }) {
-                        OutlinedButton(onClick = viewModel::pauseActiveDownloads) {
-                            Icon(Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Pause active")
-                        }
+                        TankobunActionButton(
+                            label = "Pause active",
+                            icon = Icons.Default.Pause,
+                            onClick = viewModel::pauseActiveDownloads,
+                            filled = false,
+                        )
                     }
                     if (state.downloads.any { it.state == DownloadState.PAUSED }) {
-                        Button(onClick = viewModel::resumePausedDownloads) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Resume paused")
-                        }
+                        TankobunActionButton(
+                            label = "Resume paused",
+                            icon = Icons.Default.PlayArrow,
+                            onClick = viewModel::resumePausedDownloads,
+                        )
                     }
                     if (state.downloads.any { it.state == DownloadState.FAILED }) {
-                        Button(onClick = viewModel::retryFailedDownloads) {
-                            Icon(Icons.Default.Replay, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Retry failed")
-                        }
+                        TankobunActionButton(
+                            label = "Retry failed",
+                            icon = Icons.Default.Replay,
+                            onClick = viewModel::retryFailedDownloads,
+                        )
                     }
                 }
             }
         }
         if (state.downloads.isEmpty()) {
             item {
-                Text("No downloads yet.")
+                TankobunEmptyState(title = "No downloads yet.")
             }
         } else {
             items(state.downloads, key = { it.id }) { job ->
@@ -301,7 +290,7 @@ internal fun DownloadJobRow(
     onRetry: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    ElevatedCard {
+    ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
         Column(modifier = Modifier.fillMaxWidth()) {
             ListItem(
                 headlineContent = { Text(job.chapterName, maxLines = 1, overflow = TextOverflow.Ellipsis) },

@@ -245,10 +245,9 @@ internal fun MediaViewModeRow(
             MediaViewMode.COVER_WITH_INFO to "Cover + info",
             MediaViewMode.LIST to "List",
         ).forEach { (mode, label) ->
-            FilterChip(
+            TankobunChip(
                 selected = selectedMode == mode,
                 onClick = { onSelect(mode) },
-                colors = tankobunFilterChipColors(),
                 label = { Text(label) },
             )
         }
@@ -285,7 +284,7 @@ internal fun MediaCollection(
                 }
             }
             item(key = "media-empty") {
-                Text(emptyMessage)
+                TankobunEmptyState(title = emptyMessage)
             }
         }
         return
@@ -356,6 +355,7 @@ internal fun MediaCoverTile(
         .fillMaxWidth()
         .aspectRatio(2f / 3f)
     val coverCornerRadius = if (showWholeCover) 0.dp else 8.dp
+    val titleGap = if (supportedViewMode == MediaViewMode.COVER_WITH_INFO) 0.dp else 6.dp
 
     Column(
         modifier = modifier
@@ -390,20 +390,17 @@ internal fun MediaCoverTile(
             )
         }
         if (supportedViewMode != MediaViewMode.COVER_GRID) {
-            Text(
-                media.title.userPreferred,
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (supportedViewMode == MediaViewMode.COVER_WITH_INFO) {
+            Column(verticalArrangement = Arrangement.spacedBy(titleGap)) {
                 Text(
-                    listOfNotNull(media.status, media.chapters?.let { "$it ch" }).joinToString(" / "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    media.title.userPreferred,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (supportedViewMode == MediaViewMode.COVER_WITH_INFO) {
+                    TankobunMediaStatusLabel(text = media.status.statusLabel())
+                }
             }
         }
     }
@@ -412,18 +409,22 @@ internal fun MediaCoverTile(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MediaRow(media: AnilistMedia, onClick: () -> Unit) {
-    ElevatedCard(onClick = onClick) {
+    ElevatedCard(onClick = onClick, shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
         ListItem(
             headlineContent = {
                 Text(media.title.userPreferred, maxLines = 2, overflow = TextOverflow.Ellipsis)
             },
             supportingContent = {
-                Text(
-                    listOfNotNull(media.status, media.chapters?.let { "$it chapters" })
-                        .joinToString(" / "),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    TankobunMediaStatusLabel(text = media.status.statusLabel())
+                    Text(
+                        media.chapters?.let { "$it chapters" } ?: media.format.mediaFormatLabel(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             },
             leadingContent = {
                 CoverImage(

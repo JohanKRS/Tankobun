@@ -42,7 +42,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.LocalTankobunTokens
+import com.tankobun.app.ui.components.TankobunActionButton
 
 private data class OnboardingPage(
     val icon: ImageVector,
@@ -117,9 +119,9 @@ internal fun OnboardingDialog(
                 .fillMaxWidth(0.94f)
                 .widthIn(max = 560.dp)
                 .heightIn(max = 680.dp),
-            shape = RoundedCornerShape(18.dp),
-            color = LocalTankobunTokens.current.elevatedSurface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+            color = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
             tonalElevation = 4.dp,
         ) {
             Column(
@@ -150,7 +152,7 @@ internal fun OnboardingDialog(
                     modifier = Modifier
                         .align(Alignment.CenterHorizontally)
                         .size(78.dp),
-                    shape = RoundedCornerShape(22.dp),
+                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ) {
@@ -224,19 +226,18 @@ internal fun OnboardingDialog(
                     }
                     Spacer(Modifier.weight(1f))
                     if (pageIndex > 0) {
-                        OutlinedButton(onClick = { pageIndex -= 1 }) {
-                            Text("Back")
-                        }
+                        TankobunActionButton(label = "Back", onClick = { pageIndex -= 1 }, filled = false)
                     }
-                    Button(onClick = {
-                        if (isLastPage) {
-                            onDismiss()
-                        } else {
-                            pageIndex += 1
-                        }
-                    }) {
-                        Text(if (isLastPage) "Start" else "Next")
-                    }
+                    TankobunActionButton(
+                        label = if (isLastPage) "Start" else "Next",
+                        onClick = {
+                            if (isLastPage) {
+                                onDismiss()
+                            } else {
+                                pageIndex += 1
+                            }
+                        },
+                    )
                 }
             }
         }
