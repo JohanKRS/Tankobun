@@ -7,6 +7,7 @@ import com.tankobun.core.model.AnilistMediaPage
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendationPage
 import com.tankobun.core.model.AnilistScoreFormat
+import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.MediaStatus
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
@@ -26,6 +27,7 @@ class AnilistRepository(
             accessToken = accessToken,
         )
         val viewer = requireNotNull(data["Viewer"]).jsonObject
+        val options = viewer["options"]?.jsonObject
         val mediaListOptions = viewer["mediaListOptions"]?.jsonObject
         val mangaListOptions = mediaListOptions?.get("mangaList")?.jsonObject
         return AnilistViewer(
@@ -36,16 +38,30 @@ class AnilistRepository(
                 ?.stringOrNull("scoreFormat")
                 ?.toAnilistScoreFormat()
                 ?: AnilistScoreFormat.POINT_100,
+            titleLanguage = options
+                ?.stringOrNull("titleLanguage")
+                ?.toAnilistTitleLanguage()
+                ?: AnilistTitleLanguage.ROMAJI,
             mangaCustomLists = mangaListOptions?.stringArray("customLists").orEmpty(),
         )
     }
 
-    suspend fun searchManga(query: String, page: Int = 1, perPage: Int = 50): List<AnilistMedia> =
-        searchMangaPage(query = query, page = page, perPage = perPage).media
+    suspend fun searchManga(
+        query: String,
+        page: Int = 1,
+        perPage: Int = 50,
+        accessToken: String? = null,
+    ): List<AnilistMedia> =
+        searchMangaPage(query = query, page = page, perPage = perPage, accessToken = accessToken).media
 
-    suspend fun searchMangaPage(query: String, page: Int = 1, perPage: Int = 50): AnilistMediaPage {
+    suspend fun searchMangaPage(
+        query: String,
+        page: Int = 1,
+        perPage: Int = 50,
+        accessToken: String? = null,
+    ): AnilistMediaPage {
         query.extractAniListMangaId()?.let { mediaId ->
-            val media = runCatching { listOf(mediaDetailsWithEntry(mediaId, accessToken = null).media) }
+            val media = runCatching { listOf(mediaDetailsWithEntry(mediaId, accessToken = accessToken).media) }
                 .getOrDefault(emptyList())
             return AnilistMediaPage(media = media, currentPage = 1, hasNextPage = false)
         }
@@ -57,11 +73,12 @@ class AnilistRepository(
                 put("page", page)
                 put("perPage", perPage)
             },
+            accessToken = accessToken,
         )
         val directResults = AnilistJsonMapper.searchMediaPage(data)
         return if (page == 1 && directResults.media.isEmpty()) {
             AnilistMediaPage(
-                media = fallbackSearchManga(query),
+                media = fallbackSearchManga(query, accessToken = accessToken),
                 currentPage = 1,
                 hasNextPage = false,
             )
@@ -81,6 +98,7 @@ class AnilistRepository(
         sort: String = "TRENDING_DESC",
         page: Int = 1,
         perPage: Int = 50,
+        accessToken: String? = null,
     ): List<AnilistMedia> =
         browseMangaPage(
             search = search,
@@ -93,6 +111,7 @@ class AnilistRepository(
             sort = sort,
             page = page,
             perPage = perPage,
+            accessToken = accessToken,
         ).media
 
     suspend fun browseMangaPage(
@@ -106,6 +125,7 @@ class AnilistRepository(
         sort: String = "TRENDING_DESC",
         page: Int = 1,
         perPage: Int = 50,
+        accessToken: String? = null,
     ): AnilistMediaPage {
         val normalizedSearch = search?.trim().orEmpty()
         if (
@@ -117,7 +137,7 @@ class AnilistRepository(
             year == null
         ) {
             normalizedSearch.extractAniListMangaId()?.let { mediaId ->
-                val media = runCatching { listOf(mediaDetailsWithEntry(mediaId, accessToken = null).media) }
+                val media = runCatching { listOf(mediaDetailsWithEntry(mediaId, accessToken = accessToken).media) }
                     .getOrDefault(emptyList())
                 return AnilistMediaPage(media = media, currentPage = 1, hasNextPage = false)
             }
@@ -144,6 +164,7 @@ class AnilistRepository(
                 }
                 put("sort", buildJsonArray { add(sort) })
             },
+            accessToken = accessToken,
         )
         return AnilistJsonMapper.searchMediaPage(data)
     }
@@ -153,14 +174,22 @@ class AnilistRepository(
         sort: String = "POPULARITY_DESC",
         page: Int = 1,
         perPage: Int = 50,
+        accessToken: String? = null,
     ): List<AnilistMedia> =
-        staffMangaPage(staffName = staffName, sort = sort, page = page, perPage = perPage).media
+        staffMangaPage(
+            staffName = staffName,
+            sort = sort,
+            page = page,
+            perPage = perPage,
+            accessToken = accessToken,
+        ).media
 
     suspend fun staffMangaPage(
         staffName: String,
         sort: String = "POPULARITY_DESC",
         page: Int = 1,
         perPage: Int = 50,
+        accessToken: String? = null,
     ): AnilistMediaPage {
         val normalizedStaffName = staffName.trim()
         if (normalizedStaffName.isBlank()) return AnilistMediaPage(emptyList(), currentPage = 1, hasNextPage = false)
@@ -172,6 +201,7 @@ class AnilistRepository(
                 put("perPage", perPage)
                 put("sort", buildJsonArray { add(sort) })
             },
+            accessToken = accessToken,
         )
         return AnilistJsonMapper.staffMediaPage(data)
     }
@@ -183,31 +213,33 @@ class AnilistRepository(
             .sortedWith(compareBy<AnilistMediaTag> { it.category.orEmpty() }.thenBy { it.name })
     }
 
-    suspend fun mangaById(mediaId: Int): AnilistMedia? {
+    suspend fun mangaById(mediaId: Int, accessToken: String? = null): AnilistMedia? {
         val data = graphQlClient.execute(
             query = AnilistQueries.MangaById,
             variables = buildJsonObject {
                 put("id", mediaId)
             },
+            accessToken = accessToken,
         )
         val media = data["Media"] ?: return null
         if (media is JsonNull) return null
         return AnilistJsonMapper.media(media)
     }
 
-    suspend fun mangaByMalId(idMal: Int): AnilistMedia? {
+    suspend fun mangaByMalId(idMal: Int, accessToken: String? = null): AnilistMedia? {
         val data = graphQlClient.execute(
             query = AnilistQueries.MangaByMalId,
             variables = buildJsonObject {
                 put("idMal", idMal)
             },
+            accessToken = accessToken,
         )
         val media = data["Media"] ?: return null
         if (media is JsonNull) return null
         return AnilistJsonMapper.media(media)
     }
 
-    private suspend fun fallbackSearchManga(query: String): List<AnilistMedia> {
+    private suspend fun fallbackSearchManga(query: String, accessToken: String?): List<AnilistMedia> {
         val normalizedQuery = query.normalizedSearchTokens()
         if (normalizedQuery.isEmpty()) return emptyList()
 
@@ -221,6 +253,7 @@ class AnilistRepository(
                             put("page", page)
                             put("sort", buildJsonArray { add(sort) })
                         },
+                        accessToken = accessToken,
                     ),
                 )
                 val rankedCount = candidates
@@ -410,6 +443,9 @@ private fun AnilistMedia.searchFallbackScore(tokens: List<String>): Int {
 
 private fun String.toAnilistScoreFormat(): AnilistScoreFormat =
     runCatching { AnilistScoreFormat.valueOf(this) }.getOrDefault(AnilistScoreFormat.POINT_100)
+
+private fun String.toAnilistTitleLanguage(): AnilistTitleLanguage =
+    runCatching { AnilistTitleLanguage.valueOf(this) }.getOrDefault(AnilistTitleLanguage.ROMAJI)
 
 private fun kotlinx.serialization.json.JsonObject.stringOrNull(name: String): String? =
     this[name]?.jsonPrimitive?.content

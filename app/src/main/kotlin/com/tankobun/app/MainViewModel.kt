@@ -37,6 +37,7 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import com.tankobun.core.anilist.AnilistGraphQlException
+import com.tankobun.core.anilist.AnilistViewer
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -53,6 +54,7 @@ import com.tankobun.core.model.AnilistMediaPage
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistScoreFormat
+import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.reader.ReaderProgressCalculator
 import com.tankobun.core.reader.ReaderSession
 import com.tankobun.core.model.AnilistMedia
@@ -69,6 +71,7 @@ import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceManga
 import com.tankobun.core.model.SourceSearchResult
 import com.tankobun.core.model.SyncMutationType
+import com.tankobun.core.model.withTitleLanguage
 import com.tankobun.core.sync.SyncBackoff
 import com.tankobun.core.sync.SyncMutationFactory
 import kotlinx.coroutines.CancellationException
@@ -158,6 +161,7 @@ class MainViewModel(
             clientConfigured = BuildConfig.ANILIST_CLIENT_ID.isNotBlank(),
             viewerName = container.settingsStore.viewerName(),
             anilistScoreFormat = container.settingsStore.anilistScoreFormat(),
+            anilistTitleLanguage = container.settingsStore.anilistTitleLanguage(),
             anilistCustomLists = container.settingsStore.anilistCustomLists(),
             librarySyncedAtEpochMillis = container.settingsStore.librarySyncedAtEpochMillis(),
             backupFolderUri = container.settingsStore.backupFolderUri(),
@@ -209,6 +213,7 @@ class MainViewModel(
             refreshExtensionIndex(silent = true)
         }
         if (_state.value.loggedIn) {
+            refreshAniListViewer()
             loadCachedLibrary(syncIfEmpty = true)
             processPendingAniListSync()
         }
@@ -233,6 +238,7 @@ class MainViewModel(
         container.tokenStore.clear()
         container.settingsStore.saveViewerName(null)
         container.settingsStore.saveAnilistScoreFormat(AnilistScoreFormat.POINT_100)
+        container.settingsStore.saveAnilistTitleLanguage(AnilistTitleLanguage.ROMAJI)
         container.settingsStore.saveAnilistCustomLists(emptyList())
         container.settingsStore.saveLibrarySyncedAtEpochMillis(0L)
         _state.update {
@@ -240,6 +246,7 @@ class MainViewModel(
                 loggedIn = false,
                 viewerName = null,
                 anilistScoreFormat = AnilistScoreFormat.POINT_100,
+                anilistTitleLanguage = AnilistTitleLanguage.ROMAJI,
                 anilistCustomLists = emptyList(),
                 library = emptyList(),
                 libraryItems = emptyList(),
@@ -257,6 +264,33 @@ class MainViewModel(
     fun dismissOnboarding() {
         container.settingsStore.saveOnboardingCompleted(true)
         _state.update { it.copy(onboardingVisible = false) }
+    }
+
+    private fun refreshAniListViewer() {
+        val token = container.tokenStore.accessToken() ?: return
+        viewModelScope.launch {
+            runCatching {
+                container.anilistRepository.viewer(token)
+            }.onSuccess { viewer ->
+                saveAniListViewerSettings(viewer)
+                _state.update {
+                    it.withAniListTitleLanguage(viewer.titleLanguage).copy(
+                        viewerName = viewer.name,
+                        anilistScoreFormat = viewer.scoreFormat,
+                        anilistCustomLists = viewer.mangaCustomLists,
+                    )
+                }
+            }.onFailure { error ->
+                Log.w(TAG, "AniList viewer refresh failed", error)
+            }
+        }
+    }
+
+    private fun saveAniListViewerSettings(viewer: AnilistViewer) {
+        container.settingsStore.saveViewerName(viewer.name)
+        container.settingsStore.saveAnilistScoreFormat(viewer.scoreFormat)
+        container.settingsStore.saveAnilistTitleLanguage(viewer.titleLanguage)
+        container.settingsStore.saveAnilistCustomLists(viewer.mangaCustomLists)
     }
 
     fun refreshInstalledSources() {
@@ -571,10 +605,11 @@ class MainViewModel(
 
     private fun loadCachedLibrary(syncIfEmpty: Boolean = false) {
         viewModelScope.launch {
+            val titleLanguage = _state.value.anilistTitleLanguage
             val media = container.database.mediaDao().cachedMedia().associateBy { it.id }
             val entries = container.database.listEntryDao().cachedEntries()
             val items = entries.mapNotNull { entry ->
-                media[entry.mediaId]?.toModel()?.let { cachedMedia ->
+                media[entry.mediaId]?.toModel(titleLanguage)?.let { cachedMedia ->
                     LibraryItem(cachedMedia, entry.toModel())
                 }
             }.distinctBy { it.media.id }
@@ -607,9 +642,10 @@ class MainViewModel(
         val latestProgress = container.database.progressDao().latestReadingProgress(RECENT_READING_LIMIT)
             .map { it.toModel() }
         if (latestProgress.isEmpty()) return emptyList()
+        val titleLanguage = _state.value.anilistTitleLanguage
         val mediaById = container.database.mediaDao().cachedMedia().associateBy { it.id }
         return latestProgress.mapNotNull { progress ->
-            val media = mediaById[progress.mediaId]?.toModel() ?: return@mapNotNull null
+            val media = mediaById[progress.mediaId]?.toModel(titleLanguage) ?: return@mapNotNull null
             RecentReadingProgress(
                 media = media,
                 progress = progress,
@@ -634,26 +670,28 @@ class MainViewModel(
                     userId = viewer.id,
                     scoreFormat = viewer.scoreFormat,
                 )
+                val preferredEntries = entries.map { (media, entry) ->
+                    media.withTitleLanguage(viewer.titleLanguage) to entry
+                }
                 val now = System.currentTimeMillis()
-                container.database.mediaDao().upsertMedia(entries.map { it.first.toEntity(now) })
-                container.database.listEntryDao().upsertEntries(entries.map { it.second.toEntity(now) })
-                val entryIds = entries.map { it.second.id }
+                container.database.mediaDao().upsertMedia(preferredEntries.map { it.first.toEntity(now) })
+                container.database.listEntryDao().upsertEntries(preferredEntries.map { it.second.toEntity(now) })
+                val entryIds = preferredEntries.map { it.second.id }
                 if (entryIds.isEmpty()) {
                     container.database.listEntryDao().deleteAllEntries()
                 } else {
                     container.database.listEntryDao().deleteEntriesNotIn(entryIds)
                 }
-                container.settingsStore.saveViewerName(viewer.name)
-                container.settingsStore.saveAnilistScoreFormat(viewer.scoreFormat)
-                container.settingsStore.saveAnilistCustomLists(viewer.mangaCustomLists)
+                saveAniListViewerSettings(viewer)
                 container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
                 _state.update {
                     it.copy(
                         viewerName = viewer.name,
                         anilistScoreFormat = viewer.scoreFormat,
+                        anilistTitleLanguage = viewer.titleLanguage,
                         anilistCustomLists = viewer.mangaCustomLists,
-                        library = entries.map { pair -> pair.first },
-                        libraryItems = entries.map { (media, entry) -> LibraryItem(media, entry) },
+                        library = preferredEntries.map { pair -> pair.first },
+                        libraryItems = preferredEntries.map { (media, entry) -> LibraryItem(media, entry) },
                         librarySyncedAtEpochMillis = now,
                         busy = false,
                         message = "Library synced",
@@ -862,7 +900,9 @@ class MainViewModel(
                     scoreFormat = _state.value.anilistScoreFormat,
                 )
                 val now = System.currentTimeMillis()
-                val media = container.database.mediaDao().cachedMedia(mutation.mediaId)?.toModel()
+                val media = container.database.mediaDao()
+                    .cachedMedia(mutation.mediaId)
+                    ?.toModel(_state.value.anilistTitleLanguage)
                     ?: _state.value.selectedMedia?.takeIf { it.id == mutation.mediaId }
                 container.database.listEntryDao().upsertEntry(entry.toEntity(now))
                 applySyncedListEntry(media, entry, updateTrackingForm = false)
@@ -1155,21 +1195,35 @@ class MainViewModel(
                 }
             }
             runCatching {
+                val accessToken = container.tokenStore.accessToken()
                 val trending = cachedAnilistBrowseMedia(BROWSE_TRENDING_CACHE_KEY) {
-                    container.anilistRepository.browseManga(sort = "TRENDING_DESC", perPage = BROWSE_LANDING_SECTION_SIZE)
+                    container.anilistRepository.browseManga(
+                        sort = "TRENDING_DESC",
+                        perPage = BROWSE_LANDING_SECTION_SIZE,
+                        accessToken = accessToken,
+                    )
                 }
                 val popular = cachedAnilistBrowseMedia(BROWSE_POPULAR_CACHE_KEY) {
-                    container.anilistRepository.browseManga(sort = "POPULARITY_DESC", perPage = BROWSE_LANDING_SECTION_SIZE)
+                    container.anilistRepository.browseManga(
+                        sort = "POPULARITY_DESC",
+                        perPage = BROWSE_LANDING_SECTION_SIZE,
+                        accessToken = accessToken,
+                    )
                 }
                 val popularManhwa = cachedAnilistBrowseMedia(BROWSE_MANHWA_CACHE_KEY) {
                     container.anilistRepository.browseManga(
                         countryOfOrigin = "KR",
                         sort = "POPULARITY_DESC",
                         perPage = BROWSE_LANDING_SECTION_SIZE,
+                        accessToken = accessToken,
                     )
                 }
                 val topManga = cachedAnilistBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY) {
-                    container.anilistRepository.browseManga(sort = "SCORE_DESC", perPage = BROWSE_LANDING_SECTION_SIZE)
+                    container.anilistRepository.browseManga(
+                        sort = "SCORE_DESC",
+                        perPage = BROWSE_LANDING_SECTION_SIZE,
+                        accessToken = accessToken,
+                    )
                 }.take(BROWSE_LANDING_SECTION_SIZE)
                 BrowseLandingData(trending, popular, popularManhwa, topManga)
             }.onSuccess { landing ->
@@ -1338,9 +1392,11 @@ class MainViewModel(
         val cachedIsFresh = cachedRows.isNotEmpty() &&
             cachedRows.all { now - it.fetchedAtEpochMillis <= cachePolicy.anilistSearchTtlMillis }
         if (cachedIsFresh) {
-            return container.database.searchResultDao().cachedSearchMedia(cacheKey).map { it.toModel() }
+            val titleLanguage = _state.value.anilistTitleLanguage
+            return container.database.searchResultDao().cachedSearchMedia(cacheKey).map { it.toModel(titleLanguage) }
         }
-        val results = fetch()
+        val titleLanguage = _state.value.anilistTitleLanguage
+        val results = fetch().map { it.withTitleLanguage(titleLanguage) }
         container.database.mediaDao().upsertMedia(results.map { it.toEntity(now) })
         container.database.searchResultDao().deleteForQuery(cacheKey)
         container.database.searchResultDao().upsertResults(
@@ -1365,7 +1421,10 @@ class MainViewModel(
         val cachedIsFresh = cachedRows.isNotEmpty() &&
             cachedRows.all { now - it.fetchedAtEpochMillis <= cachePolicy.anilistSearchTtlMillis }
         if (cachedIsFresh) {
-            val cachedMedia = container.database.searchResultDao().cachedSearchMedia(cacheKey).map { it.toModel() }
+            val titleLanguage = _state.value.anilistTitleLanguage
+            val cachedMedia = container.database.searchResultDao()
+                .cachedSearchMedia(cacheKey)
+                .map { it.toModel(titleLanguage) }
             val cachedPage = if (cachedMedia.size < BROWSE_RESULTS_PAGE_SIZE) {
                 0
             } else {
@@ -1386,18 +1445,21 @@ class MainViewModel(
     private suspend fun fetchBrowseResultsPage(snapshot: TankobunUiState, page: Int): AnilistMediaPage {
         val query = snapshot.searchQuery.trim()
         val staffName = snapshot.browseStaffName?.trim().orEmpty()
+        val accessToken = container.tokenStore.accessToken()
         return when {
             staffName.isNotBlank() -> container.anilistRepository.staffMangaPage(
                 staffName = staffName,
                 sort = snapshot.effectiveBrowseSort(),
                 page = page,
                 perPage = BROWSE_RESULTS_PAGE_SIZE,
+                accessToken = accessToken,
             )
             !snapshot.hasBrowseFilters() && snapshot.browseSort == BROWSE_SORT_SEARCH_MATCH -> {
                 container.anilistRepository.searchMangaPage(
                     query = query,
                     page = page,
                     perPage = BROWSE_RESULTS_PAGE_SIZE,
+                    accessToken = accessToken,
                 )
             }
             else -> container.anilistRepository.browseMangaPage(
@@ -1411,8 +1473,9 @@ class MainViewModel(
                 sort = snapshot.effectiveBrowseSort(),
                 page = page,
                 perPage = BROWSE_RESULTS_PAGE_SIZE,
+                accessToken = accessToken,
             )
-        }
+        }.withTitleLanguage(snapshot.anilistTitleLanguage)
     }
 
     private suspend fun cacheBrowseMedia(cacheKey: String, media: List<AnilistMedia>) {
@@ -1432,16 +1495,20 @@ class MainViewModel(
     }
 
     private suspend fun cachedBrowseMedia(cacheKey: String): List<AnilistMedia> =
-        container.database.searchResultDao().cachedSearchMedia(cacheKey).map { it.toModel() }
+        container.database.searchResultDao()
+            .cachedSearchMedia(cacheKey)
+            .map { it.toModel(_state.value.anilistTitleLanguage) }
 
     private fun BrowseLandingData.hasContent(): Boolean =
         trending.isNotEmpty() || popular.isNotEmpty() || popularManhwa.isNotEmpty() || topManga.isNotEmpty()
 
     fun selectMedia(media: AnilistMedia) {
+        val titleLanguage = _state.value.anilistTitleLanguage
+        val displayMedia = media.withTitleLanguage(titleLanguage)
         val existingEntry = _state.value.libraryItems.firstOrNull { item -> item.media.id == media.id }?.entry
         _state.update {
             it.copy(
-                selectedMedia = media,
+                selectedMedia = displayMedia,
                 sourceMatches = emptyList(),
                 sourceMatchChapterCounts = emptyMap(),
                 sourcePickerOpen = false,
@@ -1738,7 +1805,7 @@ class MainViewModel(
                         it
                     } else {
                         it.copy(
-                            selectedMedia = cachedMedia?.toModel() ?: it.selectedMedia,
+                            selectedMedia = cachedMedia?.toModel(it.anilistTitleLanguage) ?: it.selectedMedia,
                             selectedListEntry = cachedEntry,
                             selectedRecommendations = cachedRecommendations,
                             selectedRecommendationsPage = cachedRecommendations.recommendationPageCount(),
@@ -1778,10 +1845,13 @@ class MainViewModel(
                     recommendationsPerPage = RECOMMENDATIONS_PAGE_SIZE,
                 )
             }.onSuccess { result ->
-                val details = result.media
+                val titleLanguage = _state.value.anilistTitleLanguage
+                val details = result.media.withTitleLanguage(titleLanguage)
                 val entry = result.listEntry
                 val recommendationPage = result.recommendationPage
-                val recommendations = recommendationPage.recommendations
+                val recommendations = recommendationPage.recommendations.map { recommendation ->
+                    recommendation.copy(media = recommendation.media.withTitleLanguage(titleLanguage))
+                }
                 container.database.mediaDao().upsertMedia(details.toEntity(now))
                 container.database.mediaDao().upsertMedia(recommendations.map { it.media.toEntity(now) })
                 container.database.recommendationDao().deleteForMedia(mediaId)
@@ -1849,15 +1919,19 @@ class MainViewModel(
                 )
             }.onSuccess { recommendationPage ->
                 val now = System.currentTimeMillis()
-                container.database.mediaDao().upsertMedia(recommendationPage.recommendations.map { it.media.toEntity(now) })
+                val titleLanguage = _state.value.anilistTitleLanguage
+                val recommendations = recommendationPage.recommendations.map { recommendation ->
+                    recommendation.copy(media = recommendation.media.withTitleLanguage(titleLanguage))
+                }
+                container.database.mediaDao().upsertMedia(recommendations.map { it.media.toEntity(now) })
                 container.database.recommendationDao().upsertRecommendations(
-                    recommendationPage.recommendations.map { it.toEntity(mediaId, now) },
+                    recommendations.map { it.toEntity(mediaId, now) },
                 )
                 _state.update {
                     if (it.selectedMedia?.id != mediaId) {
                         it
                     } else {
-                        val combined = (it.selectedRecommendations + recommendationPage.recommendations)
+                        val combined = (it.selectedRecommendations + recommendations)
                             .distinctBy { recommendation -> recommendation.media.id }
                         it.copy(
                             selectedRecommendations = combined,
@@ -1890,7 +1964,9 @@ class MainViewModel(
             .cachedRecommendationMedia(mediaId)
             .associateBy { it.id }
         return recommendationEntities.mapNotNull { recommendation ->
-            mediaById[recommendation.recommendationMediaId]?.toModel()?.let { media ->
+            mediaById[recommendation.recommendationMediaId]
+                ?.toModel(_state.value.anilistTitleLanguage)
+                ?.let { media ->
                 AnilistRecommendation(media = media, rating = recommendation.rating)
             }
         }
@@ -3731,6 +3807,25 @@ private fun TankobunUiState.readerSourceForChapter(chapter: SourceChapter): Sour
     installedSources.firstOrNull { it.id == chapter.sourceId }
         ?: allInstalledSources.firstOrNull { it.id == chapter.sourceId }
         ?: selectedSource?.takeIf { it.id == chapter.sourceId }
+
+private fun TankobunUiState.withAniListTitleLanguage(language: AnilistTitleLanguage): TankobunUiState =
+    copy(
+        anilistTitleLanguage = language,
+        library = library.map { it.withTitleLanguage(language) },
+        libraryItems = libraryItems.map { item -> item.copy(media = item.media.withTitleLanguage(language)) },
+        recentReadingProgress = recentReadingProgress.map { item ->
+            item.copy(media = item.media.withTitleLanguage(language))
+        },
+        searchResults = searchResults.map { it.withTitleLanguage(language) },
+        browseTrending = browseTrending.map { it.withTitleLanguage(language) },
+        browsePopular = browsePopular.map { it.withTitleLanguage(language) },
+        browsePopularManhwa = browsePopularManhwa.map { it.withTitleLanguage(language) },
+        browseTopManga = browseTopManga.map { it.withTitleLanguage(language) },
+        selectedMedia = selectedMedia?.withTitleLanguage(language),
+        selectedRecommendations = selectedRecommendations.map { recommendation ->
+            recommendation.copy(media = recommendation.media.withTitleLanguage(language))
+        },
+    )
 
 private fun Throwable.userMessage(fallback: String): String = when (this) {
     is AnilistGraphQlException -> when (statusCode) {

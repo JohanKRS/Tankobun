@@ -84,8 +84,8 @@ internal class AniListBackupService(
         val now = System.currentTimeMillis()
         entries.forEach { entry ->
             val media = entry.mediaId
-                ?.let { mediaId -> container.anilistRepository.mangaById(mediaId) }
-                ?: entry.idMal?.let { idMal -> container.anilistRepository.mangaByMalId(idMal) }
+                ?.let { mediaId -> container.anilistRepository.mangaById(mediaId, accessToken = accessToken) }
+                ?: entry.idMal?.let { idMal -> container.anilistRepository.mangaByMalId(idMal, accessToken = accessToken) }
             if (media == null) {
                 skipped += 1
             } else {

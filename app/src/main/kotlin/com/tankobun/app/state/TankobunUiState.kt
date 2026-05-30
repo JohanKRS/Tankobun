@@ -12,6 +12,7 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistScoreFormat
+import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.DownloadJob
 import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.ReaderMode
@@ -31,6 +32,7 @@ data class TankobunUiState(
     val onboardingVisible: Boolean = false,
     val viewerName: String? = null,
     val anilistScoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
+    val anilistTitleLanguage: AnilistTitleLanguage = AnilistTitleLanguage.ROMAJI,
     val anilistCustomLists: List<String> = emptyList(),
     val library: List<AnilistMedia> = emptyList(),
     val libraryItems: List<LibraryItem> = emptyList(),

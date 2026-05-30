@@ -7,6 +7,9 @@ object AnilistQueries {
             id
             name
             avatar { large }
+            options {
+              titleLanguage
+            }
             mediaListOptions {
               scoreFormat
               mangaList {

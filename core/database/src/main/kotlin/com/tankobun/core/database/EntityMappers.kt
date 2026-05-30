@@ -2,6 +2,7 @@ package com.tankobun.core.database
 
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistTitle
 import com.tankobun.core.model.DownloadJob
@@ -11,6 +12,7 @@ import com.tankobun.core.model.SourceBinding
 import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceSearchResult
 import com.tankobun.core.model.SyncMutation
+import com.tankobun.core.model.withTitleLanguage
 
 fun AnilistMedia.toEntity(fetchedAtEpochMillis: Long): AnilistMediaEntity =
     AnilistMediaEntity(
@@ -67,6 +69,9 @@ fun AnilistMediaEntity.toModel(): AnilistMedia =
         isAdult = isAdult,
         updatedAtEpochSeconds = updatedAtEpochSeconds,
     )
+
+fun AnilistMediaEntity.toModel(titleLanguage: AnilistTitleLanguage): AnilistMedia =
+    toModel().withTitleLanguage(titleLanguage)
 
 fun AnilistListEntry.toEntity(fetchedAtEpochMillis: Long): AnilistListEntryEntity =
     AnilistListEntryEntity(

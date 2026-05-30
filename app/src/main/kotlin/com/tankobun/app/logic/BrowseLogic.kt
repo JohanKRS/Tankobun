@@ -41,6 +41,7 @@ internal fun TankobunUiState.browseCacheKey(): String = buildString {
     append("|year=").append(browseYear?.toString().orEmpty())
     append("|staff=").append(browseStaffName.orEmpty().normalizedSearchKey())
     append("|sort=").append(effectiveBrowseSort())
+    append("|title=").append(anilistTitleLanguage.name)
 }
 
 internal fun String.normalizedSearchKey(): String =

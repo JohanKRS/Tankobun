@@ -18,6 +18,15 @@ enum class AnilistScoreFormat {
     POINT_3,
 }
 
+enum class AnilistTitleLanguage {
+    ROMAJI,
+    ENGLISH,
+    NATIVE,
+    ROMAJI_STYLISED,
+    ENGLISH_STYLISED,
+    NATIVE_STYLISED,
+}
+
 enum class ReaderMode {
     PAGED,
     WEBTOON,
@@ -42,6 +51,25 @@ data class AnilistTitle(
     val native: String?,
     val userPreferred: String,
 )
+
+fun AnilistMedia.withTitleLanguage(language: AnilistTitleLanguage): AnilistMedia =
+    copy(title = title.withUserPreferred(language))
+
+fun AnilistTitle.withUserPreferred(language: AnilistTitleLanguage): AnilistTitle =
+    copy(userPreferred = preferredFor(language))
+
+private fun AnilistTitle.preferredFor(language: AnilistTitleLanguage): String =
+    when (language) {
+        AnilistTitleLanguage.ENGLISH,
+        AnilistTitleLanguage.ENGLISH_STYLISED -> firstNonBlank(english, romaji, native, userPreferred)
+        AnilistTitleLanguage.NATIVE,
+        AnilistTitleLanguage.NATIVE_STYLISED -> firstNonBlank(native, romaji, english, userPreferred)
+        AnilistTitleLanguage.ROMAJI,
+        AnilistTitleLanguage.ROMAJI_STYLISED -> firstNonBlank(romaji, english, native, userPreferred)
+    }
+
+private fun firstNonBlank(vararg values: String?): String =
+    values.firstOrNull { !it.isNullOrBlank() } ?: ""
 
 data class AnilistMedia(
     val id: Int,
@@ -73,6 +101,9 @@ data class AnilistMediaPage(
     val currentPage: Int,
     val hasNextPage: Boolean,
 )
+
+fun AnilistMediaPage.withTitleLanguage(language: AnilistTitleLanguage): AnilistMediaPage =
+    copy(media = media.map { it.withTitleLanguage(language) })
 
 data class AnilistMediaTag(
     val name: String,

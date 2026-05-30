@@ -100,10 +100,11 @@ object ScheduledBackupWork {
 }
 
 private suspend fun backupLibraryItems(container: AppContainer): List<LibraryItem> {
+    val titleLanguage = container.settingsStore.anilistTitleLanguage()
     val media = container.database.mediaDao().cachedMedia().associateBy { it.id }
     return container.database.listEntryDao().cachedEntries()
         .mapNotNull { entry ->
-            media[entry.mediaId]?.toModel()?.let { cachedMedia ->
+            media[entry.mediaId]?.toModel(titleLanguage)?.let { cachedMedia ->
                 LibraryItem(cachedMedia, entry.toModel())
             }
         }

@@ -3,6 +3,7 @@ package com.tankobun.app
 import android.content.Context
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistScoreFormat
+import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.ReaderMode
 import java.util.Base64
 import java.util.Locale
@@ -249,6 +250,15 @@ class SettingsStore(context: Context) {
         preferences.edit().putString(KEY_ANILIST_SCORE_FORMAT, format.name).apply()
     }
 
+    fun anilistTitleLanguage(): AnilistTitleLanguage =
+        preferences.getString(KEY_ANILIST_TITLE_LANGUAGE, null)
+            ?.let { stored -> runCatching { AnilistTitleLanguage.valueOf(stored) }.getOrNull() }
+            ?: AnilistTitleLanguage.ROMAJI
+
+    fun saveAnilistTitleLanguage(language: AnilistTitleLanguage) {
+        preferences.edit().putString(KEY_ANILIST_TITLE_LANGUAGE, language.name).apply()
+    }
+
     fun anilistCustomLists(): List<String> =
         preferences.getString(KEY_ANILIST_CUSTOM_LISTS, "").orEmpty()
             .lineSequence()
@@ -311,6 +321,7 @@ class SettingsStore(context: Context) {
         const val KEY_DISABLED_SOURCE_KEYS = "source.disabled.keys"
         const val KEY_VIEWER_NAME = "anilist.viewer.name"
         const val KEY_ANILIST_SCORE_FORMAT = "anilist.score.format"
+        const val KEY_ANILIST_TITLE_LANGUAGE = "anilist.title.language"
         const val KEY_ANILIST_CUSTOM_LISTS = "anilist.custom.lists"
         const val KEY_LIBRARY_SYNCED_AT = "anilist.library.synced.at"
         const val PHONE_TABLET_BREAKPOINT_DP = 600
