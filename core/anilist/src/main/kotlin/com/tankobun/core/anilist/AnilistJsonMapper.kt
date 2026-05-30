@@ -56,6 +56,7 @@ object AnilistJsonMapper {
             updatedAtEpochSeconds = obj.longOrNull("updatedAt"),
             staff = obj.staffNames(),
             tags = obj.mediaTagNames(),
+            countryOfOrigin = obj.stringOrNull("countryOfOrigin"),
         )
     }
 

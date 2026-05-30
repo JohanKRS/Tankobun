@@ -33,6 +33,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -143,8 +144,14 @@ internal fun TankobunSectionHeader(
             )
         }
         if (actionLabel != null && onAction != null) {
-            TextButton(onClick = onAction) {
-                Text(actionLabel)
+            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                TextButton(
+                    onClick = onAction,
+                    modifier = Modifier.heightIn(min = 32.dp),
+                    contentPadding = PaddingValues(horizontal = 0.dp),
+                ) {
+                    Text(actionLabel)
+                }
             }
         }
     }
@@ -335,17 +342,40 @@ internal fun TankobunChip(
     label: @Composable () -> Unit,
     leadingIcon: (@Composable () -> Unit)? = null,
 ) {
-    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
-        FilterChip(
-            selected = selected,
-            onClick = onClick,
-            enabled = enabled,
-            modifier = modifier.heightIn(min = 32.dp),
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
-            colors = tankobunFilterChipColors(),
-            leadingIcon = leadingIcon,
-            label = label,
-        )
+    val backgroundColor = if (selected) {
+        LocalTankobunStyle.current.colors.selectedChip
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)
+    }
+    val contentColor = if (selected) {
+        LocalTankobunStyle.current.colors.selectedChipContent
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val borderColor = if (selected) {
+        LocalTankobunStyle.current.colors.accent.copy(alpha = 0.46f)
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+    }
+    Surface(
+        modifier = modifier
+            .heightIn(min = 32.dp)
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        color = if (enabled) backgroundColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
+        contentColor = if (enabled) contentColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+        border = BorderStroke(1.dp, borderColor),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            CompositionLocalProvider(LocalTextStyle provides MaterialTheme.typography.labelMedium) {
+                leadingIcon?.invoke()
+                label()
+            }
+        }
     }
 }
 

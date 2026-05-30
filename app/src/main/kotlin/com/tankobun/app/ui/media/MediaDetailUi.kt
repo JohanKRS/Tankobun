@@ -470,11 +470,6 @@ internal fun DetailPlaceholderCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
@@ -947,7 +942,7 @@ private fun fallbackTitleLines(words: List<String>, maxLines: Int): List<String>
 internal fun MangaHeroMetaLine(media: AnilistMedia) {
     Text(
         listOfNotNull(
-            media.format.mediaFormatLabel(),
+            media.mediaTypeLabel(),
             media.status.statusLabel(),
         ).joinToString("  /  ").uppercase(Locale.getDefault()),
         style = MaterialTheme.typography.labelMedium,
@@ -1500,7 +1495,9 @@ internal fun RecommendationsSection(
             val tileSpacing = 12.dp
             val tileWidth = ((maxWidth - horizontalPadding * 2 - tileSpacing * (visibleCount - 1).toFloat()) / visibleCount.toFloat())
                 .coerceIn(92.dp, 132.dp)
+            val tileHeight = tileWidth * 1.5f + 48.dp
             LazyRow(
+                modifier = Modifier.height(tileHeight),
                 contentPadding = PaddingValues(horizontal = horizontalPadding),
                 horizontalArrangement = Arrangement.spacedBy(tileSpacing),
             ) {
@@ -1549,7 +1546,10 @@ internal fun RecommendationTile(
                     .aspectRatio(2f / 3f),
             )
         }
-        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        Column(
+            modifier = Modifier.height(44.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
             Text(
                 media.title.userPreferred,
                 style = MaterialTheme.typography.labelMedium.copy(lineHeight = 16.sp),

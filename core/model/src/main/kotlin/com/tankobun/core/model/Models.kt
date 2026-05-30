@@ -65,6 +65,7 @@ data class AnilistMedia(
     val updatedAtEpochSeconds: Long?,
     val staff: List<String> = emptyList(),
     val tags: List<String> = emptyList(),
+    val countryOfOrigin: String? = null,
 )
 
 data class AnilistMediaTag(

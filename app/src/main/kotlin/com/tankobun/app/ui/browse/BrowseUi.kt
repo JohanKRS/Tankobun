@@ -1060,6 +1060,12 @@ internal fun String?.statusLabel(): String = when (this) {
     else -> "Status unknown"
 }
 
+internal fun AnilistMedia.mediaTypeLabel(): String = when (countryOfOrigin?.uppercase(Locale.getDefault())) {
+    "KR" -> "Manhwa"
+    "CN", "TW", "HK" -> "Manhua"
+    else -> format.mediaFormatLabel()
+}
+
 internal fun String?.mediaFormatLabel(): String = when (this) {
     "MANGA" -> "Manga"
     "NOVEL" -> "Novel"

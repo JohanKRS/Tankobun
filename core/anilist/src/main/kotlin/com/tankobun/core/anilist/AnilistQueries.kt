@@ -31,6 +31,7 @@ object AnilistQueries {
               chapters
               volumes
               format
+              countryOfOrigin
               status
               averageScore
               popularity
@@ -59,6 +60,7 @@ object AnilistQueries {
               chapters
               volumes
               format
+              countryOfOrigin
               status
               averageScore
               popularity
@@ -86,6 +88,7 @@ object AnilistQueries {
             chapters
             volumes
             format
+            countryOfOrigin
             status
             averageScore
             popularity
@@ -112,6 +115,7 @@ object AnilistQueries {
             chapters
             volumes
             format
+            countryOfOrigin
             status
             averageScore
             popularity
@@ -173,6 +177,7 @@ object AnilistQueries {
               chapters
               volumes
               format
+              countryOfOrigin
               status
               averageScore
               popularity
@@ -204,6 +209,7 @@ object AnilistQueries {
                   chapters
                   volumes
                   format
+                  countryOfOrigin
                   status
                   averageScore
                   popularity
@@ -233,6 +239,7 @@ object AnilistQueries {
             chapters
             volumes
             format
+            countryOfOrigin
             status
             averageScore
             popularity
@@ -288,6 +295,7 @@ object AnilistQueries {
                   chapters
                   volumes
                   format
+                  countryOfOrigin
                   status
                   averageScore
                   popularity
@@ -325,6 +333,7 @@ object AnilistQueries {
                   chapters
                   volumes
                   format
+                  countryOfOrigin
                   status
                   averageScore
                   popularity
@@ -368,6 +377,7 @@ object AnilistQueries {
                   chapters
                   volumes
                   format
+                  countryOfOrigin
                   status
                   averageScore
                   popularity
@@ -411,6 +421,7 @@ object AnilistQueries {
                   chapters
                   volumes
                   format
+                  countryOfOrigin
                   status
                   averageScore
                   popularity

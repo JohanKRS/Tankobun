@@ -22,6 +22,7 @@ data class AnilistMediaEntity(
     val chapters: Int?,
     val volumes: Int?,
     val format: String?,
+    val countryOfOrigin: String?,
     val status: String?,
     val averageScore: Int?,
     val popularity: Int?,
