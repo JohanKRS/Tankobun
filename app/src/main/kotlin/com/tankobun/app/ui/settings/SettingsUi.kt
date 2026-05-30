@@ -194,6 +194,7 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistScoreFormat
+import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.DownloadJob
 import com.tankobun.core.model.DownloadState
 import com.tankobun.core.model.MediaStatus
@@ -558,6 +559,53 @@ internal fun SettingsDetailContent(
                     TankobunActionButton(label = "Sign out", onClick = viewModel::signOut, filled = false)
                 }
             }
+            Text("AniList preferences", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            TankobunPanel(
+                modifier = Modifier.fillMaxWidth(),
+                color = LocalTankobunStyle.current.colors.panel,
+                contentColor = LocalTankobunStyle.current.colors.panelContent,
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "These update your AniList account and will also apply on AniList's website.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Title language", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        FlowRowCompat {
+                            AnilistTitleLanguage.entries.forEach { language ->
+                                TankobunChip(
+                                    selected = state.anilistTitleLanguage == language,
+                                    onClick = { viewModel.setAnilistTitleLanguage(language) },
+                                    enabled = state.loggedIn && !state.busy,
+                                    label = { Text(language.settingsLabel()) },
+                                )
+                            }
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Rating format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        FlowRowCompat {
+                            AnilistScoreFormat.entries.forEach { format ->
+                                TankobunChip(
+                                    selected = state.anilistScoreFormat == format,
+                                    onClick = { viewModel.setAnilistScoreFormat(format) },
+                                    enabled = state.loggedIn && !state.busy,
+                                    label = { Text(format.settingsLabel()) },
+                                )
+                            }
+                        }
+                    }
+                    if (!state.loggedIn) {
+                        Text(
+                            "Connect AniList before changing account preferences.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
             Text("Sync behavior", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             SettingsToggleRow(
                 title = "Auto-save tracking edits",
@@ -680,3 +728,22 @@ internal fun LanguagesSettingsScreen(
         }
     }
 }
+
+internal fun AnilistTitleLanguage.settingsLabel(): String =
+    when (this) {
+        AnilistTitleLanguage.ROMAJI -> "Romaji"
+        AnilistTitleLanguage.ENGLISH -> "English"
+        AnilistTitleLanguage.NATIVE -> "Native"
+        AnilistTitleLanguage.ROMAJI_STYLISED -> "Romaji styled"
+        AnilistTitleLanguage.ENGLISH_STYLISED -> "English styled"
+        AnilistTitleLanguage.NATIVE_STYLISED -> "Native styled"
+    }
+
+internal fun AnilistScoreFormat.settingsLabel(): String =
+    when (this) {
+        AnilistScoreFormat.POINT_100 -> "100 point"
+        AnilistScoreFormat.POINT_10_DECIMAL -> "10 decimal"
+        AnilistScoreFormat.POINT_10 -> "10 point"
+        AnilistScoreFormat.POINT_5 -> "5 stars"
+        AnilistScoreFormat.POINT_3 -> "3 smileys"
+    }

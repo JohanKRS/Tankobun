@@ -1642,6 +1642,83 @@ class MainViewModel(
         _state.update { it.copy(anilistSyncManualReadProgress = enabled) }
     }
 
+    fun setAnilistTitleLanguage(language: AnilistTitleLanguage) {
+        if (_state.value.anilistTitleLanguage == language) return
+        val token = container.tokenStore.accessToken()
+        if (token == null) {
+            _state.update { it.copy(message = "Connect AniList before changing account preferences") }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                container.anilistRepository.updateUserPreferences(
+                    accessToken = token,
+                    titleLanguage = language,
+                )
+            }.onSuccess { viewer ->
+                saveAniListViewerSettings(viewer)
+                _state.update {
+                    it.withAniListTitleLanguage(viewer.titleLanguage).copy(
+                        viewerName = viewer.name,
+                        anilistScoreFormat = viewer.scoreFormat,
+                        anilistCustomLists = viewer.mangaCustomLists,
+                        busy = false,
+                        message = "AniList title language saved",
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "AniList title language update failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage("Could not update AniList title language"),
+                    )
+                }
+            }
+        }
+    }
+
+    fun setAnilistScoreFormat(format: AnilistScoreFormat) {
+        if (_state.value.anilistScoreFormat == format) return
+        val token = container.tokenStore.accessToken()
+        if (token == null) {
+            _state.update { it.copy(message = "Connect AniList before changing account preferences") }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                container.anilistRepository.updateUserPreferences(
+                    accessToken = token,
+                    scoreFormat = format,
+                )
+            }.onSuccess { viewer ->
+                saveAniListViewerSettings(viewer)
+                _state.update {
+                    it.copy(
+                        viewerName = viewer.name,
+                        anilistScoreFormat = viewer.scoreFormat,
+                        anilistTitleLanguage = viewer.titleLanguage,
+                        anilistCustomLists = viewer.mangaCustomLists,
+                        trackingScore = it.selectedListEntry?.score.formatTrackingScore(viewer.scoreFormat),
+                        busy = false,
+                        message = "AniList rating format saved",
+                    )
+                }
+                refreshLibrary()
+            }.onFailure { error ->
+                Log.e(TAG, "AniList rating format update failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage("Could not update AniList rating format"),
+                    )
+                }
+            }
+        }
+    }
+
     fun setTrackingStatus(status: MediaStatus) {
         _state.update { it.copy(trackingStatus = status) }
         scheduleTrackingAutoSave()

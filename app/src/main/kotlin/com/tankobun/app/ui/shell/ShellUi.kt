@@ -26,6 +26,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -90,7 +91,6 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
@@ -155,6 +155,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -170,6 +171,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
@@ -404,7 +407,7 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
     }
 
     fun handleAppBack() {
-        if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
+        if (quickDrawerMode != QuickDrawerMode.CLOSED) {
             quickDrawerMode = QuickDrawerMode.CLOSED
             return
         }
@@ -492,6 +495,7 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
                 },
                 quickDrawerMode = quickDrawerMode,
                 showStatusBar = state.showAppStatusBar,
+                showQuickActionsButton = !readerOpen,
                 onOpenQuickDrawer = { quickDrawerMode = QuickDrawerMode.OVERLAY },
                 onCloseQuickDrawer = { quickDrawerMode = QuickDrawerMode.CLOSED },
                 onToggleQuickDrawerPin = {
@@ -600,6 +604,7 @@ internal fun TankobunScaffold(
     onOpenRecentProgress: (RecentReadingProgress) -> Unit,
     quickDrawerMode: QuickDrawerMode,
     showStatusBar: Boolean,
+    showQuickActionsButton: Boolean,
     onOpenQuickDrawer: () -> Unit,
     onCloseQuickDrawer: () -> Unit,
     onToggleQuickDrawerPin: () -> Unit,
@@ -607,25 +612,17 @@ internal fun TankobunScaffold(
     val ignoreDisplayCutout = state.ignoreDisplayCutout
     val cutoutStartPadding = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout)
     val cutoutEndPadding = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout)
-    val drawerSafeEndPadding = maxOf(cutoutEndPadding, 10.dp)
     val density = LocalDensity.current
     val drawerTravelPx = with(density) { (QuickDrawerOverlayWidth + cutoutEndPadding).toPx() }
     val drawerSnapThresholdPx = with(density) { 72.dp.toPx() }
     val drawerElasticLimitPx = with(density) { QuickDrawerElasticLimitDp.dp.toPx() }
     val drawerScope = rememberCoroutineScope()
     var overlayDrawerDragOffsetPx by remember { mutableFloatStateOf(0f) }
-    var closedDrawerDragOffsetPx by remember { mutableFloatStateOf(0f) }
     var overlayDrawerDragging by remember { mutableStateOf(false) }
-    var closedDrawerDragging by remember { mutableStateOf(false) }
     val overlayDrawerOffsetPx by animateFloatAsState(
         targetValue = overlayDrawerDragOffsetPx,
         animationSpec = tween(durationMillis = if (overlayDrawerDragging) 0 else QuickDrawerSnapMillis),
         label = "Overlay drawer drag offset",
-    )
-    val closedDrawerTranslationPx by animateFloatAsState(
-        targetValue = drawerTravelPx + closedDrawerDragOffsetPx,
-        animationSpec = tween(durationMillis = if (closedDrawerDragging) 0 else QuickDrawerSnapMillis),
-        label = "Closed drawer peek offset",
     )
     val overlayDrawerTranslationPx = if (overlayDrawerDragging) {
         overlayDrawerDragOffsetPx
@@ -637,16 +634,7 @@ internal fun TankobunScaffold(
     } else {
         0f
     }
-    val closedDrawerRevealFraction = if (
-        quickDrawerMode == QuickDrawerMode.CLOSED &&
-        closedDrawerDragOffsetPx < -1f &&
-        drawerTravelPx > 0f
-    ) {
-        (1f - (closedDrawerTranslationPx / drawerTravelPx)).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-    val quickDrawerBackdropRevealFraction = maxOf(overlayDrawerRevealFraction, closedDrawerRevealFraction)
+    val quickDrawerBackdropRevealFraction = overlayDrawerRevealFraction
     val drawerScrimAlpha = QuickDrawerScrimAlpha * quickDrawerBackdropRevealFraction
     val drawerBackdropBlur = (QuickDrawerBackdropBlurDp * quickDrawerBackdropRevealFraction).dp
     val mediaDetailActive = selectedMedia != null
@@ -670,31 +658,18 @@ internal fun TankobunScaffold(
             overlayDrawerDragging = false
             overlayDrawerDragOffsetPx = 0f
         }
-        if (quickDrawerMode != QuickDrawerMode.CLOSED) {
-            closedDrawerDragging = false
-            closedDrawerDragOffsetPx = 0f
-        }
     }
 
     fun openQuickDrawerFromClosed(initialTranslationPx: Float = drawerTravelPx) {
         drawerScope.launch {
             overlayDrawerDragging = true
             overlayDrawerDragOffsetPx = initialTranslationPx
-            closedDrawerDragging = false
-            closedDrawerDragOffsetPx = 0f
             onOpenQuickDrawer()
             withFrameNanos { }
             withFrameNanos { }
             overlayDrawerDragging = false
             overlayDrawerDragOffsetPx = 0f
         }
-    }
-
-    fun settleOpenQuickDrawerFromDrag() {
-        closedDrawerDragging = false
-        val releaseTranslationPx = drawerTravelPx + closedDrawerDragOffsetPx
-        closedDrawerDragOffsetPx = 0f
-        openQuickDrawerFromClosed(releaseTranslationPx)
     }
 
     fun closeQuickDrawerFromOverlay(targetTranslationPx: Float = drawerTravelPx) {
@@ -718,7 +693,19 @@ internal fun TankobunScaffold(
                 ignoreDisplayCutout = ignoreDisplayCutout,
                 showStatusBar = showStatusBar,
                 mediaDetailActive = mediaDetailActive,
-                onOpenActions = if (mediaDetailActive) onOpenQuickDrawer else null,
+                quickActionsVisible = showQuickActionsButton,
+                quickActionsOpen = quickDrawerMode != QuickDrawerMode.CLOSED,
+                onToggleQuickActions = if (showQuickActionsButton) {
+                    {
+                        when (quickDrawerMode) {
+                            QuickDrawerMode.CLOSED -> openQuickDrawerFromClosed()
+                            QuickDrawerMode.OVERLAY -> closeQuickDrawerFromOverlay()
+                            QuickDrawerMode.PINNED -> onCloseQuickDrawer()
+                        }
+                    }
+                } else {
+                    null
+                },
                 onBack = onNavigateBack,
             )
         },
@@ -750,7 +737,6 @@ internal fun TankobunScaffold(
                         bottom = padding.calculateBottomPadding(),
                     ),
         ) {
-            val handleScreenCenterOffset = (padding.calculateBottomPadding() - padding.calculateTopPadding()) / 2f
             Row(
                 Modifier
                     .fillMaxSize()
@@ -804,66 +790,6 @@ internal fun TankobunScaffold(
                     )
                 }
             }
-            if (quickDrawerMode == QuickDrawerMode.CLOSED && closedDrawerRevealFraction > 0f) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = drawerScrimAlpha)),
-                )
-            }
-            if (quickDrawerMode == QuickDrawerMode.CLOSED && closedDrawerDragOffsetPx < -1f) {
-                QuickDrawer(
-                    state = state,
-                    viewModel = viewModel,
-                    selectedMedia = selectedMedia,
-                    onOpenRecentProgress = onOpenRecentProgress,
-                    pinned = false,
-                    onClose = onCloseQuickDrawer,
-                    onTogglePin = onToggleQuickDrawerPin,
-                    drawerWidth = QuickDrawerOverlayWidth,
-                    endPadding = cutoutEndPadding,
-                    showHandle = false,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(top = mediaDetailTopBarInset)
-                        .fillMaxHeight()
-                        .graphicsLayer { translationX = closedDrawerTranslationPx },
-                )
-            }
-            if (quickDrawerMode == QuickDrawerMode.CLOSED) {
-                QuickDrawerHandle(
-                    expanded = false,
-                    onClick = { openQuickDrawerFromClosed() },
-                    onSwipeIn = { openQuickDrawerFromClosed() },
-                    localDragOffset = {
-                        quickDrawerOpeningDragOffset(
-                            totalX = it,
-                            drawerTravelPx = drawerTravelPx,
-                            elasticLimitPx = drawerElasticLimitPx,
-                        )
-                    },
-                    onDragOffset = {
-                        closedDrawerDragging = true
-                        closedDrawerDragOffsetPx = quickDrawerOpeningDragOffset(
-                            totalX = it,
-                            drawerTravelPx = drawerTravelPx,
-                            elasticLimitPx = drawerElasticLimitPx,
-                        )
-                    },
-                    onDragEnd = { totalX ->
-                        closedDrawerDragging = false
-                        if (totalX < -drawerSnapThresholdPx) {
-                            settleOpenQuickDrawerFromDrag()
-                        } else {
-                            closedDrawerDragOffsetPx = 0f
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .offset(y = handleScreenCenterOffset)
-                        .padding(end = drawerSafeEndPadding),
-                )
-            }
             if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
                 Box(
                     modifier = Modifier
@@ -887,7 +813,7 @@ internal fun TankobunScaffold(
                     onTogglePin = onToggleQuickDrawerPin,
                     drawerWidth = QuickDrawerOverlayWidth,
                     endPadding = cutoutEndPadding,
-                    handleCenterOffset = handleScreenCenterOffset,
+                    showHandle = false,
                     onHandleDragOffset = {
                         overlayDrawerDragging = true
                         overlayDrawerDragOffsetPx = quickDrawerClosingDragOffset(
@@ -1021,7 +947,9 @@ internal fun TankobunTopBar(
     ignoreDisplayCutout: Boolean,
     showStatusBar: Boolean,
     mediaDetailActive: Boolean = false,
-    onOpenActions: (() -> Unit)? = null,
+    quickActionsVisible: Boolean = true,
+    quickActionsOpen: Boolean = false,
+    onToggleQuickActions: (() -> Unit)? = null,
     onBack: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
@@ -1083,11 +1011,13 @@ internal fun TankobunTopBar(
                         )
                     }
                 }
-                Image(
-                    painter = painterResource(R.drawable.ic_launcher_foreground),
-                    contentDescription = null,
-                    modifier = Modifier.size(logoSize),
-                )
+                if (!showBack) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_launcher_foreground),
+                        contentDescription = null,
+                        modifier = Modifier.size(logoSize),
+                    )
+                }
                 Text(
                     title,
                     modifier = Modifier.weight(1f),
@@ -1101,17 +1031,77 @@ internal fun TankobunTopBar(
                         else -> MaterialTheme.typography.titleLarge
                     },
                 )
-                if (onOpenActions != null) {
-                    IconButton(onClick = onOpenActions, modifier = Modifier.size(if (compact) 36.dp else 48.dp)) {
-                        Icon(
-                            Icons.Default.MoreVert,
-                            contentDescription = "Quick actions",
-                            modifier = Modifier.size(iconSize),
+                if (quickActionsVisible && onToggleQuickActions != null) {
+                    IconButton(
+                        onClick = onToggleQuickActions,
+                        modifier = Modifier.size(if (compact) 36.dp else 48.dp),
+                    ) {
+                        AnimatedHamburgerCloseIcon(
+                            close = quickActionsOpen,
+                            contentDescription = if (quickActionsOpen) "Close quick actions" else "Open quick actions",
+                            modifier = Modifier.size(iconSize + 4.dp),
                         )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun AnimatedHamburgerCloseIcon(
+    close: Boolean,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    val progress by animateFloatAsState(
+        targetValue = if (close) 1f else 0f,
+        animationSpec = tween(durationMillis = 180),
+        label = "Quick actions menu icon",
+    )
+    val color = MaterialTheme.colorScheme.onSurface
+    Canvas(
+        modifier = modifier.semantics {
+            this.contentDescription = contentDescription
+        },
+    ) {
+        val strokeWidth = 2.dp.toPx()
+        val center = this.center
+        val half = size.minDimension * 0.36f
+        val gap = size.minDimension * 0.22f * (1f - progress)
+        val diagonal = size.minDimension * 0.32f
+        val middleAlpha = 1f - progress
+
+        fun point(x: Float, y: Float): Offset = Offset(center.x + x, center.y + y)
+        fun lerp(start: Offset, end: Offset): Offset =
+            Offset(
+                x = start.x + (end.x - start.x) * progress,
+                y = start.y + (end.y - start.y) * progress,
+            )
+
+        drawLine(
+            color = color,
+            start = lerp(point(-half, -gap), point(-diagonal, -diagonal)),
+            end = lerp(point(half, -gap), point(diagonal, diagonal)),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        if (middleAlpha > 0.01f) {
+            drawLine(
+                color = color.copy(alpha = middleAlpha),
+                start = point(-half, 0f),
+                end = point(half, 0f),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+        }
+        drawLine(
+            color = color,
+            start = lerp(point(-half, gap), point(-diagonal, diagonal)),
+            end = lerp(point(half, gap), point(diagonal, -diagonal)),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
     }
 }
 
@@ -1236,7 +1226,7 @@ internal fun QuickDrawer(
     handleDragLocally: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val handleSlotWidth = if (pinned) 0.dp else QuickDrawerHandleSlotWidth
+    val handleSlotWidth = if (pinned || !showHandle) 0.dp else QuickDrawerHandleSlotWidth
     val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
     Box(modifier = modifier.width(handleSlotWidth + drawerWidth + endPadding)) {
         Surface(
@@ -1260,11 +1250,12 @@ internal fun QuickDrawer(
                         .padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Quick Actions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        }
-                        if (!compactLayout) {
+                    if (!compactLayout) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             IconButton(onClick = onTogglePin) {
                                 Icon(
                                     imageVector = if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,

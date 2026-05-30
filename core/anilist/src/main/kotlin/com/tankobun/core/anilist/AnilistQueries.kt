@@ -487,4 +487,23 @@ object AnilistQueries {
           }
         }
     """
+
+    const val UpdateUserPreferences = """
+        mutation UpdateUserPreferences(${'$'}titleLanguage: UserTitleLanguage, ${'$'}scoreFormat: ScoreFormat) {
+          UpdateUser(titleLanguage: ${'$'}titleLanguage, scoreFormat: ${'$'}scoreFormat) {
+            id
+            name
+            avatar { large }
+            options {
+              titleLanguage
+            }
+            mediaListOptions {
+              scoreFormat
+              mangaList {
+                customLists
+              }
+            }
+          }
+        }
+    """
 }

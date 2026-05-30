@@ -520,6 +520,8 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
                 state.viewerName?.let { "Signed in as $it" }
                     ?: if (state.clientConfigured) "Ready to connect" else "Client setup needed",
             )
+            add(state.anilistTitleLanguage.settingsLabel())
+            add(state.anilistScoreFormat.settingsLabel())
             if (state.anilistAutoSaveTrackingChanges) add("Auto-save edits")
             if (state.anilistAutoSyncReaderProgress) add("Auto progress")
         }.joinToString(" / ")
