@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -114,6 +115,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -157,6 +159,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.layout.ContentScale
@@ -169,6 +172,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -285,11 +290,7 @@ internal fun LibraryScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(18.dp),
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         LibraryPager(
             sections = sections,
             query = query,
@@ -474,6 +475,7 @@ internal fun LibraryPager(
     if (sections.isEmpty()) {
         LazyColumn(
             modifier = modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(LibraryContentPadding),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "library-header") {
@@ -488,6 +490,13 @@ internal fun LibraryPager(
 
     val pagerState = rememberPagerState(pageCount = { sections.size })
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    var searchHeaderHeightPx by remember { mutableIntStateOf(0) }
+    var tabHeaderHeightPx by remember { mutableIntStateOf(0) }
+    var pageScrollOffsets by remember(sections.size) { mutableStateOf(List(sections.size) { 0 }) }
+    var pageScrollRequestOffsets by remember(sections.size) { mutableStateOf(List<Int?>(sections.size) { null }) }
+    var pageScrollRequestTokens by remember(sections.size) { mutableStateOf(List(sections.size) { 0 }) }
     val visibleSections = remember(sections, query, format, publishingStatus, year, sort) {
         sections.map { section ->
             section.copy(
@@ -503,43 +512,144 @@ internal fun LibraryPager(
         }
     }
     val filtersActive = query.isNotBlank() || format != null || publishingStatus != null || year != null
+    val currentPage = pagerState.currentPage.coerceIn(0, sections.lastIndex)
+    val targetPage = pagerState.targetPage.coerceIn(0, sections.lastIndex)
+    val currentScrollOffsetPx = pageScrollOffsets.getOrElse(currentPage) { 0 }
+    val targetScrollOffsetPx = pageScrollOffsets.getOrElse(targetPage) { 0 }
+    val currentHeaderIsPinned = searchHeaderHeightPx > 0 && currentScrollOffsetPx >= searchHeaderHeightPx
+    val scrollOffsetForHeader = if (
+        pagerState.isScrollInProgress &&
+        targetPage != currentPage &&
+        currentHeaderIsPinned
+    ) {
+        maxOf(currentScrollOffsetPx, targetScrollOffsetPx)
+    } else {
+        currentScrollOffsetPx
+    }
+    val searchHeaderCollapsePx = scrollOffsetForHeader.coerceAtMost(searchHeaderHeightPx)
+    val headerTranslationY = -searchHeaderCollapsePx.toFloat()
+    val sharedHeaderHeight = with(density) { (searchHeaderHeightPx + tabHeaderHeightPx).toDp() }
+    var lastObservedPage by remember(sections.size) { mutableIntStateOf(currentPage) }
 
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        PrimaryScrollableTabRow(
-            selectedTabIndex = pagerState.currentPage.coerceAtMost(sections.lastIndex),
-            edgePadding = 0.dp,
-            containerColor = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.primary,
-        ) {
-            sections.forEachIndexed { index, section ->
-                val count = visibleSections[index].items.size
-                Tab(
-                    selected = pagerState.currentPage == index,
-                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-                    text = {
-                        Text(
-                            "${section.title} $count",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
+    fun requestPageScrollOffset(index: Int, offsetPx: Int) {
+        if (searchHeaderHeightPx <= 0) return
+        val requestedOffsetPx = offsetPx.coerceAtLeast(0)
+        pageScrollOffsets = pageScrollOffsets.toMutableList().also { offsets ->
+            if (index in offsets.indices) {
+                offsets[index] = requestedOffsetPx
+            }
+        }
+        pageScrollRequestOffsets = pageScrollRequestOffsets.toMutableList().also { offsets ->
+            if (index in offsets.indices) {
+                offsets[index] = requestedOffsetPx
+            }
+        }
+        pageScrollRequestTokens = pageScrollRequestTokens.toMutableList().also { tokens ->
+            if (index in tokens.indices) {
+                tokens[index] = tokens[index] + 1
+            }
+        }
+    }
+
+    fun pinPageAtContentTop(index: Int) {
+        requestPageScrollOffset(index = index, offsetPx = searchHeaderHeightPx)
+    }
+
+    LaunchedEffect(targetPage, searchHeaderHeightPx) {
+        if (targetPage != currentPage) {
+            if (currentHeaderIsPinned) {
+                pinPageAtContentTop(targetPage)
+            } else {
+                requestPageScrollOffset(
+                    index = targetPage,
+                    offsetPx = currentScrollOffsetPx.coerceAtMost(searchHeaderHeightPx),
                 )
             }
         }
+    }
+
+    LaunchedEffect(currentPage, searchHeaderHeightPx) {
+        val previousPage = lastObservedPage
+        val previousPageWasPinned = searchHeaderHeightPx > 0 &&
+            pageScrollOffsets.getOrElse(previousPage) { 0 } >= searchHeaderHeightPx
+        lastObservedPage = currentPage
+        if (previousPage != currentPage && previousPageWasPinned) {
+            pinPageAtContentTop(currentPage)
+        }
+    }
+
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val supportedViewMode = viewMode.supportedMediaViewMode()
+        val supportedCoverColumns = coverColumns
+            .supportedCoverColumns()
+            .coerceAtMost(if (configuration.smallestScreenWidthDp in 1 until 600) 4 else 8)
+        val contentPaddingPx = with(density) { LibraryContentPadding.roundToPx() }
+        val gridGapPx = with(density) { 16.dp.roundToPx() }
+        val listGapPx = with(density) { 8.dp.roundToPx() }
+        val availableGridWidthPx = (constraints.maxWidth - (contentPaddingPx * 2) -
+            (gridGapPx * (supportedCoverColumns - 1))).coerceAtLeast(0)
+        val gridCellWidthPx = if (supportedCoverColumns > 0) {
+            availableGridWidthPx / supportedCoverColumns
+        } else {
+            availableGridWidthPx
+        }
+        val gridCoverHeightPx = (gridCellWidthPx * 3) / 2
+        val gridInfoHeightPx = with(density) {
+            if (supportedViewMode == MediaViewMode.COVER_WITH_INFO) 74.dp.roundToPx() else 0
+        }
+        val listItemHeightPx = with(density) { 96.dp.roundToPx() }
+        val emptyStateHeightPx = with(density) { 160.dp.roundToPx() }
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxSize(),
         ) { page ->
+            val itemCount = visibleSections[page].items.size
+            val rowCount = if (itemCount == 0) {
+                1
+            } else if (supportedViewMode == MediaViewMode.LIST) {
+                itemCount
+            } else {
+                (itemCount + supportedCoverColumns - 1) / supportedCoverColumns
+            }
+            val estimatedContentHeightPx = when {
+                itemCount == 0 -> emptyStateHeightPx
+                supportedViewMode == MediaViewMode.LIST ->
+                    (rowCount * listItemHeightPx) + ((rowCount - 1).coerceAtLeast(0) * listGapPx)
+                else -> {
+                    val rowHeightPx = gridCoverHeightPx + gridInfoHeightPx
+                    (rowCount * rowHeightPx) + ((rowCount - 1).coerceAtLeast(0) * gridGapPx)
+                }
+            }
+            val requiredPinnedBottomPaddingPx = constraints.maxHeight -
+                tabHeaderHeightPx -
+                contentPaddingPx -
+                estimatedContentHeightPx
+            val pageBottomPadding = with(density) {
+                maxOf(contentPaddingPx, requiredPinnedBottomPaddingPx).toDp()
+            }
+            val pageContentPadding = PaddingValues(
+                start = LibraryContentPadding,
+                top = sharedHeaderHeight + LibraryContentPadding,
+                end = LibraryContentPadding,
+                bottom = pageBottomPadding,
+            )
             MediaCollection(
                 media = visibleSections[page].items.map { it.media },
                 viewMode = viewMode,
                 coverColumns = coverColumns,
                 showWholeCovers = showWholeCovers,
                 onSelectMedia = onSelectMedia,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 12.dp),
-                header = header,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = pageContentPadding,
+                onScrollOffsetChange = { scrollOffset ->
+                    pageScrollOffsets = pageScrollOffsets.toMutableList().also { offsets ->
+                        if (page in offsets.indices) {
+                            offsets[page] = scrollOffset
+                        }
+                    }
+                },
+                scrollToContentOffsetPx = pageScrollRequestOffsets.getOrNull(page),
+                scrollToContentOffsetRequest = pageScrollRequestTokens.getOrElse(page) { 0 },
                 emptyMessage = if (filtersActive) {
                     "No titles match these library filters."
                 } else {
@@ -547,8 +657,74 @@ internal fun LibraryPager(
                 },
             )
         }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer { translationY = headerTranslationY }
+                .background(LocalTankobunStyle.current.colors.backdrop)
+        ) {
+            Column(
+                modifier = Modifier.onSizeChanged { searchHeaderHeightPx = it.height },
+            ) {
+                Spacer(Modifier.height(LibraryContentPadding))
+                Box(Modifier.padding(horizontal = LibraryContentPadding)) {
+                    header()
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+            Column(
+                modifier = Modifier.onSizeChanged { tabHeaderHeightPx = it.height },
+            ) {
+                PrimaryScrollableTabRow(
+                    selectedTabIndex = pagerState.currentPage.coerceAtMost(sections.lastIndex),
+                    edgePadding = 0.dp,
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ) {
+                    sections.forEachIndexed { index, section ->
+                        val count = visibleSections[index].items.size
+                        Tab(
+                            selected = pagerState.currentPage == index,
+                            onClick = {
+                                if (currentHeaderIsPinned) {
+                                    pinPageAtContentTop(index)
+                                } else {
+                                    requestPageScrollOffset(
+                                        index = index,
+                                        offsetPx = currentScrollOffsetPx.coerceAtMost(searchHeaderHeightPx),
+                                    )
+                                }
+                                scope.launch { pagerState.animateScrollToPage(index) }
+                            },
+                            text = {
+                                val tabTextColor = LocalContentColor.current
+                                Text(
+                                    buildAnnotatedString {
+                                        append(section.title)
+                                        append(" ")
+                                        pushStyle(SpanStyle(color = tabTextColor.copy(alpha = 0.74f)))
+                                        append(count.toString())
+                                        pop()
+                                    },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                        )
+                    }
+                }
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+                )
+            }
+        }
     }
 }
+
+private val LibraryContentPadding = 18.dp
 
 internal fun libraryFormatOptions(sections: List<LibrarySection>): List<BrowseOption> =
     listOf(BrowseOption("Any", null)) +

@@ -271,6 +271,9 @@ internal fun MediaCollection(
     isLoadingMore: Boolean = false,
     onNearEnd: (() -> Unit)? = null,
     nearEndThreshold: Int = 8,
+    onScrollOffsetChange: ((Int) -> Unit)? = null,
+    scrollToContentOffsetPx: Int? = null,
+    scrollToContentOffsetRequest: Int = 0,
 ) {
     val configuration = LocalConfiguration.current
     val supportedCoverColumns = coverColumns
@@ -300,6 +303,7 @@ internal fun MediaCollection(
         MediaViewMode.LIST -> {
             val listState = rememberLazyListState()
             val latestOnNearEnd by rememberUpdatedState(onNearEnd)
+            val latestOnScrollOffsetChange by rememberUpdatedState(onScrollOffsetChange)
             LaunchedEffect(listState, media.size, latestOnNearEnd != null) {
                 snapshotFlow {
                     val layoutInfo = listState.layoutInfo
@@ -311,6 +315,24 @@ internal fun MediaCollection(
                     .collect { nearEnd ->
                         if (nearEnd) latestOnNearEnd?.invoke()
                     }
+            }
+            LaunchedEffect(listState, latestOnScrollOffsetChange != null) {
+                if (latestOnScrollOffsetChange == null) return@LaunchedEffect
+                snapshotFlow {
+                    if (listState.firstVisibleItemIndex == 0) {
+                        listState.firstVisibleItemScrollOffset
+                    } else {
+                        Int.MAX_VALUE
+                    }
+                }
+                    .distinctUntilChanged()
+                    .collect { scrollOffset -> latestOnScrollOffsetChange?.invoke(scrollOffset) }
+            }
+            LaunchedEffect(scrollToContentOffsetRequest, scrollToContentOffsetPx, media.size) {
+                val targetOffset = scrollToContentOffsetPx ?: return@LaunchedEffect
+                if (scrollToContentOffsetRequest > 0 && media.isNotEmpty()) {
+                    listState.scrollToItem(0, targetOffset)
+                }
             }
             LazyColumn(
                 state = listState,
@@ -338,6 +360,7 @@ internal fun MediaCollection(
         else -> {
             val gridState = rememberLazyGridState()
             val latestOnNearEnd by rememberUpdatedState(onNearEnd)
+            val latestOnScrollOffsetChange by rememberUpdatedState(onScrollOffsetChange)
             LaunchedEffect(gridState, media.size, latestOnNearEnd != null) {
                 snapshotFlow {
                     val layoutInfo = gridState.layoutInfo
@@ -349,6 +372,24 @@ internal fun MediaCollection(
                     .collect { nearEnd ->
                         if (nearEnd) latestOnNearEnd?.invoke()
                     }
+            }
+            LaunchedEffect(gridState, latestOnScrollOffsetChange != null) {
+                if (latestOnScrollOffsetChange == null) return@LaunchedEffect
+                snapshotFlow {
+                    if (gridState.firstVisibleItemIndex == 0) {
+                        gridState.firstVisibleItemScrollOffset
+                    } else {
+                        Int.MAX_VALUE
+                    }
+                }
+                    .distinctUntilChanged()
+                    .collect { scrollOffset -> latestOnScrollOffsetChange?.invoke(scrollOffset) }
+            }
+            LaunchedEffect(scrollToContentOffsetRequest, scrollToContentOffsetPx, media.size) {
+                val targetOffset = scrollToContentOffsetPx ?: return@LaunchedEffect
+                if (scrollToContentOffsetRequest > 0 && media.isNotEmpty()) {
+                    gridState.scrollToItem(0, targetOffset)
+                }
             }
             LazyVerticalGrid(
                 state = gridState,
