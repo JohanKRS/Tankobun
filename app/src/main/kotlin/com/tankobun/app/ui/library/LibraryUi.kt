@@ -226,7 +226,11 @@ import com.tankobun.app.ui.settings.*
 import com.tankobun.app.ui.shell.*
 
 @Composable
-internal fun LibraryScreen(state: TankobunUiState, viewModel: MainViewModel) {
+internal fun LibraryScreen(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    onSelectMedia: (AnilistMedia) -> Unit,
+) {
     val context = LocalContext.current
     var query by remember { mutableStateOf("") }
     var picker by remember { mutableStateOf<LibraryPicker?>(null) }
@@ -298,7 +302,7 @@ internal fun LibraryScreen(state: TankobunUiState, viewModel: MainViewModel) {
             showWholeCovers = state.libraryShowWholeCovers,
             modifier = Modifier.fillMaxSize(),
             header = libraryHeader,
-            onSelectMedia = viewModel::selectMedia,
+            onSelectMedia = onSelectMedia,
         )
     }
 

@@ -297,7 +297,11 @@ internal val BrowseSortOptions = listOf(
 )
 
 @Composable
-internal fun BrowseScreen(state: TankobunUiState, viewModel: MainViewModel) {
+internal fun BrowseScreen(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    onSelectMedia: (AnilistMedia) -> Unit,
+) {
     LaunchedEffect(Unit) {
         viewModel.loadBrowseLanding()
         viewModel.loadBrowseTags()
@@ -335,6 +339,7 @@ internal fun BrowseScreen(state: TankobunUiState, viewModel: MainViewModel) {
                 BrowseResults(
                     state = state,
                     viewModel = viewModel,
+                    onSelectMedia = onSelectMedia,
                     modifier = Modifier.fillMaxSize(),
                     header = browseHeader,
                 )
@@ -343,6 +348,7 @@ internal fun BrowseScreen(state: TankobunUiState, viewModel: MainViewModel) {
             BrowseLanding(
                 state = state,
                 viewModel = viewModel,
+                onSelectMedia = onSelectMedia,
                 modifier = Modifier.fillMaxSize(),
                 header = browseHeader,
             )
@@ -521,6 +527,7 @@ internal fun BrowseIconFilterPill(
 internal fun BrowseLanding(
     state: TankobunUiState,
     viewModel: MainViewModel,
+    onSelectMedia: (AnilistMedia) -> Unit,
     modifier: Modifier,
     header: @Composable () -> Unit,
 ) {
@@ -539,7 +546,7 @@ internal fun BrowseLanding(
                 title = "TRENDING NOW",
                 media = state.browseTrending,
                 onViewAll = { viewModel.viewAllBrowseSection("TRENDING_DESC") },
-                onSelectMedia = viewModel::selectMedia,
+                onSelectMedia = onSelectMedia,
             )
         }
         item {
@@ -547,7 +554,7 @@ internal fun BrowseLanding(
                 title = "ALL TIME POPULAR",
                 media = state.browsePopular,
                 onViewAll = { viewModel.viewAllBrowseSection("POPULARITY_DESC") },
-                onSelectMedia = viewModel::selectMedia,
+                onSelectMedia = onSelectMedia,
             )
         }
         item {
@@ -555,7 +562,7 @@ internal fun BrowseLanding(
                 title = "POPULAR MANHWA",
                 media = state.browsePopularManhwa,
                 onViewAll = viewModel::viewAllPopularManhwa,
-                onSelectMedia = viewModel::selectMedia,
+                onSelectMedia = onSelectMedia,
             )
         }
         item {
@@ -563,7 +570,7 @@ internal fun BrowseLanding(
                 title = "TOP 100 MANGA",
                 media = state.browseTopManga,
                 onViewAll = { viewModel.viewAllBrowseSection("SCORE_DESC") },
-                onSelectMedia = viewModel::selectMedia,
+                onSelectMedia = onSelectMedia,
             )
         }
     }
@@ -647,6 +654,7 @@ internal fun BrowseShelfTile(media: AnilistMedia, onClick: () -> Unit) {
 internal fun BrowseResults(
     state: TankobunUiState,
     viewModel: MainViewModel,
+    onSelectMedia: (AnilistMedia) -> Unit,
     modifier: Modifier,
     header: @Composable () -> Unit,
 ) {
@@ -686,7 +694,7 @@ internal fun BrowseResults(
         modifier = modifier.fillMaxWidth(),
         header = resultsHeader,
         contentPadding = PaddingValues(vertical = 18.dp),
-        onSelectMedia = viewModel::selectMedia,
+        onSelectMedia = onSelectMedia,
         emptyMessage = if (state.busy) {
             "Searching AniList..."
         } else {

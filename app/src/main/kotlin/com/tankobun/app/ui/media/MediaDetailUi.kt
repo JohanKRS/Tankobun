@@ -250,6 +250,7 @@ internal fun MangaDetailScreen(
     state: TankobunUiState,
     viewModel: MainViewModel,
     media: AnilistMedia,
+    onSelectMedia: (AnilistMedia) -> Unit,
     onBrowseTag: (String) -> Unit,
     onBrowseAuthor: (String) -> Unit,
 ) {
@@ -309,7 +310,7 @@ internal fun MangaDetailScreen(
                         hasMore = state.selectedRecommendationsHasMore,
                         loadingMore = state.recommendationsLoading,
                         onLoadMore = viewModel::loadMoreRecommendations,
-                        onSelectMedia = viewModel::selectMedia,
+                        onSelectMedia = onSelectMedia,
                     )
                 }
             }

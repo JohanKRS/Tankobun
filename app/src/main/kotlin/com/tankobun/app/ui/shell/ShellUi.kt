@@ -14,6 +14,7 @@ import android.view.View
 import android.view.WindowInsets as AndroidWindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -139,6 +140,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -273,6 +275,22 @@ internal enum class QuickDrawerMode {
     PINNED,
 }
 
+private const val BackPressRepeatWindowMillis = 1800L
+
+private data class TankobunRoute(
+    val tab: Int,
+    val settingsRoute: SettingsRoute = SettingsRoute.MAIN,
+    val media: AnilistMedia? = null,
+) {
+    fun normalized(): TankobunRoute =
+        copy(settingsRoute = if (tab == 3 && media == null) settingsRoute else SettingsRoute.MAIN)
+
+    fun sameDestination(other: TankobunRoute): Boolean =
+        tab == other.tab &&
+            settingsRoute == other.settingsRoute &&
+            media?.id == other.media?.id
+}
+
 internal val QuickDrawerOverlayWidth = 340.dp
 internal val QuickDrawerPinnedWidth = 320.dp
 internal val QuickDrawerHandleSlotWidth = 40.dp
@@ -319,14 +337,98 @@ internal val LibrarySortOptions = listOf(
 @Composable
 internal fun TankobunAppRoot(viewModel: MainViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
     var settingsRoute by remember { mutableStateOf(SettingsRoute.MAIN) }
     var quickDrawerMode by remember { mutableStateOf(QuickDrawerMode.CLOSED) }
+    var routeHistory by remember { mutableStateOf<List<TankobunRoute>>(emptyList()) }
+    var lastHomeBackPressAt by remember { mutableLongStateOf(0L) }
+    var lastReaderBackPressAt by remember { mutableLongStateOf(0L) }
     val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
     val selectedMedia = state.selectedMedia
     val readerOpen = state.activeChapter != null && state.readerPages.isNotEmpty()
     val appStatusBarVisible = state.showAppStatusBar && !readerOpen
     val useDarkStatusBarIcons = state.themeMode.useDarkStatusBarIcons(isSystemInDarkTheme())
+    val currentRoute = TankobunRoute(
+        tab = selectedTab,
+        settingsRoute = settingsRoute,
+        media = selectedMedia,
+    ).normalized()
+
+    fun resetBackPressWindows() {
+        lastHomeBackPressAt = 0L
+        lastReaderBackPressAt = 0L
+    }
+
+    fun applyRoute(route: TankobunRoute) {
+        val normalized = route.normalized()
+        selectedTab = normalized.tab
+        settingsRoute = normalized.settingsRoute
+        quickDrawerMode = QuickDrawerMode.CLOSED
+        when {
+            normalized.media == null && selectedMedia != null -> viewModel.clearSelectedMedia()
+            normalized.media != null && selectedMedia?.id != normalized.media.id -> viewModel.selectMedia(normalized.media)
+        }
+        resetBackPressWindows()
+    }
+
+    fun navigateTo(route: TankobunRoute) {
+        val normalized = route.normalized()
+        if (normalized.sameDestination(currentRoute)) {
+            quickDrawerMode = QuickDrawerMode.CLOSED
+            return
+        }
+        routeHistory = routeHistory + currentRoute
+        applyRoute(normalized)
+    }
+
+    fun popRoute(): Boolean {
+        val previousRoute = routeHistory.lastOrNull() ?: return false
+        routeHistory = routeHistory.dropLast(1)
+        applyRoute(previousRoute)
+        return true
+    }
+
+    fun handleReaderBack() {
+        val now = System.currentTimeMillis()
+        if (now - lastReaderBackPressAt <= BackPressRepeatWindowMillis) {
+            lastReaderBackPressAt = 0L
+            viewModel.closeReader()
+        } else {
+            lastReaderBackPressAt = now
+            Toast.makeText(context, "Press back again to exit reader", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun handleAppBack() {
+        if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
+            quickDrawerMode = QuickDrawerMode.CLOSED
+            return
+        }
+        if (popRoute()) return
+        when {
+            selectedMedia != null -> {
+                viewModel.clearSelectedMedia()
+                resetBackPressWindows()
+            }
+            selectedTab == 3 && settingsRoute != SettingsRoute.MAIN -> {
+                settingsRoute = SettingsRoute.MAIN
+                resetBackPressWindows()
+            }
+            selectedTab != 0 -> {
+                applyRoute(TankobunRoute(tab = 0))
+            }
+            else -> {
+                val now = System.currentTimeMillis()
+                if (now - lastHomeBackPressAt <= BackPressRepeatWindowMillis) {
+                    (context as? Activity)?.finish()
+                } else {
+                    lastHomeBackPressAt = now
+                    Toast.makeText(context, "Press back again to exit", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     LaunchedEffect(compactLayout, quickDrawerMode) {
         if (compactLayout && quickDrawerMode == QuickDrawerMode.PINNED) {
@@ -334,26 +436,20 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
         }
     }
 
+    LaunchedEffect(readerOpen) {
+        if (!readerOpen) {
+            lastReaderBackPressAt = 0L
+        }
+    }
+
     StatusBarVisibilityEffect(visible = appStatusBarVisible, useDarkIcons = useDarkStatusBarIcons)
 
     BackHandler(enabled = readerOpen) {
-        viewModel.closeReader()
+        handleReaderBack()
     }
 
-    BackHandler(enabled = !readerOpen && quickDrawerMode == QuickDrawerMode.OVERLAY) {
-        quickDrawerMode = QuickDrawerMode.CLOSED
-    }
-
-    BackHandler(
-        enabled = !readerOpen &&
-            quickDrawerMode != QuickDrawerMode.OVERLAY &&
-            (selectedMedia != null || (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN)),
-    ) {
-        if (selectedMedia != null) {
-            viewModel.clearSelectedMedia()
-        } else {
-            settingsRoute = SettingsRoute.MAIN
-        }
+    BackHandler(enabled = !readerOpen) {
+        handleAppBack()
     }
 
     TankobunTheme(themeMode = state.themeMode) {
@@ -367,16 +463,30 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
                 state = state,
                 viewModel = viewModel,
                 selectedTab = selectedTab,
-                onSelectTab = {
-                    selectedTab = it
-                    settingsRoute = SettingsRoute.MAIN
-                    if (selectedMedia != null) {
-                        viewModel.clearSelectedMedia()
-                    }
-                },
+                onSelectTab = { navigateTo(TankobunRoute(tab = it)) },
+                canNavigateBack = selectedMedia != null || (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN),
+                onNavigateBack = { handleAppBack() },
+                onSelectMedia = { media -> navigateTo(TankobunRoute(tab = selectedTab, media = media)) },
                 selectedMedia = selectedMedia,
                 settingsRoute = settingsRoute,
-                onOpenSettingsRoute = { settingsRoute = it },
+                onOpenSettingsRoute = { navigateTo(TankobunRoute(tab = 3, settingsRoute = it)) },
+                onBrowseTag = { tag ->
+                    viewModel.browseByTag(tag)
+                    navigateTo(TankobunRoute(tab = 1))
+                },
+                onBrowseAuthor = { author ->
+                    viewModel.browseByAuthor(author)
+                    navigateTo(TankobunRoute(tab = 1))
+                },
+                onOpenRecentProgress = { item ->
+                    val recentRoute = TankobunRoute(tab = selectedTab, media = item.media).normalized()
+                    if (!recentRoute.sameDestination(currentRoute)) {
+                        routeHistory = routeHistory + currentRoute
+                    }
+                    quickDrawerMode = QuickDrawerMode.CLOSED
+                    resetBackPressWindows()
+                    viewModel.openRecentProgress(item)
+                },
                 quickDrawerMode = quickDrawerMode,
                 showStatusBar = state.showAppStatusBar,
                 onOpenQuickDrawer = { quickDrawerMode = QuickDrawerMode.OVERLAY },
@@ -476,9 +586,15 @@ internal fun TankobunScaffold(
     viewModel: MainViewModel,
     selectedTab: Int,
     onSelectTab: (Int) -> Unit,
+    canNavigateBack: Boolean,
+    onNavigateBack: () -> Unit,
+    onSelectMedia: (AnilistMedia) -> Unit,
     selectedMedia: AnilistMedia?,
     settingsRoute: SettingsRoute,
     onOpenSettingsRoute: (SettingsRoute) -> Unit,
+    onBrowseTag: (String) -> Unit,
+    onBrowseAuthor: (String) -> Unit,
+    onOpenRecentProgress: (RecentReadingProgress) -> Unit,
     quickDrawerMode: QuickDrawerMode,
     showStatusBar: Boolean,
     onOpenQuickDrawer: () -> Unit,
@@ -595,18 +711,12 @@ internal fun TankobunScaffold(
             TankobunTopBar(
                 title = selectedMedia?.title?.userPreferred
                     ?: if (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN) settingsRoute.settingsTitle() else "Tankobun",
-                showBack = selectedMedia != null || (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN),
+                showBack = canNavigateBack,
                 ignoreDisplayCutout = ignoreDisplayCutout,
                 showStatusBar = showStatusBar,
                 mediaDetailActive = mediaDetailActive,
                 onOpenActions = if (mediaDetailActive) onOpenQuickDrawer else null,
-                onBack = {
-                    if (selectedMedia != null) {
-                        viewModel.clearSelectedMedia()
-                    } else {
-                        onOpenSettingsRoute(SettingsRoute.MAIN)
-                    }
-                },
+                onBack = onNavigateBack,
             )
         },
         bottomBar = {
@@ -651,19 +761,14 @@ internal fun TankobunScaffold(
                             state = state,
                             viewModel = viewModel,
                             media = selectedMedia,
-                            onBrowseTag = { tag ->
-                                viewModel.browseByTag(tag)
-                                onSelectTab(1)
-                            },
-                            onBrowseAuthor = { author ->
-                                viewModel.browseByAuthor(author)
-                                onSelectTab(1)
-                            },
+                            onSelectMedia = onSelectMedia,
+                            onBrowseTag = onBrowseTag,
+                            onBrowseAuthor = onBrowseAuthor,
                         )
                     } else {
                         when (selectedTab) {
-                            0 -> LibraryScreen(state, viewModel)
-                            1 -> BrowseScreen(state, viewModel)
+                            0 -> LibraryScreen(state, viewModel, onSelectMedia = onSelectMedia)
+                            1 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
                             2 -> DownloadsScreen(state, viewModel)
                             3 -> SettingsScreen(
                                 state = state,
@@ -684,6 +789,7 @@ internal fun TankobunScaffold(
                         state = state,
                         viewModel = viewModel,
                         selectedMedia = selectedMedia,
+                        onOpenRecentProgress = onOpenRecentProgress,
                         pinned = true,
                         onClose = onCloseQuickDrawer,
                         onTogglePin = onToggleQuickDrawerPin,
@@ -707,6 +813,7 @@ internal fun TankobunScaffold(
                     state = state,
                     viewModel = viewModel,
                     selectedMedia = selectedMedia,
+                    onOpenRecentProgress = onOpenRecentProgress,
                     pinned = false,
                     onClose = onCloseQuickDrawer,
                     onTogglePin = onToggleQuickDrawerPin,
@@ -771,6 +878,7 @@ internal fun TankobunScaffold(
                     state = state,
                     viewModel = viewModel,
                     selectedMedia = selectedMedia,
+                    onOpenRecentProgress = onOpenRecentProgress,
                     pinned = false,
                     onClose = { closeQuickDrawerFromOverlay() },
                     onTogglePin = onToggleQuickDrawerPin,
@@ -1112,6 +1220,7 @@ internal fun QuickDrawer(
     state: TankobunUiState,
     viewModel: MainViewModel,
     selectedMedia: AnilistMedia?,
+    onOpenRecentProgress: (RecentReadingProgress) -> Unit,
     pinned: Boolean,
     onClose: () -> Unit,
     onTogglePin: () -> Unit,
@@ -1187,7 +1296,7 @@ internal fun QuickDrawer(
                     QuickDrawerSection(title = "Continue Reading") {
                         if (state.recentReadingProgress.isNotEmpty()) {
                             state.recentReadingProgress.forEach { item ->
-                                RecentReadingAction(item = item, onClick = { viewModel.openRecentProgress(item) })
+                                RecentReadingAction(item = item, onClick = { onOpenRecentProgress(item) })
                             }
                         } else {
                             Text(
