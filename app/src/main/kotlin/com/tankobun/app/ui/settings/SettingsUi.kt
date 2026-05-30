@@ -275,7 +275,7 @@ internal fun SettingsScreen(
                 onOpenRoute = onOpenRoute,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(18.dp),
             )
         } else {
             SettingsDetailContent(
@@ -297,7 +297,7 @@ internal fun SettingsIndexPane(
 ) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -307,7 +307,7 @@ internal fun SettingsIndexPane(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             SettingsDetailRoutes.forEach { settingsRoute ->
                 SettingsRouteRow(
                     route = settingsRoute,
@@ -332,20 +332,28 @@ internal fun SettingsRouteRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val rowColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
-    val contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+    val routeColor = LocalTankobunStyle.current.colors.accent
+    val rowColor = if (selected) {
+        LocalTankobunStyle.current.colors.selectedChip.copy(alpha = 0.92f)
+    } else {
+        Color.Transparent
+    }
+    val contentColor = if (selected) {
+        LocalTankobunStyle.current.colors.selectedChipContent
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 6.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
             .background(rowColor)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SettingsRouteIcon(route = route, selected = selected)
+        SettingsRouteIcon(route = route)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 route.settingsTitle(),
@@ -363,33 +371,43 @@ internal fun SettingsRouteRow(
         }
         if (selected) {
             Surface(
-                modifier = Modifier.size(width = 4.dp, height = 28.dp),
+                modifier = Modifier.size(width = 3.dp, height = 28.dp),
                 shape = RoundedCornerShape(LocalTankobunStyle.current.radii.pill),
-                color = MaterialTheme.colorScheme.primary,
+                color = routeColor,
             ) {}
         }
     }
 }
 
 @Composable
-internal fun SettingsRouteIcon(route: SettingsRoute, selected: Boolean) {
-    val tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-    Icon(
-        imageVector = when (route) {
-            SettingsRoute.MAIN,
-            SettingsRoute.APPEARANCE -> Icons.Default.Settings
-            SettingsRoute.LIBRARY -> Icons.AutoMirrored.Filled.LibraryBooks
-            SettingsRoute.BROWSE -> Icons.Default.Explore
-            SettingsRoute.READER -> Icons.AutoMirrored.Filled.MenuBook
-            SettingsRoute.DOWNLOADS -> Icons.Default.Download
-            SettingsRoute.ANILIST -> Icons.Default.Link
-            SettingsRoute.BACKUPS -> Icons.AutoMirrored.Filled.LibraryBooks
-            SettingsRoute.ABOUT -> Icons.Default.Settings
-            SettingsRoute.SOURCES -> Icons.Default.Download
-        },
-        contentDescription = null,
-        tint = tint,
-    )
+internal fun SettingsRouteIcon(route: SettingsRoute) {
+    val routeColor = LocalTankobunStyle.current.colors.accent
+    Surface(
+        modifier = Modifier.size(36.dp),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        color = routeColor.copy(alpha = 0.14f),
+        contentColor = routeColor,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = when (route) {
+                    SettingsRoute.MAIN,
+                    SettingsRoute.APPEARANCE -> Icons.Default.Settings
+                    SettingsRoute.LANGUAGES -> Icons.Default.Tune
+                    SettingsRoute.LIBRARY -> Icons.AutoMirrored.Filled.LibraryBooks
+                    SettingsRoute.BROWSE -> Icons.Default.Explore
+                    SettingsRoute.READER -> Icons.AutoMirrored.Filled.MenuBook
+                    SettingsRoute.DOWNLOADS -> Icons.Default.Download
+                    SettingsRoute.ANILIST -> Icons.Default.Link
+                    SettingsRoute.BACKUPS -> Icons.AutoMirrored.Filled.LibraryBooks
+                    SettingsRoute.ABOUT -> Icons.Default.Settings
+                    SettingsRoute.SOURCES -> Icons.Default.Download
+                },
+                contentDescription = null,
+                modifier = Modifier.size(19.dp),
+            )
+        }
+    }
 }
 
 @Composable
@@ -426,6 +444,7 @@ internal fun SettingsDetailContent(
                 )
             }
         }
+        SettingsRoute.LANGUAGES -> LanguagesSettingsScreen(state, viewModel, modifier)
         SettingsRoute.LIBRARY -> SettingsDetailPanel(
             title = "Library",
             subtitle = "Pick the default layout for your swipeable AniList lists.",
@@ -567,5 +586,97 @@ internal fun SettingsDetailContent(
             modifier = modifier,
         )
         SettingsRoute.SOURCES -> SourcesSettingsScreen(state, viewModel)
+    }
+}
+
+@Composable
+internal fun LanguagesSettingsScreen(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val sourceLanguageOptions = remember(state.allInstalledSources, state.availableExtensions, state.sourceLanguages) {
+        (state.allInstalledSources.mapNotNull { it.lang } +
+            state.availableExtensions.mapNotNull { it.lang } +
+            state.sourceLanguages)
+            .map { it.normalizedSourceLanguage() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sortedWith(compareBy<String> { sourceLanguageSortPriority(it) }.thenBy { sourceLanguageLabel(it) })
+    }
+    SettingsDetailPanel(
+        title = "Languages",
+        subtitle = "Choose app language behavior and which source languages Tankobun should show by default.",
+        modifier = modifier,
+    ) {
+        Text("App language", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        TankobunPanel(
+            modifier = Modifier.fillMaxWidth(),
+            color = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
+        ) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                FlowRowCompat {
+                    TankobunChip(
+                        selected = true,
+                        onClick = {},
+                        label = { Text("System default") },
+                    )
+                    TankobunChip(
+                        selected = false,
+                        onClick = {},
+                        enabled = false,
+                        label = { Text("English") },
+                    )
+                    TankobunChip(
+                        selected = false,
+                        onClick = {},
+                        enabled = false,
+                        label = { Text("Portuguese") },
+                    )
+                }
+                Text(
+                    "Interface translations are a placeholder for now; Tankobun will keep following your system language.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Text("Source languages", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        TankobunPanel(
+            modifier = Modifier.fillMaxWidth(),
+            color = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
+        ) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Sources and repository entries use these languages by default. Multilingual sources are always available.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                FlowRowCompat {
+                    sourceLanguageOptions.forEach { language ->
+                        val alwaysOn = language == UNIVERSAL_SOURCE_LANGUAGE
+                        TankobunChip(
+                            selected = language in state.sourceLanguages || alwaysOn,
+                            onClick = {
+                                if (!alwaysOn) {
+                                    viewModel.setSourceLanguageEnabled(language, language !in state.sourceLanguages)
+                                }
+                            },
+                            enabled = !alwaysOn,
+                            label = {
+                                Text(
+                                    if (alwaysOn) "${sourceLanguageDisplay(language)} always" else sourceLanguageDisplay(language),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+        }
     }
 }

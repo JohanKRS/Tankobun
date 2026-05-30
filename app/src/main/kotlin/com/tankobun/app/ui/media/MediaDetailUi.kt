@@ -1495,7 +1495,7 @@ internal fun RecommendationsSection(
             val tileSpacing = 12.dp
             val tileWidth = ((maxWidth - horizontalPadding * 2 - tileSpacing * (visibleCount - 1).toFloat()) / visibleCount.toFloat())
                 .coerceIn(92.dp, 132.dp)
-            val tileHeight = tileWidth * 1.5f + 48.dp
+            val tileHeight = tileWidth * 1.5f + 58.dp
             LazyRow(
                 modifier = Modifier.height(tileHeight),
                 contentPadding = PaddingValues(horizontal = horizontalPadding),
@@ -1547,7 +1547,7 @@ internal fun RecommendationTile(
             )
         }
         Column(
-            modifier = Modifier.height(44.dp),
+            modifier = Modifier.height(54.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             Text(

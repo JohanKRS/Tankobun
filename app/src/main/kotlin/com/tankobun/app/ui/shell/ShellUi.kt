@@ -231,6 +231,7 @@ import com.tankobun.app.ui.shell.*
 internal enum class SettingsRoute {
     MAIN,
     APPEARANCE,
+    LANGUAGES,
     LIBRARY,
     BROWSE,
     READER,
@@ -245,20 +246,22 @@ internal const val TankobunGithubUrl = "https://github.com/JohanKRS/Tankobun"
 
 internal val SettingsDetailRoutes = listOf(
     SettingsRoute.APPEARANCE,
+    SettingsRoute.LANGUAGES,
     SettingsRoute.LIBRARY,
     SettingsRoute.BROWSE,
     SettingsRoute.READER,
+    SettingsRoute.SOURCES,
     SettingsRoute.DOWNLOADS,
     SettingsRoute.ANILIST,
     SettingsRoute.BACKUPS,
     SettingsRoute.ABOUT,
-    SettingsRoute.SOURCES,
 )
 
 internal fun SettingsRoute.settingsTitle(): String =
     when (this) {
         SettingsRoute.MAIN -> "Settings"
         SettingsRoute.APPEARANCE -> "Appearance"
+        SettingsRoute.LANGUAGES -> "Languages"
         SettingsRoute.LIBRARY -> "Library"
         SettingsRoute.BROWSE -> "Browse"
         SettingsRoute.READER -> "Reader"

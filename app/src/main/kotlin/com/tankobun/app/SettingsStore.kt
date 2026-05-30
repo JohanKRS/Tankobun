@@ -373,13 +373,12 @@ fun Int.supportedCoverColumns(): Int =
 
 fun defaultSourceLanguages(): Set<String> =
     buildSet {
-        add("en")
-        add(UNIVERSAL_SOURCE_LANGUAGE)
         val locale = Locale.getDefault()
         val language = locale.language.lowercase(Locale.ROOT)
         val tag = locale.toLanguageTag().lowercase(Locale.ROOT)
         if (language.isNotBlank()) add(language)
         if (tag.isNotBlank()) add(tag)
+        add(UNIVERSAL_SOURCE_LANGUAGE)
     }
 
 const val UNIVERSAL_SOURCE_LANGUAGE = "all"

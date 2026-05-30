@@ -358,7 +358,11 @@ internal fun DownloadStorageRow(
     item: DownloadStorageItem,
     onDelete: () -> Unit,
 ) {
-    ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
+    TankobunPanel(
+        modifier = Modifier.fillMaxWidth(),
+        color = LocalTankobunStyle.current.colors.panel,
+        contentColor = LocalTankobunStyle.current.colors.panelContent,
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -424,7 +428,11 @@ internal fun CutoutLayoutToggle(
     ignoreDisplayCutout: Boolean,
     onIgnoreDisplayCutoutChange: (Boolean) -> Unit,
 ) {
-    ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
+    TankobunPanel(
+        modifier = Modifier.fillMaxWidth(),
+        color = LocalTankobunStyle.current.colors.panel,
+        contentColor = LocalTankobunStyle.current.colors.panelContent,
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -492,6 +500,7 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
     when (this) {
         SettingsRoute.MAIN -> "Settings"
         SettingsRoute.APPEARANCE -> tankobunThemeChoices().firstOrNull { it.mode == state.themeMode }?.name ?: "Neon Koi"
+        SettingsRoute.LANGUAGES -> "${state.sourceLanguages.count { it != UNIVERSAL_SOURCE_LANGUAGE }} source languages"
         SettingsRoute.LIBRARY -> state.libraryViewMode.mediaViewSettingsSummary(
             columns = state.libraryCoverColumns,
             showWholeCovers = state.libraryShowWholeCovers,

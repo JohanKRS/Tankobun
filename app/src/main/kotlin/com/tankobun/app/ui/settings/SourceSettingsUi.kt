@@ -2,7 +2,6 @@ package com.tankobun.app.ui.settings
 
 import android.content.Context
 import android.content.Intent
-import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
@@ -47,6 +46,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -154,6 +154,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -229,8 +230,6 @@ import com.tankobun.app.ui.shell.*
 internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewModel) {
     val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
-    var selectedLanguageFilter by remember { mutableStateOf(SOURCE_LANGUAGE_FILTER_ACTIVE) }
-    var selectedRepositoryLanguageFilter by remember { mutableStateOf(SOURCE_LANGUAGE_FILTER_ACTIVE) }
     var sourceSettingsQuery by remember { mutableStateOf("") }
     var launchedInstallRequest by remember { mutableStateOf<ExtensionInstallRequest?>(null) }
     val installLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -266,18 +265,13 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
             )
         }
     }
-    val activeInstalledSources = remember(searchableInstalledSources, state.installedSources) {
-        searchableInstalledSources.filter { source -> state.sourceActive(source) }
-    }
     val visibleInstalledSourceList = remember(
         searchableInstalledSources,
-        activeInstalledSources,
-        selectedLanguageFilter,
+        state.sourceLanguages,
     ) {
-        when (selectedLanguageFilter) {
-            SOURCE_LANGUAGE_FILTER_ACTIVE -> activeInstalledSources
-            SOURCE_LANGUAGE_FILTER_ALL -> searchableInstalledSources
-            else -> searchableInstalledSources.filter { it.lang.normalizedSourceLanguage() == selectedLanguageFilter }
+        searchableInstalledSources.filter { source ->
+            val language = source.lang.normalizedSourceLanguage()
+            language in state.sourceLanguages || language == UNIVERSAL_SOURCE_LANGUAGE
         }
     }
     val sourceGroups = remember(visibleInstalledSourceList) {
@@ -294,19 +288,6 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                     .thenBy(String.CASE_INSENSITIVE_ORDER) { sourceLanguageLabel(it.first) },
             )
     }
-    val languageOptions = remember(searchableInstalledSources) {
-        searchableInstalledSources
-            .map { it.lang.normalizedSourceLanguage() }
-            .filter { it.isNotBlank() }
-            .distinct()
-            .sortedWith(compareBy<String> { sourceLanguageSortPriority(it) }.thenBy { sourceLanguageLabel(it) })
-    }
-    val installedLanguageCounts = remember(searchableInstalledSources) {
-        searchableInstalledSources
-            .groupingBy { it.lang.normalizedSourceLanguage() }
-            .eachCount()
-    }
-    val visibleInstalledSources = visibleInstalledSourceList
     val repositoryEntries = remember(state.availableExtensions) {
         state.availableExtensions.sortedWith(
             compareBy<ExtensionIndexEntry> { sourceLanguageSortPriority(it.lang.normalizedSourceLanguage()) }
@@ -323,28 +304,9 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
             language in state.sourceLanguages || language == UNIVERSAL_SOURCE_LANGUAGE
         }
     }
-    val repositoryLanguageOptions = remember(searchableRepositoryEntries) {
-        searchableRepositoryEntries
-            .map { it.lang.normalizedSourceLanguage() }
-            .filter { it.isNotBlank() }
-            .distinct()
-            .sortedWith(compareBy<String> { sourceLanguageSortPriority(it) }.thenBy { sourceLanguageLabel(it) })
-    }
-    val repositoryLanguageCounts = remember(searchableRepositoryEntries) {
-        searchableRepositoryEntries
-            .groupingBy { it.lang.normalizedSourceLanguage() }
-            .eachCount()
-    }
-    val visibleRepositoryEntries = remember(
-        searchableRepositoryEntries,
-        activeRepositoryEntries,
-        selectedRepositoryLanguageFilter,
-    ) {
-        when (selectedRepositoryLanguageFilter) {
-            SOURCE_LANGUAGE_FILTER_ACTIVE -> activeRepositoryEntries
-            SOURCE_LANGUAGE_FILTER_ALL -> searchableRepositoryEntries
-            else -> searchableRepositoryEntries.filter { it.lang.normalizedSourceLanguage() == selectedRepositoryLanguageFilter }
-        }
+    val visibleRepositoryEntries = activeRepositoryEntries
+    val launchUninstall: (String) -> Unit = { packageName ->
+        requestExtensionUninstall(context, packageName)
     }
 
     LazyColumn(
@@ -378,34 +340,10 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
 
         if (selectedTab == 0) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "Installed",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    TextButton(onClick = { viewModel.setSourcesEnabled(visibleInstalledSources, enabled = true) }) {
-                        Text("Visible on")
-                    }
-                    TextButton(onClick = { viewModel.setSourcesEnabled(visibleInstalledSources, enabled = false) }) {
-                        Text("Visible off")
-                    }
-                }
-            }
-            item {
-                SourceLanguageFilters(
-                    selectedFilter = selectedLanguageFilter,
-                    languageOptions = languageOptions,
-                    activeLabel = "Enabled",
-                    activeCount = activeInstalledSources.size,
-                    allCount = searchableInstalledSources.size,
-                    languageCounts = installedLanguageCounts,
-                    onSelectFilter = { selectedLanguageFilter = it },
+                Text(
+                    "Installed",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                 )
             }
 
@@ -432,7 +370,7 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                         installingPackageName = state.installingExtensionPackageName,
                         iconUrlFor = viewModel::extensionIconUrl,
                         onInstall = { entry -> requestExtensionInstall(context, viewModel, entry) },
-                        onUninstall = { packageName -> openExtensionUninstall(context, packageName) },
+                        onUninstall = launchUninstall,
                     )
                 }
             }
@@ -477,17 +415,6 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                     )
                 }
             } else {
-                item {
-                    SourceLanguageFilters(
-                        selectedFilter = selectedRepositoryLanguageFilter,
-                        languageOptions = repositoryLanguageOptions,
-                        activeLabel = "Preferred",
-                        activeCount = activeRepositoryEntries.size,
-                        allCount = searchableRepositoryEntries.size,
-                        languageCounts = repositoryLanguageCounts,
-                        onSelectFilter = { selectedRepositoryLanguageFilter = it },
-                    )
-                }
                 if (visibleRepositoryEntries.isEmpty()) {
                     item {
                         Text(
@@ -503,7 +430,7 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                         iconUrl = viewModel.extensionIconUrl(extension),
                         installing = state.installingExtensionPackageName == extension.packageName,
                         onInstall = { requestExtensionInstall(context, viewModel, extension) },
-                        onUninstall = { openExtensionUninstall(context, extension.packageName) },
+                        onUninstall = { launchUninstall(extension.packageName) },
                     )
                 }
             }
@@ -547,20 +474,62 @@ internal fun SourceSettingsSummary(
                     onClick = onRefreshRepository,
                 )
             }
-            PrimaryScrollableTabRow(
-                selectedTabIndex = selectedTab,
-                edgePadding = 0.dp,
-                containerColor = Color.Transparent,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.Bottom,
             ) {
                 listOf("Installed", "Repository").forEachIndexed { index, label ->
-                    Tab(
+                    SourceSettingsTabButton(
+                        label = label,
                         selected = selectedTab == index,
                         onClick = { onSelectTab(index) },
-                        text = { Text(label) },
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun SourceSettingsTabButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .width(116.dp)
+            .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = if (selected) {
+                LocalTankobunStyle.current.colors.accent
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Box(
+            modifier = Modifier
+                .width(74.dp)
+                .height(3.dp)
+                .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.pill))
+                .background(
+                    if (selected) {
+                        LocalTankobunStyle.current.colors.accent
+                    } else {
+                        Color.Transparent
+                    },
+                ),
+        )
     }
 }
 
@@ -576,41 +545,6 @@ internal fun SourceSettingsSearchField(
         placeholder = if (selectedTab == 0) "Search installed sources" else "Search extensions",
         showSearchAction = false,
     )
-}
-
-@Composable
-internal fun SourceLanguageFilters(
-    selectedFilter: String,
-    languageOptions: List<String>,
-    activeLabel: String,
-    activeCount: Int,
-    allCount: Int,
-    languageCounts: Map<String, Int>,
-    onSelectFilter: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Languages", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        TankobunFilterRow {
-            TankobunChip(
-                selected = selectedFilter == SOURCE_LANGUAGE_FILTER_ACTIVE,
-                onClick = { onSelectFilter(SOURCE_LANGUAGE_FILTER_ACTIVE) },
-                label = { Text("$activeLabel $activeCount") },
-            )
-            TankobunChip(
-                selected = selectedFilter == SOURCE_LANGUAGE_FILTER_ALL,
-                onClick = { onSelectFilter(SOURCE_LANGUAGE_FILTER_ALL) },
-                label = { Text("All $allCount") },
-            )
-            languageOptions.forEach { language ->
-                val count = languageCounts[language] ?: 0
-                TankobunChip(
-                    selected = selectedFilter == language,
-                    onClick = { onSelectFilter(language) },
-                    label = { Text("${sourceLanguageDisplay(language)} $count") },
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -710,30 +644,53 @@ internal fun SourceSettingsRow(
             source.versionCode?.let { installedVersion -> entry.versionCode > installedVersion } == true
         } == true
         if (extension != null && updateAvailable) {
-            IconButton(
+            SourceSettingsIconActionButton(
+                icon = Icons.Default.Download,
+                contentDescription = "Update $displayName",
                 enabled = !installing,
                 onClick = { onInstall(extension) },
-                modifier = Modifier.size(40.dp),
-            ) {
-                if (installing) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(
-                        Icons.Default.Download,
-                        contentDescription = "Update $displayName",
-                    )
-                }
-            }
+            )
         }
-        IconButton(
+        SourceSettingsIconActionButton(
+            icon = Icons.Default.Delete,
+            contentDescription = "Uninstall $displayName",
             onClick = { onUninstall(source.packageName) },
-            modifier = Modifier.size(40.dp),
-        ) {
-            Icon(Icons.Default.Close, contentDescription = "Uninstall $displayName")
-        }
+        )
         Switch(
             checked = active,
             onCheckedChange = onEnabledChange,
+        )
+    }
+}
+
+@Composable
+internal fun SourceSettingsIconActionButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control)
+    val contentColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    }
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier
+            .size(LocalTankobunStyle.current.sizes.iconAction)
+            .clip(shape),
+        shape = shape,
+        contentPadding = PaddingValues(0.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = contentColor,
+            modifier = Modifier.size(19.dp),
         )
     }
 }
@@ -807,12 +764,11 @@ internal fun ExtensionRepositoryRow(
                 }
             }
             if (installed) {
-                IconButton(
+                SourceSettingsIconActionButton(
+                    icon = Icons.Default.Delete,
+                    contentDescription = "Uninstall $displayName",
                     onClick = onUninstall,
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Uninstall $displayName")
-                }
+                )
             }
         }
     }
@@ -965,14 +921,27 @@ internal fun requestExtensionInstall(
     viewModel.installExtension(extension)
 }
 
+internal fun requestExtensionUninstall(context: Context, packageName: String) {
+    if (packageName.isBlank()) {
+        Log.w("TankobunSources", "Extension uninstall requested with a blank package name")
+        return
+    }
+    val intent = extensionUninstallIntent(packageName)
+    runCatching {
+        context.startActivity(intent)
+    }.onFailure { error ->
+        Log.w("TankobunSources", "Failed to launch extension uninstall for $packageName", error)
+    }
+}
+
 internal fun downloadedExtensionInstallIntent(installRequest: ExtensionInstallRequest): Intent =
     Intent(Intent.ACTION_VIEW)
         .setDataAndType(Uri.parse(installRequest.apkUri), "application/vnd.android.package-archive")
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
-internal fun openExtensionUninstall(context: Context, packageName: String) {
-    context.startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$packageName")))
-}
+internal fun extensionUninstallIntent(packageName: String): Intent =
+    Intent(Intent.ACTION_DELETE, Uri.parse("package:$packageName"))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
 internal fun sourceLanguageSortPriority(language: String): Int =
     when (language.normalizedSourceLanguage()) {
