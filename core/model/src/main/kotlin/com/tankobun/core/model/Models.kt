@@ -68,6 +68,12 @@ data class AnilistMedia(
     val countryOfOrigin: String? = null,
 )
 
+data class AnilistMediaPage(
+    val media: List<AnilistMedia>,
+    val currentPage: Int,
+    val hasNextPage: Boolean,
+)
+
 data class AnilistMediaTag(
     val name: String,
     val category: String?,

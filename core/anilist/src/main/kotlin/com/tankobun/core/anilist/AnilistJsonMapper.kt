@@ -3,6 +3,7 @@ package com.tankobun.core.anilist
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaDetails
+import com.tankobun.core.model.AnilistMediaPage
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistRecommendationPage
@@ -113,22 +114,33 @@ object AnilistJsonMapper {
     }
 
     fun searchPage(data: JsonObject): List<AnilistMedia> {
-        return data["Page"]
-            ?.jsonObject
-            ?.get("media")
-            ?.jsonArray
-            .orEmpty()
-            .map(::media)
+        return searchMediaPage(data).media
+    }
+
+    fun searchMediaPage(data: JsonObject): AnilistMediaPage {
+        val page = data["Page"]?.jsonObject ?: JsonObject(emptyMap())
+        val pageInfo = page["pageInfo"]?.jsonObject
+        return AnilistMediaPage(
+            media = page["media"]?.jsonArray.orEmpty().map(::media),
+            currentPage = pageInfo?.intOrNull("currentPage") ?: 1,
+            hasNextPage = pageInfo?.booleanOrFalse("hasNextPage") ?: false,
+        )
     }
 
     fun staffMedia(data: JsonObject): List<AnilistMedia> {
-        return data["Staff"]
+        return staffMediaPage(data).media
+    }
+
+    fun staffMediaPage(data: JsonObject): AnilistMediaPage {
+        val staffMedia = data["Staff"]
             ?.takeUnless { it is JsonNull }
             ?.jsonObject
             ?.get("staffMedia")
             ?.takeUnless { it is JsonNull }
             ?.jsonObject
-            ?.get("edges")
+            ?: JsonObject(emptyMap())
+        val pageInfo = staffMedia["pageInfo"]?.jsonObject
+        val media = staffMedia["edges"]
             ?.jsonArray
             .orEmpty()
             .mapNotNull { edge ->
@@ -137,6 +149,11 @@ object AnilistJsonMapper {
                 obj["node"]?.takeUnless { it is JsonNull }?.let(::media)
             }
             .distinctBy { it.id }
+        return AnilistMediaPage(
+            media = media,
+            currentPage = pageInfo?.intOrNull("currentPage") ?: 1,
+            hasNextPage = pageInfo?.booleanOrFalse("hasNextPage") ?: false,
+        )
     }
 
     fun mediaTags(data: JsonObject): List<AnilistMediaTag> {

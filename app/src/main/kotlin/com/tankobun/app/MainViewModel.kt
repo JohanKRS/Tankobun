@@ -49,6 +49,7 @@ import com.tankobun.core.database.toReaderPage
 import com.tankobun.core.database.AnilistSearchResultEntity
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
+import com.tankobun.core.model.AnilistMediaPage
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistScoreFormat
@@ -93,6 +94,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 private const val BROWSE_LANDING_SECTION_SIZE = 12
+private const val BROWSE_RESULTS_PAGE_SIZE = 50
 
 private data class BulkDownloadResult(
     val queued: Int = 0,
@@ -1020,6 +1022,9 @@ class MainViewModel(
                 searchQuery = "",
                 searchResults = emptyList(),
                 browseSearched = false,
+                browseResultsPage = 0,
+                browseResultsHasMore = false,
+                browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = emptySet(),
                 browseFormat = null,
@@ -1040,6 +1045,9 @@ class MainViewModel(
                 searchQuery = "",
                 searchResults = emptyList(),
                 browseSearched = false,
+                browseResultsPage = 0,
+                browseResultsHasMore = false,
+                browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = emptySet(),
                 browseFormat = null,
@@ -1060,6 +1068,9 @@ class MainViewModel(
                 searchQuery = "",
                 searchResults = emptyList(),
                 browseSearched = false,
+                browseResultsPage = 0,
+                browseResultsHasMore = false,
+                browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = emptySet(),
                 browseFormat = null,
@@ -1080,6 +1091,9 @@ class MainViewModel(
                 searchQuery = "",
                 searchResults = emptyList(),
                 browseSearched = false,
+                browseResultsPage = 0,
+                browseResultsHasMore = false,
+                browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = setOf(tag),
                 browseFormat = null,
@@ -1100,6 +1114,9 @@ class MainViewModel(
                 searchQuery = "",
                 searchResults = emptyList(),
                 browseSearched = false,
+                browseResultsPage = 0,
+                browseResultsHasMore = false,
+                browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = emptySet(),
                 browseFormat = null,
@@ -1201,42 +1218,113 @@ class MainViewModel(
     fun searchAniList() {
         val snapshot = _state.value
         val query = snapshot.searchQuery.trim()
-        val staffName = snapshot.browseStaffName?.trim().orEmpty()
         if (!snapshot.hasBrowseQueryOrFilters()) {
-            _state.update { it.copy(searchResults = emptyList(), browseSearched = false, message = null) }
+            _state.update {
+                it.copy(
+                    searchResults = emptyList(),
+                    browseSearched = false,
+                    browseResultsPage = 0,
+                    browseResultsHasMore = false,
+                    browseResultsLoadingMore = false,
+                    message = null,
+                )
+            }
             loadBrowseLanding()
             return
         }
+        val cacheKey = snapshot.browseCacheKey()
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, browseSearched = true, message = null) }
+            _state.update {
+                it.copy(
+                    busy = true,
+                    browseSearched = true,
+                    browseResultsPage = 0,
+                    browseResultsHasMore = false,
+                    browseResultsLoadingMore = false,
+                    message = null,
+                )
+            }
             runCatching {
-                val cacheKey = snapshot.browseCacheKey()
-                cachedAnilistBrowseMedia(cacheKey) {
-                    if (staffName.isNotBlank()) {
-                        container.anilistRepository.staffManga(
-                            staffName = staffName,
-                            sort = snapshot.effectiveBrowseSort(),
-                        )
-                    } else if (!snapshot.hasBrowseFilters() && snapshot.browseSort == BROWSE_SORT_SEARCH_MATCH) {
-                        container.anilistRepository.searchManga(query)
-                    } else {
-                        container.anilistRepository.browseManga(
-                            search = query.takeIf { it.isNotBlank() },
-                            genres = snapshot.browseGenres,
-                            tags = snapshot.browseTags,
-                            format = snapshot.browseFormat,
-                            status = snapshot.browsePublishingStatus,
-                            countryOfOrigin = snapshot.browseCountryOfOrigin,
-                            year = snapshot.browseYear,
-                            sort = snapshot.effectiveBrowseSort(),
+                cachedAnilistBrowseMediaPage(cacheKey) {
+                    fetchBrowseResultsPage(snapshot, page = 1)
+                }
+            }.onSuccess { page ->
+                if (_state.value.browseCacheKey() == cacheKey) {
+                    _state.update {
+                        it.copy(
+                            searchResults = page.media,
+                            browseResultsPage = page.currentPage,
+                            browseResultsHasMore = page.hasNextPage,
+                            browseResultsLoadingMore = false,
+                            busy = false,
                         )
                     }
                 }
-            }.onSuccess { results ->
-                _state.update { it.copy(searchResults = results, busy = false) }
             }.onFailure { error ->
                 Log.e(TAG, "AniList search failed for $query", error)
-                _state.update { it.copy(busy = false, message = error.userMessage("Search failed")) }
+                if (_state.value.browseCacheKey() == cacheKey) {
+                    _state.update {
+                        it.copy(
+                            busy = false,
+                            browseResultsLoadingMore = false,
+                            message = error.userMessage("Search failed"),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun loadMoreBrowseResults() {
+        val snapshot = _state.value
+        if (
+            !snapshot.browseSearched ||
+            !snapshot.browseResultsHasMore ||
+            snapshot.busy ||
+            snapshot.browseResultsLoadingMore ||
+            !snapshot.hasBrowseQueryOrFilters()
+        ) {
+            return
+        }
+        val cacheKey = snapshot.browseCacheKey()
+        val nextPage = snapshot.browseResultsPage.coerceAtLeast(1) + 1
+        viewModelScope.launch {
+            _state.update {
+                if (
+                    it.browseCacheKey() == cacheKey &&
+                    it.browseResultsHasMore &&
+                    !it.browseResultsLoadingMore &&
+                    !it.busy
+                ) {
+                    it.copy(browseResultsLoadingMore = true, message = null)
+                } else {
+                    it
+                }
+            }
+            runCatching {
+                fetchBrowseResultsPage(snapshot, page = nextPage)
+            }.onSuccess { page ->
+                if (_state.value.browseCacheKey() != cacheKey) return@onSuccess
+                val merged = (_state.value.searchResults + page.media).distinctBy { it.id }
+                cacheBrowseMedia(cacheKey, merged)
+                _state.update {
+                    it.copy(
+                        searchResults = merged,
+                        browseResultsPage = page.currentPage.coerceAtLeast(nextPage),
+                        browseResultsHasMore = page.hasNextPage && page.media.isNotEmpty(),
+                        browseResultsLoadingMore = false,
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "AniList browse page $nextPage failed for $cacheKey", error)
+                if (_state.value.browseCacheKey() == cacheKey) {
+                    _state.update {
+                        it.copy(
+                            browseResultsLoadingMore = false,
+                            message = error.userMessage("Could not load more manga"),
+                        )
+                    }
+                }
             }
         }
     }
@@ -1266,6 +1354,81 @@ class MainViewModel(
             },
         )
         return results
+    }
+
+    private suspend fun cachedAnilistBrowseMediaPage(
+        cacheKey: String,
+        fetch: suspend () -> AnilistMediaPage,
+    ): AnilistMediaPage {
+        val now = System.currentTimeMillis()
+        val cachedRows = container.database.searchResultDao().cachedSearchRows(cacheKey)
+        val cachedIsFresh = cachedRows.isNotEmpty() &&
+            cachedRows.all { now - it.fetchedAtEpochMillis <= cachePolicy.anilistSearchTtlMillis }
+        if (cachedIsFresh) {
+            val cachedMedia = container.database.searchResultDao().cachedSearchMedia(cacheKey).map { it.toModel() }
+            val cachedPage = if (cachedMedia.size < BROWSE_RESULTS_PAGE_SIZE) {
+                0
+            } else {
+                ((cachedMedia.size - 1) / BROWSE_RESULTS_PAGE_SIZE + 1).coerceAtLeast(1)
+            }
+            return AnilistMediaPage(
+                media = cachedMedia,
+                currentPage = cachedPage,
+                hasNextPage = cachedMedia.isNotEmpty() &&
+                    (cachedMedia.size < BROWSE_RESULTS_PAGE_SIZE || cachedMedia.size % BROWSE_RESULTS_PAGE_SIZE == 0),
+            )
+        }
+        val page = fetch()
+        cacheBrowseMedia(cacheKey, page.media)
+        return page
+    }
+
+    private suspend fun fetchBrowseResultsPage(snapshot: TankobunUiState, page: Int): AnilistMediaPage {
+        val query = snapshot.searchQuery.trim()
+        val staffName = snapshot.browseStaffName?.trim().orEmpty()
+        return when {
+            staffName.isNotBlank() -> container.anilistRepository.staffMangaPage(
+                staffName = staffName,
+                sort = snapshot.effectiveBrowseSort(),
+                page = page,
+                perPage = BROWSE_RESULTS_PAGE_SIZE,
+            )
+            !snapshot.hasBrowseFilters() && snapshot.browseSort == BROWSE_SORT_SEARCH_MATCH -> {
+                container.anilistRepository.searchMangaPage(
+                    query = query,
+                    page = page,
+                    perPage = BROWSE_RESULTS_PAGE_SIZE,
+                )
+            }
+            else -> container.anilistRepository.browseMangaPage(
+                search = query.takeIf { it.isNotBlank() },
+                genres = snapshot.browseGenres,
+                tags = snapshot.browseTags,
+                format = snapshot.browseFormat,
+                status = snapshot.browsePublishingStatus,
+                countryOfOrigin = snapshot.browseCountryOfOrigin,
+                year = snapshot.browseYear,
+                sort = snapshot.effectiveBrowseSort(),
+                page = page,
+                perPage = BROWSE_RESULTS_PAGE_SIZE,
+            )
+        }
+    }
+
+    private suspend fun cacheBrowseMedia(cacheKey: String, media: List<AnilistMedia>) {
+        val now = System.currentTimeMillis()
+        container.database.mediaDao().upsertMedia(media.map { it.toEntity(now) })
+        container.database.searchResultDao().deleteForQuery(cacheKey)
+        container.database.searchResultDao().upsertResults(
+            media.mapIndexed { index, item ->
+                AnilistSearchResultEntity(
+                    query = cacheKey,
+                    mediaId = item.id,
+                    orderIndex = index,
+                    fetchedAtEpochMillis = now,
+                )
+            },
+        )
     }
 
     private suspend fun cachedBrowseMedia(cacheKey: String): List<AnilistMedia> =

@@ -72,6 +72,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -141,6 +142,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
@@ -266,6 +268,9 @@ internal fun MediaCollection(
     header: (@Composable () -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     emptyMessage: String = "No manga here yet.",
+    isLoadingMore: Boolean = false,
+    onNearEnd: (() -> Unit)? = null,
+    nearEndThreshold: Int = 8,
 ) {
     val configuration = LocalConfiguration.current
     val supportedCoverColumns = coverColumns
@@ -292,46 +297,110 @@ internal fun MediaCollection(
 
     val supportedViewMode = viewMode.supportedMediaViewMode()
     when (supportedViewMode) {
-        MediaViewMode.LIST -> LazyColumn(
-            modifier = modifier,
-            contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            header?.let { headerContent ->
-                item(key = "media-header") {
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        headerContent()
+        MediaViewMode.LIST -> {
+            val listState = rememberLazyListState()
+            val latestOnNearEnd by rememberUpdatedState(onNearEnd)
+            LaunchedEffect(listState, media.size, latestOnNearEnd != null) {
+                snapshotFlow {
+                    val layoutInfo = listState.layoutInfo
+                    val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                    layoutInfo.totalItemsCount > 0 &&
+                        lastVisibleIndex >= layoutInfo.totalItemsCount - nearEndThreshold - 1
+                }
+                    .distinctUntilChanged()
+                    .collect { nearEnd ->
+                        if (nearEnd) latestOnNearEnd?.invoke()
+                    }
+            }
+            LazyColumn(
+                state = listState,
+                modifier = modifier,
+                contentPadding = contentPadding,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                header?.let { headerContent ->
+                    item(key = "media-header") {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            headerContent()
+                        }
+                    }
+                }
+                items(media, key = { it.id }) { item ->
+                    MediaRow(media = item, onClick = { onSelectMedia(item) })
+                }
+                if (isLoadingMore) {
+                    item(key = "media-loading-more") {
+                        MediaLoadingMoreFooter()
                     }
                 }
             }
-            items(media, key = { it.id }) { item ->
-                MediaRow(media = item, onClick = { onSelectMedia(item) })
-            }
         }
-        else -> LazyVerticalGrid(
-            columns = GridCells.Fixed(supportedCoverColumns),
-            modifier = modifier,
-            contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            header?.let { headerContent ->
-                item(
-                    key = "media-header",
-                    span = { GridItemSpan(maxLineSpan) },
-                ) {
-                    headerContent()
+        else -> {
+            val gridState = rememberLazyGridState()
+            val latestOnNearEnd by rememberUpdatedState(onNearEnd)
+            LaunchedEffect(gridState, media.size, latestOnNearEnd != null) {
+                snapshotFlow {
+                    val layoutInfo = gridState.layoutInfo
+                    val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                    layoutInfo.totalItemsCount > 0 &&
+                        lastVisibleIndex >= layoutInfo.totalItemsCount - nearEndThreshold - 1
+                }
+                    .distinctUntilChanged()
+                    .collect { nearEnd ->
+                        if (nearEnd) latestOnNearEnd?.invoke()
+                    }
+            }
+            LazyVerticalGrid(
+                state = gridState,
+                columns = GridCells.Fixed(supportedCoverColumns),
+                modifier = modifier,
+                contentPadding = contentPadding,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                header?.let { headerContent ->
+                    item(
+                        key = "media-header",
+                        span = { GridItemSpan(maxLineSpan) },
+                    ) {
+                        headerContent()
+                    }
+                }
+                gridItems(media, key = { it.id }) { item ->
+                    MediaCoverTile(
+                        media = item,
+                        viewMode = supportedViewMode,
+                        showWholeCover = showWholeCovers,
+                        onClick = { onSelectMedia(item) },
+                    )
+                }
+                if (isLoadingMore) {
+                    item(
+                        key = "media-loading-more",
+                        span = { GridItemSpan(maxLineSpan) },
+                    ) {
+                        MediaLoadingMoreFooter()
+                    }
                 }
             }
-            gridItems(media, key = { it.id }) { item ->
-                MediaCoverTile(
-                    media = item,
-                    viewMode = supportedViewMode,
-                    showWholeCover = showWholeCovers,
-                    onClick = { onSelectMedia(item) },
-                )
-            }
         }
+    }
+}
+
+@Composable
+internal fun MediaLoadingMoreFooter() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(24.dp),
+            strokeWidth = 2.dp,
+            color = LocalTankobunStyle.current.colors.accent,
+        )
     }
 }
 

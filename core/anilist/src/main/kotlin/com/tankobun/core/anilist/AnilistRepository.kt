@@ -3,6 +3,7 @@ package com.tankobun.core.anilist
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaDetails
+import com.tankobun.core.model.AnilistMediaPage
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendationPage
 import com.tankobun.core.model.AnilistScoreFormat
@@ -39,10 +40,14 @@ class AnilistRepository(
         )
     }
 
-    suspend fun searchManga(query: String, page: Int = 1): List<AnilistMedia> {
+    suspend fun searchManga(query: String, page: Int = 1, perPage: Int = 50): List<AnilistMedia> =
+        searchMangaPage(query = query, page = page, perPage = perPage).media
+
+    suspend fun searchMangaPage(query: String, page: Int = 1, perPage: Int = 50): AnilistMediaPage {
         query.extractAniListMangaId()?.let { mediaId ->
-            return runCatching { listOf(mediaDetailsWithEntry(mediaId, accessToken = null).media) }
+            val media = runCatching { listOf(mediaDetailsWithEntry(mediaId, accessToken = null).media) }
                 .getOrDefault(emptyList())
+            return AnilistMediaPage(media = media, currentPage = 1, hasNextPage = false)
         }
 
         val data = graphQlClient.execute(
@@ -50,11 +55,18 @@ class AnilistRepository(
             variables = buildJsonObject {
                 put("search", query)
                 put("page", page)
+                put("perPage", perPage)
             },
         )
-        val directResults = AnilistJsonMapper.searchPage(data)
-        return directResults.ifEmpty {
-            fallbackSearchManga(query)
+        val directResults = AnilistJsonMapper.searchMediaPage(data)
+        return if (page == 1 && directResults.media.isEmpty()) {
+            AnilistMediaPage(
+                media = fallbackSearchManga(query),
+                currentPage = 1,
+                hasNextPage = false,
+            )
+        } else {
+            directResults
         }
     }
 
@@ -69,7 +81,32 @@ class AnilistRepository(
         sort: String = "TRENDING_DESC",
         page: Int = 1,
         perPage: Int = 50,
-    ): List<AnilistMedia> {
+    ): List<AnilistMedia> =
+        browseMangaPage(
+            search = search,
+            genres = genres,
+            tags = tags,
+            format = format,
+            status = status,
+            countryOfOrigin = countryOfOrigin,
+            year = year,
+            sort = sort,
+            page = page,
+            perPage = perPage,
+        ).media
+
+    suspend fun browseMangaPage(
+        search: String? = null,
+        genres: Set<String> = emptySet(),
+        tags: Set<String> = emptySet(),
+        format: String? = null,
+        status: String? = null,
+        countryOfOrigin: String? = null,
+        year: Int? = null,
+        sort: String = "TRENDING_DESC",
+        page: Int = 1,
+        perPage: Int = 50,
+    ): AnilistMediaPage {
         val normalizedSearch = search?.trim().orEmpty()
         if (
             genres.isEmpty() &&
@@ -80,8 +117,9 @@ class AnilistRepository(
             year == null
         ) {
             normalizedSearch.extractAniListMangaId()?.let { mediaId ->
-                return runCatching { listOf(mediaDetailsWithEntry(mediaId, accessToken = null).media) }
+                val media = runCatching { listOf(mediaDetailsWithEntry(mediaId, accessToken = null).media) }
                     .getOrDefault(emptyList())
+                return AnilistMediaPage(media = media, currentPage = 1, hasNextPage = false)
             }
         }
 
@@ -107,7 +145,7 @@ class AnilistRepository(
                 put("sort", buildJsonArray { add(sort) })
             },
         )
-        return AnilistJsonMapper.searchPage(data)
+        return AnilistJsonMapper.searchMediaPage(data)
     }
 
     suspend fun staffManga(
@@ -115,9 +153,17 @@ class AnilistRepository(
         sort: String = "POPULARITY_DESC",
         page: Int = 1,
         perPage: Int = 50,
-    ): List<AnilistMedia> {
+    ): List<AnilistMedia> =
+        staffMangaPage(staffName = staffName, sort = sort, page = page, perPage = perPage).media
+
+    suspend fun staffMangaPage(
+        staffName: String,
+        sort: String = "POPULARITY_DESC",
+        page: Int = 1,
+        perPage: Int = 50,
+    ): AnilistMediaPage {
         val normalizedStaffName = staffName.trim()
-        if (normalizedStaffName.isBlank()) return emptyList()
+        if (normalizedStaffName.isBlank()) return AnilistMediaPage(emptyList(), currentPage = 1, hasNextPage = false)
         val data = graphQlClient.execute(
             query = AnilistQueries.StaffManga,
             variables = buildJsonObject {
@@ -127,7 +173,7 @@ class AnilistRepository(
                 put("sort", buildJsonArray { add(sort) })
             },
         )
-        return AnilistJsonMapper.staffMedia(data)
+        return AnilistJsonMapper.staffMediaPage(data)
     }
 
     suspend fun mediaTags(): List<AnilistMediaTag> {

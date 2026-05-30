@@ -18,8 +18,8 @@ object AnilistQueries {
     """
 
     const val SearchManga = """
-        query SearchManga(${'$'}page: Int!, ${'$'}search: String!) {
-          Page(page: ${'$'}page, perPage: 20) {
+        query SearchManga(${'$'}page: Int!, ${'$'}perPage: Int!, ${'$'}search: String!) {
+          Page(page: ${'$'}page, perPage: ${'$'}perPage) {
             pageInfo { hasNextPage currentPage lastPage }
             media(type: MANGA, search: ${'$'}search, sort: SEARCH_MATCH) {
               id
@@ -197,6 +197,7 @@ object AnilistQueries {
         query StaffManga(${'$'}search: String!, ${'$'}page: Int!, ${'$'}perPage: Int!, ${'$'}sort: [MediaSort]) {
           Staff(search: ${'$'}search) {
             staffMedia(type: MANGA, sort: ${'$'}sort, page: ${'$'}page, perPage: ${'$'}perPage) {
+              pageInfo { hasNextPage currentPage lastPage }
               edges {
                 staffRole
                 node {

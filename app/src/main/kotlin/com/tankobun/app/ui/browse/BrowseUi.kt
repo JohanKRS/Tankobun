@@ -695,6 +695,8 @@ internal fun BrowseResults(
         header = resultsHeader,
         contentPadding = PaddingValues(vertical = 18.dp),
         onSelectMedia = onSelectMedia,
+        isLoadingMore = state.browseResultsLoadingMore,
+        onNearEnd = if (state.browseResultsHasMore) viewModel::loadMoreBrowseResults else null,
         emptyMessage = if (state.busy) {
             "Searching AniList..."
         } else {
