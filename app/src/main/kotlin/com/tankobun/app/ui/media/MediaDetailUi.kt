@@ -255,6 +255,10 @@ internal fun MangaDetailScreen(
     onBrowseAuthor: (String) -> Unit,
 ) {
     val backdrop = mediaDetailBackdropColor()
+    val listState = rememberLazyListState()
+    LaunchedEffect(media.id) {
+        listState.scrollToItem(0)
+    }
     Box(
         Modifier
             .fillMaxSize()
@@ -283,6 +287,7 @@ internal fun MangaDetailScreen(
                 ),
         )
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .blur(if (state.sourcePickerOpen) 8.dp else 0.dp),
@@ -790,16 +795,16 @@ internal fun AutoResizingMangaTitle(
         val maxLines = if (compact) 3 else 4
         val maxWidthPx = with(density) { maxWidth.toPx() }
         val maxHeightPx = with(density) { maxHeight.toPx() }
-        val spToPx = with(density) { 1.sp.toPx() }
+        val verticalClipGuardPx = with(density) { if (compact) 0.dp.toPx() else 3.dp.toPx() }
         val layout = remember(title, compact, maxWidth, maxHeight, density.fontScale) {
             buildMangaTitleLayout(
                 title = title,
                 maxWidthPx = maxWidthPx,
                 maxHeightPx = maxHeightPx,
+                verticalClipGuardPx = verticalClipGuardPx,
                 maxLines = maxLines,
                 maxFontSize = maxFontSize,
                 minFontSize = minFontSize,
-                spToPx = spToPx,
                 textMeasurer = textMeasurer,
             )
         }
@@ -820,8 +825,6 @@ private data class MangaTitleLayout(
     val fontSize: Float,
     val lines: List<String>,
 )
-
-private const val MangaTitleLineHeightRatio = 0.84f
 
 @Composable
 private fun bebasNeueStatTextStyle(compact: Boolean): TextStyle =
@@ -856,10 +859,10 @@ private fun buildMangaTitleLayout(
     title: String,
     maxWidthPx: Float,
     maxHeightPx: Float,
+    verticalClipGuardPx: Float,
     maxLines: Int,
     maxFontSize: Float,
     minFontSize: Float,
-    spToPx: Float,
     textMeasurer: androidx.compose.ui.text.TextMeasurer,
 ): MangaTitleLayout {
     val words = title
@@ -872,8 +875,10 @@ private fun buildMangaTitleLayout(
     while (fontSize >= minFontSize) {
         val style = tankobunMangaTitleTextStyle(fontSize)
         val lines = preferredTitleLinesForWidth(words, maxWidthPx, maxLines, style, textMeasurer)
-        val lineHeightPx = fontSize * MangaTitleLineHeightRatio * spToPx
-        if (lines != null && lineHeightPx * lines.size <= maxHeightPx) {
+        if (
+            lines != null &&
+            measuredTitleHeight(lines, style, textMeasurer) + verticalClipGuardPx <= maxHeightPx
+        ) {
             return MangaTitleLayout(fontSize, lines)
         }
         fontSize -= 1f
@@ -934,6 +939,18 @@ private fun measuredTitleWidth(
         softWrap = false,
         maxLines = 1,
     ).size.width
+
+private fun measuredTitleHeight(
+    lines: List<String>,
+    style: TextStyle,
+    textMeasurer: androidx.compose.ui.text.TextMeasurer,
+): Int =
+    textMeasurer.measure(
+        text = AnnotatedString(lines.joinToString("\n")),
+        style = style,
+        softWrap = false,
+        maxLines = lines.size,
+    ).size.height
 
 private fun fallbackTitleLines(words: List<String>, maxLines: Int): List<String> =
     words.take(maxLines).ifEmpty { listOf("") }
