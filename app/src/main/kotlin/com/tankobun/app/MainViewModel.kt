@@ -92,6 +92,8 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
+private const val BROWSE_LANDING_SECTION_SIZE = 12
+
 private data class BulkDownloadResult(
     val queued: Int = 0,
     val resumed: Int = 0,
@@ -1120,7 +1122,7 @@ class MainViewModel(
                 trending = cachedBrowseMedia(BROWSE_TRENDING_CACHE_KEY),
                 popular = cachedBrowseMedia(BROWSE_POPULAR_CACHE_KEY),
                 popularManhwa = cachedBrowseMedia(BROWSE_MANHWA_CACHE_KEY),
-                topManga = cachedBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY),
+                topManga = cachedBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY).take(BROWSE_LANDING_SECTION_SIZE),
             )
             val hasCachedLanding = cachedLanding.hasContent()
             if (hasCachedLanding) {
@@ -1137,21 +1139,21 @@ class MainViewModel(
             }
             runCatching {
                 val trending = cachedAnilistBrowseMedia(BROWSE_TRENDING_CACHE_KEY) {
-                    container.anilistRepository.browseManga(sort = "TRENDING_DESC", perPage = 12)
+                    container.anilistRepository.browseManga(sort = "TRENDING_DESC", perPage = BROWSE_LANDING_SECTION_SIZE)
                 }
                 val popular = cachedAnilistBrowseMedia(BROWSE_POPULAR_CACHE_KEY) {
-                    container.anilistRepository.browseManga(sort = "POPULARITY_DESC", perPage = 12)
+                    container.anilistRepository.browseManga(sort = "POPULARITY_DESC", perPage = BROWSE_LANDING_SECTION_SIZE)
                 }
                 val popularManhwa = cachedAnilistBrowseMedia(BROWSE_MANHWA_CACHE_KEY) {
                     container.anilistRepository.browseManga(
                         countryOfOrigin = "KR",
                         sort = "POPULARITY_DESC",
-                        perPage = 12,
+                        perPage = BROWSE_LANDING_SECTION_SIZE,
                     )
                 }
                 val topManga = cachedAnilistBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY) {
-                    fetchTopManga()
-                }
+                    container.anilistRepository.browseManga(sort = "SCORE_DESC", perPage = BROWSE_LANDING_SECTION_SIZE)
+                }.take(BROWSE_LANDING_SECTION_SIZE)
                 BrowseLandingData(trending, popular, popularManhwa, topManga)
             }.onSuccess { landing ->
                 _state.update {
@@ -1271,12 +1273,6 @@ class MainViewModel(
 
     private fun BrowseLandingData.hasContent(): Boolean =
         trending.isNotEmpty() || popular.isNotEmpty() || popularManhwa.isNotEmpty() || topManga.isNotEmpty()
-
-    private suspend fun fetchTopManga(): List<AnilistMedia> {
-        val firstPage = container.anilistRepository.browseManga(sort = "SCORE_DESC", page = 1, perPage = 50)
-        val secondPage = container.anilistRepository.browseManga(sort = "SCORE_DESC", page = 2, perPage = 50)
-        return (firstPage + secondPage).distinctBy { it.id }.take(100)
-    }
 
     fun selectMedia(media: AnilistMedia) {
         val existingEntry = _state.value.libraryItems.firstOrNull { item -> item.media.id == media.id }?.entry

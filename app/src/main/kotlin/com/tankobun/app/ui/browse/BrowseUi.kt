@@ -39,7 +39,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -68,7 +67,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -175,7 +173,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -562,32 +559,12 @@ internal fun BrowseLanding(
             )
         }
         item {
-            Box(Modifier.padding(horizontal = BrowseLandingContentPadding)) {
-                TankobunSectionHeader(
-                    title = "Top 100 Manga",
-                    actionLabel = "View All",
-                    onAction = { viewModel.viewAllBrowseSection("SCORE_DESC") },
-                )
-            }
-        }
-        if (state.browseTopManga.isEmpty()) {
-            item {
-                Text(
-                    "Cached rankings will appear here after AniList responds.",
-                    modifier = Modifier.padding(horizontal = BrowseLandingContentPadding),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else {
-            itemsIndexed(state.browseTopManga, key = { _, item -> "top:${item.id}" }) { index, item ->
-                Box(Modifier.padding(horizontal = BrowseLandingContentPadding)) {
-                    BrowseRankedMangaRow(
-                        rank = index + 1,
-                        media = item,
-                        onClick = { viewModel.selectMedia(item) },
-                    )
-                }
-            }
+            BrowseMangaShelf(
+                title = "TOP 100 MANGA",
+                media = state.browseTopManga,
+                onViewAll = { viewModel.viewAllBrowseSection("SCORE_DESC") },
+                onSelectMedia = viewModel::selectMedia,
+            )
         }
     }
 }
@@ -663,90 +640,6 @@ internal fun BrowseShelfTile(media: AnilistMedia, onClick: () -> Unit) {
             )
             TankobunMediaStatusLabel(text = media.status.statusLabel())
         }
-    }
-}
-
-@Composable
-internal fun BrowseRankedMangaRow(rank: Int, media: AnilistMedia, onClick: () -> Unit) {
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val compact = maxWidth < 520.dp
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = if (compact) 12.dp else 14.dp),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
-            ) {
-                Text(
-                    "#$rank",
-                    modifier = Modifier.width(if (compact) 42.dp else 62.dp),
-                    style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                BrowseRankCover(media = media, compact = compact)
-                BrowseRankTitle(
-                    media = media,
-                    compact = compact,
-                    modifier = Modifier.weight(1f),
-                    titleMaxLines = if (compact) 2 else 1,
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
-            )
-        }
-    }
-}
-
-@Composable
-internal fun BrowseRankCover(media: AnilistMedia, compact: Boolean) {
-    CoverImage(
-        url = media.coverImage,
-        title = media.title.userPreferred,
-        modifier = Modifier.size(width = if (compact) 58.dp else 64.dp, height = if (compact) 82.dp else 90.dp),
-    )
-}
-
-@Composable
-internal fun BrowseRankTitle(
-    media: AnilistMedia,
-    compact: Boolean,
-    modifier: Modifier = Modifier,
-    titleMaxLines: Int = 1,
-) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(7.dp),
-    ) {
-        Text(
-            media.title.userPreferred,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = titleMaxLines,
-            overflow = TextOverflow.Ellipsis,
-        )
-        FlowRowCompat {
-            media.genres.take(if (compact) 3 else 5).forEach { genre ->
-                TankobunTag(label = genre, compact = true)
-            }
-        }
-        Text(
-            media.topMangaMetaLine(),
-            style = MaterialTheme.typography.labelMedium.copy(lineHeight = 16.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 
@@ -1172,16 +1065,6 @@ internal fun AnilistMedia.publishingYearLabel(): String = when {
     startDateYear != null -> startDateYear.toString()
     else -> "Date unknown"
 }
-
-internal fun AnilistMedia.topMangaMetaLine(): String =
-    listOfNotNull(
-        averageScore?.let { "$it%" },
-        popularity?.let { "${it.formatCompact()} users" },
-        format.mediaFormatLabel(),
-        chapters?.let { "$it chapters" },
-        publishingYearLabel(),
-        status.statusLabel(),
-    ).joinToString(" / ")
 
 internal fun List<String>.authorLabel(): String =
     take(3).joinToString(", ").ifBlank { "Unknown" }
