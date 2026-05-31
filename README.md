@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  Tankobun helps you keep your AniList library, reading progress, sources, downloads, and backups in one calm mobile app.
+  Tankobun helps you keep your AniList library, reading progress, sources, downloads, and backups in one beautiful app.
 </p>
 
 <p align="center">
