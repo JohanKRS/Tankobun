@@ -237,21 +237,35 @@ internal fun LibraryScreen(
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
     val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.loadBrowseTags()
+    }
+
     var query by remember { mutableStateOf("") }
     var picker by remember { mutableStateOf<LibraryPicker?>(null) }
+    var genresOpen by remember { mutableStateOf(false) }
+    var tagsOpen by remember { mutableStateOf(false) }
+    var genres by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var tags by remember { mutableStateOf<Set<String>>(emptySet()) }
     var format by remember { mutableStateOf<String?>(null) }
     var publishingStatus by remember { mutableStateOf<String?>(null) }
+    var countryOfOrigin by remember { mutableStateOf<String?>(null) }
     var year by remember { mutableStateOf<String?>(null) }
     var sort by remember { mutableStateOf(LIBRARY_SORT_LIST_ORDER) }
     var optionsOpen by remember { mutableStateOf(false) }
     val sections = state.librarySections
+    val tagOptions = remember(sections, state.browseAvailableTags) { libraryTagOptions(sections, state.browseAvailableTags) }
     val formatOptions = remember(sections) { libraryFormatOptions(sections) }
     val statusOptions = remember(sections) { libraryStatusOptions(sections) }
+    val countryOptions = remember(sections) { libraryCountryOptions(sections) }
     val yearOptions = remember(sections) { libraryYearOptions(sections) }
     val resetLibraryControls = {
         query = ""
+        genres = emptySet()
+        tags = emptySet()
         format = null
         publishingStatus = null
+        countryOfOrigin = null
         year = null
         sort = LIBRARY_SORT_LIST_ORDER
     }
@@ -261,13 +275,19 @@ internal fun LibraryScreen(
             LibraryFilterBar(
                 query = query,
                 onQueryChange = { query = it },
+                genres = genres,
+                tags = tags,
                 format = format,
                 publishingStatus = publishingStatus,
+                countryOfOrigin = countryOfOrigin,
                 year = year,
                 sort = sort,
                 formatOptions = formatOptions,
                 statusOptions = statusOptions,
+                countryOptions = countryOptions,
                 yearOptions = yearOptions,
+                onOpenGenres = { genresOpen = true },
+                onOpenTags = { tagsOpen = true },
                 onOpenPicker = { picker = it },
                 onOpenOptions = { optionsOpen = true },
                 onReset = resetLibraryControls,
@@ -294,8 +314,11 @@ internal fun LibraryScreen(
         LibraryPager(
             sections = sections,
             query = query,
+            genres = genres,
+            tags = tags,
             format = format,
             publishingStatus = publishingStatus,
+            countryOfOrigin = countryOfOrigin,
             year = year,
             sort = sort,
             viewMode = state.libraryViewMode,
@@ -312,27 +335,54 @@ internal fun LibraryScreen(
             title = when (activePicker) {
                 LibraryPicker.FORMAT -> "Format"
                 LibraryPicker.STATUS -> "Publishing Status"
+                LibraryPicker.COUNTRY -> "Country Of Origin"
                 LibraryPicker.YEAR -> "Year"
             },
             options = when (activePicker) {
                 LibraryPicker.FORMAT -> formatOptions
                 LibraryPicker.STATUS -> statusOptions
+                LibraryPicker.COUNTRY -> countryOptions
                 LibraryPicker.YEAR -> yearOptions
             },
             selectedValue = when (activePicker) {
                 LibraryPicker.FORMAT -> format
                 LibraryPicker.STATUS -> publishingStatus
+                LibraryPicker.COUNTRY -> countryOfOrigin
                 LibraryPicker.YEAR -> year
             },
             onSelect = { value ->
                 when (activePicker) {
                     LibraryPicker.FORMAT -> format = value
                     LibraryPicker.STATUS -> publishingStatus = value
+                    LibraryPicker.COUNTRY -> countryOfOrigin = value
                     LibraryPicker.YEAR -> year = value
                 }
                 picker = null
             },
             onDismiss = { picker = null },
+        )
+    }
+
+    if (genresOpen) {
+        LibraryGenreDialog(
+            selectedGenres = genres,
+            onGenreSelected = { genre, selected ->
+                genres = if (selected) genres + genre else genres - genre
+            },
+            onClear = { genres = emptySet() },
+            onDismiss = { genresOpen = false },
+        )
+    }
+
+    if (tagsOpen) {
+        LibraryTagDialog(
+            availableTags = tagOptions,
+            selectedTags = tags,
+            onTagSelected = { tag, selected ->
+                tags = if (selected) tags + tag else tags - tag
+            },
+            onClear = { tags = emptySet() },
+            onDismiss = { tagsOpen = false },
         )
     }
 
@@ -352,20 +402,29 @@ internal fun LibraryScreen(
 internal fun LibraryFilterBar(
     query: String,
     onQueryChange: (String) -> Unit,
+    genres: Set<String>,
+    tags: Set<String>,
     format: String?,
     publishingStatus: String?,
+    countryOfOrigin: String?,
     year: String?,
     sort: String,
     formatOptions: List<BrowseOption>,
     statusOptions: List<BrowseOption>,
+    countryOptions: List<BrowseOption>,
     yearOptions: List<BrowseOption>,
+    onOpenGenres: () -> Unit,
+    onOpenTags: () -> Unit,
     onOpenPicker: (LibraryPicker) -> Unit,
     onOpenOptions: () -> Unit,
     onReset: () -> Unit,
 ) {
     val controlsActive = query.isNotBlank() ||
+        genres.isNotEmpty() ||
+        tags.isNotEmpty() ||
         format != null ||
         publishingStatus != null ||
+        countryOfOrigin != null ||
         year != null ||
         sort != LIBRARY_SORT_LIST_ORDER
 
@@ -381,6 +440,18 @@ internal fun LibraryFilterBar(
         )
         TankobunFilterRow {
             BrowseFilterPill(
+                label = "Genres",
+                value = if (genres.isEmpty()) "Any" else genres.size.toString(),
+                selected = genres.isNotEmpty(),
+                onClick = onOpenGenres,
+            )
+            BrowseFilterPill(
+                label = "Tags",
+                value = if (tags.isEmpty()) "Any" else tags.size.toString(),
+                selected = tags.isNotEmpty(),
+                onClick = onOpenTags,
+            )
+            BrowseFilterPill(
                 label = "Format",
                 value = formatOptions.labelFor(format),
                 selected = format != null,
@@ -393,16 +464,16 @@ internal fun LibraryFilterBar(
                 onClick = { onOpenPicker(LibraryPicker.STATUS) },
             )
             BrowseFilterPill(
+                label = "Country",
+                value = countryOptions.labelFor(countryOfOrigin),
+                selected = countryOfOrigin != null,
+                onClick = { onOpenPicker(LibraryPicker.COUNTRY) },
+            )
+            BrowseFilterPill(
                 label = "Year",
                 value = yearOptions.labelFor(year),
                 selected = year != null,
                 onClick = { onOpenPicker(LibraryPicker.YEAR) },
-            )
-            BrowseFilterPill(
-                label = "Sort",
-                value = LibrarySortOptions.labelFor(sort),
-                selected = sort != LIBRARY_SORT_LIST_ORDER,
-                onClick = onOpenOptions,
             )
             BrowseIconFilterPill(
                 contentDescription = "Library options",
@@ -461,8 +532,11 @@ internal fun LibraryConnectPrompt(
 internal fun LibraryPager(
     sections: List<LibrarySection>,
     query: String,
+    genres: Set<String>,
+    tags: Set<String>,
     format: String?,
     publishingStatus: String?,
+    countryOfOrigin: String?,
     year: String?,
     sort: String,
     viewMode: MediaViewMode,
@@ -497,21 +571,30 @@ internal fun LibraryPager(
     var pageScrollOffsets by remember(sections.size) { mutableStateOf(List(sections.size) { 0 }) }
     var pageScrollRequestOffsets by remember(sections.size) { mutableStateOf(List<Int?>(sections.size) { null }) }
     var pageScrollRequestTokens by remember(sections.size) { mutableStateOf(List(sections.size) { 0 }) }
-    val visibleSections = remember(sections, query, format, publishingStatus, year, sort) {
+    val visibleSections = remember(sections, query, genres, tags, format, publishingStatus, countryOfOrigin, year, sort) {
         sections.map { section ->
             section.copy(
                 items = section.items
                     .filterLibraryItems(
                         query = query,
+                        genres = genres,
+                        tags = tags,
                         format = format,
                         publishingStatus = publishingStatus,
+                        countryOfOrigin = countryOfOrigin,
                         year = year,
                     )
                     .sortLibraryItems(sort),
             )
         }
     }
-    val filtersActive = query.isNotBlank() || format != null || publishingStatus != null || year != null
+    val filtersActive = query.isNotBlank() ||
+        genres.isNotEmpty() ||
+        tags.isNotEmpty() ||
+        format != null ||
+        publishingStatus != null ||
+        countryOfOrigin != null ||
+        year != null
     val currentPage = pagerState.currentPage.coerceIn(0, sections.lastIndex)
     val targetPage = pagerState.targetPage.coerceIn(0, sections.lastIndex)
     val currentScrollOffsetPx = pageScrollOffsets.getOrElse(currentPage) { 0 }
@@ -726,6 +809,127 @@ internal fun LibraryPager(
 
 private val LibraryContentPadding = 18.dp
 
+@Composable
+internal fun LibraryGenreDialog(
+    selectedGenres: Set<String>,
+    onGenreSelected: (String, Boolean) -> Unit,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        TankobunDialogSurface(fillMaxHeightFraction = 0.78f, scrollable = false) {
+            TankobunDialogHeader(title = "Genres", onDismiss = onDismiss)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                FlowRowCompat {
+                    BrowseGenres.forEach { genre ->
+                        TankobunChip(
+                            selected = genre in selectedGenres,
+                            onClick = { onGenreSelected(genre, genre !in selectedGenres) },
+                            label = {
+                                Text(genre, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            },
+                        )
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onClear) {
+                    Text("Clear")
+                }
+                Spacer(Modifier.weight(1f))
+                TankobunActionButton(label = "Apply", onClick = onDismiss)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun LibraryTagDialog(
+    availableTags: List<AnilistMediaTag>,
+    selectedTags: Set<String>,
+    onTagSelected: (String, Boolean) -> Unit,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    val visibleTags = availableTags.visibleTags(query)
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        TankobunDialogSurface(fillMaxHeightFraction = 0.82f, scrollable = false) {
+            TankobunDialogHeader(title = "Tags", onDismiss = onDismiss)
+            TankobunSearchField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = "Find a tag",
+                showSearchAction = false,
+            )
+            if (availableTags.isEmpty()) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        "Tags will appear here after the next AniList library sync.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    FlowRowCompat {
+                        visibleTags.forEach { tag ->
+                            TankobunChip(
+                                selected = tag.name in selectedTags,
+                                onClick = { onTagSelected(tag.name, tag.name !in selectedTags) },
+                                label = {
+                                    Text(
+                                        tag.name,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onClear) {
+                    Text("Clear")
+                }
+                Spacer(Modifier.weight(1f))
+                TankobunActionButton(label = "Apply", onClick = onDismiss)
+            }
+        }
+    }
+}
+
+internal fun libraryTagOptions(
+    sections: List<LibrarySection>,
+    anilistTags: List<AnilistMediaTag>,
+): List<AnilistMediaTag> {
+    val tagsInLibrary = sections
+        .flatMap { section -> section.items }
+        .flatMap { item -> item.media.tags }
+        .distinctBy { it.lowercase(Locale.ROOT) }
+        .sortedWith(String.CASE_INSENSITIVE_ORDER)
+    val knownTagsByName = anilistTags.associateBy { it.name.lowercase(Locale.ROOT) }
+    return tagsInLibrary.map { tagName ->
+        knownTagsByName[tagName.lowercase(Locale.ROOT)] ?: AnilistMediaTag(
+            name = tagName,
+            category = null,
+            isAdult = false,
+        )
+    }
+}
+
 internal fun libraryFormatOptions(sections: List<LibrarySection>): List<BrowseOption> =
     listOf(BrowseOption("Any", null)) +
         sections.flatMap { section -> section.items }
@@ -742,6 +946,17 @@ internal fun libraryStatusOptions(sections: List<LibrarySection>): List<BrowseOp
             .sorted()
             .map { BrowseOption(it.statusLabel(), it) }
 
+internal fun libraryCountryOptions(sections: List<LibrarySection>): List<BrowseOption> {
+    val countriesInLibrary = sections
+        .flatMap { section -> section.items }
+        .mapNotNull { it.media.countryOfOrigin }
+        .toSet()
+    val countryOptions = BrowseCountryOptions.filter { option ->
+        option.value == null || option.value in countriesInLibrary
+    }
+    return if (countryOptions.size > 1) countryOptions else BrowseCountryOptions
+}
+
 internal fun libraryYearOptions(sections: List<LibrarySection>): List<BrowseOption> =
     listOf(BrowseOption("Any", null)) +
         sections.flatMap { section -> section.items }
@@ -752,18 +967,28 @@ internal fun libraryYearOptions(sections: List<LibrarySection>): List<BrowseOpti
 
 internal fun List<LibraryItem>.filterLibraryItems(
     query: String,
+    genres: Set<String>,
+    tags: Set<String>,
     format: String?,
     publishingStatus: String?,
+    countryOfOrigin: String?,
     year: String?,
 ): List<LibraryItem> {
     val normalizedQuery = query.trim().lowercase()
     return filter { item ->
         val media = item.media
         val queryMatches = normalizedQuery.isBlank() || media.librarySearchText().contains(normalizedQuery)
+        val genreMatches = genres.isEmpty() || genres.any { genre ->
+            media.genres.any { it.equals(genre, ignoreCase = true) }
+        }
+        val tagMatches = tags.isEmpty() || tags.any { tag ->
+            media.tags.any { it.equals(tag, ignoreCase = true) }
+        }
         val formatMatches = format == null || media.format == format
         val statusMatches = publishingStatus == null || media.status == publishingStatus
+        val countryMatches = countryOfOrigin == null || media.countryOfOrigin == countryOfOrigin
         val yearMatches = year == null || media.startDateYear?.toString() == year
-        queryMatches && formatMatches && statusMatches && yearMatches
+        queryMatches && genreMatches && tagMatches && formatMatches && statusMatches && countryMatches && yearMatches
     }
 }
 
@@ -783,5 +1008,7 @@ internal fun AnilistMedia.librarySearchText(): String =
         title.english?.let(::add)
         title.native?.let(::add)
         genres.forEach(::add)
+        tags.forEach(::add)
+        countryOfOrigin?.let { add(BrowseCountryOptions.labelFor(it)) }
         synonyms.forEach(::add)
     }.joinToString(" ").lowercase()

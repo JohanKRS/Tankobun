@@ -114,6 +114,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -170,6 +171,9 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -229,7 +233,6 @@ import com.tankobun.app.ui.shell.*
 @Composable
 internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewModel) {
     val context = LocalContext.current
-    var selectedTab by remember { mutableIntStateOf(0) }
     var sourceSettingsQuery by remember { mutableStateOf("") }
     var launchedInstallRequest by remember { mutableStateOf<ExtensionInstallRequest?>(null) }
     val installLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -309,243 +312,367 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
         requestExtensionUninstall(context, packageName)
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    val pagerState = rememberPagerState(pageCount = { 2 })
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    var sourceHeaderHeightPx by remember { mutableIntStateOf(0) }
+    var tabHeaderHeightPx by remember { mutableIntStateOf(0) }
+    var pageScrollOffsets by remember { mutableStateOf(List(2) { 0 }) }
+    var pageScrollRequestOffsets by remember { mutableStateOf(List<Int?>(2) { null }) }
+    var pageScrollRequestTokens by remember { mutableStateOf(List(2) { 0 }) }
+    val currentPage = pagerState.currentPage.coerceIn(0, 1)
+    val targetPage = pagerState.targetPage.coerceIn(0, 1)
+    val currentScrollOffsetPx = pageScrollOffsets.getOrElse(currentPage) { 0 }
+    val targetScrollOffsetPx = pageScrollOffsets.getOrElse(targetPage) { 0 }
+    val currentHeaderIsPinned = sourceHeaderHeightPx > 0 && currentScrollOffsetPx >= sourceHeaderHeightPx
+    val scrollOffsetForHeader = if (
+        pagerState.isScrollInProgress &&
+        targetPage != currentPage &&
+        currentHeaderIsPinned
     ) {
-        item {
-            SourceSettingsSummary(
-                state = state,
-                repositoryCount = state.availableExtensions.size,
-                selectedTab = selectedTab,
-                onSelectTab = { selectedTab = it },
-                onRefreshInstalled = viewModel::refreshInstalledSources,
-                onRefreshRepository = viewModel::refreshExtensionIndex,
-            )
-        }
-        item {
-            SourceSettingsSearchField(
-                query = sourceSettingsQuery,
-                selectedTab = selectedTab,
-                onQueryChange = { sourceSettingsQuery = it },
-            )
-        }
-        state.message?.let { message ->
-            item {
-                TankobunMessageBanner(message)
-            }
-        }
+        maxOf(currentScrollOffsetPx, targetScrollOffsetPx)
+    } else {
+        currentScrollOffsetPx
+    }
+    val headerCollapsePx = scrollOffsetForHeader.coerceAtMost(sourceHeaderHeightPx)
+    val headerTranslationY = -headerCollapsePx.toFloat()
+    val sharedHeaderHeight = with(density) { (sourceHeaderHeightPx + tabHeaderHeightPx).toDp() }
+    var lastObservedPage by remember { mutableIntStateOf(currentPage) }
 
-        if (selectedTab == 0) {
-            item {
-                Text(
-                    "Installed",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+    fun requestPageScrollOffset(index: Int, offsetPx: Int) {
+        if (sourceHeaderHeightPx <= 0) return
+        val requestedOffsetPx = offsetPx.coerceAtLeast(0)
+        pageScrollOffsets = pageScrollOffsets.toMutableList().also { offsets ->
+            if (index in offsets.indices) offsets[index] = requestedOffsetPx
+        }
+        pageScrollRequestOffsets = pageScrollRequestOffsets.toMutableList().also { offsets ->
+            if (index in offsets.indices) offsets[index] = requestedOffsetPx
+        }
+        pageScrollRequestTokens = pageScrollRequestTokens.toMutableList().also { tokens ->
+            if (index in tokens.indices) tokens[index] = tokens[index] + 1
+        }
+    }
+
+    fun pinPageAtContentTop(index: Int) {
+        requestPageScrollOffset(index = index, offsetPx = sourceHeaderHeightPx)
+    }
+
+    LaunchedEffect(targetPage, sourceHeaderHeightPx) {
+        if (targetPage != currentPage) {
+            if (currentHeaderIsPinned) {
+                pinPageAtContentTop(targetPage)
+            } else {
+                requestPageScrollOffset(
+                    index = targetPage,
+                    offsetPx = currentScrollOffsetPx.coerceAtMost(sourceHeaderHeightPx),
                 )
             }
+        }
+    }
 
-            if (state.allInstalledSources.isEmpty()) {
-                item {
-                    Text("No installed Tachiyomi-compatible source extensions found.")
-                }
-            } else if (sourceGroups.isEmpty()) {
-                item {
-                    Text(
-                        "No installed sources match this search and language filter.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                items(sourceGroups, key = { it.first }) { (language, sources) ->
-                    SourceLanguageGroupSection(
-                        language = language,
-                        sources = sources,
-                        state = state,
-                        repositoryByPackage = repositoryByPackage,
-                        onSourceEnabledChange = viewModel::setSourceEnabled,
-                        onGroupEnabledChange = viewModel::setSourcesEnabled,
-                        installingPackageName = state.installingExtensionPackageName,
-                        iconUrlFor = viewModel::extensionIconUrl,
-                        onInstall = { entry -> requestExtensionInstall(context, viewModel, entry) },
-                        onUninstall = launchUninstall,
-                    )
-                }
-            }
+    LaunchedEffect(currentPage, sourceHeaderHeightPx) {
+        val previousPage = lastObservedPage
+        val previousPageWasPinned = sourceHeaderHeightPx > 0 &&
+            pageScrollOffsets.getOrElse(previousPage) { 0 } >= sourceHeaderHeightPx
+        lastObservedPage = currentPage
+        if (previousPage != currentPage && previousPageWasPinned) {
+            pinPageAtContentTop(currentPage)
+        }
+    }
 
-        } else {
-            item {
-                Text("Extension Repository", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = state.extensionRepositoryUrl,
-                    onValueChange = viewModel::setExtensionRepositoryUrl,
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("User-provided repository index URL") },
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TankobunActionButton(label = "Load", icon = Icons.Default.Refresh, onClick = viewModel::refreshExtensionIndex)
-                    TankobunActionButton(
-                        label = "Rescan",
-                        icon = Icons.Default.Tune,
-                        onClick = viewModel::refreshInstalledSources,
-                        filled = false,
-                    )
-                }
-                if (state.availableExtensions.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "${state.availableExtensions.size} extensions loaded",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            if (repositoryEntries.isEmpty()) {
-                item {
-                    Text(
-                        "Load a repository index to browse installable extensions.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                if (visibleRepositoryEntries.isEmpty()) {
-                    item {
-                        Text(
-                            "No repository extensions match this search and language filter.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+    Box(
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        val pageContentPadding = PaddingValues(
+            start = SourceSettingsContentPadding,
+            top = sharedHeaderHeight + SourceSettingsContentPadding,
+            end = SourceSettingsContentPadding,
+            bottom = SourceSettingsContentPadding,
+        )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+        ) { page ->
+            val listState = rememberLazyListState()
+            LaunchedEffect(listState) {
+                snapshotFlow {
+                    if (listState.firstVisibleItemIndex == 0) {
+                        listState.firstVisibleItemScrollOffset
+                    } else {
+                        Int.MAX_VALUE
                     }
                 }
-                items(visibleRepositoryEntries, key = { "${it.packageName}:${it.versionCode}" }) { extension ->
-                    ExtensionRepositoryRow(
-                        extension = extension,
-                        installedSources = installedByPackage[extension.packageName].orEmpty(),
-                        iconUrl = viewModel.extensionIconUrl(extension),
-                        installing = state.installingExtensionPackageName == extension.packageName,
-                        onInstall = { requestExtensionInstall(context, viewModel, extension) },
-                        onUninstall = { launchUninstall(extension.packageName) },
-                    )
-                }
+                    .distinctUntilChanged()
+                    .collect { scrollOffset ->
+                        pageScrollOffsets = pageScrollOffsets.toMutableList().also { offsets ->
+                            if (page in offsets.indices) offsets[page] = scrollOffset
+                        }
+                    }
             }
-        }
-    }
-}
-
-@Composable
-internal fun SourceSettingsSummary(
-    state: TankobunUiState,
-    repositoryCount: Int,
-    selectedTab: Int,
-    onSelectTab: (Int) -> Unit,
-    onRefreshInstalled: () -> Unit,
-    onRefreshRepository: () -> Unit,
-) {
-    TankobunPanel(
-        modifier = Modifier.fillMaxWidth(),
-        color = LocalTankobunStyle.current.colors.panel,
-        contentColor = LocalTankobunStyle.current.colors.panelContent,
-        tonalElevation = 1.dp,
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Sources", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(
-                        "${state.installedSources.size} active / ${state.allInstalledSources.size} installed / $repositoryCount in repository",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                TankobunIconActionButton(
-                    icon = Icons.Default.Refresh,
-                    contentDescription = "Refresh installed sources",
-                    onClick = onRefreshInstalled,
-                )
-                TankobunIconActionButton(
-                    icon = Icons.Default.Download,
-                    contentDescription = "Load extension repository",
-                    onClick = onRefreshRepository,
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.Bottom,
+            LaunchedEffect(
+                pageScrollRequestTokens.getOrElse(page) { 0 },
+                pageScrollRequestOffsets.getOrNull(page),
             ) {
-                listOf("Installed", "Repository").forEachIndexed { index, label ->
-                    SourceSettingsTabButton(
-                        label = label,
-                        selected = selectedTab == index,
-                        onClick = { onSelectTab(index) },
-                    )
+                val targetOffset = pageScrollRequestOffsets.getOrNull(page) ?: return@LaunchedEffect
+                if (pageScrollRequestTokens.getOrElse(page) { 0 } > 0) {
+                    listState.scrollToItem(0, targetOffset)
                 }
+            }
+
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = pageContentPadding,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (page == 0) {
+                    if (state.allInstalledSources.isEmpty()) {
+                        item(key = "installed-empty") {
+                            TankobunEmptyState(title = "No installed Tachiyomi-compatible source extensions found.")
+                        }
+                    } else if (sourceGroups.isEmpty()) {
+                        item(key = "installed-filter-empty") {
+                            TankobunEmptyState(title = "No installed sources match this search and language filter.")
+                        }
+                    } else {
+                        items(sourceGroups, key = { it.first }) { (language, sources) ->
+                            SourceLanguageGroupSection(
+                                language = language,
+                                sources = sources,
+                                state = state,
+                                repositoryByPackage = repositoryByPackage,
+                                onSourceEnabledChange = viewModel::setSourceEnabled,
+                                onGroupEnabledChange = viewModel::setSourcesEnabled,
+                                installingPackageName = state.installingExtensionPackageName,
+                                iconUrlFor = viewModel::extensionIconUrl,
+                                onInstall = { entry -> requestExtensionInstall(context, viewModel, entry) },
+                                onUninstall = launchUninstall,
+                            )
+                        }
+                    }
+                } else {
+                    item(key = "repository-controls") {
+                        SourceRepositoryControls(
+                            repositoryUrl = state.extensionRepositoryUrl,
+                            repositoryCount = state.availableExtensions.size,
+                            onRepositoryUrlChange = viewModel::setExtensionRepositoryUrl,
+                            onRefreshRepository = viewModel::refreshExtensionIndex,
+                            onRefreshInstalled = viewModel::refreshInstalledSources,
+                        )
+                    }
+                    if (repositoryEntries.isEmpty()) {
+                        item(key = "repository-empty") {
+                            TankobunEmptyState(title = "Load a repository index to browse installable extensions.")
+                        }
+                    } else {
+                        if (visibleRepositoryEntries.isEmpty()) {
+                            item(key = "repository-filter-empty") {
+                                TankobunEmptyState(title = "No repository extensions match this search and language filter.")
+                            }
+                        }
+                        items(visibleRepositoryEntries, key = { "${it.packageName}:${it.versionCode}" }) { extension ->
+                            ExtensionRepositoryRow(
+                                extension = extension,
+                                installedSources = installedByPackage[extension.packageName].orEmpty(),
+                                iconUrl = viewModel.extensionIconUrl(extension),
+                                installing = state.installingExtensionPackageName == extension.packageName,
+                                onInstall = { requestExtensionInstall(context, viewModel, extension) },
+                                onUninstall = { launchUninstall(extension.packageName) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer { translationY = headerTranslationY }
+                .background(LocalTankobunStyle.current.colors.backdrop),
+        ) {
+            Column(
+                modifier = Modifier.onSizeChanged { sourceHeaderHeightPx = it.height },
+            ) {
+                Spacer(Modifier.height(SourceSettingsContentPadding))
+                SourceSettingsHeader(
+                    state = state,
+                    query = sourceSettingsQuery,
+                    selectedTab = currentPage,
+                    onQueryChange = { sourceSettingsQuery = it },
+                    onRefreshInstalled = viewModel::refreshInstalledSources,
+                    onRefreshRepository = viewModel::refreshExtensionIndex,
+                    modifier = Modifier.padding(horizontal = SourceSettingsContentPadding),
+                )
+                state.message?.let { message ->
+                    Spacer(Modifier.height(12.dp))
+                    Box(Modifier.padding(horizontal = SourceSettingsContentPadding)) {
+                        TankobunMessageBanner(message)
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+            Column(
+                modifier = Modifier.onSizeChanged { tabHeaderHeightPx = it.height },
+            ) {
+                SourceSettingsTabRow(
+                    selectedTab = currentPage,
+                    installedCount = visibleInstalledSourceList.size,
+                    repositoryCount = visibleRepositoryEntries.size,
+                    onSelectTab = { index ->
+                        if (currentHeaderIsPinned) {
+                            pinPageAtContentTop(index)
+                        } else {
+                            requestPageScrollOffset(
+                                index = index,
+                                offsetPx = currentScrollOffsetPx.coerceAtMost(sourceHeaderHeightPx),
+                            )
+                        }
+                        scope.launch { pagerState.animateScrollToPage(index) }
+                    },
+                )
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+                )
             }
         }
     }
 }
 
 @Composable
-internal fun SourceSettingsTabButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .width(116.dp)
-            .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = if (selected) {
-                LocalTankobunStyle.current.colors.accent
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Box(
-            modifier = Modifier
-                .width(74.dp)
-                .height(3.dp)
-                .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.pill))
-                .background(
-                    if (selected) {
-                        LocalTankobunStyle.current.colors.accent
-                    } else {
-                        Color.Transparent
-                    },
-                ),
-        )
-    }
-}
-
-@Composable
-internal fun SourceSettingsSearchField(
+internal fun SourceSettingsHeader(
+    state: TankobunUiState,
     query: String,
     selectedTab: Int,
     onQueryChange: (String) -> Unit,
+    onRefreshInstalled: () -> Unit,
+    onRefreshRepository: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    TankobunSearchField(
-        value = query,
-        onValueChange = onQueryChange,
-        placeholder = if (selectedTab == 0) "Search installed sources" else "Search extensions",
-        showSearchAction = false,
-    )
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Source extensions",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${state.installedSources.size} active / ${state.allInstalledSources.size} installed",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            TankobunIconActionButton(
+                icon = Icons.Default.Refresh,
+                contentDescription = "Refresh installed sources",
+                onClick = onRefreshInstalled,
+            )
+            TankobunIconActionButton(
+                icon = Icons.Default.Download,
+                contentDescription = "Load extension repository",
+                onClick = onRefreshRepository,
+            )
+        }
+        TankobunSearchField(
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = if (selectedTab == 0) "Search installed sources" else "Search extensions",
+            showSearchAction = false,
+        )
+    }
 }
+
+@Composable
+internal fun SourceSettingsTabRow(
+    selectedTab: Int,
+    installedCount: Int,
+    repositoryCount: Int,
+    onSelectTab: (Int) -> Unit,
+) {
+    PrimaryScrollableTabRow(
+        selectedTabIndex = selectedTab,
+        edgePadding = 0.dp,
+        containerColor = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.primary,
+    ) {
+        listOf("Installed" to installedCount, "Repository" to repositoryCount).forEachIndexed { index, (label, count) ->
+            Tab(
+                selected = selectedTab == index,
+                onClick = { onSelectTab(index) },
+                text = {
+                    val tabTextColor = LocalContentColor.current
+                    Text(
+                        buildAnnotatedString {
+                            append(label)
+                            append(" ")
+                            pushStyle(SpanStyle(color = tabTextColor.copy(alpha = 0.74f)))
+                            append(count.toString())
+                            pop()
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+internal fun SourceRepositoryControls(
+    repositoryUrl: String,
+    repositoryCount: Int,
+    onRepositoryUrlChange: (String) -> Unit,
+    onRefreshRepository: () -> Unit,
+    onRefreshInstalled: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            "Extension repository",
+            style = LocalTankobunStyle.current.typography.sectionLabel,
+            color = LocalTankobunStyle.current.colors.accent,
+        )
+        OutlinedTextField(
+            value = repositoryUrl,
+            onValueChange = onRepositoryUrlChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Repository index URL") },
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            TankobunActionButton(label = "Load", icon = Icons.Default.Refresh, onClick = onRefreshRepository)
+            TankobunActionButton(
+                label = "Rescan",
+                icon = Icons.Default.Tune,
+                onClick = onRefreshInstalled,
+                filled = false,
+            )
+        }
+        if (repositoryCount > 0) {
+            Text(
+                "$repositoryCount extensions loaded",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private val SourceSettingsContentPadding = 18.dp
 
 @Composable
 internal fun SourceLanguageGroupSection(

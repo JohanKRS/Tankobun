@@ -221,6 +221,12 @@ object AnilistQueries {
                   endDate { year }
                   siteUrl
                   genres
+                  tags {
+                    name
+                    rank
+                    isMediaSpoiler
+                    isGeneralSpoiler
+                  }
                   synonyms
                   isAdult
                   updatedAt
@@ -307,6 +313,12 @@ object AnilistQueries {
                   endDate { year }
                   siteUrl
                   genres
+                  tags {
+                    name
+                    rank
+                    isMediaSpoiler
+                    isGeneralSpoiler
+                  }
                   synonyms
                   isAdult
                   updatedAt
@@ -345,6 +357,12 @@ object AnilistQueries {
                   endDate { year }
                   siteUrl
                   genres
+                  tags {
+                    name
+                    rank
+                    isMediaSpoiler
+                    isGeneralSpoiler
+                  }
                   synonyms
                   isAdult
                   updatedAt
@@ -389,6 +407,12 @@ object AnilistQueries {
                   endDate { year }
                   siteUrl
                   genres
+                  tags {
+                    name
+                    rank
+                    isMediaSpoiler
+                    isGeneralSpoiler
+                  }
                   synonyms
                   isAdult
                   updatedAt
@@ -433,6 +457,12 @@ object AnilistQueries {
                   endDate { year }
                   siteUrl
                   genres
+                  tags {
+                    name
+                    rank
+                    isMediaSpoiler
+                    isGeneralSpoiler
+                  }
                   synonyms
                   isAdult
                   updatedAt

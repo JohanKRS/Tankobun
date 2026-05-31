@@ -525,6 +525,7 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
             if (state.anilistAutoSaveTrackingChanges) add("Auto-save edits")
             if (state.anilistAutoSyncReaderProgress) add("Auto progress")
         }.joinToString(" / ")
+        SettingsRoute.CUSTOM_LISTS -> "${state.anilistCustomLists.size} list${if (state.anilistCustomLists.size == 1) "" else "s"}"
         SettingsRoute.BACKUPS -> "${state.libraryItems.count { it.media.idMal != null }} / ${state.libraryItems.size} MAL matched"
         SettingsRoute.ABOUT -> "Tutorial and notices"
         SettingsRoute.SOURCES -> "${state.installedSources.size} active / ${state.allInstalledSources.size} installed"

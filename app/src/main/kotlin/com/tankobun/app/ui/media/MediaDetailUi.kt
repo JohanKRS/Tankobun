@@ -1222,10 +1222,35 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
             Text("Private", style = MaterialTheme.typography.bodyMedium)
             Switch(checked = state.trackingPrivate, onCheckedChange = viewModel::setTrackingPrivate)
             Spacer(Modifier.weight(1f))
+            val canSaveTracking = state.loggedIn &&
+                !state.trackingSaveInProgress &&
+                (state.selectedListEntry == null || state.trackingDirty || state.trackingSaveFailed)
+            val actionLabel = when {
+                state.trackingSaveInProgress -> "Saving..."
+                state.trackingSaveFailed -> "Retry save"
+                state.selectedListEntry == null -> "Track manga"
+                state.trackingDirty -> "Save AniList"
+                else -> "Saved"
+            }
+            val actionIcon = when {
+                state.trackingSaveInProgress || state.trackingSaveFailed -> Icons.Default.Refresh
+                else -> Icons.Default.Check
+            }
             TankobunActionButton(
-                label = if (state.selectedListEntry == null) "Track manga" else "Save AniList",
+                label = actionLabel,
+                icon = actionIcon,
                 onClick = viewModel::saveTracking,
-                enabled = state.loggedIn,
+                enabled = canSaveTracking,
+                disabledContainerColor = if (state.trackingSaveInProgress) {
+                    LocalTankobunStyle.current.colors.selectedChip
+                } else {
+                    null
+                },
+                disabledContentColor = if (state.trackingSaveInProgress) {
+                    LocalTankobunStyle.current.colors.selectedChipContent
+                } else {
+                    null
+                },
             )
         }
         if (!state.loggedIn) {

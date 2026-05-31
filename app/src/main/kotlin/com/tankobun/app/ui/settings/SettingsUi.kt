@@ -400,6 +400,7 @@ internal fun SettingsRouteIcon(route: SettingsRoute) {
                     SettingsRoute.READER -> Icons.AutoMirrored.Filled.MenuBook
                     SettingsRoute.DOWNLOADS -> Icons.Default.Download
                     SettingsRoute.ANILIST -> Icons.Default.Link
+                    SettingsRoute.CUSTOM_LISTS -> Icons.AutoMirrored.Filled.LibraryBooks
                     SettingsRoute.BACKUPS -> Icons.AutoMirrored.Filled.LibraryBooks
                     SettingsRoute.ABOUT -> Icons.Default.Settings
                     SettingsRoute.SOURCES -> Icons.Default.Download
@@ -628,12 +629,211 @@ internal fun SettingsDetailContent(
                 enabled = state.anilistAutoSyncReaderProgress,
             )
         }
+        SettingsRoute.CUSTOM_LISTS -> CustomListsSettingsScreen(state, viewModel, modifier)
         SettingsRoute.BACKUPS -> BackupsSettingsScreen(state, viewModel, modifier)
         SettingsRoute.ABOUT -> AboutSettingsScreen(
             onReplayOnboarding = viewModel::showOnboarding,
             modifier = modifier,
         )
         SettingsRoute.SOURCES -> SourcesSettingsScreen(state, viewModel)
+    }
+}
+
+@Composable
+internal fun CustomListsSettingsScreen(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    modifier: Modifier = Modifier,
+) {
+    var creatingList by remember { mutableStateOf(false) }
+    var renamingList by remember { mutableStateOf<String?>(null) }
+    var deletingList by remember { mutableStateOf<String?>(null) }
+    val listCounts = remember(state.libraryItems) {
+        state.libraryItems
+            .flatMap { item -> item.entry.customLists.map { listName -> listName to item.media.id } }
+            .groupBy({ it.first.lowercase(Locale.ROOT) }, { it.second })
+            .mapValues { (_, mediaIds) -> mediaIds.distinct().size }
+    }
+
+    SettingsDetailPanel(
+        title = "Custom Lists",
+        subtitle = "Create, rename, and delete AniList manga custom lists. Manga stay in their normal AniList status lists.",
+        modifier = modifier,
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            TankobunActionButton(
+                label = "New list",
+                enabled = state.loggedIn && !state.busy,
+                onClick = { creatingList = true },
+            )
+            TankobunActionButton(
+                label = "Sync AniList",
+                icon = Icons.Default.Refresh,
+                enabled = state.loggedIn && !state.busy,
+                onClick = viewModel::refreshLibrary,
+                filled = false,
+            )
+        }
+
+        if (!state.loggedIn) {
+            TankobunMessageBanner("Connect AniList before managing custom lists.")
+        }
+
+        if (state.anilistCustomLists.isEmpty()) {
+            TankobunEmptyState(title = "No custom lists yet.")
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.anilistCustomLists.forEach { listName ->
+                    CustomListSettingsRow(
+                        name = listName,
+                        count = listCounts[listName.lowercase(Locale.ROOT)] ?: 0,
+                        enabled = state.loggedIn && !state.busy,
+                        onRename = { renamingList = listName },
+                        onDelete = { deletingList = listName },
+                    )
+                }
+            }
+        }
+    }
+
+    if (creatingList) {
+        CustomListNameDialog(
+            title = "New Custom List",
+            confirmLabel = "Create",
+            initialName = "",
+            onConfirm = { name ->
+                viewModel.createAnilistCustomList(name)
+                creatingList = false
+            },
+            onDismiss = { creatingList = false },
+        )
+    }
+
+    renamingList?.let { listName ->
+        CustomListNameDialog(
+            title = "Rename Custom List",
+            confirmLabel = "Rename",
+            initialName = listName,
+            onConfirm = { name ->
+                viewModel.renameAnilistCustomList(listName, name)
+                renamingList = null
+            },
+            onDismiss = { renamingList = null },
+        )
+    }
+
+    deletingList?.let { listName ->
+        DeleteCustomListDialog(
+            name = listName,
+            count = listCounts[listName.lowercase(Locale.ROOT)] ?: 0,
+            onConfirm = {
+                viewModel.deleteAnilistCustomList(listName)
+                deletingList = null
+            },
+            onDismiss = { deletingList = null },
+        )
+    }
+}
+
+@Composable
+internal fun CustomListSettingsRow(
+    name: String,
+    count: Int,
+    enabled: Boolean,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    TankobunPanel(
+        modifier = Modifier.fillMaxWidth(),
+        color = LocalTankobunStyle.current.colors.panel,
+        contentColor = LocalTankobunStyle.current.colors.panelContent,
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "$count manga",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(enabled = enabled, onClick = onRename) {
+                Text("Rename")
+            }
+            TankobunIconActionButton(
+                icon = Icons.Default.Delete,
+                contentDescription = "Delete custom list $name",
+                enabled = enabled,
+                onClick = onDelete,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun CustomListNameDialog(
+    title: String,
+    confirmLabel: String,
+    initialName: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember(initialName) { mutableStateOf(initialName) }
+    TankobunDialog(onDismiss = onDismiss) {
+        TankobunDialogHeader(title = title, onDismiss = onDismiss)
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("List name") },
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+            Spacer(Modifier.weight(1f))
+            TankobunActionButton(
+                label = confirmLabel,
+                enabled = name.trim().isNotBlank(),
+                onClick = { onConfirm(name) },
+            )
+        }
+    }
+}
+
+@Composable
+internal fun DeleteCustomListDialog(
+    name: String,
+    count: Int,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    TankobunDialog(onDismiss = onDismiss) {
+        TankobunDialogHeader(title = "Delete Custom List", onDismiss = onDismiss)
+        Text(
+            "Delete \"$name\" and remove it from $count manga? The manga will stay in their normal AniList status lists.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+            Spacer(Modifier.weight(1f))
+            TankobunActionButton(label = "Delete", icon = Icons.Default.Delete, onClick = onConfirm)
+        }
     }
 }
 

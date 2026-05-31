@@ -12,8 +12,12 @@ import com.tankobun.core.model.MediaStatus
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -471,8 +475,35 @@ private fun kotlinx.serialization.json.JsonObject.stringOrNull(name: String): St
     this[name]?.jsonPrimitive?.content
 
 private fun kotlinx.serialization.json.JsonObject.stringArray(name: String): List<String> =
-    this[name]?.let { value ->
-        value.takeIf { it !is kotlinx.serialization.json.JsonNull }
-            ?.let { it as? kotlinx.serialization.json.JsonArray }
-            ?.mapNotNull { it.jsonPrimitive.content }
-    }.orEmpty()
+    this[name]?.takeUnless { it is JsonNull }?.stringValues().orEmpty()
+
+private fun JsonElement.stringValues(): List<String> =
+    when (this) {
+        is JsonArray -> flatMap { it.stringValues() }
+        is JsonPrimitive -> listOf(content.trim()).filter { it.isNotBlank() }
+        is JsonObject -> objectStringValues()
+        else -> emptyList()
+    }
+
+private fun JsonObject.objectStringValues(): List<String> {
+    stringOrNull("name")?.trim()?.takeIf { it.isNotBlank() }?.let { name ->
+        return if (namedObjectEnabled()) listOf(name) else emptyList()
+    }
+    return entries.mapNotNull { (key, value) ->
+        when (value) {
+            is JsonPrimitive -> when (value.booleanOrNull) {
+                true -> key
+                false -> null
+                null -> value.content.trim().takeIf { it.isNotBlank() }
+            }
+            is JsonObject -> value.stringOrNull("name")?.trim()?.takeIf { it.isNotBlank() }
+            else -> null
+        }
+    }
+}
+
+private fun JsonObject.namedObjectEnabled(): Boolean {
+    val explicitState = listOf("enabled", "selected", "value", "checked")
+        .firstNotNullOfOrNull { field -> (this[field]?.takeUnless { it is JsonNull } as? JsonPrimitive)?.booleanOrNull }
+    return explicitState != false
+}

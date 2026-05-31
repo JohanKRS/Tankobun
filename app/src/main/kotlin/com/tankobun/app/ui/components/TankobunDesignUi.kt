@@ -213,8 +213,14 @@ internal fun TankobunActionButton(
     icon: ImageVector? = null,
     enabled: Boolean = true,
     filled: Boolean = true,
+    containerColor: Color? = null,
+    contentColor: Color? = null,
+    disabledContainerColor: Color? = null,
+    disabledContentColor: Color? = null,
 ) {
     val shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control)
+    val resolvedContainerColor = containerColor ?: LocalTankobunStyle.current.colors.action
+    val resolvedContentColor = contentColor ?: LocalTankobunStyle.current.colors.actionContent
     val content: @Composable () -> Unit = {
         icon?.let {
             Icon(it, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -230,8 +236,10 @@ internal fun TankobunActionButton(
             shape = shape,
             contentPadding = PaddingValues(horizontal = 14.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = LocalTankobunStyle.current.colors.action,
-                contentColor = LocalTankobunStyle.current.colors.actionContent,
+                containerColor = resolvedContainerColor,
+                contentColor = resolvedContentColor,
+                disabledContainerColor = disabledContainerColor ?: ButtonDefaults.buttonColors().disabledContainerColor,
+                disabledContentColor = disabledContentColor ?: ButtonDefaults.buttonColors().disabledContentColor,
             ),
             content = { content() },
         )

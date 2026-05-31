@@ -240,6 +240,7 @@ internal enum class SettingsRoute {
     READER,
     DOWNLOADS,
     ANILIST,
+    CUSTOM_LISTS,
     BACKUPS,
     ABOUT,
     SOURCES,
@@ -256,6 +257,7 @@ internal val SettingsDetailRoutes = listOf(
     SettingsRoute.SOURCES,
     SettingsRoute.DOWNLOADS,
     SettingsRoute.ANILIST,
+    SettingsRoute.CUSTOM_LISTS,
     SettingsRoute.BACKUPS,
     SettingsRoute.ABOUT,
 )
@@ -270,6 +272,7 @@ internal fun SettingsRoute.settingsTitle(): String =
         SettingsRoute.READER -> "Reader"
         SettingsRoute.DOWNLOADS -> "Downloads"
         SettingsRoute.ANILIST -> "AniList"
+        SettingsRoute.CUSTOM_LISTS -> "Custom Lists"
         SettingsRoute.BACKUPS -> "Backups"
         SettingsRoute.ABOUT -> "About"
         SettingsRoute.SOURCES -> "Sources"
@@ -308,6 +311,7 @@ internal const val QuickDrawerElasticLimitDp = 36f
 internal enum class LibraryPicker {
     FORMAT,
     STATUS,
+    COUNTRY,
     YEAR,
 }
 
@@ -1266,24 +1270,15 @@ internal fun QuickDrawer(
                         }
                     }
 
-                    QuickDrawerSection(title = "Sync") {
-                        Text(
-                            state.librarySyncedAtEpochMillis.takeIf { it > 0 }?.let { "Library cache: ${cacheAgeLabel(it)}" }
-                                ?: "Library has not synced yet.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        TankobunActionButton(
-                            label = "Sync AniList",
-                            icon = Icons.Default.Refresh,
-                            enabled = state.loggedIn,
-                            onClick = viewModel::refreshLibrary,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-
-                    if (selectedMedia != null) {
-                        QuickDrawerSection(title = "AniList") {
+                    QuickDrawerSection(title = "AniList Tracking") {
+                        if (selectedMedia != null) {
                             AniListTrackingSection(state, viewModel, selectedMedia)
+                        } else {
+                            Text(
+                                "Open a manga to track it here.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
 

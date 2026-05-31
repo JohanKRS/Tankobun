@@ -95,6 +95,7 @@ import java.io.File
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 
 private const val BROWSE_LANDING_SECTION_SIZE = 12
 private const val BROWSE_RESULTS_PAGE_SIZE = 50
@@ -1002,6 +1003,9 @@ class MainViewModel(
                 trackingNotes = if (selected && updateTrackingForm) entry.notes.orEmpty() else state.trackingNotes,
                 trackingPrivate = if (selected && updateTrackingForm) entry.private else state.trackingPrivate,
                 trackingCustomLists = if (selected && updateTrackingForm) entry.customLists.toSet() else state.trackingCustomLists,
+                trackingDirty = if (selected && updateTrackingForm) false else state.trackingDirty,
+                trackingSaveInProgress = if (selected) false else state.trackingSaveInProgress,
+                trackingSaveFailed = if (selected && updateTrackingForm) false else state.trackingSaveFailed,
             )
         }
     }
@@ -1526,6 +1530,9 @@ class MainViewModel(
                 trackingNotes = existingEntry?.notes.orEmpty(),
                 trackingPrivate = existingEntry?.private ?: false,
                 trackingCustomLists = existingEntry?.customLists.orEmpty().toSet(),
+                trackingDirty = false,
+                trackingSaveInProgress = false,
+                trackingSaveFailed = false,
                 selectedSourceManga = null,
                 sourceChapters = emptyList(),
                 latestProgress = null,
@@ -1583,6 +1590,9 @@ class MainViewModel(
                 selectedRecommendationsPage = 0,
                 selectedRecommendationsHasMore = false,
                 recommendationsLoading = false,
+                trackingDirty = false,
+                trackingSaveInProgress = false,
+                trackingSaveFailed = false,
                 selectedSourceManga = null,
                 sourceChapters = emptyList(),
                 latestProgress = null,
@@ -1719,28 +1729,208 @@ class MainViewModel(
         }
     }
 
+    fun createAnilistCustomList(name: String) {
+        val normalizedName = name.trim()
+        if (normalizedName.isBlank()) return
+        val token = container.tokenStore.accessToken()
+        if (token == null) {
+            _state.update { it.copy(message = "Connect AniList before managing custom lists") }
+            return
+        }
+        val currentLists = _state.value.anilistCustomLists.normalizedCustomLists()
+        if (currentLists.any { it.equals(normalizedName, ignoreCase = true) }) {
+            _state.update { it.copy(message = "Custom list already exists") }
+            return
+        }
+        val nextLists = (currentLists + normalizedName).normalizedCustomLists()
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                container.anilistRepository.updateMangaCustomLists(token, nextLists)
+                    .ifEmpty { nextLists }
+                    .normalizedCustomLists()
+            }.onSuccess { savedLists ->
+                container.settingsStore.saveAnilistCustomLists(savedLists)
+                _state.update {
+                    it.copy(
+                        anilistCustomLists = savedLists,
+                        busy = false,
+                        message = "Custom list created",
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "AniList custom list create failed", error)
+                _state.update { it.copy(busy = false, message = error.userMessage("Custom list create failed")) }
+            }
+        }
+    }
+
+    fun renameAnilistCustomList(oldName: String, newName: String) {
+        val normalizedOldName = oldName.trim()
+        val normalizedNewName = newName.trim()
+        if (normalizedOldName.isBlank() || normalizedNewName.isBlank()) return
+        if (normalizedOldName.equals(normalizedNewName, ignoreCase = true)) return
+        val token = container.tokenStore.accessToken()
+        if (token == null) {
+            _state.update { it.copy(message = "Connect AniList before managing custom lists") }
+            return
+        }
+        val snapshot = _state.value
+        val currentLists = snapshot.anilistCustomLists.normalizedCustomLists()
+        if (currentLists.any { it.equals(normalizedNewName, ignoreCase = true) && !it.equals(normalizedOldName, ignoreCase = true) }) {
+            _state.update { it.copy(message = "A custom list with that name already exists") }
+            return
+        }
+        val nextLists = currentLists
+            .map { if (it.equals(normalizedOldName, ignoreCase = true)) normalizedNewName else it }
+            .normalizedCustomLists()
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                val savedLists = container.anilistRepository.updateMangaCustomLists(token, nextLists)
+                    .ifEmpty { nextLists }
+                    .normalizedCustomLists()
+                val affectedItems = snapshot.libraryItems.filter { item ->
+                    item.entry.customLists.any { it.equals(normalizedOldName, ignoreCase = true) }
+                }
+                val now = System.currentTimeMillis()
+                val updatedEntries = affectedItems.associate { item ->
+                    val updatedCustomLists = item.entry.customLists.renamedCustomList(normalizedOldName, normalizedNewName)
+                    item.media.id to container.anilistRepository.saveListEntry(
+                        accessToken = token,
+                        mediaId = item.media.id,
+                        status = null,
+                        progress = null,
+                        score = null,
+                        notes = null,
+                        private = null,
+                        customLists = updatedCustomLists,
+                        scoreFormat = snapshot.anilistScoreFormat,
+                    )
+                }
+                if (updatedEntries.isNotEmpty()) {
+                    container.database.listEntryDao().upsertEntries(updatedEntries.values.map { it.toEntity(now) })
+                }
+                container.settingsStore.saveAnilistCustomLists(savedLists)
+                savedLists to updatedEntries
+            }.onSuccess { (savedLists, updatedEntries) ->
+                _state.update {
+                    val nextItems = it.libraryItems.map { item ->
+                        val entry = updatedEntries[item.media.id]
+                            ?: item.entry.copy(customLists = item.entry.customLists.renamedCustomList(normalizedOldName, normalizedNewName))
+                        item.copy(entry = entry)
+                    }.sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
+                    it.copy(
+                        anilistCustomLists = savedLists,
+                        libraryItems = nextItems,
+                        library = nextItems.map { item -> item.media },
+                        selectedListEntry = it.selectedListEntry?.let { entry ->
+                            updatedEntries[entry.mediaId]
+                                ?: entry.copy(customLists = entry.customLists.renamedCustomList(normalizedOldName, normalizedNewName))
+                        },
+                        trackingCustomLists = it.trackingCustomLists.renamedCustomList(normalizedOldName, normalizedNewName).toSet(),
+                        busy = false,
+                        message = "Custom list renamed",
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "AniList custom list rename failed", error)
+                _state.update { it.copy(busy = false, message = error.userMessage("Custom list rename failed")) }
+            }
+        }
+    }
+
+    fun deleteAnilistCustomList(name: String) {
+        val normalizedName = name.trim()
+        if (normalizedName.isBlank()) return
+        val token = container.tokenStore.accessToken()
+        if (token == null) {
+            _state.update { it.copy(message = "Connect AniList before managing custom lists") }
+            return
+        }
+        val snapshot = _state.value
+        val currentLists = snapshot.anilistCustomLists.normalizedCustomLists()
+        val nextLists = currentLists
+            .filterNot { it.equals(normalizedName, ignoreCase = true) }
+            .normalizedCustomLists()
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                val savedLists = container.anilistRepository.updateMangaCustomLists(token, nextLists)
+                    .ifEmpty { nextLists }
+                    .normalizedCustomLists()
+                val affectedItems = snapshot.libraryItems.filter { item ->
+                    item.entry.customLists.any { it.equals(normalizedName, ignoreCase = true) }
+                }
+                val now = System.currentTimeMillis()
+                val updatedEntries = affectedItems.associate { item ->
+                    val updatedCustomLists = item.entry.customLists.withoutCustomList(normalizedName)
+                    item.media.id to container.anilistRepository.saveListEntry(
+                        accessToken = token,
+                        mediaId = item.media.id,
+                        status = null,
+                        progress = null,
+                        score = null,
+                        notes = null,
+                        private = null,
+                        customLists = updatedCustomLists,
+                        scoreFormat = snapshot.anilistScoreFormat,
+                    )
+                }
+                if (updatedEntries.isNotEmpty()) {
+                    container.database.listEntryDao().upsertEntries(updatedEntries.values.map { it.toEntity(now) })
+                }
+                container.settingsStore.saveAnilistCustomLists(savedLists)
+                savedLists to updatedEntries
+            }.onSuccess { (savedLists, updatedEntries) ->
+                _state.update {
+                    val nextItems = it.libraryItems.map { item ->
+                        val entry = updatedEntries[item.media.id]
+                            ?: item.entry.copy(customLists = item.entry.customLists.withoutCustomList(normalizedName))
+                        item.copy(entry = entry)
+                    }.sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
+                    it.copy(
+                        anilistCustomLists = savedLists,
+                        libraryItems = nextItems,
+                        library = nextItems.map { item -> item.media },
+                        selectedListEntry = it.selectedListEntry?.let { entry ->
+                            updatedEntries[entry.mediaId]
+                                ?: entry.copy(customLists = entry.customLists.withoutCustomList(normalizedName))
+                        },
+                        trackingCustomLists = it.trackingCustomLists.withoutCustomList(normalizedName).toSet(),
+                        busy = false,
+                        message = "Custom list deleted",
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "AniList custom list delete failed", error)
+                _state.update { it.copy(busy = false, message = error.userMessage("Custom list delete failed")) }
+            }
+        }
+    }
+
     fun setTrackingStatus(status: MediaStatus) {
-        _state.update { it.copy(trackingStatus = status) }
+        _state.update { it.copy(trackingStatus = status).withRecomputedTrackingDirty() }
         scheduleTrackingAutoSave()
     }
 
     fun setTrackingProgress(progress: String) {
-        _state.update { it.copy(trackingProgress = progress.filter { char -> char.isDigit() }.take(5)) }
+        _state.update { it.copy(trackingProgress = progress.filter { char -> char.isDigit() }.take(5)).withRecomputedTrackingDirty() }
         scheduleTrackingAutoSave()
     }
 
     fun setTrackingScore(score: String) {
-        _state.update { it.copy(trackingScore = score.filteredScoreInput(it.anilistScoreFormat)) }
+        _state.update { it.copy(trackingScore = score.filteredScoreInput(it.anilistScoreFormat)).withRecomputedTrackingDirty() }
         scheduleTrackingAutoSave()
     }
 
     fun setTrackingNotes(notes: String) {
-        _state.update { it.copy(trackingNotes = notes) }
+        _state.update { it.copy(trackingNotes = notes).withRecomputedTrackingDirty() }
         scheduleTrackingAutoSave()
     }
 
     fun setTrackingPrivate(private: Boolean) {
-        _state.update { it.copy(trackingPrivate = private) }
+        _state.update { it.copy(trackingPrivate = private).withRecomputedTrackingDirty() }
         scheduleTrackingAutoSave()
     }
 
@@ -1754,9 +1944,9 @@ class MainViewModel(
                 } else {
                     it.trackingCustomLists - normalizedName
                 },
-            )
+            ).withRecomputedTrackingDirty()
         }
-        scheduleTrackingAutoSave()
+        scheduleTrackingCustomListSave()
     }
 
     fun addTrackingCustomList(name: String) {
@@ -1769,9 +1959,79 @@ class MainViewModel(
             it.copy(
                 anilistCustomLists = knownLists,
                 trackingCustomLists = it.trackingCustomLists + normalizedName,
-            )
+            ).withRecomputedTrackingDirty()
         }
-        scheduleTrackingAutoSave()
+        scheduleTrackingCustomListSave()
+    }
+
+    private fun scheduleTrackingCustomListSave() {
+        if (_state.value.anilistAutoSaveTrackingChanges) {
+            scheduleTrackingAutoSave()
+        }
+    }
+
+    private fun saveTrackingCustomListsOnly() {
+        val media = _state.value.selectedMedia ?: return
+        val token = container.tokenStore.accessToken() ?: return
+        val snapshot = _state.value
+        val customLists = snapshot.trackingCustomLists.normalizedCustomLists()
+        if (customLists.isEmpty() && snapshot.selectedListEntry == null) return
+
+        viewModelScope.launch {
+            runCatching {
+                val knownCustomLists = snapshot.anilistCustomLists.normalizedCustomLists()
+                val missingCustomLists = customLists.filterNot { selectedList ->
+                    knownCustomLists.any { knownList -> knownList.equals(selectedList, ignoreCase = true) }
+                }
+                val nextKnownCustomLists = if (missingCustomLists.isEmpty()) {
+                    knownCustomLists
+                } else {
+                    container.anilistRepository.updateMangaCustomLists(
+                        accessToken = token,
+                        customLists = (knownCustomLists + missingCustomLists).normalizedCustomLists(),
+                    ).ifEmpty { (knownCustomLists + missingCustomLists).normalizedCustomLists() }
+                }
+                val entry = container.anilistRepository.saveListEntry(
+                    accessToken = token,
+                    mediaId = media.id,
+                    status = if (snapshot.selectedListEntry == null) snapshot.trackingStatus else null,
+                    progress = null,
+                    score = null,
+                    notes = null,
+                    private = null,
+                    customLists = customLists,
+                    scoreFormat = snapshot.anilistScoreFormat,
+                )
+                val now = System.currentTimeMillis()
+                container.database.mediaDao().upsertMedia(media.toEntity(now))
+                container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+                container.settingsStore.saveAnilistCustomLists(nextKnownCustomLists)
+                nextKnownCustomLists to entry
+            }.onSuccess { (knownCustomLists, entry) ->
+                _state.update {
+                    val nextItem = LibraryItem(media, entry)
+                    val nextItems = (it.libraryItems.filterNot { item -> item.media.id == media.id } + nextItem)
+                        .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
+                    it.copy(
+                        anilistCustomLists = knownCustomLists,
+                        library = nextItems.map { item -> item.media },
+                        libraryItems = nextItems,
+                        selectedListEntry = entry,
+                        trackingStatus = entry.status,
+                        trackingProgress = entry.progress.toString(),
+                        trackingScore = entry.score.formatTrackingScore(it.anilistScoreFormat),
+                        trackingNotes = entry.notes.orEmpty(),
+                        trackingPrivate = entry.private,
+                        trackingCustomLists = entry.customLists.toSet(),
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "AniList custom list save failed for ${media.id}", error)
+                _state.update {
+                    it.copy(message = error.userMessage("Custom list save failed"))
+                }
+            }
+        }
     }
 
     private fun scheduleTrackingAutoSave() {
@@ -1786,6 +2046,31 @@ class MainViewModel(
 
     fun saveTracking() {
         saveTracking(autoSave = false)
+    }
+
+    private fun applyOptimisticTrackingEntry(
+        media: AnilistMedia,
+        entry: AnilistListEntry,
+        knownCustomLists: List<String>,
+        autoSave: Boolean,
+    ) {
+        _state.update {
+            val selected = it.selectedMedia?.id == media.id
+            val nextItem = LibraryItem(media, entry)
+            val nextItems = (it.libraryItems.filterNot { item -> item.media.id == media.id } + nextItem)
+                .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
+            it.copy(
+                anilistCustomLists = knownCustomLists,
+                library = nextItems.map { item -> item.media },
+                libraryItems = nextItems,
+                selectedListEntry = if (selected) entry else it.selectedListEntry,
+                trackingDirty = if (selected) false else it.trackingDirty,
+                trackingSaveInProgress = if (selected) true else it.trackingSaveInProgress,
+                trackingSaveFailed = if (selected) false else it.trackingSaveFailed,
+                busy = if (autoSave) it.busy else true,
+                message = null,
+            )
+        }
     }
 
     private fun saveTracking(autoSave: Boolean) {
@@ -1803,16 +2088,31 @@ class MainViewModel(
         val score = snapshot.trackingScore.toAniListScore(snapshot.anilistScoreFormat)
         val notes = snapshot.trackingNotes.trim().ifBlank { null }
         val customLists = snapshot.trackingCustomLists.normalizedCustomLists()
+        val knownCustomLists = snapshot.anilistCustomLists.normalizedCustomLists()
+        val missingCustomLists = customLists.filterNot { selectedList ->
+            knownCustomLists.any { knownList -> knownList.equals(selectedList, ignoreCase = true) }
+        }
+        val optimisticKnownCustomLists = (knownCustomLists + missingCustomLists).normalizedCustomLists()
+        val optimisticEntry = AnilistListEntry(
+            id = snapshot.selectedListEntry?.id ?: -media.id,
+            mediaId = media.id,
+            status = snapshot.trackingStatus,
+            progress = progress ?: 0,
+            score = score,
+            notes = notes,
+            private = snapshot.trackingPrivate,
+            customLists = customLists,
+            updatedAtEpochSeconds = System.currentTimeMillis() / 1000L,
+        )
 
         viewModelScope.launch {
-            if (!autoSave) {
-                _state.update { it.copy(busy = true, message = null) }
-            }
+            applyOptimisticTrackingEntry(
+                media = media,
+                entry = optimisticEntry,
+                knownCustomLists = optimisticKnownCustomLists,
+                autoSave = autoSave,
+            )
             runCatching {
-                val knownCustomLists = snapshot.anilistCustomLists.normalizedCustomLists()
-                val missingCustomLists = customLists.filterNot { selectedList ->
-                    knownCustomLists.any { knownList -> knownList.equals(selectedList, ignoreCase = true) }
-                }
                 val nextKnownCustomLists = if (missingCustomLists.isEmpty()) {
                     knownCustomLists
                 } else {
@@ -1842,17 +2142,26 @@ class MainViewModel(
                     val nextItem = LibraryItem(media, entry)
                     val nextItems = (it.libraryItems.filterNot { item -> item.media.id == media.id } + nextItem)
                         .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
+                    val selected = it.selectedMedia?.id == media.id
+                    val preserveEditedForm = selected && it.trackingDirty
                     it.copy(
                         anilistCustomLists = knownCustomLists,
                         library = nextItems.map { item -> item.media },
                         libraryItems = nextItems,
-                        selectedListEntry = entry,
-                        trackingStatus = entry.status,
-                        trackingProgress = entry.progress.toString(),
-                        trackingScore = entry.score.formatTrackingScore(it.anilistScoreFormat),
-                        trackingNotes = entry.notes.orEmpty(),
-                        trackingPrivate = entry.private,
-                        trackingCustomLists = entry.customLists.toSet(),
+                        selectedListEntry = if (selected) entry else it.selectedListEntry,
+                        trackingStatus = if (!selected || preserveEditedForm) it.trackingStatus else entry.status,
+                        trackingProgress = if (!selected || preserveEditedForm) it.trackingProgress else entry.progress.toString(),
+                        trackingScore = if (!selected || preserveEditedForm) {
+                            it.trackingScore
+                        } else {
+                            entry.score.formatTrackingScore(it.anilistScoreFormat)
+                        },
+                        trackingNotes = if (!selected || preserveEditedForm) it.trackingNotes else entry.notes.orEmpty(),
+                        trackingPrivate = if (!selected || preserveEditedForm) it.trackingPrivate else entry.private,
+                        trackingCustomLists = if (!selected || preserveEditedForm) it.trackingCustomLists else entry.customLists.toSet(),
+                        trackingDirty = if (selected) preserveEditedForm else it.trackingDirty,
+                        trackingSaveInProgress = if (selected) false else it.trackingSaveInProgress,
+                        trackingSaveFailed = if (selected) false else it.trackingSaveFailed,
                         busy = if (autoSave) it.busy else false,
                         message = if (autoSave) it.message else "AniList tracking saved",
                     )
@@ -1860,9 +2169,13 @@ class MainViewModel(
             }.onFailure { error ->
                 Log.e(TAG, "AniList tracking save failed for ${media.id}", error)
                 _state.update {
+                    val selected = it.selectedMedia?.id == media.id
                     it.copy(
+                        trackingDirty = if (selected) true else it.trackingDirty,
+                        trackingSaveInProgress = if (selected) false else it.trackingSaveInProgress,
+                        trackingSaveFailed = if (selected) true else it.trackingSaveFailed,
                         busy = if (autoSave) it.busy else false,
-                        message = error.userMessage(if (autoSave) "Tracking auto-save failed" else "Tracking save failed"),
+                        message = error.userMessage(if (autoSave) "Tracking auto-save failed. Tap save to retry" else "Tracking save failed"),
                     )
                 }
             }
@@ -1881,20 +2194,33 @@ class MainViewModel(
                     if (it.selectedMedia?.id != mediaId) {
                         it
                     } else {
+                        val preserveTrackingForm = it.trackingDirty || it.trackingSaveInProgress || it.trackingSaveFailed
                         it.copy(
                             selectedMedia = cachedMedia?.toModel(it.anilistTitleLanguage) ?: it.selectedMedia,
                             selectedListEntry = cachedEntry,
                             selectedRecommendations = cachedRecommendations,
                             selectedRecommendationsPage = cachedRecommendations.recommendationPageCount(),
                             selectedRecommendationsHasMore = cachedRecommendations.size >= RECOMMENDATIONS_PAGE_SIZE,
-                            trackingStatus = cachedEntry?.status ?: it.trackingStatus,
-                            trackingProgress = cachedEntry?.progress?.toString() ?: it.trackingProgress,
-                            trackingScore = cachedEntry?.score.formatTrackingScore(it.anilistScoreFormat)
-                                .takeIf { score -> score.isNotBlank() }
-                                ?: it.trackingScore,
-                            trackingNotes = cachedEntry?.notes ?: it.trackingNotes,
-                            trackingPrivate = cachedEntry?.private ?: it.trackingPrivate,
-                            trackingCustomLists = cachedEntry?.customLists?.toSet() ?: it.trackingCustomLists,
+                            trackingStatus = if (preserveTrackingForm) it.trackingStatus else cachedEntry?.status ?: it.trackingStatus,
+                            trackingProgress = if (preserveTrackingForm) {
+                                it.trackingProgress
+                            } else {
+                                cachedEntry?.progress?.toString() ?: it.trackingProgress
+                            },
+                            trackingScore = if (preserveTrackingForm) {
+                                it.trackingScore
+                            } else {
+                                cachedEntry?.score.formatTrackingScore(it.anilistScoreFormat)
+                                    .takeIf { score -> score.isNotBlank() }
+                                    ?: it.trackingScore
+                            },
+                            trackingNotes = if (preserveTrackingForm) it.trackingNotes else cachedEntry?.notes ?: it.trackingNotes,
+                            trackingPrivate = if (preserveTrackingForm) it.trackingPrivate else cachedEntry?.private ?: it.trackingPrivate,
+                            trackingCustomLists = if (preserveTrackingForm) {
+                                it.trackingCustomLists
+                            } else {
+                                cachedEntry?.customLists?.toSet() ?: it.trackingCustomLists
+                            },
                         )
                     }
                 }
@@ -1943,6 +2269,7 @@ class MainViewModel(
                         it
                     } else {
                         val effectiveEntry = entry ?: cachedEntry
+                        val preserveTrackingForm = it.trackingDirty || it.trackingSaveInProgress || it.trackingSaveFailed
                         val nextItems = if (effectiveEntry == null) {
                             it.libraryItems
                         } else {
@@ -1958,14 +2285,26 @@ class MainViewModel(
                             recommendationsLoading = false,
                             library = nextItems.map { item -> item.media },
                             libraryItems = nextItems,
-                            trackingStatus = effectiveEntry?.status ?: it.trackingStatus,
-                            trackingProgress = effectiveEntry?.progress?.toString() ?: it.trackingProgress,
-                            trackingScore = effectiveEntry?.score.formatTrackingScore(it.anilistScoreFormat)
-                                .takeIf { score -> score.isNotBlank() }
-                                ?: it.trackingScore,
-                            trackingNotes = effectiveEntry?.notes ?: it.trackingNotes,
-                            trackingPrivate = effectiveEntry?.private ?: it.trackingPrivate,
-                            trackingCustomLists = effectiveEntry?.customLists?.toSet() ?: it.trackingCustomLists,
+                            trackingStatus = if (preserveTrackingForm) it.trackingStatus else effectiveEntry?.status ?: it.trackingStatus,
+                            trackingProgress = if (preserveTrackingForm) {
+                                it.trackingProgress
+                            } else {
+                                effectiveEntry?.progress?.toString() ?: it.trackingProgress
+                            },
+                            trackingScore = if (preserveTrackingForm) {
+                                it.trackingScore
+                            } else {
+                                effectiveEntry?.score.formatTrackingScore(it.anilistScoreFormat)
+                                    .takeIf { score -> score.isNotBlank() }
+                                    ?: it.trackingScore
+                            },
+                            trackingNotes = if (preserveTrackingForm) it.trackingNotes else effectiveEntry?.notes ?: it.trackingNotes,
+                            trackingPrivate = if (preserveTrackingForm) it.trackingPrivate else effectiveEntry?.private ?: it.trackingPrivate,
+                            trackingCustomLists = if (preserveTrackingForm) {
+                                it.trackingCustomLists
+                            } else {
+                                effectiveEntry?.customLists?.toSet() ?: it.trackingCustomLists
+                            },
                         )
                     }
                 }
@@ -3904,6 +4243,31 @@ private fun TankobunUiState.withAniListTitleLanguage(language: AnilistTitleLangu
         },
     )
 
+private fun TankobunUiState.withRecomputedTrackingDirty(): TankobunUiState =
+    copy(
+        trackingDirty = trackingSaveFailed || hasTrackingFormChanges(),
+        trackingSaveFailed = false,
+    )
+
+private fun TankobunUiState.hasTrackingFormChanges(): Boolean {
+    val entry = selectedListEntry ?: return false
+    val progress = trackingProgress.toIntOrNull()?.coerceAtLeast(0) ?: 0
+    val score = trackingScore.toAniListScore(anilistScoreFormat)
+    val notes = trackingNotes.trim().ifBlank { null }
+    return trackingStatus != entry.status ||
+        progress != entry.progress ||
+        !score.sameAniListScore(entry.score) ||
+        notes != entry.notes?.trim()?.ifBlank { null } ||
+        trackingPrivate != entry.private ||
+        trackingCustomLists.normalizedCustomLists() != entry.customLists.normalizedCustomLists()
+}
+
+private fun Double?.sameAniListScore(other: Double?): Boolean = when {
+    this == null && other == null -> true
+    this == null || other == null -> false
+    else -> abs(this - other) < 0.0001
+}
+
 private fun Throwable.userMessage(fallback: String): String = when (this) {
     is AnilistGraphQlException -> when (statusCode) {
         401 -> "AniList session expired. Sign in again."
@@ -3913,6 +4277,14 @@ private fun Throwable.userMessage(fallback: String): String = when (this) {
     }
     else -> message ?: fallback
 }
+
+private fun Iterable<String>.renamedCustomList(oldName: String, newName: String): List<String> =
+    map { if (it.equals(oldName, ignoreCase = true)) newName else it }
+        .normalizedCustomLists()
+
+private fun Iterable<String>.withoutCustomList(name: String): List<String> =
+    filterNot { it.equals(name, ignoreCase = true) }
+        .normalizedCustomLists()
 
 private fun SourceSearchResult.sourceMatchKey(): String =
     sourceMatchKey(source.id, manga.url)

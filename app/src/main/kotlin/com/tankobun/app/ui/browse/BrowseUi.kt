@@ -470,12 +470,6 @@ internal fun BrowseFilterBar(
                 selected = state.browseYear != null,
                 onClick = { onOpenPicker(BrowsePicker.YEAR) },
             )
-            BrowseFilterPill(
-                label = "Sort",
-                value = BrowseSortOptions.labelFor(state.browseSort),
-                selected = state.browseSort != BROWSE_SORT_SEARCH_MATCH_UI,
-                onClick = onOpenAdvanced,
-            )
             BrowseIconFilterPill(
                 contentDescription = "Browse options",
                 onClick = onOpenAdvanced,
