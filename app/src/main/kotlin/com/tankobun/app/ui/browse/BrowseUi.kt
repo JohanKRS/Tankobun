@@ -1029,8 +1029,7 @@ internal fun browseYearOptions(): List<BrowseOption> {
 }
 
 internal fun TankobunUiState.browseControlsActive(): Boolean =
-    searchQuery.isNotBlank() ||
-        browseFiltersOrSortActive()
+    browseFiltersOrSortActive()
 
 internal fun TankobunUiState.browseFiltersOrSortActive(): Boolean =
     browseGenres.isNotEmpty() ||
