@@ -274,6 +274,7 @@ internal fun MediaCollection(
     onScrollOffsetChange: ((Int) -> Unit)? = null,
     scrollToContentOffsetPx: Int? = null,
     scrollToContentOffsetRequest: Int = 0,
+    onContentHeightMeasured: ((Int) -> Unit)? = null,
 ) {
     val configuration = LocalConfiguration.current
     val supportedCoverColumns = coverColumns
@@ -281,7 +282,45 @@ internal fun MediaCollection(
         .coerceAtMost(if (configuration.smallestScreenWidthDp in 1 until 600) 4 else 8)
 
     if (media.isEmpty()) {
+        val listState = rememberLazyListState()
+        val latestOnScrollOffsetChange by rememberUpdatedState(onScrollOffsetChange)
+        val latestOnContentHeightMeasured by rememberUpdatedState(onContentHeightMeasured)
+        LaunchedEffect(listState, latestOnScrollOffsetChange != null) {
+            if (latestOnScrollOffsetChange == null) return@LaunchedEffect
+            snapshotFlow {
+                if (listState.firstVisibleItemIndex == 0) {
+                    listState.firstVisibleItemScrollOffset
+                } else {
+                    Int.MAX_VALUE
+                }
+            }
+                .distinctUntilChanged()
+                .collect { scrollOffset -> latestOnScrollOffsetChange?.invoke(scrollOffset) }
+        }
+        LaunchedEffect(listState, latestOnContentHeightMeasured != null) {
+            if (latestOnContentHeightMeasured == null) return@LaunchedEffect
+            snapshotFlow {
+                val layoutInfo = listState.layoutInfo
+                val items = layoutInfo.visibleItemsInfo
+                if (items.isNotEmpty() && items.size == layoutInfo.totalItemsCount) {
+                    val top = items.minOf { it.offset }
+                    val bottom = items.maxOf { it.offset + it.size }
+                    bottom - top
+                } else {
+                    null
+                }
+            }
+                .distinctUntilChanged()
+                .collect { height -> height?.let { latestOnContentHeightMeasured?.invoke(it) } }
+        }
+        LaunchedEffect(scrollToContentOffsetRequest, scrollToContentOffsetPx) {
+            val targetOffset = scrollToContentOffsetPx ?: return@LaunchedEffect
+            if (scrollToContentOffsetRequest > 0) {
+                listState.scrollToItem(0, targetOffset)
+            }
+        }
         LazyColumn(
+            state = listState,
             modifier = modifier.fillMaxWidth(),
             contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -304,6 +343,7 @@ internal fun MediaCollection(
             val listState = rememberLazyListState()
             val latestOnNearEnd by rememberUpdatedState(onNearEnd)
             val latestOnScrollOffsetChange by rememberUpdatedState(onScrollOffsetChange)
+            val latestOnContentHeightMeasured by rememberUpdatedState(onContentHeightMeasured)
             LaunchedEffect(listState, media.size, latestOnNearEnd != null) {
                 snapshotFlow {
                     val layoutInfo = listState.layoutInfo
@@ -327,6 +367,24 @@ internal fun MediaCollection(
                 }
                     .distinctUntilChanged()
                     .collect { scrollOffset -> latestOnScrollOffsetChange?.invoke(scrollOffset) }
+            }
+            LaunchedEffect(listState, media.size, header != null, latestOnContentHeightMeasured != null) {
+                if (latestOnContentHeightMeasured == null) return@LaunchedEffect
+                snapshotFlow {
+                    val layoutInfo = listState.layoutInfo
+                    val mediaStartIndex = if (header == null) 0 else 1
+                    val mediaEndIndex = mediaStartIndex + media.size
+                    val items = layoutInfo.visibleItemsInfo.filter { it.index in mediaStartIndex until mediaEndIndex }
+                    if (items.size == media.size) {
+                        val top = items.minOf { it.offset }
+                        val bottom = items.maxOf { it.offset + it.size }
+                        bottom - top
+                    } else {
+                        null
+                    }
+                }
+                    .distinctUntilChanged()
+                    .collect { height -> height?.let { latestOnContentHeightMeasured?.invoke(it) } }
             }
             LaunchedEffect(scrollToContentOffsetRequest, scrollToContentOffsetPx, media.size) {
                 val targetOffset = scrollToContentOffsetPx ?: return@LaunchedEffect
@@ -361,6 +419,7 @@ internal fun MediaCollection(
             val gridState = rememberLazyGridState()
             val latestOnNearEnd by rememberUpdatedState(onNearEnd)
             val latestOnScrollOffsetChange by rememberUpdatedState(onScrollOffsetChange)
+            val latestOnContentHeightMeasured by rememberUpdatedState(onContentHeightMeasured)
             LaunchedEffect(gridState, media.size, latestOnNearEnd != null) {
                 snapshotFlow {
                     val layoutInfo = gridState.layoutInfo
@@ -384,6 +443,24 @@ internal fun MediaCollection(
                 }
                     .distinctUntilChanged()
                     .collect { scrollOffset -> latestOnScrollOffsetChange?.invoke(scrollOffset) }
+            }
+            LaunchedEffect(gridState, media.size, header != null, latestOnContentHeightMeasured != null) {
+                if (latestOnContentHeightMeasured == null) return@LaunchedEffect
+                snapshotFlow {
+                    val layoutInfo = gridState.layoutInfo
+                    val mediaStartIndex = if (header == null) 0 else 1
+                    val mediaEndIndex = mediaStartIndex + media.size
+                    val items = layoutInfo.visibleItemsInfo.filter { it.index in mediaStartIndex until mediaEndIndex }
+                    if (items.size == media.size) {
+                        val top = items.minOf { it.offset.y }
+                        val bottom = items.maxOf { it.offset.y + it.size.height }
+                        bottom - top
+                    } else {
+                        null
+                    }
+                }
+                    .distinctUntilChanged()
+                    .collect { height -> height?.let { latestOnContentHeightMeasured?.invoke(it) } }
             }
             LaunchedEffect(scrollToContentOffsetRequest, scrollToContentOffsetPx, media.size) {
                 val targetOffset = scrollToContentOffsetPx ?: return@LaunchedEffect

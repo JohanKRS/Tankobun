@@ -678,10 +678,19 @@ internal fun LibraryPager(
         }
         val gridCoverHeightPx = (gridCellWidthPx * 3) / 2
         val gridInfoHeightPx = with(density) {
-            if (supportedViewMode == MediaViewMode.COVER_WITH_INFO) 74.dp.roundToPx() else 0
+            if (supportedViewMode == MediaViewMode.COVER_WITH_INFO) 36.dp.roundToPx() else 0
         }
         val listItemHeightPx = with(density) { 96.dp.roundToPx() }
         val emptyStateHeightPx = with(density) { 160.dp.roundToPx() }
+        var measuredPageContentHeightsPx by remember(
+            visibleSections,
+            supportedViewMode,
+            supportedCoverColumns,
+            showWholeCovers,
+            constraints.maxWidth,
+        ) {
+            mutableStateOf(List<Int?>(sections.size) { null })
+        }
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
@@ -703,10 +712,11 @@ internal fun LibraryPager(
                     (rowCount * rowHeightPx) + ((rowCount - 1).coerceAtLeast(0) * gridGapPx)
                 }
             }
+            val contentHeightPx = measuredPageContentHeightsPx.getOrNull(page) ?: estimatedContentHeightPx
             val requiredPinnedBottomPaddingPx = constraints.maxHeight -
                 tabHeaderHeightPx -
                 contentPaddingPx -
-                estimatedContentHeightPx
+                contentHeightPx
             val pageBottomPadding = with(density) {
                 maxOf(contentPaddingPx, requiredPinnedBottomPaddingPx).toDp()
             }
@@ -733,6 +743,13 @@ internal fun LibraryPager(
                 },
                 scrollToContentOffsetPx = pageScrollRequestOffsets.getOrNull(page),
                 scrollToContentOffsetRequest = pageScrollRequestTokens.getOrElse(page) { 0 },
+                onContentHeightMeasured = { heightPx ->
+                    measuredPageContentHeightsPx = measuredPageContentHeightsPx.toMutableList().also { heights ->
+                        if (page in heights.indices) {
+                            heights[page] = heightPx
+                        }
+                    }
+                },
                 emptyMessage = if (filtersActive) {
                     "No titles match these library filters."
                 } else {

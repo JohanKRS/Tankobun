@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Rect
+import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
@@ -755,7 +757,7 @@ internal fun SourceSettingsRow(
             packageName = source.packageName,
             name = displayName,
             iconUrl = iconUrl,
-            modifier = Modifier.size(34.dp),
+            modifier = Modifier.size(42.dp),
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(displayName, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
@@ -850,7 +852,7 @@ internal fun ExtensionRepositoryRow(
                 packageName = installedSources.firstOrNull()?.packageName,
                 name = displayName,
                 iconUrl = iconUrl,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(42.dp),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -970,34 +972,41 @@ internal fun ExtensionIcon(
                 }.getOrNull()
             }
     }
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        tonalElevation = 1.dp,
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control)),
+        contentAlignment = Alignment.Center,
     ) {
         when {
             packageIcon != null -> {
                 Image(
                     bitmap = packageIcon,
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize().padding(3.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
                 )
             }
             iconUrl != null -> {
                 AsyncImage(
                     model = iconUrl,
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize().padding(3.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
                 )
             }
             else -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        extensionInitials(name),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                    color = LocalTankobunStyle.current.colors.accent.copy(alpha = 0.16f),
+                    contentColor = LocalTankobunStyle.current.colors.accent,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            extensionInitials(name),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
             }
         }
@@ -1005,13 +1014,47 @@ internal fun ExtensionIcon(
 }
 
 internal fun Drawable.toImageBitmap(): ImageBitmap {
-    val width = intrinsicWidth.takeIf { it > 0 } ?: 96
-    val height = intrinsicHeight.takeIf { it > 0 } ?: 96
+    val drawable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && this is AdaptiveIconDrawable) {
+        foreground ?: this
+    } else {
+        this
+    }
+    val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 192
+    val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 192
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
-    setBounds(0, 0, canvas.width, canvas.height)
-    draw(canvas)
-    return bitmap.asImageBitmap()
+    drawable.setBounds(0, 0, canvas.width, canvas.height)
+    drawable.draw(canvas)
+    val visibleBounds = bitmap.visibleAlphaBounds()
+    val trimmed = if (visibleBounds != null && visibleBounds.width() > 0 && visibleBounds.height() > 0) {
+        Bitmap.createBitmap(bitmap, visibleBounds.left, visibleBounds.top, visibleBounds.width(), visibleBounds.height())
+    } else {
+        bitmap
+    }
+    return trimmed.asImageBitmap()
+}
+
+private fun Bitmap.visibleAlphaBounds(alphaThreshold: Int = 8): Rect? {
+    val pixels = IntArray(width * height)
+    getPixels(pixels, 0, width, 0, 0, width, height)
+    var left = width
+    var top = height
+    var right = -1
+    var bottom = -1
+    for (y in 0 until height) {
+        val rowOffset = y * width
+        for (x in 0 until width) {
+            val alpha = pixels[rowOffset + x] ushr 24
+            if (alpha > alphaThreshold) {
+                if (x < left) left = x
+                if (x > right) right = x
+                if (y < top) top = y
+                if (y > bottom) bottom = y
+            }
+        }
+    }
+    if (right < left || bottom < top) return null
+    return Rect(left, top, right + 1, bottom + 1)
 }
 
 internal fun extensionInitials(name: String): String =

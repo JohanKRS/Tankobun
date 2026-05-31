@@ -2226,7 +2226,7 @@ class MainViewModel(
                 }
             }
 
-            val cachedMediaHasEnrichedDetails = cachedMedia?.let { it.staff.isNotEmpty() || it.tags.isNotEmpty() } ?: false
+            val cachedMediaHasEnrichedDetails = cachedMedia?.let { it.staff.isNotEmpty() && it.tags.isNotEmpty() } ?: false
             val cachedMediaIsFresh = cachedMedia != null &&
                 cachedMediaHasEnrichedDetails &&
                 now - cachedMedia.fetchedAtEpochMillis <= cachePolicy.mediaDetailsTtlMillis
