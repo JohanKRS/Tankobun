@@ -88,7 +88,13 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.FormatListBulleted
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
@@ -100,13 +106,13 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -392,18 +398,18 @@ internal fun SettingsRouteIcon(route: SettingsRoute) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = when (route) {
-                    SettingsRoute.MAIN,
-                    SettingsRoute.APPEARANCE -> Icons.Default.Settings
-                    SettingsRoute.LANGUAGES -> Icons.Default.Tune
-                    SettingsRoute.LIBRARY -> Icons.AutoMirrored.Filled.LibraryBooks
+                    SettingsRoute.MAIN -> Icons.Default.Settings
+                    SettingsRoute.APPEARANCE -> Icons.Default.Palette
+                    SettingsRoute.LANGUAGES -> Icons.Default.Translate
+                    SettingsRoute.LIBRARY -> Icons.Default.CollectionsBookmark
                     SettingsRoute.BROWSE -> Icons.Default.Explore
                     SettingsRoute.READER -> Icons.AutoMirrored.Filled.MenuBook
                     SettingsRoute.DOWNLOADS -> Icons.Default.Download
                     SettingsRoute.ANILIST -> Icons.Default.Link
-                    SettingsRoute.CUSTOM_LISTS -> Icons.AutoMirrored.Filled.LibraryBooks
-                    SettingsRoute.BACKUPS -> Icons.AutoMirrored.Filled.LibraryBooks
-                    SettingsRoute.ABOUT -> Icons.Default.Settings
-                    SettingsRoute.SOURCES -> Icons.Default.Download
+                    SettingsRoute.CUSTOM_LISTS -> Icons.Default.FormatListBulleted
+                    SettingsRoute.BACKUPS -> Icons.Default.Backup
+                    SettingsRoute.ABOUT -> Icons.Default.Info
+                    SettingsRoute.SOURCES -> Icons.Default.Extension
                 },
                 contentDescription = null,
                 modifier = Modifier.size(19.dp),
@@ -527,8 +533,8 @@ internal fun SettingsDetailContent(
             Text("Connection", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             TankobunPanel(
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 1.dp,
+                color = LocalTankobunStyle.current.colors.panel,
+                contentColor = LocalTankobunStyle.current.colors.panelContent,
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(

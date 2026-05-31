@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.tankobun.app.LocalTankobunStyle
-import com.tankobun.app.LocalTankobunTokens
 import com.tankobun.app.ui.components.TankobunActionButton
 
 private data class OnboardingPage(
@@ -153,8 +152,8 @@ internal fun OnboardingDialog(
                         .align(Alignment.CenterHorizontally)
                         .size(78.dp),
                     shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = LocalTankobunStyle.current.colors.selectedChip,
+                    contentColor = LocalTankobunStyle.current.colors.selectedChipContent,
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(page.icon, contentDescription = null, modifier = Modifier.size(38.dp))

@@ -8,6 +8,7 @@ import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
+import android.provider.DocumentsContract
 import android.provider.Settings
 import android.util.Log
 import android.view.View
@@ -106,7 +107,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -246,9 +246,13 @@ internal fun BackupsSettingsScreen(
     ) { uri ->
         uri?.let(viewModel::setScheduledBackupFolder)
     }
+    val context = LocalContext.current
     val totalItems = state.libraryItems.size
     val malMatchedItems = state.libraryItems.count { it.media.idMal != null }
     val missingMalItems = totalItems - malMatchedItems
+    val backupFolderLabel = remember(context, state.backupFolderUri) {
+        backupFolderDisplayLabel(context, state.backupFolderUri)
+    }
 
     SettingsDetailPanel(
         title = "Backups",
@@ -256,7 +260,11 @@ internal fun BackupsSettingsScreen(
         modifier = modifier,
     ) {
         Text("AniList manga backup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
+        TankobunPanel(
+            modifier = Modifier.fillMaxWidth(),
+            color = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -323,7 +331,11 @@ internal fun BackupsSettingsScreen(
             }
         }
         Text("Scheduled backups", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
+        TankobunPanel(
+            modifier = Modifier.fillMaxWidth(),
+            color = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -335,6 +347,9 @@ internal fun BackupsSettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                state.backupFolderUri?.let {
+                    ScheduledBackupFolderSummary(folderLabel = backupFolderLabel ?: "Selected folder")
+                }
                 BackupSchedulePicker(
                     selected = state.backupSchedule,
                     onSelect = viewModel::setBackupSchedule,
@@ -363,6 +378,37 @@ internal fun BackupsSettingsScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ScheduledBackupFolderSummary(folderLabel: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
+            .background(LocalTankobunStyle.current.colors.selectedChip.copy(alpha = 0.18f))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(
+            "Selected folder",
+            style = MaterialTheme.typography.labelMedium,
+            color = LocalTankobunStyle.current.colors.accent,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            folderLabel,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            "Run now writes an XML backup to this folder immediately.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -397,4 +443,34 @@ internal fun BackupSchedulePicker(
             }
         }
     }
+}
+
+private fun backupFolderDisplayLabel(context: Context, uriString: String?): String? {
+    val uri = uriString
+        ?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        ?: return null
+    val treeDocumentId = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
+    val documentUri = treeDocumentId?.let { documentId ->
+        runCatching { DocumentsContract.buildDocumentUriUsingTree(uri, documentId) }.getOrNull()
+    }
+    val queriedName = documentUri?.let { folderUri ->
+        runCatching {
+            context.contentResolver.query(
+                folderUri,
+                arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        }.getOrNull()
+    }?.trim()?.takeIf { it.isNotBlank() }
+    return queriedName
+        ?: treeDocumentId
+            ?.substringAfterLast(':')
+            ?.substringAfterLast('/')
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+        ?: uri.authority
 }

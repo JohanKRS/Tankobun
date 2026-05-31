@@ -106,7 +106,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -238,7 +237,11 @@ internal fun DownloadsSettingsScreen(
         modifier = modifier,
     ) {
         val summary = state.downloadStorageSummary
-        ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
+        TankobunPanel(
+            modifier = Modifier.fillMaxWidth(),
+            color = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -465,7 +468,11 @@ internal fun SettingsToggleRow(
     onCheckedChange: (Boolean) -> Unit,
     enabled: Boolean = true,
 ) {
-    ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
+    TankobunPanel(
+        modifier = Modifier.fillMaxWidth(),
+        color = LocalTankobunStyle.current.colors.panel,
+        contentColor = LocalTankobunStyle.current.colors.panelContent,
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

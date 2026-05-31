@@ -388,6 +388,31 @@ internal fun TankobunChip(
 }
 
 @Composable
+internal fun TankobunClearFiltersChip(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .heightIn(min = 32.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.82f),
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.42f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CompositionLocalProvider(LocalTextStyle provides MaterialTheme.typography.labelMedium) {
+                Text("Clear filters")
+            }
+        }
+    }
+}
+
+@Composable
 internal fun TankobunTag(
     label: String,
     modifier: Modifier = Modifier,

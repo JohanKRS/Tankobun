@@ -2,6 +2,7 @@ package com.tankobun.app.backup
 
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.content.ContentResolver
 import com.tankobun.app.AppContainer
 import com.tankobun.app.logic.normalizedCustomLists
 import com.tankobun.app.state.LibraryItem
@@ -45,12 +46,12 @@ internal class AniListBackupService(
         folderUri: Uri,
         snapshot: TankobunUiState,
     ): Int = withContext(Dispatchers.IO) {
-        val fileUri = DocumentsContract.createDocument(
-            container.application.contentResolver,
-            folderUri,
-            "text/xml",
-            suggestedScheduledAniListBackupFileName(snapshot.viewerName),
-        ) ?: error("Could not create backup file")
+        val fileUri = createDocumentInTree(
+            contentResolver = container.application.contentResolver,
+            treeUri = folderUri,
+            mimeType = "text/xml",
+            displayName = suggestedScheduledAniListBackupFileName(snapshot.viewerName),
+        )
         saveBackup(
             uri = fileUri,
             items = snapshot.libraryItems,
@@ -131,6 +132,24 @@ internal class AniListBackupService(
             ).ifEmpty { (normalizedKnownCustomLists + missingCustomLists).normalizedCustomLists() }
         }
     }
+}
+
+internal fun createDocumentInTree(
+    contentResolver: ContentResolver,
+    treeUri: Uri,
+    mimeType: String,
+    displayName: String,
+): Uri {
+    val parentDocumentUri = DocumentsContract.buildDocumentUriUsingTree(
+        treeUri,
+        DocumentsContract.getTreeDocumentId(treeUri),
+    )
+    return DocumentsContract.createDocument(
+        contentResolver,
+        parentDocumentUri,
+        mimeType,
+        displayName,
+    ) ?: error("Could not create backup file in selected folder")
 }
 
 private fun suggestedScheduledAniListBackupFileName(viewerName: String?): String {

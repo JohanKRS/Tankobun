@@ -474,6 +474,9 @@ internal fun BrowseFilterBar(
                 contentDescription = "Browse options",
                 onClick = onOpenAdvanced,
             )
+            if (state.browseFiltersOrSortActive()) {
+                TankobunClearFiltersChip(onClick = viewModel::resetBrowseFilters)
+            }
         }
     }
 }
@@ -673,9 +676,6 @@ internal fun BrowseResults(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            TextButton(onClick = viewModel::resetBrowseFilters) {
-                Text("Reset")
             }
         }
     }
@@ -892,7 +892,7 @@ internal fun LibraryOptionsDialog(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onReset) {
-                Text("Reset")
+                Text("Clear filters")
             }
             Spacer(Modifier.weight(1f))
             TankobunActionButton(label = "Apply", onClick = onDismiss)
@@ -935,7 +935,7 @@ internal fun BrowseAdvancedDialog(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = viewModel::resetBrowseFilters) {
-                Text("Reset")
+                Text("Clear filters")
             }
             Spacer(Modifier.weight(1f))
             TankobunActionButton(
@@ -1013,7 +1013,10 @@ internal fun browseYearOptions(): List<BrowseOption> {
 
 internal fun TankobunUiState.browseControlsActive(): Boolean =
     searchQuery.isNotBlank() ||
-        browseGenres.isNotEmpty() ||
+        browseFiltersOrSortActive()
+
+internal fun TankobunUiState.browseFiltersOrSortActive(): Boolean =
+    browseGenres.isNotEmpty() ||
         browseTags.isNotEmpty() ||
         browseFormat != null ||
         browsePublishingStatus != null ||

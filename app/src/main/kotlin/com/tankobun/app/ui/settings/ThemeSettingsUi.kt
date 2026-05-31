@@ -106,7 +106,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -276,6 +275,14 @@ internal fun ThemeChoiceCard(
         animationSpec = tween(durationMillis = 160),
         label = "Theme card scale",
     )
+    val style = LocalTankobunStyle.current
+    val cardColor = if (selected) style.colors.selectedChip else style.colors.panel
+    val cardContentColor = if (selected) style.colors.selectedChipContent else style.colors.panelContent
+    val secondaryTextColor = if (selected) {
+        cardContentColor.copy(alpha = 0.76f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -285,11 +292,11 @@ internal fun ThemeChoiceCard(
                 scaleY = scale
             }
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else LocalTankobunTokens.current.elevatedSurface,
-        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-        tonalElevation = if (selected) 4.dp else 1.dp,
-        shadowElevation = if (selected) 3.dp else 1.dp,
+        shape = RoundedCornerShape(style.radii.panel),
+        color = cardColor,
+        contentColor = cardContentColor,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -308,7 +315,7 @@ internal fun ThemeChoiceCard(
                     Text(
                         choice.description,
                         style = MaterialTheme.typography.labelMedium,
-                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = secondaryTextColor,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -322,7 +329,7 @@ internal fun ThemeChoiceCard(
                         null -> "Auto"
                     },
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = secondaryTextColor,
                 )
                 if (selected) {
                     Text("Selected", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)

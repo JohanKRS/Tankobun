@@ -2,7 +2,6 @@ package com.tankobun.app
 
 import android.content.Context
 import android.net.Uri
-import android.provider.DocumentsContract
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -11,6 +10,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.tankobun.app.backup.buildMyAnimeListBackupXml
+import com.tankobun.app.backup.createDocumentInTree
 import com.tankobun.app.state.LibraryItem
 import com.tankobun.core.database.toModel
 import kotlinx.coroutines.Dispatchers
@@ -37,12 +37,12 @@ class ScheduledBackupWorker(
                 if (items.isEmpty()) {
                     Result.success()
                 } else {
-                    val fileUri = DocumentsContract.createDocument(
-                        applicationContext.contentResolver,
-                        folderUri,
-                        "text/xml",
-                        scheduledBackupFileName(settings.viewerName()),
-                    ) ?: error("Could not create backup file")
+                    val fileUri = createDocumentInTree(
+                        contentResolver = applicationContext.contentResolver,
+                        treeUri = folderUri,
+                        mimeType = "text/xml",
+                        displayName = scheduledBackupFileName(settings.viewerName()),
+                    )
                     val xml = buildMyAnimeListBackupXml(
                         items = items,
                         viewerName = settings.viewerName(),
@@ -57,7 +57,10 @@ class ScheduledBackupWorker(
                     Result.success()
                 }
             }
-        }.getOrElse { Result.retry() }
+        }.getOrElse { error ->
+            android.util.Log.w("ScheduledBackupWorker", "Scheduled AniList backup failed", error)
+            Result.retry()
+        }
     }
 }
 

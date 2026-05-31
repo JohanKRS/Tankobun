@@ -392,6 +392,17 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
         applyRoute(normalized)
     }
 
+    fun navigateToRootTab(tab: Int) {
+        val normalized = TankobunRoute(tab = tab).normalized()
+        routeHistory = emptyList()
+        if (normalized.sameDestination(currentRoute)) {
+            quickDrawerMode = QuickDrawerMode.CLOSED
+            resetBackPressWindows()
+        } else {
+            applyRoute(normalized)
+        }
+    }
+
     fun popRoute(): Boolean {
         val previousRoute = routeHistory.lastOrNull() ?: return false
         routeHistory = routeHistory.dropLast(1)
@@ -473,7 +484,7 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
                 state = state,
                 viewModel = viewModel,
                 selectedTab = selectedTab,
-                onSelectTab = { navigateTo(TankobunRoute(tab = it)) },
+                onSelectTab = ::navigateToRootTab,
                 canNavigateBack = selectedMedia != null || (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN),
                 onNavigateBack = { handleAppBack() },
                 onSelectMedia = { media -> navigateTo(TankobunRoute(tab = selectedTab, media = media)) },

@@ -419,8 +419,7 @@ internal fun LibraryFilterBar(
     onOpenOptions: () -> Unit,
     onReset: () -> Unit,
 ) {
-    val controlsActive = query.isNotBlank() ||
-        genres.isNotEmpty() ||
+    val filtersOrSortActive = genres.isNotEmpty() ||
         tags.isNotEmpty() ||
         format != null ||
         publishingStatus != null ||
@@ -479,10 +478,8 @@ internal fun LibraryFilterBar(
                 contentDescription = "Library options",
                 onClick = onOpenOptions,
             )
-            if (controlsActive) {
-                TextButton(onClick = onReset) {
-                    Text("Reset")
-                }
+            if (filtersOrSortActive) {
+                TankobunClearFiltersChip(onClick = onReset)
             }
         }
     }

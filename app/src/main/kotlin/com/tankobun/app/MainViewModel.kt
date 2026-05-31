@@ -779,16 +779,24 @@ class MainViewModel(
 
     fun setScheduledBackupFolder(uri: Uri) {
         val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        runCatching {
+        val persisted = runCatching {
             container.application.contentResolver.takePersistableUriPermission(uri, flags)
         }.onFailure { error ->
             Log.w(TAG, "Could not persist backup folder permission", error)
+        }.isSuccess
+        if (!persisted) {
+            _state.update {
+                it.copy(message = "Could not keep access to that folder. Choose another writable folder.")
+            }
+            return
         }
         val uriString = uri.toString()
         container.settingsStore.saveBackupFolderUri(uriString)
         _state.update { it.copy(backupFolderUri = uriString, message = "Backup folder selected") }
         ScheduledBackupWork.update(container.application, _state.value.backupSchedule)
-        runScheduledAniListBackupIfDue(force = true, reportResult = true)
+        if (_state.value.backupSchedule != BackupSchedule.OFF) {
+            runScheduledAniListBackupIfDue(force = true, reportResult = true)
+        }
     }
 
     fun setBackupSchedule(schedule: BackupSchedule) {
@@ -803,16 +811,21 @@ class MainViewModel(
             _state.update { it.copy(message = "Choose a backup folder first") }
             return
         }
-        runScheduledAniListBackupIfDue(force = true, reportResult = true)
+        runScheduledAniListBackupIfDue(
+            force = true,
+            reportResult = true,
+            requireSchedule = false,
+        )
     }
 
     private fun runScheduledAniListBackupIfDue(
         force: Boolean = false,
         reportResult: Boolean = false,
+        requireSchedule: Boolean = true,
     ) {
         val snapshot = _state.value
         val schedule = snapshot.backupSchedule
-        if (schedule == BackupSchedule.OFF) return
+        if (schedule == BackupSchedule.OFF && requireSchedule) return
         val folderUri = snapshot.backupFolderUri?.let(Uri::parse)
         if (folderUri == null) {
             if (reportResult) {
@@ -828,7 +841,12 @@ class MainViewModel(
         }
         val now = System.currentTimeMillis()
         if (!force && !schedule.isDue(lastRunAt = snapshot.lastScheduledBackupAtEpochMillis, now = now)) return
-        if (scheduledBackupJob?.isActive == true) return
+        if (scheduledBackupJob?.isActive == true) {
+            if (reportResult) {
+                _state.update { it.copy(message = "Backup is already running") }
+            }
+            return
+        }
 
         scheduledBackupJob = viewModelScope.launch {
             if (reportResult) {

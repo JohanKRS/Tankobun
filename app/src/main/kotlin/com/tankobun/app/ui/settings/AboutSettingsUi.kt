@@ -106,7 +106,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -236,7 +235,11 @@ internal fun AboutSettingsScreen(
         subtitle = "A little context about what Tankobun is and is not.",
         modifier = modifier,
     ) {
-        ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
+        TankobunPanel(
+            modifier = Modifier.fillMaxWidth(),
+            color = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()

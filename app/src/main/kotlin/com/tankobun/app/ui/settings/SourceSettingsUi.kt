@@ -108,7 +108,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -692,8 +691,8 @@ internal fun SourceLanguageGroupSection(
     val activeCount = sources.count { source -> state.sourceActive(source) }
     TankobunPanel(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
+        color = LocalTankobunStyle.current.colors.panel,
+        contentColor = LocalTankobunStyle.current.colors.panelContent,
     ) {
         Column(Modifier.padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(
@@ -841,7 +840,6 @@ internal fun ExtensionRepositoryRow(
         modifier = Modifier.fillMaxWidth(),
         color = LocalTankobunStyle.current.colors.panel,
         contentColor = LocalTankobunStyle.current.colors.panelContent,
-        tonalElevation = 1.dp,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
