@@ -717,6 +717,7 @@ internal fun LibraryPager(
                 tabHeaderHeightPx -
                 contentPaddingPx -
                 contentHeightPx
+            val shouldMeasureShortPage = estimatedContentHeightPx < constraints.maxHeight
             val pageBottomPadding = with(density) {
                 maxOf(contentPaddingPx, requiredPinnedBottomPaddingPx).toDp()
             }
@@ -743,12 +744,16 @@ internal fun LibraryPager(
                 },
                 scrollToContentOffsetPx = pageScrollRequestOffsets.getOrNull(page),
                 scrollToContentOffsetRequest = pageScrollRequestTokens.getOrElse(page) { 0 },
-                onContentHeightMeasured = { heightPx ->
-                    measuredPageContentHeightsPx = measuredPageContentHeightsPx.toMutableList().also { heights ->
-                        if (page in heights.indices) {
-                            heights[page] = heightPx
+                onContentHeightMeasured = if (shouldMeasureShortPage) {
+                    { heightPx ->
+                        measuredPageContentHeightsPx = measuredPageContentHeightsPx.toMutableList().also { heights ->
+                            if (page in heights.indices) {
+                                heights[page] = heightPx
+                            }
                         }
                     }
+                } else {
+                    null
                 },
                 emptyMessage = if (filtersActive) {
                     "No titles match these library filters."

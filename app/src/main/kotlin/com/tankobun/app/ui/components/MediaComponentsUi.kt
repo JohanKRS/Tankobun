@@ -345,6 +345,7 @@ internal fun MediaCollection(
             val latestOnScrollOffsetChange by rememberUpdatedState(onScrollOffsetChange)
             val latestOnContentHeightMeasured by rememberUpdatedState(onContentHeightMeasured)
             LaunchedEffect(listState, media.size, latestOnNearEnd != null) {
+                if (latestOnNearEnd == null) return@LaunchedEffect
                 snapshotFlow {
                     val layoutInfo = listState.layoutInfo
                     val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
@@ -421,6 +422,7 @@ internal fun MediaCollection(
             val latestOnScrollOffsetChange by rememberUpdatedState(onScrollOffsetChange)
             val latestOnContentHeightMeasured by rememberUpdatedState(onContentHeightMeasured)
             LaunchedEffect(gridState, media.size, latestOnNearEnd != null) {
+                if (latestOnNearEnd == null) return@LaunchedEffect
                 snapshotFlow {
                     val layoutInfo = gridState.layoutInfo
                     val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1

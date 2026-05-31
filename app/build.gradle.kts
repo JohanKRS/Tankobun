@@ -20,8 +20,8 @@ android {
         applicationId = "com.tankobun.app"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 3
-        versionName = "0.1.2"
+        versionCode = 4
+        versionName = "0.2.0-beta.1"
 
         val clientId = localProperties.getProperty("anilistClientId", "")
         buildConfigField("String", "ANILIST_CLIENT_ID", "\"$clientId\"")
@@ -36,6 +36,15 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+            isShrinkResources = false
+            isDebuggable = false
         }
     }
 }
