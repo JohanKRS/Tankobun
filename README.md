@@ -1,10 +1,26 @@
 <p align="center">
-  <img src="docs/app-icon.png" width="112" alt="Tankobun app icon">
+  <img src="docs/app-icon.png" width="148" alt="Tankobun app icon">
 </p>
 
-# Tankobun
+<h1 align="center">Tankobun</h1>
 
-Tankobun is an Android reading and tracking app built around an AniList-first workflow.
+<p align="center">
+  <strong>A personal Android manga shelf for reading, tracking, and AniList-first organization.</strong>
+</p>
+
+<p align="center">
+  Tankobun helps you keep your AniList library, reading progress, sources, downloads, and backups in one calm mobile app.
+</p>
+
+<p align="center">
+  <img src="docs/mockups/manga-detail-dark.png" width="31%" alt="Tankobun manga detail screen in a dark theme">
+  <img src="docs/mockups/library-dark.png" width="31%" alt="Tankobun library screen in a dark theme">
+  <img src="docs/mockups/browse-light.png" width="31%" alt="Tankobun browse screen in a light theme">
+</p>
+
+## What Tankobun Is
+
+Tankobun is an Android reader and tracking client built around an AniList-first workflow.
 
 It is designed as a personal reading shelf: sign in with AniList, browse your lists, open a manga entry, choose a user-installed source when available, read in paged or webtoon mode, and keep your progress organized.
 
@@ -32,13 +48,15 @@ Tankobun is only a reader/tracking client. It does not grant permission to acces
 
 ## APK Releases
 
-APK files, when published in this repository, are provided only as convenience builds of this project’s source code.
+APK files, when published in this repository, are provided only as convenience builds of this project's source code.
 
 The APK does not include manga content, source extensions, source repositories, or content feeds. Installing the APK does not provide access to any manga source by itself.
 
 Tankobun is not distributed through Google Play. Android may show warnings when installing APKs from outside an app store. Install only if you understand and accept the risks of sideloading Android applications.
 
 ## Support Policy
+
+Bug reports and feature requests about the app itself are welcome.
 
 Please do not open issues, discussions, pull requests, or support requests asking for:
 
@@ -49,8 +67,6 @@ Please do not open issues, discussions, pull requests, or support requests askin
 - Help downloading, copying, or redistributing copyrighted content without permission.
 
 Requests of that kind may be closed or removed without response.
-
-Bug reports and feature requests about the app itself are welcome.
 
 ## AniList
 
@@ -116,6 +132,4 @@ This project is licensed under the MIT License. See `LICENCE.md` for details.
 
 ## Third-Party Notices
 
-Some extension compatibility behavior is adapted from the Mihon/Tachiyomi-compatible
-network and extension host ecosystem under the Apache License 2.0. See `NOTICE.md`
-for attribution and license details.
+Some extension compatibility behavior is adapted from the Mihon/Tachiyomi-compatible network and extension host ecosystem under the Apache License 2.0. See `NOTICE.md` for attribution and license details.
