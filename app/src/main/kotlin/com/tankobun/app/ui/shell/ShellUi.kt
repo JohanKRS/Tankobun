@@ -357,7 +357,7 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
     var lastReaderBackPressAt by remember { mutableLongStateOf(0L) }
     val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
     val selectedMedia = state.selectedMedia
-    val readerOpen = state.activeChapter != null && state.readerPages.isNotEmpty()
+    val readerOpen = state.activeChapter != null
     val appStatusBarVisible = state.showAppStatusBar && !readerOpen
     val useDarkStatusBarIcons = state.themeMode.useDarkStatusBarIcons(isSystemInDarkTheme())
     val currentRoute = TankobunRoute(
@@ -467,6 +467,12 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
         if (!readerOpen) {
             lastReaderBackPressAt = 0L
         }
+    }
+
+    LaunchedEffect(state.message) {
+        val message = state.message ?: return@LaunchedEffect
+        delay(10_000L)
+        viewModel.dismissMessage(message)
     }
 
     StatusBarVisibilityEffect(visible = appStatusBarVisible, useDarkIcons = useDarkStatusBarIcons)

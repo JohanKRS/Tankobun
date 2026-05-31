@@ -527,6 +527,16 @@ class MainViewModel(
         _state.update { it.copy(extensionInstallRequest = null) }
     }
 
+    fun dismissMessage(message: String? = null) {
+        _state.update {
+            if (message == null || it.message == message) {
+                it.copy(message = null)
+            } else {
+                it
+            }
+        }
+    }
+
     fun refreshInstalledSourcesAfterExtensionInstall(request: ExtensionInstallRequest) {
         viewModelScope.launch {
             var installedVersion: InstalledExtensionVersion? = null
@@ -3347,13 +3357,13 @@ class MainViewModel(
                         selectedDownloadChapterUrls = emptySet(),
                         busy = false,
                         sourceMatchChapterCounts = it.sourceMatchChapterCounts + (sourceMatchKey(source.id, detailedManga.url) to chapters.size),
-                        message = if (chapters.isEmpty()) "No chapters found" else "Loaded ${chapters.size} chapters",
+                        message = if (chapters.isEmpty()) "No chapters found" else null,
                     )
                 }
                 if (_state.value.keepNextTenDownloads) {
                     val result = ensureNextTenDownloads()
                     if (result.changed > 0) {
-                        _state.update { it.copy(message = "Loaded ${chapters.size} chapters / queued ${result.changed} next chapters") }
+                        _state.update { it.copy(message = "Queued ${result.changed} next chapters for download") }
                     }
                 }
             }.onFailure { error ->
@@ -3373,15 +3383,45 @@ class MainViewModel(
                 it.copy(
                     busy = true,
                     message = null,
+                    activeChapter = chapter,
+                    readerPages = emptyList(),
                     readerPreviousSegment = null,
                     readerNextSegment = null,
+                    currentPageIndex = 0,
+                    currentPageScrollOffset = 0,
                 )
             }
             runCatching {
                 loadReaderPagesForChapter(media.id, chapter, source)
             }.onSuccess { pages ->
                 if (pages.isEmpty() && source == null) {
-                    _state.update { it.copy(busy = false, message = "Source is not installed") }
+                    _state.update {
+                        if (it.activeChapter?.url == chapter.url) {
+                            it.copy(
+                                activeChapter = null,
+                                readerPages = emptyList(),
+                                busy = false,
+                                message = "Source is not installed",
+                            )
+                        } else {
+                            it
+                        }
+                    }
+                    return@onSuccess
+                }
+                if (pages.isEmpty()) {
+                    _state.update {
+                        if (it.activeChapter?.url == chapter.url) {
+                            it.copy(
+                                activeChapter = null,
+                                readerPages = emptyList(),
+                                busy = false,
+                                message = "No pages found",
+                            )
+                        } else {
+                            it
+                        }
+                    }
                     return@onSuccess
                 }
                 val savedProgress = if (startFromSavedProgress) {
@@ -3392,24 +3432,42 @@ class MainViewModel(
                 val startPageIndex = savedProgress?.pageIndex?.coerceIn(0, pages.lastIndex.coerceAtLeast(0)) ?: 0
                 val startPageScrollOffset = savedProgress?.pageScrollOffset?.coerceAtLeast(0) ?: 0
                 Log.i(TAG, "Page load ${source?.name ?: "downloaded"}/${chapter.name}: pages=${pages.size}")
+                var readerStillOpen = false
                 _state.update {
-                    it.copy(
-                        activeChapter = chapter,
-                        readerPages = pages,
-                        readerPreviousSegment = null,
-                        readerNextSegment = null,
-                        currentPageIndex = startPageIndex,
-                        currentPageScrollOffset = startPageScrollOffset,
-                        busy = false,
-                        message = if (pages.isEmpty()) "No pages found" else "Opened ${chapter.name}",
-                    )
+                    if (it.activeChapter?.url == chapter.url) {
+                        readerStillOpen = true
+                        it.copy(
+                            activeChapter = chapter,
+                            readerPages = pages,
+                            readerPreviousSegment = null,
+                            readerNextSegment = null,
+                            currentPageIndex = startPageIndex,
+                            currentPageScrollOffset = startPageScrollOffset,
+                            busy = false,
+                            message = null,
+                        )
+                    } else {
+                        it
+                    }
                 }
+                if (!readerStillOpen) return@onSuccess
                 saveReaderProgress()
                 cacheReaderWindow(media.id, chapter, pages, startPageIndex)
                 loadAdjacentReaderSegments(media.id, chapter)
             }.onFailure { error ->
                 Log.w(TAG, "Page load failed for ${source?.name ?: "cached source"}/${chapter.name}", error)
-                _state.update { it.copy(busy = false, message = error.message ?: "Reader failed") }
+                _state.update {
+                    if (it.activeChapter?.url == chapter.url) {
+                        it.copy(
+                            activeChapter = null,
+                            readerPages = emptyList(),
+                            busy = false,
+                            message = error.message ?: "Reader failed",
+                        )
+                    } else {
+                        it
+                    }
+                }
             }
         }
     }
@@ -3558,6 +3616,7 @@ class MainViewModel(
                 readerNextSegment = null,
                 currentPageIndex = 0,
                 currentPageScrollOffset = 0,
+                busy = false,
             )
         }
     }

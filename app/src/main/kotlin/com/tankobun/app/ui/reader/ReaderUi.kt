@@ -177,7 +177,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
@@ -228,7 +228,10 @@ import com.tankobun.app.ui.shell.*
 @Composable
 internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     val chapter = state.activeChapter ?: return
-    if (state.readerPages.isEmpty()) return
+    if (state.readerPages.isEmpty()) {
+        ReaderLoadingScreen(chapter = chapter, onClose = viewModel::closeReader)
+        return
+    }
     var controlsVisible by remember { mutableStateOf(false) }
     val transformKey = if (state.readerMode == ReaderMode.WEBTOON) {
         "${state.selectedMedia?.id}:${state.selectedSourceId}:webtoon"
@@ -586,7 +589,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     webtoonPageItems,
                     key = { _, item -> "${item.chapter.url}:${item.page.index}:${item.page.imageUrl}" },
                 ) { _, item ->
-                    AsyncImage(
+                    ReaderPageImage(
                         model = readerImageRequest(item.page),
                         contentDescription = item.chapter.name,
                         modifier = Modifier.fillMaxWidth(),
@@ -635,13 +638,14 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                AsyncImage(
+                ReaderPageImage(
                     model = readerImageRequest(page),
                     contentDescription = chapter.name,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(if (state.readerPageGapLevel == 0) 8.dp else pageGap),
                     contentScale = if (state.readerFitWidth) ContentScale.FillWidth else ContentScale.Fit,
+                    fillViewportWhileLoading = true,
                 )
             }
         }
@@ -842,6 +846,103 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun ReaderLoadingScreen(chapter: SourceChapter, onClose: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(WindowInsets.safeDrawing.asPaddingValues()),
+    ) {
+        IconButton(
+            onClick = onClose,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(8.dp),
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Close reader",
+                tint = Color.White,
+            )
+        }
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CircularProgressIndicator(color = Color.White.copy(alpha = 0.86f))
+            Text(
+                "Loading ${chapter.name}",
+                color = Color.White.copy(alpha = 0.72f),
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun ReaderPageImage(
+    model: ImageRequest,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale,
+    fillViewportWhileLoading: Boolean = false,
+) {
+    val loadingModifier = if (fillViewportWhileLoading) {
+        Modifier.fillMaxSize()
+    } else {
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 320.dp)
+    }
+    SubcomposeAsyncImage(
+        model = model,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = contentScale,
+        loading = {
+            ReaderImagePlaceholder(
+                modifier = loadingModifier,
+                label = null,
+            )
+        },
+        error = {
+            ReaderImagePlaceholder(
+                modifier = loadingModifier,
+                label = "Page failed to load",
+            )
+        },
+    )
+}
+
+@Composable
+internal fun ReaderImagePlaceholder(modifier: Modifier, label: String?) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (label == null) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(28.dp),
+                strokeWidth = 2.dp,
+                color = Color.White.copy(alpha = 0.86f),
+            )
+        } else {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.72f),
+            )
         }
     }
 }
