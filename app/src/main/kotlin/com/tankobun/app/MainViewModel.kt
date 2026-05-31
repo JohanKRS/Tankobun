@@ -1595,36 +1595,40 @@ class MainViewModel(
 
     fun clearSelectedMedia() {
         _state.update {
-            it.copy(
-                selectedMedia = null,
-                sourceMatches = emptyList(),
-                sourceMatchChapterCounts = emptyMap(),
-                sourcePickerOpen = false,
-                sourcePickerLoading = false,
-                sourcePickerMessage = null,
-                sourcePickerDiagnostics = emptyList(),
-                selectedListEntry = null,
-                selectedRecommendations = emptyList(),
-                selectedRecommendationsPage = 0,
-                selectedRecommendationsHasMore = false,
-                recommendationsLoading = false,
-                trackingDirty = false,
-                trackingSaveInProgress = false,
-                trackingSaveFailed = false,
-                selectedSourceManga = null,
-                sourceChapters = emptyList(),
-                latestProgress = null,
-                chapterProgress = emptyMap(),
-                activeChapter = null,
-                readerPages = emptyList(),
-                readerPreviousSegment = null,
-                readerNextSegment = null,
-                currentPageIndex = 0,
-                currentPageScrollOffset = 0,
-                selectingDownloadChapters = false,
-                selectedDownloadChapterUrls = emptySet(),
-                message = null,
-            )
+            if (it.selectedMedia == null) {
+                it
+            } else {
+                it.copy(
+                    selectedMedia = null,
+                    sourceMatches = emptyList(),
+                    sourceMatchChapterCounts = emptyMap(),
+                    sourcePickerOpen = false,
+                    sourcePickerLoading = false,
+                    sourcePickerMessage = null,
+                    sourcePickerDiagnostics = emptyList(),
+                    selectedListEntry = null,
+                    selectedRecommendations = emptyList(),
+                    selectedRecommendationsPage = 0,
+                    selectedRecommendationsHasMore = false,
+                    recommendationsLoading = false,
+                    trackingDirty = false,
+                    trackingSaveInProgress = false,
+                    trackingSaveFailed = false,
+                    selectedSourceManga = null,
+                    sourceChapters = emptyList(),
+                    latestProgress = null,
+                    chapterProgress = emptyMap(),
+                    activeChapter = null,
+                    readerPages = emptyList(),
+                    readerPreviousSegment = null,
+                    readerNextSegment = null,
+                    currentPageIndex = 0,
+                    currentPageScrollOffset = 0,
+                    selectingDownloadChapters = false,
+                    selectedDownloadChapterUrls = emptySet(),
+                    message = null,
+                )
+            }
         }
     }
 

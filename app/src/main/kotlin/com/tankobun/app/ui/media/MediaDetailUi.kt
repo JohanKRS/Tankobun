@@ -256,6 +256,7 @@ internal fun MangaDetailScreen(
 ) {
     val backdrop = mediaDetailBackdropColor()
     val listState = rememberLazyListState()
+    val trackedStatuses = remember(state.libraryItems) { state.libraryItems.trackedMediaStatuses() }
     LaunchedEffect(media.id) {
         listState.scrollToItem(0)
     }
@@ -316,6 +317,7 @@ internal fun MangaDetailScreen(
                         loadingMore = state.recommendationsLoading,
                         onLoadMore = viewModel::loadMoreRecommendations,
                         onSelectMedia = onSelectMedia,
+                        trackedStatuses = trackedStatuses,
                     )
                 }
             }
@@ -1508,6 +1510,7 @@ internal fun RecommendationsSection(
     loadingMore: Boolean,
     onLoadMore: () -> Unit,
     onSelectMedia: (AnilistMedia) -> Unit,
+    trackedStatuses: Map<Int, MediaStatus>,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(
@@ -1547,6 +1550,7 @@ internal fun RecommendationsSection(
                     RecommendationTile(
                         recommendation = recommendation,
                         onClick = { onSelectMedia(recommendation.media) },
+                        trackedStatus = trackedStatuses[recommendation.media.id],
                         modifier = Modifier.width(tileWidth),
                     )
                 }
@@ -1569,6 +1573,7 @@ internal fun RecommendationTile(
     recommendation: AnilistRecommendation,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    trackedStatus: MediaStatus? = null,
 ) {
     val media = recommendation.media
     Column(
@@ -1580,9 +1585,10 @@ internal fun RecommendationTile(
             tonalElevation = 1.dp,
             shadowElevation = 2.dp,
         ) {
-            CoverImage(
+            TrackedCoverImage(
                 url = media.coverImage,
                 title = media.title.userPreferred,
+                trackedStatus = trackedStatus,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(2f / 3f),

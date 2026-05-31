@@ -312,6 +312,7 @@ internal fun BrowseScreen(
     var tagsOpen by remember { mutableStateOf(false) }
     var advancedOpen by remember { mutableStateOf(false) }
     val controlsActive = state.browseControlsActive()
+    val trackedStatuses = remember(state.libraryItems) { state.libraryItems.trackedMediaStatuses() }
     val browseHeader: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             BrowseFilterBar(
@@ -340,6 +341,7 @@ internal fun BrowseScreen(
                     state = state,
                     viewModel = viewModel,
                     onSelectMedia = onSelectMedia,
+                    trackedStatuses = trackedStatuses,
                     modifier = Modifier.fillMaxSize(),
                     header = browseHeader,
                 )
@@ -349,6 +351,7 @@ internal fun BrowseScreen(
                 state = state,
                 viewModel = viewModel,
                 onSelectMedia = onSelectMedia,
+                trackedStatuses = trackedStatuses,
                 modifier = Modifier.fillMaxSize(),
                 header = browseHeader,
             )
@@ -432,6 +435,7 @@ internal fun BrowseFilterBar(
             onValueChange = viewModel::setSearchQuery,
             placeholder = "Search AniList manga",
             onSearch = viewModel::searchAniList,
+            showSearchAction = false,
         )
         TankobunFilterRow {
             BrowseFilterPill(
@@ -525,6 +529,7 @@ internal fun BrowseLanding(
     state: TankobunUiState,
     viewModel: MainViewModel,
     onSelectMedia: (AnilistMedia) -> Unit,
+    trackedStatuses: Map<Int, MediaStatus>,
     modifier: Modifier,
     header: @Composable () -> Unit,
 ) {
@@ -542,6 +547,7 @@ internal fun BrowseLanding(
             BrowseMangaShelf(
                 title = "TRENDING NOW",
                 media = state.browseTrending,
+                trackedStatuses = trackedStatuses,
                 onViewAll = { viewModel.viewAllBrowseSection("TRENDING_DESC") },
                 onSelectMedia = onSelectMedia,
             )
@@ -550,6 +556,7 @@ internal fun BrowseLanding(
             BrowseMangaShelf(
                 title = "ALL TIME POPULAR",
                 media = state.browsePopular,
+                trackedStatuses = trackedStatuses,
                 onViewAll = { viewModel.viewAllBrowseSection("POPULARITY_DESC") },
                 onSelectMedia = onSelectMedia,
             )
@@ -558,6 +565,7 @@ internal fun BrowseLanding(
             BrowseMangaShelf(
                 title = "POPULAR MANHWA",
                 media = state.browsePopularManhwa,
+                trackedStatuses = trackedStatuses,
                 onViewAll = viewModel::viewAllPopularManhwa,
                 onSelectMedia = onSelectMedia,
             )
@@ -566,6 +574,7 @@ internal fun BrowseLanding(
             BrowseMangaShelf(
                 title = "TOP 100 MANGA",
                 media = state.browseTopManga,
+                trackedStatuses = trackedStatuses,
                 onViewAll = { viewModel.viewAllBrowseSection("SCORE_DESC") },
                 onSelectMedia = onSelectMedia,
             )
@@ -580,6 +589,7 @@ private val BrowseShelfTitleHeight = 62.dp
 internal fun BrowseMangaShelf(
     title: String,
     media: List<AnilistMedia>,
+    trackedStatuses: Map<Int, MediaStatus>,
     onViewAll: () -> Unit,
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
@@ -602,7 +612,11 @@ internal fun BrowseMangaShelf(
                 horizontalArrangement = Arrangement.spacedBy(28.dp),
             ) {
                 items(media, key = { it.id }) { item ->
-                    BrowseShelfTile(media = item, onClick = { onSelectMedia(item) })
+                    BrowseShelfTile(
+                        media = item,
+                        trackedStatus = trackedStatuses[item.id],
+                        onClick = { onSelectMedia(item) },
+                    )
                 }
             }
         }
@@ -610,7 +624,7 @@ internal fun BrowseMangaShelf(
 }
 
 @Composable
-internal fun BrowseShelfTile(media: AnilistMedia, onClick: () -> Unit) {
+internal fun BrowseShelfTile(media: AnilistMedia, trackedStatus: MediaStatus?, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .width(190.dp)
@@ -622,9 +636,10 @@ internal fun BrowseShelfTile(media: AnilistMedia, onClick: () -> Unit) {
             tonalElevation = 1.dp,
             shadowElevation = 2.dp,
         ) {
-            CoverImage(
+            TrackedCoverImage(
                 url = media.coverImage,
                 title = media.title.userPreferred,
+                trackedStatus = trackedStatus,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(2f / 3f),
@@ -652,6 +667,7 @@ internal fun BrowseResults(
     state: TankobunUiState,
     viewModel: MainViewModel,
     onSelectMedia: (AnilistMedia) -> Unit,
+    trackedStatuses: Map<Int, MediaStatus>,
     modifier: Modifier,
     header: @Composable () -> Unit,
 ) {
@@ -685,6 +701,7 @@ internal fun BrowseResults(
         viewMode = state.browseViewMode,
         coverColumns = state.browseCoverColumns,
         showWholeCovers = state.browseShowWholeCovers,
+        trackedStatuses = trackedStatuses,
         modifier = modifier.fillMaxWidth(),
         header = resultsHeader,
         contentPadding = PaddingValues(vertical = 18.dp),

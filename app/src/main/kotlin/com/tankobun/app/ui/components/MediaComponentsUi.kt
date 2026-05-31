@@ -265,6 +265,7 @@ internal fun MediaCollection(
     showWholeCovers: Boolean,
     onSelectMedia: (AnilistMedia) -> Unit,
     modifier: Modifier = Modifier,
+    trackedStatuses: Map<Int, MediaStatus> = emptyMap(),
     header: (@Composable () -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     emptyMessage: String = "No manga here yet.",
@@ -407,7 +408,11 @@ internal fun MediaCollection(
                     }
                 }
                 items(media, key = { it.id }) { item ->
-                    MediaRow(media = item, onClick = { onSelectMedia(item) })
+                    MediaRow(
+                        media = item,
+                        trackedStatus = trackedStatuses[item.id],
+                        onClick = { onSelectMedia(item) },
+                    )
                 }
                 if (isLoadingMore) {
                     item(key = "media-loading-more") {
@@ -491,6 +496,7 @@ internal fun MediaCollection(
                         media = item,
                         viewMode = supportedViewMode,
                         showWholeCover = showWholeCovers,
+                        trackedStatus = trackedStatuses[item.id],
                         onClick = { onSelectMedia(item) },
                     )
                 }
@@ -531,6 +537,7 @@ internal fun MediaCoverTile(
     showWholeCover: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    trackedStatus: MediaStatus? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -569,9 +576,10 @@ internal fun MediaCoverTile(
                 else -> 3.dp
             },
         ) {
-            CoverImage(
+            TrackedCoverImage(
                 url = media.coverImage,
                 title = media.title.userPreferred,
+                trackedStatus = trackedStatus,
                 modifier = coverModifier,
                 contentScale = if (showWholeCover) ContentScale.Fit else ContentScale.Crop,
                 imageAlignment = if (showWholeCover) Alignment.BottomCenter else Alignment.Center,
@@ -597,7 +605,7 @@ internal fun MediaCoverTile(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun MediaRow(media: AnilistMedia, onClick: () -> Unit) {
+internal fun MediaRow(media: AnilistMedia, trackedStatus: MediaStatus? = null, onClick: () -> Unit) {
     ElevatedCard(onClick = onClick, shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
         ListItem(
             headlineContent = {
@@ -616,12 +624,111 @@ internal fun MediaRow(media: AnilistMedia, onClick: () -> Unit) {
                 }
             },
             leadingContent = {
-                CoverImage(
+                TrackedCoverImage(
                     url = media.coverImage,
                     title = media.title.userPreferred,
+                    trackedStatus = trackedStatus,
                     modifier = Modifier.size(width = 56.dp, height = 78.dp),
                 )
             },
         )
     }
 }
+
+@Composable
+internal fun TrackedCoverImage(
+    url: String?,
+    title: String,
+    trackedStatus: MediaStatus?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    imageAlignment: Alignment = Alignment.Center,
+    cornerRadius: Dp = 8.dp,
+) {
+    Box(modifier = modifier) {
+        CoverImage(
+            url = url,
+            title = title,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = contentScale,
+            imageAlignment = imageAlignment,
+            cornerRadius = cornerRadius,
+        )
+        trackedStatus
+            ?.takeUnless { it == MediaStatus.UNKNOWN }
+            ?.let { status ->
+                TrackedMediaStatusBadge(
+                    status = status,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(6.dp),
+                )
+            }
+    }
+}
+
+@Composable
+internal fun TrackedMediaStatusBadge(
+    status: MediaStatus,
+    modifier: Modifier = Modifier,
+) {
+    val containerColor = when (status) {
+        MediaStatus.CURRENT -> LocalTankobunStyle.current.colors.selectedChip
+        MediaStatus.PLANNING -> MaterialTheme.colorScheme.tertiaryContainer
+        MediaStatus.COMPLETED -> MaterialTheme.colorScheme.primaryContainer
+        MediaStatus.PAUSED -> MaterialTheme.colorScheme.secondaryContainer
+        MediaStatus.DROPPED -> MaterialTheme.colorScheme.errorContainer
+        MediaStatus.REPEATING -> LocalTankobunStyle.current.colors.accent
+        MediaStatus.UNKNOWN -> MaterialTheme.colorScheme.surfaceVariant
+    }.copy(alpha = 0.94f)
+    val contentColor = when (status) {
+        MediaStatus.CURRENT -> LocalTankobunStyle.current.colors.selectedChipContent
+        MediaStatus.PLANNING -> MaterialTheme.colorScheme.onTertiaryContainer
+        MediaStatus.COMPLETED -> MaterialTheme.colorScheme.onPrimaryContainer
+        MediaStatus.PAUSED -> MaterialTheme.colorScheme.onSecondaryContainer
+        MediaStatus.DROPPED -> MaterialTheme.colorScheme.onErrorContainer
+        MediaStatus.REPEATING -> MaterialTheme.colorScheme.onPrimary
+        MediaStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val icon = when (status) {
+        MediaStatus.CURRENT -> Icons.Default.PlayArrow
+        MediaStatus.PLANNING -> Icons.Default.StarBorder
+        MediaStatus.COMPLETED -> Icons.Default.Check
+        MediaStatus.PAUSED -> Icons.Default.Pause
+        MediaStatus.DROPPED -> Icons.Default.Close
+        MediaStatus.REPEATING -> Icons.Default.Replay
+        MediaStatus.UNKNOWN -> Icons.Default.Check
+    }
+    Surface(
+        modifier = modifier.size(24.dp),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        color = containerColor,
+        contentColor = contentColor,
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+        ),
+        shadowElevation = 2.dp,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = "Tracked: ${status.trackedBadgeLabel()}",
+                modifier = Modifier.size(14.dp),
+            )
+        }
+    }
+}
+
+internal fun MediaStatus.trackedBadgeLabel(): String = when (this) {
+    MediaStatus.CURRENT -> "Reading"
+    MediaStatus.PLANNING -> "Planning"
+    MediaStatus.COMPLETED -> "Completed"
+    MediaStatus.PAUSED -> "Paused"
+    MediaStatus.DROPPED -> "Dropped"
+    MediaStatus.REPEATING -> "Rereading"
+    MediaStatus.UNKNOWN -> "Tracked"
+}
+
+internal fun List<LibraryItem>.trackedMediaStatuses(): Map<Int, MediaStatus> =
+    associate { item -> item.media.id to item.entry.status }

@@ -144,6 +144,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -364,6 +365,8 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
         settingsRoute = settingsRoute,
         media = selectedMedia,
     ).normalized()
+    val latestCurrentRoute = rememberUpdatedState(currentRoute)
+    val latestSelectedMedia = rememberUpdatedState(selectedMedia)
 
     fun resetBackPressWindows() {
         lastHomeBackPressAt = 0L
@@ -372,30 +375,33 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
 
     fun applyRoute(route: TankobunRoute) {
         val normalized = route.normalized()
+        val currentMedia = latestSelectedMedia.value
         selectedTab = normalized.tab
         settingsRoute = normalized.settingsRoute
         quickDrawerMode = QuickDrawerMode.CLOSED
         when {
-            normalized.media == null && selectedMedia != null -> viewModel.clearSelectedMedia()
-            normalized.media != null && selectedMedia?.id != normalized.media.id -> viewModel.selectMedia(normalized.media)
+            normalized.media == null -> viewModel.clearSelectedMedia()
+            currentMedia?.id != normalized.media.id -> viewModel.selectMedia(normalized.media)
         }
         resetBackPressWindows()
     }
 
     fun navigateTo(route: TankobunRoute) {
         val normalized = route.normalized()
-        if (normalized.sameDestination(currentRoute)) {
+        val routeNow = latestCurrentRoute.value
+        if (normalized.sameDestination(routeNow)) {
             quickDrawerMode = QuickDrawerMode.CLOSED
             return
         }
-        routeHistory = routeHistory + currentRoute
+        routeHistory = routeHistory + routeNow
         applyRoute(normalized)
     }
 
     fun navigateToRootTab(tab: Int) {
         val normalized = TankobunRoute(tab = tab).normalized()
+        val routeNow = latestCurrentRoute.value
         routeHistory = emptyList()
-        if (normalized.sameDestination(currentRoute)) {
+        if (normalized.sameDestination(routeNow)) {
             quickDrawerMode = QuickDrawerMode.CLOSED
             resetBackPressWindows()
         } else {
@@ -501,8 +507,9 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
                 },
                 onOpenRecentProgress = { item ->
                     val recentRoute = TankobunRoute(tab = selectedTab, media = item.media).normalized()
-                    if (!recentRoute.sameDestination(currentRoute)) {
-                        routeHistory = routeHistory + currentRoute
+                    val routeNow = latestCurrentRoute.value
+                    if (!recentRoute.sameDestination(routeNow)) {
+                        routeHistory = routeHistory + routeNow
                     }
                     quickDrawerMode = QuickDrawerMode.CLOSED
                     resetBackPressWindows()
