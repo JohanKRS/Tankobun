@@ -73,6 +73,20 @@ class SourceMatcherTest {
     }
 
     @Test
+    fun titleOverrideRanksAgainstTemporarySearchTitle() {
+        val ranked = matcher.rank(
+            media = media("Monster #8"),
+            source = source,
+            candidates = listOf(SourceManga(1, "/kaiju", "Kaiju No. 8", null, null, null, null, null)),
+            searchedAtEpochMillis = 0,
+            titleOverrides = listOf("Kaiju No. 8"),
+        )
+
+        assertEquals("/kaiju", ranked.first().manga.url)
+        assertTrue(ranked.first().score > 0.95)
+    }
+
+    @Test
     fun singleWordInsideDifferentTitleIsLooseMatch() {
         val ranked = matcher.rank(
             media = media("Berserk"),

@@ -1888,6 +1888,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
         matches.mapTo(mutableSetOf()) { it.source.sourceSettingsKey() }
     }
     val diagnostics = state.sourcePickerDiagnostics
+    val showSearchTitleEditor = matches.isEmpty() && availableSources.isNotEmpty() && !state.sourcePickerLoading
 
     Dialog(
         onDismissRequest = viewModel::closeSourcePicker,
@@ -1916,6 +1917,15 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
 
                 state.sourcePickerMessage?.let { pickerMessage ->
                     TankobunMessageBanner(pickerMessage)
+                }
+
+                AnimatedVisibility(showSearchTitleEditor) {
+                    SourcePickerSearchTitleEditor(
+                        title = state.sourcePickerSearchTitle,
+                        enabled = !state.sourcePickerLoading,
+                        onTitleChange = viewModel::updateSourcePickerSearchTitle,
+                        onSearch = viewModel::findSourceMatchesWithEditedTitle,
+                    )
                 }
 
                 if (matches.isEmpty() && availableSources.isEmpty() && !state.sourcePickerLoading) {
@@ -1990,6 +2000,86 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                 }
         }
     }
+}
+
+@Composable
+internal fun SourcePickerSearchTitleEditor(
+    title: String,
+    enabled: Boolean,
+    onTitleChange: (String) -> Unit,
+    onSearch: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    ) {
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(12.dp)) {
+            val compact = maxWidth < 420.dp
+            if (compact) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SourceSearchTitleField(
+                        title = title,
+                        enabled = enabled,
+                        onTitleChange = onTitleChange,
+                        onSearch = onSearch,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Button(
+                        onClick = onSearch,
+                        enabled = enabled && title.trim().length >= 2,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                        Spacer(Modifier.size(8.dp))
+                        Text("Search")
+                    }
+                }
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SourceSearchTitleField(
+                        title = title,
+                        enabled = enabled,
+                        onTitleChange = onTitleChange,
+                        onSearch = onSearch,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Button(
+                        onClick = onSearch,
+                        enabled = enabled && title.trim().length >= 2,
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                        Spacer(Modifier.size(8.dp))
+                        Text("Search")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun SourceSearchTitleField(
+    title: String,
+    enabled: Boolean,
+    onTitleChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = title,
+        onValueChange = onTitleChange,
+        modifier = modifier,
+        enabled = enabled,
+        singleLine = true,
+        label = { Text("Search title") },
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { if (enabled && title.trim().length >= 2) onSearch() }),
+    )
 }
 
 @Composable

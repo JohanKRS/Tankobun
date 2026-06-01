@@ -14,13 +14,18 @@ class SourceMatcher {
         source: SourceDescriptor,
         candidates: List<SourceManga>,
         searchedAtEpochMillis: Long,
+        titleOverrides: List<String> = emptyList(),
     ): List<SourceSearchResult> {
-        val titles = buildSet {
-            add(media.title.userPreferred)
-            media.title.romaji?.let(::add)
-            media.title.english?.let(::add)
-            media.title.native?.let(::add)
-            addAll(media.synonyms)
+        val titles = if (titleOverrides.isEmpty()) {
+            buildSet {
+                add(media.title.userPreferred)
+                media.title.romaji?.let(::add)
+                media.title.english?.let(::add)
+                media.title.native?.let(::add)
+                addAll(media.synonyms)
+            }
+        } else {
+            titleOverrides.toSet()
         }.map(::normalize)
             .filter { it.isNotBlank() }
 

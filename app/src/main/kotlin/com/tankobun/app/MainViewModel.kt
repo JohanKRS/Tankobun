@@ -1547,6 +1547,7 @@ class MainViewModel(
                 sourcePickerLoading = false,
                 sourcePickerMessage = null,
                 sourcePickerDiagnostics = emptyList(),
+                sourcePickerSearchTitle = "",
                 selectedListEntry = existingEntry,
                 selectedRecommendations = emptyList(),
                 selectedRecommendationsPage = 0,
@@ -1616,6 +1617,7 @@ class MainViewModel(
                     sourcePickerLoading = false,
                     sourcePickerMessage = null,
                     sourcePickerDiagnostics = emptyList(),
+                    sourcePickerSearchTitle = "",
                     selectedListEntry = null,
                     selectedRecommendations = emptyList(),
                     selectedRecommendationsPage = 0,
@@ -2531,13 +2533,14 @@ class MainViewModel(
             .associateBy { it.chapterUrl }
 
     fun openSourcePicker() {
-        _state.value.selectedMedia ?: return
+        val media = _state.value.selectedMedia ?: return
         val sources = sourcePickerSources()
         _state.update {
             it.copy(
                 sourcePickerOpen = true,
                 sourcePickerMessage = null,
                 sourcePickerDiagnostics = emptyList(),
+                sourcePickerSearchTitle = sourcePickerDefaultSearchTitle(media),
                 message = null,
             )
         }
@@ -2559,8 +2562,22 @@ class MainViewModel(
                 sourcePickerLoading = false,
                 sourcePickerMessage = null,
                 sourcePickerDiagnostics = emptyList(),
+                sourcePickerSearchTitle = "",
             )
         }
+    }
+
+    fun updateSourcePickerSearchTitle(title: String) {
+        _state.update { it.copy(sourcePickerSearchTitle = title) }
+    }
+
+    fun findSourceMatchesWithEditedTitle() {
+        val title = _state.value.sourcePickerSearchTitle.trim()
+        if (title.length < 2) {
+            _state.update { it.copy(sourcePickerMessage = "Enter at least two characters to search.") }
+            return
+        }
+        findSourceMatches(forceRefresh = true, titleOverride = title)
     }
 
     private fun beginSourcePickerJob(): Long {
@@ -2650,8 +2667,10 @@ class MainViewModel(
         media: AnilistMedia,
         source: SourceDescriptor,
         now: Long,
+        titleOverride: String? = null,
     ): List<SourceSearchResult> {
-        val queries = sourceSearchQueries(media)
+        val queries = sourceSearchQueries(media, titleOverride)
+        val titleOverrides = titleOverride?.let(::sourceSearchRankTitleVariants).orEmpty()
         val candidates = mutableListOf<SourceManga>()
         var searchedQueries = 0
         var failedQueries = 0
@@ -2684,6 +2703,7 @@ class MainViewModel(
                 source = source,
                 candidates = candidates.distinctBy { "${it.sourceId}:${it.url}:${it.title}" },
                 searchedAtEpochMillis = now,
+                titleOverrides = titleOverrides,
             )
             if ((rankedSoFar.firstOrNull()?.score ?: 0.0) >= SOURCE_STRONG_MATCH_SCORE) {
                 break
@@ -2699,7 +2719,7 @@ class MainViewModel(
             throw searchError
         }
 
-        val ranked = container.sourceMatcher.rank(media, source, distinctCandidates, now)
+        val ranked = container.sourceMatcher.rank(media, source, distinctCandidates, now, titleOverrides)
         Log.i(
             TAG,
             "Source search ${source.name}: queries=$searchedQueries/${queries.size}, failed=$failedQueries, candidates=${distinctCandidates.size}, ranked=${ranked.size}",
@@ -2718,14 +2738,17 @@ class MainViewModel(
         }
     }
 
-    private fun sourceSearchQueries(media: AnilistMedia): List<String> {
-        val rawTitles = buildList {
-            add(media.title.userPreferred)
-            media.title.romaji?.let(::add)
-            media.title.english?.let(::add)
-            media.title.native?.let(::add)
-            addAll(media.synonyms)
-        }
+    private fun sourceSearchQueries(media: AnilistMedia, titleOverride: String? = null): List<String> {
+        val rawTitles = titleOverride
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::listOf)
+            ?: buildList {
+                add(media.title.userPreferred)
+                media.title.romaji?.let(::add)
+                media.title.english?.let(::add)
+                media.title.native?.let(::add)
+                addAll(media.synonyms)
+            }
 
         return rawTitles
             .flatMap(::sourceSearchQueryVariants)
@@ -2734,6 +2757,20 @@ class MainViewModel(
             .distinctBy { it.lowercase(Locale.ROOT) }
             .take(SOURCE_SEARCH_QUERY_LIMIT)
     }
+
+    private fun sourceSearchRankTitleVariants(title: String): List<String> =
+        sourceSearchQueryVariants(title)
+            .flatMap { variant -> listOf(variant, cleanSourceSearchQuery(variant)) }
+            .filter { it.isNotBlank() }
+            .distinctBy { it.lowercase(Locale.ROOT) }
+
+    private fun sourcePickerDefaultSearchTitle(media: AnilistMedia): String =
+        listOf(
+            media.title.userPreferred,
+            media.title.romaji,
+            media.title.english,
+            media.title.native,
+        ).firstOrNull { !it.isNullOrBlank() }.orEmpty()
 
     private fun sourceSearchQueryVariants(title: String): List<String> {
         val withoutHtml = title.withoutHtmlTags()
@@ -2954,33 +2991,39 @@ class MainViewModel(
             details.contains("HTTP error 403", ignoreCase = true)
     }
 
-    fun findSourceMatches(forceRefresh: Boolean = false) {
+    fun findSourceMatches(forceRefresh: Boolean = false, titleOverride: String? = null) {
         val media = _state.value.selectedMedia ?: return
         val sources = sourcePickerSources()
         if (sources.isEmpty()) {
             _state.update { it.copy(sourcePickerMessage = "Enable or install a source extension first") }
             return
         }
+        val editedTitle = titleOverride?.trim()?.takeIf { it.length >= 2 }
         val requestId = beginSourcePickerJob()
         sourcePickerJob = viewModelScope.launch {
             _state.update {
                 it.copy(
                     sourcePickerLoading = true,
-                    sourcePickerMessage = "Searching enabled sources...",
+                    sourcePickerMessage = editedTitle?.let { title -> "Searching enabled sources for \"$title\"..." }
+                        ?: "Searching enabled sources...",
                     sourcePickerDiagnostics = emptyList(),
                     message = null,
                 )
             }
             try {
                 val now = System.currentTimeMillis()
-                val verified = cachedVerifiedMatches(media.id, sources, now)
-                    .takeIf { !forceRefresh && it.matches.isNotEmpty() }
-                    ?: searchVerifiedMatches(media, sources, now, requestId).also { verified ->
-                        container.database.sourceSearchDao().clearForMedia(media.id)
-                        if (verified.matches.isNotEmpty()) {
-                            container.database.sourceSearchDao().upsertResults(verified.matches.map { it.toEntity() })
+                val verified = if (editedTitle == null) {
+                    cachedVerifiedMatches(media.id, sources, now)
+                        .takeIf { !forceRefresh && it.matches.isNotEmpty() }
+                        ?: searchVerifiedMatches(media, sources, now, requestId).also { verified ->
+                            container.database.sourceSearchDao().clearForMedia(media.id)
+                            if (verified.matches.isNotEmpty()) {
+                                container.database.sourceSearchDao().upsertResults(verified.matches.map { it.toEntity() })
+                            }
                         }
-                    }
+                } else {
+                    searchVerifiedMatches(media, sources, now, requestId, editedTitle)
+                }
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 _state.update {
                     val selectedMatches = it.sourceMatches.filter { match ->
@@ -2996,9 +3039,12 @@ class MainViewModel(
                         busy = false,
                         sourcePickerLoading = false,
                         sourcePickerMessage = if (nextMatches.isEmpty()) {
-                            "No readable matches found automatically. Tap a source below to try it directly."
+                            editedTitle?.let { title ->
+                                "No readable matches found for \"$title\". Edit the search title or tap a source below to try it directly."
+                            } ?: "No readable matches found automatically. Edit the search title or tap a source below to try it directly."
                         } else {
-                            "Found ${nextMatches.size} readable sources"
+                            editedTitle?.let { title -> "Found ${nextMatches.size} readable sources for \"$title\"" }
+                                ?: "Found ${nextMatches.size} readable sources"
                         },
                         message = null,
                     )
@@ -3083,6 +3129,7 @@ class MainViewModel(
         sources: List<SourceDescriptor>,
         now: Long,
         requestId: Long,
+        titleOverride: String? = null,
     ): VerifiedSourceMatches = supervisorScope {
         val semaphore = Semaphore(SOURCE_SEARCH_CONCURRENCY)
         val verified = sources
@@ -3091,7 +3138,7 @@ class MainViewModel(
                     semaphore.withPermit {
                         try {
                             val searchResults = withTimeoutOrNull(SOURCE_MATCH_TIMEOUT_MILLIS) {
-                                searchSourceMatches(media, source, now)
+                                searchSourceMatches(media, source, now, titleOverride)
                             }
                             val candidates = searchResults
                                 .orEmpty()
