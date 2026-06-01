@@ -590,7 +590,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     key = { _, item -> "${item.chapter.url}:${item.page.index}:${item.page.imageUrl}" },
                 ) { _, item ->
                     ReaderPageImage(
-                        model = readerImageRequest(item.page),
+                        model = { retryAttempt -> readerImageRequest(state, item.chapter, item.page, retryAttempt) },
                         contentDescription = item.chapter.name,
                         modifier = Modifier.fillMaxWidth(),
                         contentScale = ContentScale.FillWidth,
@@ -639,7 +639,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 contentAlignment = Alignment.Center,
             ) {
                 ReaderPageImage(
-                    model = readerImageRequest(page),
+                    model = { retryAttempt -> readerImageRequest(state, chapter, page, retryAttempt) },
                     contentDescription = chapter.name,
                     modifier = Modifier
                         .fillMaxSize()
@@ -891,12 +891,14 @@ internal fun ReaderLoadingScreen(chapter: SourceChapter, onClose: () -> Unit) {
 
 @Composable
 internal fun ReaderPageImage(
-    model: ImageRequest,
+    model: @Composable (retryAttempt: Int) -> ImageRequest,
     contentDescription: String,
     modifier: Modifier = Modifier,
     contentScale: ContentScale,
     fillViewportWhileLoading: Boolean = false,
 ) {
+    var retryAttempt by remember { mutableIntStateOf(0) }
+    val imageRequest = model(retryAttempt)
     val loadingModifier = if (fillViewportWhileLoading) {
         Modifier.fillMaxSize()
     } else {
@@ -905,7 +907,7 @@ internal fun ReaderPageImage(
             .heightIn(min = 320.dp)
     }
     SubcomposeAsyncImage(
-        model = model,
+        model = imageRequest,
         contentDescription = contentDescription,
         modifier = modifier,
         contentScale = contentScale,
@@ -919,17 +921,22 @@ internal fun ReaderPageImage(
             ReaderImagePlaceholder(
                 modifier = loadingModifier,
                 label = "Page failed to load",
+                onRetry = { retryAttempt += 1 },
             )
         },
     )
 }
 
 @Composable
-internal fun ReaderImagePlaceholder(modifier: Modifier, label: String?) {
+internal fun ReaderImagePlaceholder(
+    modifier: Modifier,
+    label: String?,
+    onRetry: (() -> Unit)? = null,
+) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
     ) {
         if (label == null) {
             CircularProgressIndicator(
@@ -943,6 +950,20 @@ internal fun ReaderImagePlaceholder(modifier: Modifier, label: String?) {
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.72f),
             )
+            if (onRetry != null) {
+                TextButton(onClick = onRetry) {
+                    Icon(
+                        Icons.Default.Replay,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.88f),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Retry",
+                        color = Color.White.copy(alpha = 0.88f),
+                    )
+                }
+            }
         }
     }
 }
@@ -1109,9 +1130,23 @@ internal fun Velocity.readerVelocityForAxis(axis: ReaderPanAxis): Velocity = whe
 }
 
 @Composable
-internal fun readerImageRequest(page: ReaderPage): ImageRequest {
+internal fun readerImageRequest(
+    state: TankobunUiState,
+    chapter: SourceChapter,
+    page: ReaderPage,
+    retryAttempt: Int = 0,
+): ImageRequest {
     val context = LocalContext.current
-    return remember(page.imageUrl, page.cachedFilePath, page.headers) {
+    val mediaId = state.selectedMedia?.id
+    val source = remember(
+        chapter.sourceId,
+        state.installedSources,
+        state.allInstalledSources,
+        state.selectedSource,
+    ) {
+        state.readerImageSourceFor(chapter)
+    }
+    return remember(context, mediaId, chapter, source, page, retryAttempt) {
         val headers = NetworkHeaders.Builder().apply {
             page.headers.forEach { (name, value) ->
                 if (name.isNotBlank() && value.isNotBlank()) {
@@ -1119,9 +1154,21 @@ internal fun readerImageRequest(page: ReaderPage): ImageRequest {
                 }
             }
         }.build()
+        val data = when {
+            page.cachedFilePath != null -> page.cachedFilePath
+            mediaId != null && source != null -> ReaderPageImageModel(
+                mediaId = mediaId,
+                chapter = chapter,
+                source = source,
+                page = page,
+                retryAttempt = retryAttempt,
+            )
+            else -> page.imageUrl
+        }
 
         ImageRequest.Builder(context)
-            .data(page.cachedFilePath ?: page.imageUrl)
+            .data(data)
+            .memoryCacheKeyExtra("retry", retryAttempt.toString())
             .httpHeaders(headers)
             .listener(
                 onError = { _, result ->
@@ -1135,3 +1182,8 @@ internal fun readerImageRequest(page: ReaderPage): ImageRequest {
             .build()
     }
 }
+
+private fun TankobunUiState.readerImageSourceFor(chapter: SourceChapter): SourceDescriptor? =
+    installedSources.firstOrNull { it.id == chapter.sourceId }
+        ?: allInstalledSources.firstOrNull { it.id == chapter.sourceId }
+        ?: selectedSource?.takeIf { it.id == chapter.sourceId }

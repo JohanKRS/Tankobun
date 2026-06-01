@@ -94,6 +94,11 @@ abstract class HttpSource : CatalogueSource {
             client.newCall(imageUrlRequest(page)).execute().use(::imageUrlParse)
         }
 
+    open fun fetchImage(page: Page): Observable<Response> =
+        Observable.fromCallable {
+            client.newCall(imageRequest(page)).execute()
+        }
+
     open fun popularMangaRequest(page: Int): Request = throw UnsupportedOperationException()
     open fun popularMangaParse(response: Response): MangasPage = throw UnsupportedOperationException()
     open fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request = throw UnsupportedOperationException()

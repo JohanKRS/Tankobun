@@ -3452,7 +3452,7 @@ class MainViewModel(
                 }
                 if (!readerStillOpen) return@onSuccess
                 saveReaderProgress()
-                cacheReaderWindow(media.id, chapter, pages, startPageIndex)
+                cacheReaderWindow(media.id, chapter, pages, startPageIndex, source)
                 loadAdjacentReaderSegments(media.id, chapter)
             }.onFailure { error ->
                 Log.w(TAG, "Page load failed for ${source?.name ?: "cached source"}/${chapter.name}", error)
@@ -3523,6 +3523,7 @@ class MainViewModel(
             }
             previousSegment?.let { segment ->
                 startReaderPageCache(
+                    source = previousSource,
                     mediaId = mediaId,
                     chapter = segment.chapter,
                     pages = segment.pages.takeLast(READER_ADJACENT_CACHE_PAGE_COUNT),
@@ -3531,6 +3532,7 @@ class MainViewModel(
             }
             nextSegment?.let { segment ->
                 startReaderPageCache(
+                    source = nextSource,
                     mediaId = mediaId,
                     chapter = segment.chapter,
                     pages = segment.pages.take(READER_ADJACENT_CACHE_PAGE_COUNT),
@@ -3648,7 +3650,7 @@ class MainViewModel(
         val media = snapshot.selectedMedia
         val chapter = snapshot.activeChapter
         if (media != null && chapter != null) {
-            cacheReaderWindow(media.id, chapter, pages, nextIndex)
+            cacheReaderWindow(media.id, chapter, pages, nextIndex, snapshot.readerSourceForChapter(chapter))
         }
     }
 
@@ -3716,7 +3718,13 @@ class MainViewModel(
             pageIndex = nextIndex,
             pageScrollOffset = pageScrollOffset,
         )
-        cacheReaderWindow(media.id, targetSegment.chapter, targetSegment.pages, nextIndex)
+        cacheReaderWindow(
+            mediaId = media.id,
+            chapter = targetSegment.chapter,
+            pages = targetSegment.pages,
+            pageIndex = nextIndex,
+            source = snapshot.readerSourceForChapter(targetSegment.chapter),
+        )
         loadAdjacentReaderSegments(media.id, targetSegment.chapter)
     }
 
@@ -3725,11 +3733,14 @@ class MainViewModel(
         chapter: SourceChapter,
         pages: List<ReaderPage>,
         pageIndex: Int,
+        source: SourceDescriptor? = _state.value.readerSourceForChapter(chapter),
     ) {
         if (pages.isEmpty()) return
+        source ?: return
         val start = (pageIndex - READER_CACHE_BACK_PAGES).coerceAtLeast(0)
         val end = (pageIndex + READER_CACHE_FORWARD_PAGES).coerceAtMost(pages.lastIndex)
         startReaderPageCache(
+            source = source,
             mediaId = mediaId,
             chapter = chapter,
             pages = pages.subList(start, end + 1),
@@ -3739,12 +3750,14 @@ class MainViewModel(
     }
 
     private fun startReaderPageCache(
+        source: SourceDescriptor?,
         mediaId: Int,
         chapter: SourceChapter,
         pages: List<ReaderPage>,
         cacheKeySuffix: String,
         replaceExisting: Boolean = false,
     ) {
+        source ?: return
         val pagesToCache = pages.filter { it.cachedFilePath == null }
         if (pagesToCache.isEmpty()) return
         val key = "$mediaId:${chapter.sourceId}:${chapter.url}:$cacheKeySuffix"
@@ -3760,26 +3773,14 @@ class MainViewModel(
                     if (ReaderPageCache.cachedBytes(container.application, mediaId, chapter, page) != null) {
                         return@runCatching
                     }
-                    val request = Request.Builder()
-                        .url(page.imageUrl)
-                        .apply {
-                            page.headers.forEach { (name, value) ->
-                                if (name.isNotBlank() && value.isNotBlank()) header(name, value)
-                            }
-                        }
-                        .build()
-                    container.okHttpClient.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) {
-                            error("Reader cache page ${page.index + 1} failed: HTTP ${response.code}")
-                        }
-                        ReaderPageCache.writePage(
-                            context = container.application,
-                            mediaId = mediaId,
-                            chapter = chapter,
-                            page = page,
-                            bytes = response.body.bytes(),
-                        )
-                    }
+                    val bytes = container.sourceHost.imageBytes(source, page)
+                    ReaderPageCache.writePage(
+                        context = container.application,
+                        mediaId = mediaId,
+                        chapter = chapter,
+                        page = page,
+                        bytes = bytes,
+                    )
                 }.onFailure { error ->
                     if (error !is CancellationException) {
                         Log.w(TAG, "Reader cache failed for ${chapter.name} page ${page.index + 1}", error)

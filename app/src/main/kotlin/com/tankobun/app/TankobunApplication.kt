@@ -2,6 +2,8 @@ package com.tankobun.app
 
 import android.app.Application
 import android.net.Uri
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
 import com.tankobun.core.anilist.AnilistGraphQlClient
 import com.tankobun.core.anilist.AnilistRepository
 import com.tankobun.core.database.DatabaseFactory
@@ -29,7 +31,6 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.Cache
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import uy.kohesive.injekt.TankobunInjektRegistry
 import java.io.File
 import java.security.MessageDigest
@@ -43,7 +44,15 @@ class TankobunApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         TankobunInjektRegistry.registerApplication(this)
-        container
+        val appContainer = container
+        SingletonImageLoader.setSafe {
+            ImageLoader.Builder(it)
+                .components {
+                    add(ReaderPageFetcher.Factory(appContainer))
+                    add(ReaderPageImageModelKeyer())
+                }
+                .build()
+        }
         ScheduledBackupWork.sync(this, container.settingsStore.backupSchedule())
     }
 }
@@ -139,7 +148,7 @@ class AppContainer(application: Application) {
                 sourceHost.pages(source, chapter)
 
             override suspend fun bytes(page: ReaderPage): ByteArray =
-                downloadPageBytes(downloadJob, chapter, page)
+                downloadPageBytes(source, downloadJob, chapter, page)
         }
 
     private fun filePageStorage(): DownloadPageStorage =
@@ -149,6 +158,7 @@ class AppContainer(application: Application) {
         }
 
     private suspend fun downloadPageBytes(
+        source: SourceDescriptor,
         job: DownloadJob,
         chapter: SourceChapter,
         page: ReaderPage,
@@ -157,21 +167,8 @@ class AppContainer(application: Application) {
             ReaderPageCache.cachedBytes(application, job.mediaId, chapter, page)?.let { bytes ->
                 return@withContext bytes
             }
-            val request = Request.Builder()
-                .url(page.imageUrl)
-                .apply {
-                    page.headers.forEach { (name, value) ->
-                        if (name.isNotBlank() && value.isNotBlank()) header(name, value)
-                    }
-                }
-                .build()
-            okHttpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    error("Page ${page.index + 1} failed: HTTP ${response.code}")
-                }
-                response.body.bytes().also { bytes ->
-                    ReaderPageCache.writePage(application, job.mediaId, chapter, page, bytes)
-                }
+            sourceHost.imageBytes(source, page).also { bytes ->
+                ReaderPageCache.writePage(application, job.mediaId, chapter, page, bytes)
             }
         }
 

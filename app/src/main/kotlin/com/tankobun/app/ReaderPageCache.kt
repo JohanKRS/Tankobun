@@ -89,7 +89,7 @@ object ReaderPageCache {
         )
 
     private fun rootDir(context: Context): File =
-        File(context.filesDir, "reader_page_cache").also { it.mkdirs() }
+        File(context.filesDir, "reader_page_cache_v2").also { it.mkdirs() }
 
     private fun pageFileName(page: ReaderPage): String =
         "${page.index.toString().padStart(4, '0')}.${pageFileExtension(page.imageUrl)}"

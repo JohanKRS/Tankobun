@@ -177,6 +177,7 @@ data class ReaderPage(
     val imageUrl: String,
     val cachedFilePath: String?,
     val headers: Map<String, String> = emptyMap(),
+    val sourcePageUrl: String = "",
 )
 
 data class SourceBinding(

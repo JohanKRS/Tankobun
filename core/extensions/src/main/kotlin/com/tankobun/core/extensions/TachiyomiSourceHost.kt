@@ -174,19 +174,7 @@ class TachiyomiSourceHost(
                 sourceInstance.getPageList(sourceChapter)
             }
             pages.map { page ->
-                if (page.imageUrl == null && page.uri == null && sourceInstance is HttpSource) {
-                    page.imageUrl = runCatching {
-                        sourceInstance.getImageUrl(page)
-                    }.onFailure { error ->
-                        logSourceFailure(
-                            action = "imageUrl",
-                            packageName = source.packageName,
-                            source = sourceInstance,
-                            error = error,
-                        )
-                    }.getOrNull()
-                }
-                val imageRequest = if (sourceInstance is HttpSource) {
+                val imageRequest = if (sourceInstance is HttpSource && page.imageUrl != null) {
                     runCatching {
                         sourceInstance.imageRequest(page)
                     }.onFailure { error ->
@@ -212,7 +200,59 @@ class TachiyomiSourceHost(
                     imageUrl = imageUrl,
                     cachedFilePath = null,
                     headers = headers,
+                    sourcePageUrl = page.url,
                 )
+            }
+        }
+    }
+
+    suspend fun imageBytes(source: SourceDescriptor, page: ReaderPage): ByteArray = withContext(Dispatchers.IO) {
+        val sourceInstance = findSource(source) ?: error("Source is not installed")
+        if (sourceInstance !is HttpSource) {
+            error("${sourceInstance.name} does not support HTTP image loading")
+        }
+        runSourceAction(source, sourceInstance, "image") {
+            val sourcePageUrl = page.sourcePageUrl.ifBlank { page.imageUrl }
+            val imageUrlCandidate = page.imageUrl.takeIf { it.isNotBlank() }
+            val sourcePage = Page(
+                index = page.index,
+                url = sourcePageUrl,
+                imageUrl = imageUrlCandidate.takeIf { it != sourcePageUrl || it.looksLikeImageUrl() },
+            )
+            val resolutionError = if (sourcePage.imageUrl == null) {
+                sourceInstance.resolveImageUrl(sourcePage)
+            } else {
+                null
+            }
+            if (sourcePage.imageUrl == null) {
+                sourcePage.imageUrl = sourcePageUrl.takeIf { it.isHttpUrl() }
+            }
+            val usingDirectFallback = sourcePage.imageUrl == sourcePageUrl && resolutionError != null
+            runCatching {
+                sourceInstance.fetchImage(sourcePage).toBlocking().first()
+            }.getOrElse { error ->
+                if (usingDirectFallback) {
+                    resolutionError?.let(error::addSuppressed)
+                }
+                throw error
+            }.use { response ->
+                if (!response.isSuccessful) {
+                    throw IllegalStateException("Page ${page.index + 1} failed: HTTP ${response.code}").also { error ->
+                        if (usingDirectFallback) {
+                            resolutionError?.let(error::addSuppressed)
+                        }
+                    }
+                }
+                val contentType = response.body.contentType()?.toString().orEmpty()
+                response.body.bytes().also { bytes ->
+                    if (!bytes.looksLikeImage() && !contentType.startsWith("image/", ignoreCase = true)) {
+                        throw IllegalStateException("Page ${page.index + 1} did not return an image").also { error ->
+                            if (usingDirectFallback) {
+                                resolutionError?.let(error::addSuppressed)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -358,6 +398,60 @@ private fun ensureHttpAgent() {
         System.setProperty("http.agent", eu.kanade.tachiyomi.network.NetworkHelper.defaultUserAgent())
     }
 }
+
+private suspend fun HttpSource.resolveImageUrl(page: Page): Throwable? =
+    runCatching {
+        getImageUrl(page)
+    }.onSuccess { resolvedUrl ->
+        if (resolvedUrl.isNotBlank()) {
+            page.imageUrl = resolvedUrl
+        }
+    }.exceptionOrNull()
+        ?.takeUnless { it.hasUnsupportedOperationCause() }
+
+private fun String.isHttpUrl(): Boolean =
+    startsWith("http://", ignoreCase = true) || startsWith("https://", ignoreCase = true)
+
+private fun String.looksLikeImageUrl(): Boolean {
+    val path = substringBefore('#').substringBefore('?').lowercase()
+    return path.endsWith(".jpg") ||
+        path.endsWith(".jpeg") ||
+        path.endsWith(".png") ||
+        path.endsWith(".webp") ||
+        path.endsWith(".gif") ||
+        path.endsWith(".avif") ||
+        path.endsWith(".bmp")
+}
+
+private fun Throwable.hasUnsupportedOperationCause(): Boolean {
+    var current: Throwable? = this
+    while (current != null) {
+        if (current is UnsupportedOperationException) {
+            return true
+        }
+        current = current.cause
+    }
+    return false
+}
+
+private fun ByteArray.looksLikeImage(): Boolean =
+    startsWith(0xFF, 0xD8, 0xFF) ||
+        startsWith(0x89, 0x50, 0x4E, 0x47) ||
+        startsWith(0x47, 0x49, 0x46) ||
+        (
+            size >= 12 &&
+                this[0] == 0x52.toByte() &&
+                this[1] == 0x49.toByte() &&
+                this[2] == 0x46.toByte() &&
+                this[3] == 0x46.toByte() &&
+                this[8] == 0x57.toByte() &&
+                this[9] == 0x45.toByte() &&
+                this[10] == 0x42.toByte() &&
+                this[11] == 0x50.toByte()
+            )
+
+private fun ByteArray.startsWith(vararg values: Int): Boolean =
+    size >= values.size && values.indices.all { index -> this[index] == values[index].toByte() }
 
 private fun <T : Source> List<T>.bestMatch(source: SourceDescriptor): T? {
     firstOrNull { it.id == source.id }?.let { return it }
