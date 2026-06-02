@@ -22,7 +22,7 @@ data class ReaderPageImageModel(
     val retryAttempt: Int = 0,
 ) {
     val cacheKey: String =
-        "reader:$mediaId:${source.id}:${chapter.url}:${page.index}:${page.sourcePageUrl}:${page.imageUrl}:retry:$retryAttempt"
+        "reader:$mediaId:${source.id}:${chapter.url}:${page.index}:${page.sourcePageUrl}:${page.imageUrl}:${page.imageUrlResolved}:retry:$retryAttempt"
 }
 
 class ReaderPageFetcher(
@@ -31,34 +31,23 @@ class ReaderPageFetcher(
     private val options: Options,
 ) : Fetcher {
     override suspend fun fetch(): FetchResult {
-        val cachedBytes = if (data.retryAttempt == 0) {
-            ReaderPageCache.cachedBytes(
-                context = container.application,
-                mediaId = data.mediaId,
-                chapter = data.chapter,
-                page = data.page,
-            )
-        } else {
-            null
-        }
-        val bytes = cachedBytes ?: container.sourceHost.imageBytes(data.source, data.page).also { fetchedBytes ->
-            runCatching {
-                ReaderPageCache.writePage(
-                    context = container.application,
-                    mediaId = data.mediaId,
-                    chapter = data.chapter,
-                    page = data.page,
-                    bytes = fetchedBytes,
-                )
-            }.onFailure { error ->
+        val pageBytes = ReaderPageCache.cachedOrFetch(
+            context = container.application,
+            mediaId = data.mediaId,
+            chapter = data.chapter,
+            page = data.page,
+            allowCachedRead = data.retryAttempt == 0,
+            onCacheWriteFailure = { error ->
                 Log.w(TAG, "Reader page cache write failed for ${data.chapter.name} page ${data.page.index + 1}", error)
-            }
+            },
+        ) {
+            container.sourceHost.imageBytes(data.source, data.page)
         }
 
         return SourceFetchResult(
-            source = ImageSource(Buffer().write(bytes), options.fileSystem),
+            source = ImageSource(Buffer().write(pageBytes.bytes), options.fileSystem),
             mimeType = null,
-            dataSource = if (cachedBytes == null) DataSource.NETWORK else DataSource.DISK,
+            dataSource = if (pageBytes.fromCache) DataSource.DISK else DataSource.NETWORK,
         )
     }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.util.Log
+import com.tankobun.core.network.RespectfulRateLimiter
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.SourceChapter
@@ -18,14 +19,19 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import uy.kohesive.injekt.TankobunInjektRegistry
+import java.util.concurrent.ConcurrentHashMap
 
 class TachiyomiSourceHost(
     private val context: Context,
 ) {
     private val appContext = context.applicationContext
     private val sourceCache = mutableMapOf<String, CachedSources>()
+    private val imageFetchSemaphores = ConcurrentHashMap<String, Semaphore>()
+    private val imageFetchRateLimiters = ConcurrentHashMap<String, RespectfulRateLimiter>()
 
     init {
         TankobunInjektRegistry.applicationOrNull()?.let { registered ->
@@ -192,6 +198,7 @@ class TachiyomiSourceHost(
                     ?: page.imageUrl
                     ?: page.uri?.toString()
                     ?: page.url
+                val imageUrlResolved = imageRequest != null || page.imageUrl != null || page.uri != null
                 val headers = imageRequest?.headers?.names()
                     ?.associateWith { name -> imageRequest.headers[name].orEmpty() }
                     .orEmpty()
@@ -201,6 +208,7 @@ class TachiyomiSourceHost(
                     cachedFilePath = null,
                     headers = headers,
                     sourcePageUrl = page.url,
+                    imageUrlResolved = imageUrlResolved,
                 )
             }
         }
@@ -211,50 +219,69 @@ class TachiyomiSourceHost(
         if (sourceInstance !is HttpSource) {
             error("${sourceInstance.name} does not support HTTP image loading")
         }
-        runSourceAction(source, sourceInstance, "image") {
-            val sourcePageUrl = page.sourcePageUrl.ifBlank { page.imageUrl }
-            val imageUrlCandidate = page.imageUrl.takeIf { it.isNotBlank() }
-            val sourcePage = Page(
-                index = page.index,
-                url = sourcePageUrl,
-                imageUrl = imageUrlCandidate.takeIf { it != sourcePageUrl || it.looksLikeImageUrl() },
-            )
-            val resolutionError = if (sourcePage.imageUrl == null) {
-                sourceInstance.resolveImageUrl(sourcePage)
-            } else {
-                null
-            }
-            if (sourcePage.imageUrl == null) {
-                sourcePage.imageUrl = sourcePageUrl.takeIf { it.isHttpUrl() }
-            }
-            val usingDirectFallback = sourcePage.imageUrl == sourcePageUrl && resolutionError != null
-            runCatching {
-                sourceInstance.fetchImage(sourcePage).toBlocking().first()
-            }.getOrElse { error ->
-                if (usingDirectFallback) {
-                    resolutionError?.let(error::addSuppressed)
-                }
-                throw error
-            }.use { response ->
-                if (!response.isSuccessful) {
-                    throw IllegalStateException("Page ${page.index + 1} failed: HTTP ${response.code}").also { error ->
-                        if (usingDirectFallback) {
-                            resolutionError?.let(error::addSuppressed)
-                        }
+        val fetchKey = source.imageFetchKey()
+        val semaphore = imageFetchSemaphores.getOrPut(fetchKey) { Semaphore(SOURCE_IMAGE_FETCH_CONCURRENCY) }
+        val rateLimiter = imageFetchRateLimiters.getOrPut(fetchKey) {
+            RespectfulRateLimiter(minSpacingMillis = SOURCE_IMAGE_REQUEST_SPACING_MILLIS)
+        }
+        semaphore.withPermit {
+            rateLimiter.run {
+                runSourceAction(source, sourceInstance, "image") {
+                    val sourcePageUrl = page.sourcePageUrl.ifBlank { page.imageUrl }
+                    val imageUrlCandidate = page.imageUrl.takeIf { it.isNotBlank() }
+                    val sourcePage = Page(
+                        index = page.index,
+                        url = sourcePageUrl,
+                        imageUrl = imageUrlCandidate.takeIf {
+                            page.imageUrlResolved || it != sourcePageUrl || it.looksLikeImageUrl()
+                        },
+                    )
+                    val resolutionError = if (sourcePage.imageUrl == null) {
+                        sourceInstance.resolveImageUrl(sourcePage)
+                    } else {
+                        null
                     }
-                }
-                val contentType = response.body.contentType()?.toString().orEmpty()
-                response.body.bytes().also { bytes ->
-                    if (!bytes.looksLikeImage() && !contentType.startsWith("image/", ignoreCase = true)) {
-                        throw IllegalStateException("Page ${page.index + 1} did not return an image").also { error ->
-                            if (usingDirectFallback) {
-                                resolutionError?.let(error::addSuppressed)
+                    if (sourcePage.imageUrl == null) {
+                        sourcePage.imageUrl = sourcePageUrl.takeIf { it.isHttpUrl() }
+                    }
+                    val usingDirectFallback = sourcePage.imageUrl == sourcePageUrl && resolutionError != null
+                    runCatching {
+                        sourceInstance.fetchImage(sourcePage).toBlocking().first()
+                    }.getOrElse { error ->
+                        if (usingDirectFallback) {
+                            error.addSuppressed(resolutionError)
+                        }
+                        throw error
+                    }.use { response ->
+                        if (!response.isSuccessful) {
+                            throw IllegalStateException("Page ${page.index + 1} failed: HTTP ${response.code}").also { error ->
+                                if (usingDirectFallback) {
+                                    error.addSuppressed(resolutionError)
+                                }
+                            }
+                        }
+                        val contentType = response.body.contentType()?.toString().orEmpty()
+                        response.body.bytes().also { bytes ->
+                            if (!bytes.looksLikeImage() && !contentType.startsWith("image/", ignoreCase = true)) {
+                                throw IllegalStateException("Page ${page.index + 1} did not return an image").also { error ->
+                                    if (usingDirectFallback) {
+                                        error.addSuppressed(resolutionError)
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    private fun SourceDescriptor.imageFetchKey(): String = "$packageName:$id"
+
+    companion object {
+        private const val TAG = "TankobunSources"
+        private const val SOURCE_IMAGE_FETCH_CONCURRENCY = 2
+        private const val SOURCE_IMAGE_REQUEST_SPACING_MILLIS = 250L
     }
 
     private fun findCatalogueSource(source: SourceDescriptor): CatalogueSource? =
@@ -318,10 +345,6 @@ class TachiyomiSourceHost(
         val sourceDir = applicationInfo?.sourceDir.orEmpty()
         val updatedAt = lastUpdateTime
         return "$version:$updatedAt:$sourceDir"
-    }
-
-    companion object {
-        private const val TAG = "TankobunSources"
     }
 }
 

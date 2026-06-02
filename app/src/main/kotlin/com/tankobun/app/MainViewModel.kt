@@ -3575,6 +3575,7 @@ class MainViewModel(
                     chapter = segment.chapter,
                     pages = segment.pages.takeLast(READER_ADJACENT_CACHE_PAGE_COUNT),
                     cacheKeySuffix = "tail",
+                    initialDelayMillis = READER_ADJACENT_CACHE_INITIAL_DELAY_MILLIS,
                 )
             }
             nextSegment?.let { segment ->
@@ -3584,6 +3585,7 @@ class MainViewModel(
                     chapter = segment.chapter,
                     pages = segment.pages.take(READER_ADJACENT_CACHE_PAGE_COUNT),
                     cacheKeySuffix = "head",
+                    initialDelayMillis = READER_ADJACENT_CACHE_INITIAL_DELAY_MILLIS,
                 )
             }
             _state.update {
@@ -3793,6 +3795,7 @@ class MainViewModel(
             pages = pages.subList(start, end + 1),
             cacheKeySuffix = "window",
             replaceExisting = true,
+            initialDelayMillis = READER_CACHE_INITIAL_DELAY_MILLIS,
         )
     }
 
@@ -3803,6 +3806,7 @@ class MainViewModel(
         pages: List<ReaderPage>,
         cacheKeySuffix: String,
         replaceExisting: Boolean = false,
+        initialDelayMillis: Long = 0L,
     ) {
         source ?: return
         val pagesToCache = pages.filter { it.cachedFilePath == null }
@@ -3814,20 +3818,20 @@ class MainViewModel(
             return
         }
         val job = viewModelScope.launch(Dispatchers.IO) {
+            if (initialDelayMillis > 0L) {
+                delay(initialDelayMillis)
+            }
             pagesToCache.forEachIndexed { index, page ->
                 if (index > 0) delay(READER_CACHE_REQUEST_SPACING_MILLIS)
                 runCatching {
-                    if (ReaderPageCache.cachedBytes(container.application, mediaId, chapter, page) != null) {
-                        return@runCatching
-                    }
-                    val bytes = container.sourceHost.imageBytes(source, page)
-                    ReaderPageCache.writePage(
+                    ReaderPageCache.cachedOrFetch(
                         context = container.application,
                         mediaId = mediaId,
                         chapter = chapter,
                         page = page,
-                        bytes = bytes,
-                    )
+                    ) {
+                        container.sourceHost.imageBytes(source, page)
+                    }
                 }.onFailure { error ->
                     if (error !is CancellationException) {
                         Log.w(TAG, "Reader cache failed for ${chapter.name} page ${page.index + 1}", error)
@@ -4319,9 +4323,11 @@ class MainViewModel(
         private const val SOURCE_STRONG_MATCH_SCORE = 0.9
         private const val TRACKING_AUTO_SAVE_DELAY_MILLIS = 1_200L
         private const val READER_CACHE_BACK_PAGES = 4
-        private const val READER_CACHE_FORWARD_PAGES = 6
-        private const val READER_ADJACENT_CACHE_PAGE_COUNT = 4
-        private const val READER_CACHE_REQUEST_SPACING_MILLIS = 1_200L
+        private const val READER_CACHE_FORWARD_PAGES = 4
+        private const val READER_ADJACENT_CACHE_PAGE_COUNT = 2
+        private const val READER_CACHE_INITIAL_DELAY_MILLIS = 5_000L
+        private const val READER_ADJACENT_CACHE_INITIAL_DELAY_MILLIS = 12_000L
+        private const val READER_CACHE_REQUEST_SPACING_MILLIS = 3_000L
     }
 }
 

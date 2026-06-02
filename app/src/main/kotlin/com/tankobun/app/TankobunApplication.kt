@@ -123,7 +123,7 @@ class AppContainer(application: Application) {
                 scanlator = null,
                 uploadedAtEpochMillis = null,
             )
-        val semaphore = downloadSemaphores.getOrPut(job.sourceId) { Semaphore(2) }
+        val semaphore = downloadSemaphores.getOrPut(job.sourceId) { Semaphore(DOWNLOAD_SOURCE_CONCURRENCY) }
         val limiter = downloadRateLimiters.getOrPut(job.sourceId) {
             RespectfulRateLimiter(minSpacingMillis = DOWNLOAD_REQUEST_SPACING_MILLIS)
         }
@@ -164,12 +164,14 @@ class AppContainer(application: Application) {
         page: ReaderPage,
     ): ByteArray =
         withContext(Dispatchers.IO) {
-            ReaderPageCache.cachedBytes(application, job.mediaId, chapter, page)?.let { bytes ->
-                return@withContext bytes
-            }
-            sourceHost.imageBytes(source, page).also { bytes ->
-                ReaderPageCache.writePage(application, job.mediaId, chapter, page, bytes)
-            }
+            ReaderPageCache.cachedOrFetch(
+                context = application,
+                mediaId = job.mediaId,
+                chapter = chapter,
+                page = page,
+            ) {
+                sourceHost.imageBytes(source, page)
+            }.bytes
         }
 
     private suspend fun writeDownloadedPage(job: DownloadJob, page: ReaderPage, bytes: ByteArray): String =
@@ -265,6 +267,7 @@ class AppContainer(application: Application) {
     }
 
     companion object {
+        private const val DOWNLOAD_SOURCE_CONCURRENCY = 1
         private const val DOWNLOAD_REQUEST_SPACING_MILLIS = 2_500L
         private val DOWNLOAD_IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "gif")
     }
