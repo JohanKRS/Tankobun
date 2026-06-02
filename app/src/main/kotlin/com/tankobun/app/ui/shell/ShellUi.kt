@@ -801,8 +801,9 @@ internal fun TankobunScaffold(
                         contentColor = routeContentColor,
                         tintAlpha = FrostedGlassTintAlpha,
                         blurLayerAlpha = FrostedGlassDimAlpha,
+                        borderAlpha = 0f,
                         washAlpha = FrostedGlassWashAlpha,
-                        shadowElevation = 10.dp,
+                        shadowElevation = 0.dp,
                     ) {
                         TankobunBottomNavigationBar(
                             selectedTab = selectedTab,

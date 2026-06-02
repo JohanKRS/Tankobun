@@ -382,20 +382,43 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
     ) {
-        val pageContentPadding = PaddingValues(
-            start = SourceSettingsContentPadding,
-            top = chromeInsets.top + sharedHeaderHeight + SourceSettingsContentPadding,
-            end = SourceSettingsContentPadding,
-            bottom = chromeInsets.bottom + SourceSettingsContentPadding,
-        )
+        val contentPaddingPx = with(density) { SourceSettingsContentPadding.roundToPx() }
+        val topChromeInsetPx = with(density) { chromeInsets.top.roundToPx() }
+        val bottomChromeInsetPx = with(density) { chromeInsets.bottom.roundToPx() }
+        val sourceGroupGapPx = with(density) { 12.dp.roundToPx() }
+        val sourceGroupHeaderHeightPx = with(density) { 58.dp.roundToPx() }
+        val sourceRowHeightPx = with(density) { 58.dp.roundToPx() }
+        val emptyStateHeightPx = with(density) { 160.dp.roundToPx() }
+        val installedContentHeightPx = if (state.allInstalledSources.isEmpty() || sourceGroups.isEmpty()) {
+            emptyStateHeightPx
+        } else {
+            sourceGroups.sumOf { (_, sources) ->
+                sourceGroupHeaderHeightPx + sourceRowHeightPx * sources.size
+            } + sourceGroupGapPx * (sourceGroups.size - 1).coerceAtLeast(0)
+        }
+        val availablePinnedHeightPx = constraints.maxHeight - topChromeInsetPx - bottomChromeInsetPx
+        val installedPinnedBottomPaddingPx = availablePinnedHeightPx -
+            tabHeaderHeightPx -
+            contentPaddingPx -
+            installedContentHeightPx
+        val installedBottomPadding = with(density) {
+            maxOf(contentPaddingPx, installedPinnedBottomPaddingPx).toDp()
+        }
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
         ) { page ->
             val listState = rememberLazyListState()
+            val pageBottomPadding = if (page == 0) installedBottomPadding else SourceSettingsContentPadding
+            val pageContentPadding = PaddingValues(
+                start = SourceSettingsContentPadding,
+                top = chromeInsets.top + sharedHeaderHeight + SourceSettingsContentPadding,
+                end = SourceSettingsContentPadding,
+                bottom = chromeInsets.bottom + pageBottomPadding,
+            )
             LaunchedEffect(listState) {
                 snapshotFlow {
                     if (listState.firstVisibleItemIndex == 0) {
@@ -456,7 +479,7 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                     item(key = "repository-controls") {
                         SourceRepositoryControls(
                             repositoryUrl = state.extensionRepositoryUrl,
-                            repositoryCount = state.availableExtensions.size,
+                            repositoryCount = visibleRepositoryEntries.size,
                             onRepositoryUrlChange = viewModel::setExtensionRepositoryUrl,
                             onRefreshRepository = viewModel::refreshExtensionIndex,
                             onRefreshInstalled = viewModel::refreshInstalledSources,
@@ -499,12 +522,11 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
             ) {
                 Spacer(Modifier.height(SourceSettingsContentPadding))
                 SourceSettingsHeader(
-                    state = state,
+                    activeInstalledCount = state.installedSources.size,
+                    visibleInstalledCount = visibleInstalledSourceList.size,
                     query = sourceSettingsQuery,
                     selectedTab = currentPage,
                     onQueryChange = { sourceSettingsQuery = it },
-                    onRefreshInstalled = viewModel::refreshInstalledSources,
-                    onRefreshRepository = viewModel::refreshExtensionIndex,
                     modifier = Modifier.padding(horizontal = SourceSettingsContentPadding),
                 )
                 state.message?.let { message ->
@@ -547,12 +569,11 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
 
 @Composable
 internal fun SourceSettingsHeader(
-    state: TankobunUiState,
+    activeInstalledCount: Int,
+    visibleInstalledCount: Int,
     query: String,
     selectedTab: Int,
     onQueryChange: (String) -> Unit,
-    onRefreshInstalled: () -> Unit,
-    onRefreshRepository: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -563,29 +584,19 @@ internal fun SourceSettingsHeader(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "Source extensions",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = LocalTankobunStyle.current.typography.sectionLabel,
+                    color = LocalTankobunStyle.current.colors.accent,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "${state.installedSources.size} active / ${state.allInstalledSources.size} installed",
+                    "$activeInstalledCount active / $visibleInstalledCount installed",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            TankobunIconActionButton(
-                icon = Icons.Default.Refresh,
-                contentDescription = "Refresh installed sources",
-                onClick = onRefreshInstalled,
-            )
-            TankobunIconActionButton(
-                icon = Icons.Default.Download,
-                contentDescription = "Load extension repository",
-                onClick = onRefreshRepository,
-            )
         }
         TankobunSearchField(
             value = query,
@@ -623,8 +634,7 @@ internal fun SourceSettingsTabRow(
                             append(count.toString())
                             pop()
                         },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = LocalTankobunStyle.current.typography.sectionLabel,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -667,7 +677,7 @@ internal fun SourceRepositoryControls(
         }
         if (repositoryCount > 0) {
             Text(
-                "$repositoryCount extensions loaded",
+                "$repositoryCount extensions shown",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -705,7 +715,11 @@ internal fun SourceLanguageGroupSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(sourceLanguageDisplay(language), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        sourceLanguageDisplay(language),
+                        style = LocalTankobunStyle.current.typography.sectionLabel,
+                        color = LocalTankobunStyle.current.colors.accent,
+                    )
                     Text(
                         "$activeCount of ${sources.size} active",
                         style = MaterialTheme.typography.bodySmall,

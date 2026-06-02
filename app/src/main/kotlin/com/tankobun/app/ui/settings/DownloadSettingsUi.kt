@@ -544,7 +544,13 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
         SettingsRoute.CUSTOM_LISTS -> "${state.anilistCustomLists.size} list${if (state.anilistCustomLists.size == 1) "" else "s"}"
         SettingsRoute.BACKUPS -> "${state.libraryItems.count { it.media.idMal != null }} / ${state.libraryItems.size} MAL matched"
         SettingsRoute.ABOUT -> "Tutorial and notices"
-        SettingsRoute.SOURCES -> "${state.installedSources.size} active / ${state.allInstalledSources.size} installed"
+        SettingsRoute.SOURCES -> "${state.installedSources.size} active / ${state.visibleInstalledSourceCount()} installed"
+    }
+
+private fun TankobunUiState.visibleInstalledSourceCount(): Int =
+    allInstalledSources.count { source ->
+        val language = source.lang.normalizedSourceLanguage()
+        language in sourceLanguages || language == UNIVERSAL_SOURCE_LANGUAGE
     }
 
 internal fun BackupSchedule.label(): String =
