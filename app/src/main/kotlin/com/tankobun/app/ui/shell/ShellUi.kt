@@ -324,6 +324,7 @@ private val FrostedDockTopMargin = 8.dp
 private val FrostedDockBottomMargin = 8.dp
 private val FrostedDockHeight = 56.dp
 private val FrostedDockWidth = 220.dp
+private val FrostedDockWithQuickActionsWidth = 284.dp
 private val FrostedGlassBlur = 88.dp
 private val FrostedTopBarShape = RoundedCornerShape(0.dp)
 private val FrostedDockShape = RoundedCornerShape(percent = 50)
@@ -746,6 +747,14 @@ internal fun TankobunScaffold(
         }
     }
 
+    fun toggleQuickDrawer() {
+        when (quickDrawerMode) {
+            QuickDrawerMode.CLOSED -> openQuickDrawerFromClosed()
+            QuickDrawerMode.OVERLAY -> closeQuickDrawerFromOverlay()
+            QuickDrawerMode.PINNED -> onCloseQuickDrawer()
+        }
+    }
+
     CompositionLocalProvider(LocalTankobunChromeInsets provides chromeInsets) {
         Scaffold(
             containerColor = routeBackdropColor,
@@ -759,19 +768,6 @@ internal fun TankobunScaffold(
                     ignoreDisplayCutout = ignoreDisplayCutout,
                     showStatusBar = showStatusBar,
                     mediaDetailActive = mediaDetailActive,
-                    quickActionsVisible = showQuickActionsButton,
-                    quickActionsOpen = quickDrawerMode != QuickDrawerMode.CLOSED,
-                    onToggleQuickActions = if (showQuickActionsButton) {
-                        {
-                            when (quickDrawerMode) {
-                                QuickDrawerMode.CLOSED -> openQuickDrawerFromClosed()
-                                QuickDrawerMode.OVERLAY -> closeQuickDrawerFromOverlay()
-                                QuickDrawerMode.PINNED -> onCloseQuickDrawer()
-                            }
-                        }
-                    } else {
-                        null
-                    },
                     onBack = onNavigateBack,
                 )
             },
@@ -794,7 +790,7 @@ internal fun TankobunScaffold(
                 ) {
                     TankobunGlassChrome(
                         modifier = Modifier
-                            .width(FrostedDockWidth)
+                            .width(if (showQuickActionsButton) FrostedDockWithQuickActionsWidth else FrostedDockWidth)
                             .height(FrostedDockHeight),
                         shape = FrostedDockShape,
                         hazeState = chromeHazeState,
@@ -808,6 +804,9 @@ internal fun TankobunScaffold(
                         TankobunBottomNavigationBar(
                             selectedTab = selectedTab,
                             onSelectTab = onSelectTab,
+                            quickActionsVisible = showQuickActionsButton,
+                            quickActionsOpen = quickDrawerMode != QuickDrawerMode.CLOSED,
+                            onToggleQuickActions = ::toggleQuickDrawer,
                             modifier = Modifier.height(FrostedDockHeight),
                         )
                     }
@@ -1038,9 +1037,6 @@ internal fun TankobunTopBar(
     ignoreDisplayCutout: Boolean,
     showStatusBar: Boolean,
     mediaDetailActive: Boolean = false,
-    quickActionsVisible: Boolean = true,
-    quickActionsOpen: Boolean = false,
-    onToggleQuickActions: (() -> Unit)? = null,
     onBack: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
@@ -1113,18 +1109,6 @@ internal fun TankobunTopBar(
                         else -> MaterialTheme.typography.titleLarge
                     },
                 )
-                if (quickActionsVisible && onToggleQuickActions != null) {
-                    IconButton(
-                        onClick = onToggleQuickActions,
-                        modifier = Modifier.size(if (compact) 36.dp else 48.dp),
-                    ) {
-                        AnimatedHamburgerCloseIcon(
-                            close = quickActionsOpen,
-                            contentDescription = if (quickActionsOpen) "Close quick actions" else "Open quick actions",
-                            modifier = Modifier.size(iconSize + 4.dp),
-                        )
-                    }
-                }
             }
         }
     }
@@ -1217,13 +1201,13 @@ internal fun AnimatedHamburgerCloseIcon(
     close: Boolean,
     contentDescription: String,
     modifier: Modifier = Modifier,
+    iconColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     val progress by animateFloatAsState(
         targetValue = if (close) 1f else 0f,
         animationSpec = tween(durationMillis = 180),
         label = "Quick actions menu icon",
     )
-    val color = MaterialTheme.colorScheme.onSurface
     Canvas(
         modifier = modifier.semantics {
             this.contentDescription = contentDescription
@@ -1244,7 +1228,7 @@ internal fun AnimatedHamburgerCloseIcon(
             )
 
         drawLine(
-            color = color,
+            color = iconColor,
             start = lerp(point(-half, -gap), point(-diagonal, -diagonal)),
             end = lerp(point(half, -gap), point(diagonal, diagonal)),
             strokeWidth = strokeWidth,
@@ -1252,7 +1236,7 @@ internal fun AnimatedHamburgerCloseIcon(
         )
         if (middleAlpha > 0.01f) {
             drawLine(
-                color = color.copy(alpha = middleAlpha),
+                color = iconColor.copy(alpha = middleAlpha),
                 start = point(-half, 0f),
                 end = point(half, 0f),
                 strokeWidth = strokeWidth,
@@ -1260,7 +1244,7 @@ internal fun AnimatedHamburgerCloseIcon(
             )
         }
         drawLine(
-            color = color,
+            color = iconColor,
             start = lerp(point(-half, gap), point(-diagonal, diagonal)),
             end = lerp(point(half, gap), point(diagonal, -diagonal)),
             strokeWidth = strokeWidth,
@@ -1273,6 +1257,9 @@ internal fun AnimatedHamburgerCloseIcon(
 internal fun TankobunBottomNavigationBar(
     selectedTab: Int,
     onSelectTab: (Int) -> Unit,
+    quickActionsVisible: Boolean = false,
+    quickActionsOpen: Boolean = false,
+    onToggleQuickActions: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val styleColors = LocalTankobunStyle.current.colors
@@ -1373,6 +1360,38 @@ internal fun TankobunBottomNavigationBar(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(icon, contentDescription = label, tint = iconColor, modifier = Modifier.size(24.dp))
+                }
+            }
+            if (quickActionsVisible && onToggleQuickActions != null) {
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(28.dp)
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(styleColors.panelContent.copy(alpha = 0.22f)),
+                )
+                val quickActionIconColor by animateColorAsState(
+                    targetValue = styleColors.panelContent.copy(alpha = if (quickActionsOpen) 0.96f else 0.72f),
+                    animationSpec = tween(durationMillis = 160),
+                    label = "Quick actions dock icon color",
+                )
+                Box(
+                    modifier = Modifier
+                        .size(itemSize)
+                        .clip(CircleShape)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onToggleQuickActions,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AnimatedHamburgerCloseIcon(
+                        close = quickActionsOpen,
+                        contentDescription = if (quickActionsOpen) "Close quick actions" else "Open quick actions",
+                        iconColor = quickActionIconColor,
+                        modifier = Modifier.size(26.dp),
+                    )
                 }
             }
         }
