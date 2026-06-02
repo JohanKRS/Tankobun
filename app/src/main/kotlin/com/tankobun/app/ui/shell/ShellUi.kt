@@ -161,6 +161,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -190,6 +191,8 @@ import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
+import dev.chrisbanes.haze.ExperimentalHazeApi
+import dev.chrisbanes.haze.HazeInputScale
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
@@ -315,12 +318,15 @@ private val FrostedDockHorizontalMargin = 16.dp
 private val FrostedDockTopMargin = 8.dp
 private val FrostedDockBottomMargin = 8.dp
 private val FrostedDockHeight = 56.dp
-private val FrostedGlassBlur = 40.dp
+private val FrostedDockWidth = 220.dp
+private val FrostedGlassBlur = 88.dp
 private val FrostedTopBarShape = RoundedCornerShape(0.dp)
 private val FrostedDockShape = RoundedCornerShape(percent = 50)
-private const val FrostedGlassTintAlpha = 0.82f
-private const val FrostedGlassBlurLayerAlpha = 0.54f
-private const val FrostedGlassWashAlpha = 0.22f
+private const val FrostedGlassInputScale = 0.33f
+private const val FrostedGlassTintAlpha = 0.34f
+private const val FrostedGlassDimAlpha = 0.30f
+private const val FrostedGlassWashAlpha = 0.18f
+private const val FrostedGlassNoiseFactor = 0.08f
 internal const val QuickDrawerSnapMillis = 240
 internal const val QuickDrawerScrimAlpha = 0.20f
 internal const val QuickDrawerBackdropBlurDp = 6f
@@ -783,12 +789,13 @@ internal fun TankobunScaffold(
                 ) {
                     TankobunGlassChrome(
                         modifier = Modifier
+                            .width(FrostedDockWidth)
                             .height(FrostedDockHeight),
                         shape = FrostedDockShape,
                         hazeState = chromeHazeState,
                         contentColor = routeContentColor,
                         tintAlpha = FrostedGlassTintAlpha,
-                        blurLayerAlpha = FrostedGlassBlurLayerAlpha,
+                        blurLayerAlpha = FrostedGlassDimAlpha,
                         washAlpha = FrostedGlassWashAlpha,
                         shadowElevation = 10.dp,
                     ) {
@@ -809,7 +816,7 @@ internal fun TankobunScaffold(
                         end = padding.calculateEndPadding(LocalLayoutDirection.current),
                     ),
             ) {
-                Row(
+                Box(
                     Modifier
                         .fillMaxSize()
                         .padding(start = cutoutStartPadding, end = cutoutEndPadding)
@@ -817,48 +824,50 @@ internal fun TankobunScaffold(
                         .background(routeBackdropColor)
                         .hazeSource(state = chromeHazeState),
                 ) {
-                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        if (selectedMedia != null) {
-                            MangaDetailScreen(
-                                state = state,
-                                viewModel = viewModel,
-                                media = selectedMedia,
-                                onSelectMedia = onSelectMedia,
-                                onBrowseTag = onBrowseTag,
-                                onBrowseAuthor = onBrowseAuthor,
-                            )
-                        } else {
-                            when (selectedTab) {
-                                0 -> LibraryScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                                1 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                                2 -> DownloadsScreen(state, viewModel)
-                                3 -> SettingsScreen(
+                    Row(Modifier.fillMaxSize()) {
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            if (selectedMedia != null) {
+                                MangaDetailScreen(
                                     state = state,
                                     viewModel = viewModel,
-                                    route = settingsRoute,
-                                    onOpenRoute = onOpenSettingsRoute,
+                                    media = selectedMedia,
+                                    onSelectMedia = onSelectMedia,
+                                    onBrowseTag = onBrowseTag,
+                                    onBrowseAuthor = onBrowseAuthor,
                                 )
+                            } else {
+                                when (selectedTab) {
+                                    0 -> LibraryScreen(state, viewModel, onSelectMedia = onSelectMedia)
+                                    1 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
+                                    2 -> DownloadsScreen(state, viewModel)
+                                    3 -> SettingsScreen(
+                                        state = state,
+                                        viewModel = viewModel,
+                                        route = settingsRoute,
+                                        onOpenRoute = onOpenSettingsRoute,
+                                    )
+                                }
                             }
                         }
-                    }
-                    if (quickDrawerMode == QuickDrawerMode.PINNED) {
-                        val pinnedWidth by animateDpAsState(
-                            targetValue = QuickDrawerPinnedWidth,
-                            animationSpec = tween(durationMillis = 220),
-                            label = "Pinned drawer width",
-                        )
-                        QuickDrawer(
-                            state = state,
-                            viewModel = viewModel,
-                            selectedMedia = selectedMedia,
-                            onOpenRecentProgress = onOpenRecentProgress,
-                            pinned = true,
-                            onClose = onCloseQuickDrawer,
-                            onTogglePin = onToggleQuickDrawerPin,
-                            drawerWidth = pinnedWidth,
-                            endPadding = cutoutEndPadding,
-                            modifier = Modifier.fillMaxHeight(),
-                        )
+                        if (quickDrawerMode == QuickDrawerMode.PINNED) {
+                            val pinnedWidth by animateDpAsState(
+                                targetValue = QuickDrawerPinnedWidth,
+                                animationSpec = tween(durationMillis = 220),
+                                label = "Pinned drawer width",
+                            )
+                            QuickDrawer(
+                                state = state,
+                                viewModel = viewModel,
+                                selectedMedia = selectedMedia,
+                                onOpenRecentProgress = onOpenRecentProgress,
+                                pinned = true,
+                                onClose = onCloseQuickDrawer,
+                                onTogglePin = onToggleQuickDrawerPin,
+                                drawerWidth = pinnedWidth,
+                                endPadding = cutoutEndPadding,
+                                modifier = Modifier.fillMaxHeight(),
+                            )
+                        }
                     }
                 }
                 if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
@@ -1048,7 +1057,7 @@ internal fun TankobunTopBar(
         shape = FrostedTopBarShape,
         hazeState = hazeState,
         tintAlpha = FrostedGlassTintAlpha,
-        blurLayerAlpha = FrostedGlassBlurLayerAlpha,
+        blurLayerAlpha = FrostedGlassDimAlpha,
         borderAlpha = 0f,
         washAlpha = FrostedGlassWashAlpha,
         shadowElevation = 0.dp,
@@ -1115,6 +1124,7 @@ internal fun TankobunTopBar(
     }
 }
 
+@OptIn(ExperimentalHazeApi::class)
 @Composable
 private fun TankobunGlassChrome(
     modifier: Modifier = Modifier,
@@ -1125,27 +1135,39 @@ private fun TankobunGlassChrome(
     hazeState: HazeState? = null,
     borderAlpha: Float = 0.22f,
     washAlpha: Float = 0.18f,
+    blurRadius: Dp = FrostedGlassBlur,
     shadowElevation: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
     val colors = LocalTankobunStyle.current.colors
-    val surfaceTint = colors.panel.copy(alpha = tintAlpha.coerceIn(0f, 1f))
-    val blurBackground = colors.panel.copy(alpha = (tintAlpha * 0.7f).coerceIn(0f, 0.84f))
-    val blurTint = colors.backdrop.copy(alpha = blurLayerAlpha.coerceIn(0f, 1f))
+    val lightBackdrop = colors.backdrop.luminance() >= 0.5f
+    val surfaceTint = colors.panel.copy(alpha = (tintAlpha * 2.2f).coerceIn(0.48f, 0.86f))
+    val colorBleedTint = colors.panel.copy(alpha = tintAlpha.coerceIn(0f, 0.56f))
+    val dimTint = if (lightBackdrop) {
+        Color.White.copy(alpha = (blurLayerAlpha * 0.56f).coerceIn(0f, 0.28f))
+    } else {
+        Color.Black.copy(alpha = (blurLayerAlpha * 0.8f).coerceIn(0f, 0.36f))
+    }
     val glassWash = colors.panel.copy(alpha = if (hazeState != null) washAlpha.coerceIn(0f, 1f) else 0f)
-    val sheen = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    val sheen = Color.White.copy(alpha = if (lightBackdrop) 0.08f else 0.05f)
     val border = BorderStroke(1.dp, colors.outline.copy(alpha = borderAlpha.coerceIn(0f, 1f)))
     val hazeStyle = HazeStyle(
-        backgroundColor = blurBackground,
-        tint = HazeTint(blurTint),
-        blurRadius = FrostedGlassBlur,
-        noiseFactor = 0.05f,
+        backgroundColor = colors.panel,
+        tints = listOf(
+            HazeTint(colorBleedTint),
+            HazeTint(dimTint),
+        ),
+        blurRadius = blurRadius,
+        noiseFactor = FrostedGlassNoiseFactor,
         fallbackTint = HazeTint(surfaceTint),
     )
     val chromeModifier = if (hazeState != null) {
         modifier
             .clip(shape)
-            .hazeEffect(state = hazeState, style = hazeStyle)
+            .hazeEffect(state = hazeState, style = hazeStyle) {
+                inputScale = HazeInputScale.Fixed(FrostedGlassInputScale)
+                forceInvalidateOnPreDraw = true
+            }
     } else {
         modifier.clip(shape)
     }
