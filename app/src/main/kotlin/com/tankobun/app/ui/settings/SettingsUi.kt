@@ -248,7 +248,7 @@ internal fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 SettingsIndexPane(
@@ -276,14 +276,14 @@ internal fun SettingsScreen(
                 }
             }
         } else if (route == SettingsRoute.MAIN) {
-            SettingsIndexPane(
-                state = state,
-                selectedRoute = SettingsRoute.MAIN,
-                onOpenRoute = onOpenRoute,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(18.dp),
-            )
+                SettingsIndexPane(
+                    state = state,
+                    selectedRoute = SettingsRoute.MAIN,
+                    onOpenRoute = onOpenRoute,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 18.dp),
+                )
         } else {
             SettingsDetailContent(
                 state = state,
@@ -302,8 +302,11 @@ internal fun SettingsIndexPane(
     onOpenRoute: (SettingsRoute) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val chromeInsets = LocalTankobunChromeInsets.current
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()),
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(top = chromeInsets.top + 18.dp, bottom = chromeInsets.bottom + 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -533,9 +533,13 @@ internal fun BrowseLanding(
     modifier: Modifier,
     header: @Composable () -> Unit,
 ) {
+    val chromeInsets = LocalTankobunChromeInsets.current
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(vertical = BrowseLandingContentPadding),
+        contentPadding = PaddingValues(
+            top = chromeInsets.top + BrowseLandingContentPadding,
+            bottom = chromeInsets.bottom + BrowseLandingContentPadding,
+        ),
         verticalArrangement = Arrangement.spacedBy(34.dp),
     ) {
         item(key = "browse-header") {
@@ -671,6 +675,7 @@ internal fun BrowseResults(
     modifier: Modifier,
     header: @Composable () -> Unit,
 ) {
+    val chromeInsets = LocalTankobunChromeInsets.current
     val resultsHeader: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             header()
@@ -704,7 +709,10 @@ internal fun BrowseResults(
         trackedStatuses = trackedStatuses,
         modifier = modifier.fillMaxWidth(),
         header = resultsHeader,
-        contentPadding = PaddingValues(vertical = 18.dp),
+        contentPadding = PaddingValues(
+            top = chromeInsets.top + 18.dp,
+            bottom = chromeInsets.bottom + 18.dp,
+        ),
         onSelectMedia = onSelectMedia,
         isLoadingMore = state.browseResultsLoadingMore,
         onNearEnd = if (state.browseResultsHasMore) viewModel::loadMoreBrowseResults else null,

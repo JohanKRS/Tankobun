@@ -15,6 +15,7 @@ datastore = "1.1.7"
 securityCrypto = "1.1.0-alpha07"
 preference = "1.2.1"
 graphics = "1.1.0"
+haze = "1.7.2"
 okhttp = "5.1.0"
 coil = "3.3.0"
 apollo = "4.4.3"
@@ -40,6 +41,7 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 androidx-preference = { module = "androidx.preference:preference-ktx", version.ref = "preference" }
 androidx-graphics-path = { module = "androidx.graphics:graphics-path", version.ref = "graphics" }
+haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
 compose-ui = { module = "androidx.compose.ui:ui" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }

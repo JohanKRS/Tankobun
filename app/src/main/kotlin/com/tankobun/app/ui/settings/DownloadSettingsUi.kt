@@ -408,10 +408,12 @@ internal fun SettingsDetailPanel(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val chromeInsets = LocalTankobunChromeInsets.current
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(horizontal = 20.dp)
+            .padding(top = chromeInsets.top + 20.dp, bottom = chromeInsets.bottom + 20.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

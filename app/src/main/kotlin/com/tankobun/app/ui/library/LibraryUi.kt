@@ -543,10 +543,16 @@ internal fun LibraryPager(
     header: @Composable () -> Unit,
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
+    val chromeInsets = LocalTankobunChromeInsets.current
     if (sections.isEmpty()) {
         LazyColumn(
             modifier = modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(LibraryContentPadding),
+            contentPadding = PaddingValues(
+                start = LibraryContentPadding,
+                top = chromeInsets.top + LibraryContentPadding,
+                end = LibraryContentPadding,
+                bottom = chromeInsets.bottom + LibraryContentPadding,
+            ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "library-header") {
@@ -664,6 +670,8 @@ internal fun LibraryPager(
             .supportedCoverColumns()
             .coerceAtMost(if (configuration.smallestScreenWidthDp in 1 until 600) 4 else 8)
         val contentPaddingPx = with(density) { LibraryContentPadding.roundToPx() }
+        val topChromeInsetPx = with(density) { chromeInsets.top.roundToPx() }
+        val bottomChromeInsetPx = with(density) { chromeInsets.bottom.roundToPx() }
         val gridGapPx = with(density) { 16.dp.roundToPx() }
         val listGapPx = with(density) { 8.dp.roundToPx() }
         val availableGridWidthPx = (constraints.maxWidth - (contentPaddingPx * 2) -
@@ -710,7 +718,10 @@ internal fun LibraryPager(
                 }
             }
             val contentHeightPx = measuredPageContentHeightsPx.getOrNull(page) ?: estimatedContentHeightPx
-            val requiredPinnedBottomPaddingPx = constraints.maxHeight -
+            val availablePinnedHeightPx = constraints.maxHeight -
+                topChromeInsetPx -
+                bottomChromeInsetPx
+            val requiredPinnedBottomPaddingPx = availablePinnedHeightPx -
                 tabHeaderHeightPx -
                 contentPaddingPx -
                 contentHeightPx
@@ -720,9 +731,9 @@ internal fun LibraryPager(
             }
             val pageContentPadding = PaddingValues(
                 start = LibraryContentPadding,
-                top = sharedHeaderHeight + LibraryContentPadding,
+                top = chromeInsets.top + sharedHeaderHeight + LibraryContentPadding,
                 end = LibraryContentPadding,
-                bottom = pageBottomPadding,
+                bottom = pageBottomPadding + chromeInsets.bottom,
             )
             MediaCollection(
                 media = visibleSections[page].items.map { it.media },
@@ -764,6 +775,7 @@ internal fun LibraryPager(
                 .fillMaxWidth()
                 .graphicsLayer { translationY = headerTranslationY }
                 .background(LocalTankobunStyle.current.colors.backdrop)
+                .padding(top = chromeInsets.top)
         ) {
             Column(
                 modifier = Modifier.onSizeChanged { searchHeaderHeightPx = it.height },
@@ -810,6 +822,7 @@ internal fun LibraryPager(
                                     },
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
+                                    style = LocalTankobunStyle.current.typography.sectionLabel,
                                 )
                             },
                         )

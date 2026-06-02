@@ -25,6 +25,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -78,6 +79,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -117,8 +119,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryScrollableTabRow
@@ -134,6 +134,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -148,6 +149,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -188,6 +190,11 @@ import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
 import com.tankobun.app.logic.nextInReadingOrderAfter
 import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.state.DownloadStorageItem
@@ -304,9 +311,26 @@ private data class TankobunRoute(
 internal val QuickDrawerOverlayWidth = 340.dp
 internal val QuickDrawerPinnedWidth = 320.dp
 internal val QuickDrawerHandleSlotWidth = 40.dp
+private val FrostedDockHorizontalMargin = 16.dp
+private val FrostedDockTopMargin = 8.dp
+private val FrostedDockBottomMargin = 8.dp
+private val FrostedDockHeight = 56.dp
+private val FrostedGlassBlur = 40.dp
+private val FrostedTopBarShape = RoundedCornerShape(0.dp)
+private val FrostedDockShape = RoundedCornerShape(percent = 50)
+private const val FrostedGlassTintAlpha = 0.82f
+private const val FrostedGlassBlurLayerAlpha = 0.54f
+private const val FrostedGlassWashAlpha = 0.22f
 internal const val QuickDrawerSnapMillis = 240
 internal const val QuickDrawerScrimAlpha = 0.20f
 internal const val QuickDrawerBackdropBlurDp = 6f
+
+internal data class TankobunChromeInsets(
+    val top: Dp = 0.dp,
+    val bottom: Dp = 0.dp,
+)
+
+internal val LocalTankobunChromeInsets = staticCompositionLocalOf { TankobunChromeInsets() }
 internal const val QuickDrawerElasticLimitDp = 36f
 
 internal enum class LibraryPicker {
@@ -667,19 +691,20 @@ internal fun TankobunScaffold(
     val drawerBackdropBlur = (QuickDrawerBackdropBlurDp * quickDrawerBackdropRevealFraction).dp
     val mediaDetailActive = selectedMedia != null
     val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
-    val mediaDetailTopBarInset = if (mediaDetailActive) {
-        val statusBarInset = if (showStatusBar) {
-            WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        } else {
-            0.dp
-        }
-        statusBarInset + if (compactLayout) 48.dp else 72.dp
+    val routeBackdropColor = LocalTankobunTokens.current.appBackdrop
+    val routeContentColor = MaterialTheme.colorScheme.onSurface
+    val statusBarInset = if (showStatusBar) {
+        WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     } else {
         0.dp
     }
-    val routeBackdropColor = LocalTankobunTokens.current.appBackdrop
-    val routeBarColor = LocalTankobunTokens.current.elevatedSurface
-    val routeContentColor = MaterialTheme.colorScheme.onSurface
+    val topChromeInset = statusBarInset + if (compactLayout) 48.dp else 72.dp
+    val bottomChromeInset = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() +
+        FrostedDockBottomMargin +
+        FrostedDockHeight +
+        FrostedDockTopMargin
+    val chromeInsets = TankobunChromeInsets(top = topChromeInset, bottom = bottomChromeInset)
+    val chromeHazeState = remember { HazeState() }
 
     LaunchedEffect(quickDrawerMode) {
         if (quickDrawerMode != QuickDrawerMode.OVERLAY) {
@@ -710,164 +735,186 @@ internal fun TankobunScaffold(
         }
     }
 
-    Scaffold(
-        containerColor = routeBackdropColor,
-        contentWindowInsets = WindowInsets(0.dp),
-        topBar = {
-            TankobunTopBar(
-                title = selectedMedia?.title?.userPreferred
-                    ?: if (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN) settingsRoute.settingsTitle() else "Tankobun",
-                showBack = canNavigateBack,
-                ignoreDisplayCutout = ignoreDisplayCutout,
-                showStatusBar = showStatusBar,
-                mediaDetailActive = mediaDetailActive,
-                quickActionsVisible = showQuickActionsButton,
-                quickActionsOpen = quickDrawerMode != QuickDrawerMode.CLOSED,
-                onToggleQuickActions = if (showQuickActionsButton) {
-                    {
-                        when (quickDrawerMode) {
-                            QuickDrawerMode.CLOSED -> openQuickDrawerFromClosed()
-                            QuickDrawerMode.OVERLAY -> closeQuickDrawerFromOverlay()
-                            QuickDrawerMode.PINNED -> onCloseQuickDrawer()
+    CompositionLocalProvider(LocalTankobunChromeInsets provides chromeInsets) {
+        Scaffold(
+            containerColor = routeBackdropColor,
+            contentWindowInsets = WindowInsets(0.dp),
+            topBar = {
+                TankobunTopBar(
+                    title = selectedMedia?.title?.userPreferred
+                        ?: if (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN) settingsRoute.settingsTitle() else "Tankobun",
+                    hazeState = chromeHazeState,
+                    showBack = canNavigateBack,
+                    ignoreDisplayCutout = ignoreDisplayCutout,
+                    showStatusBar = showStatusBar,
+                    mediaDetailActive = mediaDetailActive,
+                    quickActionsVisible = showQuickActionsButton,
+                    quickActionsOpen = quickDrawerMode != QuickDrawerMode.CLOSED,
+                    onToggleQuickActions = if (showQuickActionsButton) {
+                        {
+                            when (quickDrawerMode) {
+                                QuickDrawerMode.CLOSED -> openQuickDrawerFromClosed()
+                                QuickDrawerMode.OVERLAY -> closeQuickDrawerFromOverlay()
+                                QuickDrawerMode.PINNED -> onCloseQuickDrawer()
+                            }
                         }
-                    }
-                } else {
-                    null
-                },
-                onBack = onNavigateBack,
-            )
-        },
-        bottomBar = {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = routeBarColor,
-                contentColor = routeContentColor,
-                tonalElevation = 2.dp,
-            ) {
-                TankobunBottomNavigationBar(
-                    selectedTab = selectedTab,
-                    onSelectTab = onSelectTab,
-                    modifier = Modifier.padding(
-                        start = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout),
-                        end = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout),
-                    ),
+                    } else {
+                        null
+                    },
+                    onBack = onNavigateBack,
                 )
-            }
-        },
-    ) { padding ->
-        Box(
+            },
+            bottomBar = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout),
+                            end = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout),
+                        )
+                        .padding(
+                            start = FrostedDockHorizontalMargin,
+                            top = FrostedDockTopMargin,
+                            end = FrostedDockHorizontalMargin,
+                            bottom = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() +
+                                FrostedDockBottomMargin,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    TankobunGlassChrome(
+                        modifier = Modifier
+                            .height(FrostedDockHeight),
+                        shape = FrostedDockShape,
+                        hazeState = chromeHazeState,
+                        contentColor = routeContentColor,
+                        tintAlpha = FrostedGlassTintAlpha,
+                        blurLayerAlpha = FrostedGlassBlurLayerAlpha,
+                        washAlpha = FrostedGlassWashAlpha,
+                        shadowElevation = 10.dp,
+                    ) {
+                        TankobunBottomNavigationBar(
+                            selectedTab = selectedTab,
+                            onSelectTab = onSelectTab,
+                            modifier = Modifier.height(FrostedDockHeight),
+                        )
+                    }
+                }
+            },
+        ) { padding ->
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
                         start = padding.calculateStartPadding(LocalLayoutDirection.current),
-                        top = if (mediaDetailActive) 0.dp else padding.calculateTopPadding(),
                         end = padding.calculateEndPadding(LocalLayoutDirection.current),
-                        bottom = padding.calculateBottomPadding(),
                     ),
-        ) {
-            Row(
-                Modifier
-                    .fillMaxSize()
-                    .padding(start = cutoutStartPadding, end = cutoutEndPadding)
-                    .blur(drawerBackdropBlur)
-                    .background(routeBackdropColor),
             ) {
-                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                    if (selectedMedia != null) {
-                        MangaDetailScreen(
-                            state = state,
-                            viewModel = viewModel,
-                            media = selectedMedia,
-                            onSelectMedia = onSelectMedia,
-                            onBrowseTag = onBrowseTag,
-                            onBrowseAuthor = onBrowseAuthor,
-                        )
-                    } else {
-                        when (selectedTab) {
-                            0 -> LibraryScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                            1 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                            2 -> DownloadsScreen(state, viewModel)
-                            3 -> SettingsScreen(
+                Row(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(start = cutoutStartPadding, end = cutoutEndPadding)
+                        .blur(drawerBackdropBlur)
+                        .background(routeBackdropColor)
+                        .hazeSource(state = chromeHazeState),
+                ) {
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        if (selectedMedia != null) {
+                            MangaDetailScreen(
                                 state = state,
                                 viewModel = viewModel,
-                                route = settingsRoute,
-                                onOpenRoute = onOpenSettingsRoute,
+                                media = selectedMedia,
+                                onSelectMedia = onSelectMedia,
+                                onBrowseTag = onBrowseTag,
+                                onBrowseAuthor = onBrowseAuthor,
                             )
+                        } else {
+                            when (selectedTab) {
+                                0 -> LibraryScreen(state, viewModel, onSelectMedia = onSelectMedia)
+                                1 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
+                                2 -> DownloadsScreen(state, viewModel)
+                                3 -> SettingsScreen(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    route = settingsRoute,
+                                    onOpenRoute = onOpenSettingsRoute,
+                                )
+                            }
                         }
                     }
+                    if (quickDrawerMode == QuickDrawerMode.PINNED) {
+                        val pinnedWidth by animateDpAsState(
+                            targetValue = QuickDrawerPinnedWidth,
+                            animationSpec = tween(durationMillis = 220),
+                            label = "Pinned drawer width",
+                        )
+                        QuickDrawer(
+                            state = state,
+                            viewModel = viewModel,
+                            selectedMedia = selectedMedia,
+                            onOpenRecentProgress = onOpenRecentProgress,
+                            pinned = true,
+                            onClose = onCloseQuickDrawer,
+                            onTogglePin = onToggleQuickDrawerPin,
+                            drawerWidth = pinnedWidth,
+                            endPadding = cutoutEndPadding,
+                            modifier = Modifier.fillMaxHeight(),
+                        )
+                    }
                 }
-                if (quickDrawerMode == QuickDrawerMode.PINNED) {
-                    val pinnedWidth by animateDpAsState(
-                        targetValue = QuickDrawerPinnedWidth,
-                        animationSpec = tween(durationMillis = 220),
-                        label = "Pinned drawer width",
+                if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = drawerScrimAlpha))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { closeQuickDrawerFromOverlay() },
+                            ),
                     )
+                }
+                if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
                     QuickDrawer(
                         state = state,
                         viewModel = viewModel,
                         selectedMedia = selectedMedia,
                         onOpenRecentProgress = onOpenRecentProgress,
-                        pinned = true,
-                        onClose = onCloseQuickDrawer,
+                        pinned = false,
+                        onClose = { closeQuickDrawerFromOverlay() },
                         onTogglePin = onToggleQuickDrawerPin,
-                        drawerWidth = pinnedWidth,
+                        drawerWidth = QuickDrawerOverlayWidth,
                         endPadding = cutoutEndPadding,
+                        showHandle = false,
+                        onHandleDragOffset = {
+                            overlayDrawerDragging = true
+                            overlayDrawerDragOffsetPx = quickDrawerClosingDragOffset(
+                                totalX = it,
+                                drawerTravelPx = drawerTravelPx,
+                                elasticLimitPx = drawerElasticLimitPx,
+                            )
+                        },
+                        onHandleDragEnd = { totalX ->
+                            overlayDrawerDragging = false
+                            if (totalX > drawerSnapThresholdPx) {
+                                closeQuickDrawerFromOverlay()
+                            } else {
+                                overlayDrawerDragOffsetPx = 0f
+                            }
+                        },
+                        handleDragLocally = false,
                         modifier = Modifier
-                            .padding(top = mediaDetailTopBarInset)
-                            .fillMaxHeight(),
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
+                            .graphicsLayer { translationX = overlayDrawerTranslationPx },
                     )
                 }
-            }
-            if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = drawerScrimAlpha))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { closeQuickDrawerFromOverlay() },
-                        ),
-                )
-            }
-            if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
-                QuickDrawer(
-                    state = state,
-                    viewModel = viewModel,
-                    selectedMedia = selectedMedia,
-                    onOpenRecentProgress = onOpenRecentProgress,
-                    pinned = false,
-                    onClose = { closeQuickDrawerFromOverlay() },
-                    onTogglePin = onToggleQuickDrawerPin,
-                    drawerWidth = QuickDrawerOverlayWidth,
-                    endPadding = cutoutEndPadding,
-                    showHandle = false,
-                    onHandleDragOffset = {
-                        overlayDrawerDragging = true
-                        overlayDrawerDragOffsetPx = quickDrawerClosingDragOffset(
-                            totalX = it,
-                            drawerTravelPx = drawerTravelPx,
-                            elasticLimitPx = drawerElasticLimitPx,
-                        )
-                    },
-                    onHandleDragEnd = { totalX ->
-                        overlayDrawerDragging = false
-                        if (totalX > drawerSnapThresholdPx) {
-                            closeQuickDrawerFromOverlay()
-                        } else {
-                            overlayDrawerDragOffsetPx = 0f
-                        }
-                    },
-                    handleDragLocally = false,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(top = mediaDetailTopBarInset)
-                        .fillMaxHeight()
-                        .graphicsLayer { translationX = overlayDrawerTranslationPx },
-                )
-            }
-            if (state.busy && !(state.sourcePickerOpen && state.sourcePickerLoading)) {
-                LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (state.busy && !(state.sourcePickerOpen && state.sourcePickerLoading)) {
+                    LinearProgressIndicator(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = chromeInsets.top),
+                    )
+                }
             }
         }
     }
@@ -971,6 +1018,7 @@ internal fun displayCutoutEndPadding(ignoreDisplayCutout: Boolean): Dp {
 @Composable
 internal fun TankobunTopBar(
     title: String,
+    hazeState: HazeState,
     showBack: Boolean,
     ignoreDisplayCutout: Boolean,
     showStatusBar: Boolean,
@@ -994,31 +1042,22 @@ internal fun TankobunTopBar(
     val iconSize = if (compact) 18.dp else 24.dp
     val logoSize = if (compact) 36.dp else 56.dp
     val spacing = if (compact) 7.dp else 12.dp
-    val barColor = if (mediaDetailActive) Color.Transparent else LocalTankobunStyle.current.colors.panel
     val contentColor = LocalTankobunStyle.current.colors.panelContent
-    Surface(
-        color = barColor,
+    TankobunGlassChrome(
         contentColor = contentColor,
-        tonalElevation = if (mediaDetailActive) 0.dp else 1.dp,
+        shape = FrostedTopBarShape,
+        hazeState = hazeState,
+        tintAlpha = FrostedGlassTintAlpha,
+        blurLayerAlpha = FrostedGlassBlurLayerAlpha,
+        borderAlpha = 0f,
+        washAlpha = FrostedGlassWashAlpha,
+        shadowElevation = 0.dp,
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(barHeight + statusBarInset),
         ) {
-            if (mediaDetailActive) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .blur(42.dp)
-                        .background(LocalTankobunStyle.current.colors.backdrop.copy(alpha = 0.96f)),
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(LocalTankobunStyle.current.colors.panel.copy(alpha = 0.72f)),
-                )
-            }
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1072,6 +1111,68 @@ internal fun TankobunTopBar(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TankobunGlassChrome(
+    modifier: Modifier = Modifier,
+    shape: RoundedCornerShape,
+    contentColor: Color = LocalTankobunStyle.current.colors.panelContent,
+    tintAlpha: Float = 0.88f,
+    blurLayerAlpha: Float = 0.46f,
+    hazeState: HazeState? = null,
+    borderAlpha: Float = 0.22f,
+    washAlpha: Float = 0.18f,
+    shadowElevation: Dp = 0.dp,
+    content: @Composable () -> Unit,
+) {
+    val colors = LocalTankobunStyle.current.colors
+    val surfaceTint = colors.panel.copy(alpha = tintAlpha.coerceIn(0f, 1f))
+    val blurBackground = colors.panel.copy(alpha = (tintAlpha * 0.7f).coerceIn(0f, 0.84f))
+    val blurTint = colors.backdrop.copy(alpha = blurLayerAlpha.coerceIn(0f, 1f))
+    val glassWash = colors.panel.copy(alpha = if (hazeState != null) washAlpha.coerceIn(0f, 1f) else 0f)
+    val sheen = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    val border = BorderStroke(1.dp, colors.outline.copy(alpha = borderAlpha.coerceIn(0f, 1f)))
+    val hazeStyle = HazeStyle(
+        backgroundColor = blurBackground,
+        tint = HazeTint(blurTint),
+        blurRadius = FrostedGlassBlur,
+        noiseFactor = 0.05f,
+        fallbackTint = HazeTint(surfaceTint),
+    )
+    val chromeModifier = if (hazeState != null) {
+        modifier
+            .clip(shape)
+            .hazeEffect(state = hazeState, style = hazeStyle)
+    } else {
+        modifier.clip(shape)
+    }
+
+    Surface(
+        modifier = chromeModifier,
+        shape = shape,
+        color = if (hazeState != null) Color.Transparent else surfaceTint,
+        contentColor = contentColor,
+        tonalElevation = 0.dp,
+        shadowElevation = shadowElevation,
+        border = border.takeIf { borderAlpha > 0f },
+    ) {
+        Box(
+            modifier = Modifier.clip(shape),
+        ) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(glassWash),
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(sheen),
+            )
+            content()
         }
     }
 }
@@ -1139,24 +1240,52 @@ internal fun TankobunBottomNavigationBar(
     onSelectTab: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    NavigationBar(
-        modifier = modifier,
-        containerColor = LocalTankobunStyle.current.colors.panel.copy(alpha = 0.92f),
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        tonalElevation = 0.dp,
+    val styleColors = LocalTankobunStyle.current.colors
+    val items = listOf(
+        Triple("Library", Icons.AutoMirrored.Filled.LibraryBooks, 0),
+        Triple("Browse", Icons.Default.Explore, 1),
+        Triple("Downloads", Icons.Default.Download, 2),
+        Triple("Settings", Icons.Default.Settings, 3),
+    )
+    Row(
+        modifier = modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        listOf(
-            Triple("Library", Icons.AutoMirrored.Filled.LibraryBooks, 0),
-            Triple("Browse", Icons.Default.Explore, 1),
-            Triple("Downloads", Icons.Default.Download, 2),
-            Triple("Settings", Icons.Default.Settings, 3),
-        ).forEach { (label, icon, index) ->
-            NavigationBarItem(
-                selected = selectedTab == index,
-                onClick = { onSelectTab(index) },
-                icon = { Icon(icon, contentDescription = label) },
-                label = { Text(label) },
-            )
+        items.forEach { (label, icon, index) ->
+            val selected = selectedTab == index
+            val iconColor = if (selected) {
+                styleColors.selectedChipContent
+            } else {
+                styleColors.panelContent.copy(alpha = 0.72f)
+            }
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { onSelectTab(index) },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (selected) {
+                                styleColors.selectedChip.copy(alpha = 0.86f)
+                            } else {
+                                Color.Transparent
+                            },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = label, tint = iconColor, modifier = Modifier.size(24.dp))
+                }
+            }
         }
     }
 }
@@ -1256,6 +1385,7 @@ internal fun QuickDrawer(
 ) {
     val handleSlotWidth = if (pinned || !showHandle) 0.dp else QuickDrawerHandleSlotWidth
     val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
+    val chromeInsets = LocalTankobunChromeInsets.current
     Box(modifier = modifier.width(handleSlotWidth + drawerWidth + endPadding)) {
         Surface(
             modifier = Modifier
@@ -1269,71 +1399,80 @@ internal fun QuickDrawer(
             shadowElevation = if (pinned) 0.dp else 10.dp,
         ) {
             Box(Modifier.fillMaxSize()) {
-                Column(
+                Box(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
                         .width(drawerWidth)
                         .fillMaxHeight()
-                        .verticalScroll(rememberScrollState())
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                        .padding(
+                            top = chromeInsets.top,
+                            bottom = chromeInsets.bottom,
+                        ),
                 ) {
-                    if (!compactLayout) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            IconButton(onClick = onTogglePin) {
-                                Icon(
-                                    imageVector = if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                                    contentDescription = if (pinned) "Unpin quick actions" else "Pin quick actions",
-                                    tint = if (pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        if (!compactLayout) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                IconButton(onClick = onTogglePin) {
+                                    Icon(
+                                        imageVector = if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                        contentDescription = if (pinned) "Unpin quick actions" else "Pin quick actions",
+                                        tint = if (pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+
+                        QuickDrawerSection(title = "AniList Tracking") {
+                            if (selectedMedia != null) {
+                                AniListTrackingSection(state, viewModel, selectedMedia)
+                            } else {
+                                Text(
+                                    "Open a manga to track it here.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
-                    }
 
-                    QuickDrawerSection(title = "AniList Tracking") {
-                        if (selectedMedia != null) {
-                            AniListTrackingSection(state, viewModel, selectedMedia)
-                        } else {
-                            Text(
-                                "Open a manga to track it here.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-
-                    QuickDrawerSection(title = "Continue Reading") {
-                        if (state.recentReadingProgress.isNotEmpty()) {
-                            state.recentReadingProgress.forEach { item ->
-                                RecentReadingAction(item = item, onClick = { onOpenRecentProgress(item) })
+                        QuickDrawerSection(title = "Continue Reading") {
+                            if (state.recentReadingProgress.isNotEmpty()) {
+                                state.recentReadingProgress.forEach { item ->
+                                    RecentReadingAction(item = item, onClick = { onOpenRecentProgress(item) })
+                                }
+                            } else {
+                                Text(
+                                    "Start reading any manga to create resume points.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
-                        } else {
-                            Text(
-                                "Start reading any manga to create resume points.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
-                    }
 
-                    QuickDrawerSection(title = "Downloads") {
-                        if (state.downloads.isEmpty()) {
-                            Text("No downloads queued.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        } else {
-                            state.downloads.take(4).forEach { job ->
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(job.chapterName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(
-                                            job.state.name.lowercase(),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
+                        QuickDrawerSection(title = "Downloads") {
+                            if (state.downloads.isEmpty()) {
+                                Text("No downloads queued.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            } else {
+                                state.downloads.take(4).forEach { job ->
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(job.chapterName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(
+                                                job.state.name.lowercase(),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     }
                                 }
                             }

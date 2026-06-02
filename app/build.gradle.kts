@@ -75,6 +75,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.graphics.path)
+    implementation(libs.haze)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.work.runtime)
 

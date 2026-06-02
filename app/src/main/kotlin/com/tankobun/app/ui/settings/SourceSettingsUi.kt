@@ -234,6 +234,7 @@ import com.tankobun.app.ui.shell.*
 @Composable
 internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewModel) {
     val context = LocalContext.current
+    val chromeInsets = LocalTankobunChromeInsets.current
     var sourceSettingsQuery by remember { mutableStateOf("") }
     var launchedInstallRequest by remember { mutableStateOf<ExtensionInstallRequest?>(null) }
     val installLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -386,9 +387,9 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
     ) {
         val pageContentPadding = PaddingValues(
             start = SourceSettingsContentPadding,
-            top = sharedHeaderHeight + SourceSettingsContentPadding,
+            top = chromeInsets.top + sharedHeaderHeight + SourceSettingsContentPadding,
             end = SourceSettingsContentPadding,
-            bottom = SourceSettingsContentPadding,
+            bottom = chromeInsets.bottom + SourceSettingsContentPadding,
         )
         HorizontalPager(
             state = pagerState,
@@ -490,7 +491,8 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
             modifier = Modifier
                 .fillMaxWidth()
                 .graphicsLayer { translationY = headerTranslationY }
-                .background(LocalTankobunStyle.current.colors.backdrop),
+                .background(LocalTankobunStyle.current.colors.backdrop)
+                .padding(top = chromeInsets.top),
         ) {
             Column(
                 modifier = Modifier.onSizeChanged { sourceHeaderHeightPx = it.height },
