@@ -540,7 +540,7 @@ internal fun BrowseLanding(
             top = chromeInsets.top + BrowseLandingContentPadding,
             bottom = chromeInsets.bottom + BrowseLandingContentPadding,
         ),
-        verticalArrangement = Arrangement.spacedBy(34.dp),
+        verticalArrangement = Arrangement.spacedBy(BrowseHeaderTextGap),
     ) {
         item(key = "browse-header") {
             Box(Modifier.padding(horizontal = BrowseLandingContentPadding)) {
@@ -587,6 +587,7 @@ internal fun BrowseLanding(
 }
 
 private val BrowseLandingContentPadding = 18.dp
+private val BrowseHeaderTextGap = 24.dp
 private val BrowseShelfTitleHeight = 62.dp
 
 @Composable
@@ -677,7 +678,7 @@ internal fun BrowseResults(
 ) {
     val chromeInsets = LocalTankobunChromeInsets.current
     val resultsHeader: @Composable () -> Unit = {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(BrowseHeaderTextGap)) {
             header()
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(modifier = Modifier.weight(1f)) {
@@ -687,8 +688,8 @@ internal fun BrowseResults(
                         state.searchQuery.isBlank() -> "Browse Manga"
                         else -> "Search Results"
                     },
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = LocalTankobunStyle.current.typography.sectionLabel,
+                    color = LocalTankobunStyle.current.colors.accent,
                 )
                 Text(
                     browseSummary(state),

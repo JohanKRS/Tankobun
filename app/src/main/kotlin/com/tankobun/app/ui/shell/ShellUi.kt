@@ -19,8 +19,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -223,6 +227,7 @@ import com.tankobun.core.model.SourceSearchResult
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.abs
@@ -785,7 +790,7 @@ internal fun TankobunScaffold(
                             bottom = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() +
                                 FrostedDockBottomMargin,
                         ),
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = state.dockAlignment.dockContentAlignment(),
                 ) {
                     TankobunGlassChrome(
                         modifier = Modifier
@@ -1199,6 +1204,13 @@ private fun TankobunGlassChrome(
     }
 }
 
+private fun DockAlignment.dockContentAlignment(): Alignment =
+    when (this) {
+        DockAlignment.LEFT -> Alignment.CenterStart
+        DockAlignment.CENTER -> Alignment.Center
+        DockAlignment.RIGHT -> Alignment.CenterEnd
+    }
+
 @Composable
 internal fun AnimatedHamburgerCloseIcon(
     close: Boolean,
@@ -1269,39 +1281,93 @@ internal fun TankobunBottomNavigationBar(
         Triple("Downloads", Icons.Default.Download, 2),
         Triple("Settings", Icons.Default.Settings, 3),
     )
-    Row(
-        modifier = modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        items.forEach { (label, icon, index) ->
-            val selected = selectedTab == index
-            val iconColor = if (selected) {
-                styleColors.selectedChipContent
-            } else {
-                styleColors.panelContent.copy(alpha = 0.72f)
+    val selectedIndex = selectedTab.coerceIn(0, items.lastIndex)
+    val itemSize = 44.dp
+    val itemSpacing = 8.dp
+    val indicatorSize = 40.dp
+    val density = LocalDensity.current
+    val indicatorOffsetPx = remember { Animatable(0f) }
+    val indicatorStretchPx = remember { Animatable(0f) }
+    val itemStridePx = with(density) { (itemSize + itemSpacing).toPx() }
+    val maxStretchPx = with(density) { 26.dp.toPx() }
+    val indicatorOffset = with(density) { indicatorOffsetPx.value.toDp() }
+    val indicatorWidth = with(density) { (indicatorSize.toPx() + indicatorStretchPx.value).toDp() }
+
+    LaunchedEffect(selectedIndex, itemStridePx) {
+        val targetOffsetPx = itemStridePx * selectedIndex
+        val travelPx = abs(targetOffsetPx - indicatorOffsetPx.value)
+        val stretchTargetPx = (travelPx * 0.42f).coerceIn(0f, maxStretchPx)
+        val slide = launch {
+            indicatorOffsetPx.animateTo(
+                targetValue = targetOffsetPx,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            )
+        }
+        val stretch = launch {
+            if (stretchTargetPx > 0f) {
+                indicatorStretchPx.animateTo(
+                    targetValue = stretchTargetPx,
+                    animationSpec = tween(durationMillis = 90),
+                )
             }
+            indicatorStretchPx.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+            )
+        }
+        joinAll(slide, stretch)
+    }
+
+    Box(
+        modifier = modifier
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .fillMaxWidth(),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            modifier = Modifier
+                .offset(x = indicatorOffset)
+                .size(itemSize),
+            contentAlignment = Alignment.Center,
+        ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .width(indicatorWidth)
+                    .height(indicatorSize)
                     .clip(CircleShape)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = { onSelectTab(index) },
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
+                    .background(styleColors.selectedChip.copy(alpha = 0.86f)),
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items.forEach { (label, icon, index) ->
+                val selected = selectedTab == index
+                val iconColor by animateColorAsState(
+                    targetValue = if (selected) {
+                        styleColors.selectedChipContent
+                    } else {
+                        styleColors.panelContent.copy(alpha = 0.72f)
+                    },
+                    animationSpec = tween(durationMillis = 160),
+                    label = "Dock icon color",
+                )
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(itemSize)
                         .clip(CircleShape)
-                        .background(
-                            if (selected) {
-                                styleColors.selectedChip.copy(alpha = 0.86f)
-                            } else {
-                                Color.Transparent
-                            },
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { onSelectTab(index) },
                         ),
                     contentAlignment = Alignment.Center,
                 ) {

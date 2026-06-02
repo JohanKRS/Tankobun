@@ -417,7 +417,11 @@ internal fun SettingsDetailPanel(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                title,
+                style = LocalTankobunStyle.current.typography.sectionLabel,
+                color = LocalTankobunStyle.current.colors.accent,
+            )
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodyMedium,
@@ -508,7 +512,10 @@ internal fun SettingsToggleRow(
 internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
     when (this) {
         SettingsRoute.MAIN -> "Settings"
-        SettingsRoute.APPEARANCE -> tankobunThemeChoices().firstOrNull { it.mode == state.themeMode }?.name ?: "Neon Koi"
+        SettingsRoute.APPEARANCE -> buildList {
+            add(tankobunThemeChoices().firstOrNull { it.mode == state.themeMode }?.name ?: "Neon Koi")
+            add("${state.dockAlignment.settingsLabel()} dock")
+        }.joinToString(" / ")
         SettingsRoute.LANGUAGES -> "${state.sourceLanguages.count { it != UNIVERSAL_SOURCE_LANGUAGE }} source languages"
         SettingsRoute.LIBRARY -> state.libraryViewMode.mediaViewSettingsSummary(
             columns = state.libraryCoverColumns,

@@ -181,6 +181,7 @@ class MainViewModel(
             themeMode = container.settingsStore.themeMode(),
             ignoreDisplayCutout = container.settingsStore.ignoreDisplayCutout(),
             showAppStatusBar = container.settingsStore.showAppStatusBar(),
+            dockAlignment = container.settingsStore.dockAlignment(),
             onboardingVisible = !container.settingsStore.onboardingCompleted(),
             readerMode = container.settingsStore.readerMode(),
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
@@ -345,6 +346,11 @@ class MainViewModel(
     fun setShowAppStatusBar(enabled: Boolean) {
         container.settingsStore.saveShowAppStatusBar(enabled)
         _state.update { it.copy(showAppStatusBar = enabled) }
+    }
+
+    fun setDockAlignment(alignment: DockAlignment) {
+        container.settingsStore.saveDockAlignment(alignment)
+        _state.update { it.copy(dockAlignment = alignment) }
     }
 
     fun setLibraryViewMode(mode: MediaViewMode) {

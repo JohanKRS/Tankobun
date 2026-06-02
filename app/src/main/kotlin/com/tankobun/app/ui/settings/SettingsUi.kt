@@ -310,7 +310,11 @@ internal fun SettingsIndexPane(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Settings",
+                style = LocalTankobunStyle.current.typography.sectionLabel,
+                color = LocalTankobunStyle.current.colors.accent,
+            )
             Text(
                 "Tune Tankobun for how you read, browse, and sync.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -439,6 +443,11 @@ internal fun SettingsDetailContent(
             ThemePicker(
                 selected = state.themeMode,
                 onSelect = viewModel::setThemeMode,
+            )
+            Text("Dock position", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            DockAlignmentRow(
+                selected = state.dockAlignment,
+                onSelect = viewModel::setDockAlignment,
             )
             Text("System UI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             SettingsToggleRow(
@@ -955,4 +964,27 @@ internal fun AnilistScoreFormat.settingsLabel(): String =
         AnilistScoreFormat.POINT_10 -> "10 point"
         AnilistScoreFormat.POINT_5 -> "5 stars"
         AnilistScoreFormat.POINT_3 -> "3 smileys"
+    }
+
+@Composable
+internal fun DockAlignmentRow(
+    selected: DockAlignment,
+    onSelect: (DockAlignment) -> Unit,
+) {
+    FlowRowCompat {
+        DockAlignment.entries.forEach { alignment ->
+            TankobunChip(
+                selected = selected == alignment,
+                onClick = { onSelect(alignment) },
+                label = { Text(alignment.settingsLabel()) },
+            )
+        }
+    }
+}
+
+internal fun DockAlignment.settingsLabel(): String =
+    when (this) {
+        DockAlignment.LEFT -> "Left"
+        DockAlignment.CENTER -> "Center"
+        DockAlignment.RIGHT -> "Right"
     }

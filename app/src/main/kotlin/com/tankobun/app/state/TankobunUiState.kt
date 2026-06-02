@@ -2,6 +2,7 @@ package com.tankobun.app.state
 
 import com.tankobun.app.BackupSchedule
 import com.tankobun.app.DEFAULT_MEDIA_COVER_COLUMNS
+import com.tankobun.app.DockAlignment
 import com.tankobun.app.MediaViewMode
 import com.tankobun.app.TankobunThemeMode
 import com.tankobun.app.defaultSourceLanguages
@@ -29,6 +30,7 @@ data class TankobunUiState(
     val themeMode: TankobunThemeMode = TankobunThemeMode.SYSTEM,
     val ignoreDisplayCutout: Boolean = false,
     val showAppStatusBar: Boolean = true,
+    val dockAlignment: DockAlignment = DockAlignment.CENTER,
     val onboardingVisible: Boolean = false,
     val viewerName: String? = null,
     val anilistScoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,

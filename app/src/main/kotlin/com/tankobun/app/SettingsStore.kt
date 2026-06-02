@@ -43,6 +43,15 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean(KEY_SHOW_APP_STATUS_BAR, enabled).apply()
     }
 
+    fun dockAlignment(): DockAlignment =
+        preferences.getString(KEY_DOCK_ALIGNMENT, null)
+            ?.let { stored -> runCatching { DockAlignment.valueOf(stored) }.getOrNull() }
+            ?: DockAlignment.CENTER
+
+    fun saveDockAlignment(alignment: DockAlignment) {
+        preferences.edit().putString(KEY_DOCK_ALIGNMENT, alignment.name).apply()
+    }
+
     fun onboardingCompleted(): Boolean =
         preferences.getBoolean(KEY_ONBOARDING_COMPLETED, false)
 
@@ -298,6 +307,7 @@ class SettingsStore(context: Context) {
         const val KEY_THEME_MODE = "theme.mode"
         const val KEY_IGNORE_DISPLAY_CUTOUT = "layout.ignore.display.cutout"
         const val KEY_SHOW_APP_STATUS_BAR = "layout.show.app.status.bar"
+        const val KEY_DOCK_ALIGNMENT = "layout.dock.alignment"
         const val KEY_ONBOARDING_COMPLETED = "onboarding.completed"
         const val KEY_LIBRARY_VIEW_MODE = "library.view.mode"
         const val KEY_LIBRARY_COVER_COLUMNS = "library.cover.columns"
@@ -359,6 +369,12 @@ enum class MediaViewMode {
     MASONRY,
     JUSTIFIED,
     LIST,
+}
+
+enum class DockAlignment {
+    LEFT,
+    CENTER,
+    RIGHT,
 }
 
 enum class BackupSchedule {
