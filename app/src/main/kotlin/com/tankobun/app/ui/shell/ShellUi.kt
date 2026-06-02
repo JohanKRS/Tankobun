@@ -1514,14 +1514,18 @@ internal fun QuickDrawer(
                         .fillMaxHeight()
                         .padding(
                             top = chromeInsets.top,
-                            bottom = chromeInsets.bottom,
                         ),
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
-                            .padding(18.dp),
+                            .padding(
+                                start = 18.dp,
+                                top = 18.dp,
+                                end = 18.dp,
+                                bottom = 18.dp + chromeInsets.bottom,
+                            ),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         if (!compactLayout) {
