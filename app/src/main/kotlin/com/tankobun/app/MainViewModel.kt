@@ -110,6 +110,12 @@ private data class BulkDownloadResult(
         get() = queued + resumed + retried
 }
 
+private data class ReaderPagePosition(
+    val chapterUrl: String,
+    val pageIndex: Int,
+    val pageScrollOffset: Int,
+)
+
 private data class VerifiedSourceMatches(
     val matches: List<SourceSearchResult>,
     val chapterCounts: Map<String, Int>,
@@ -155,6 +161,7 @@ class MainViewModel(
     private var sourcePickerJob: Job? = null
     private var sourcePickerRequestId: Long = 0L
     private var lastReaderProgressSavedAtEpochMillis: Long = 0L
+    private var latestReaderPosition: ReaderPagePosition? = null
     private val readerPageCacheJobs = ConcurrentHashMap<String, Job>()
     private val _state = MutableStateFlow(
         TankobunUiState(
@@ -3432,6 +3439,8 @@ class MainViewModel(
         val source = state.readerSourceForChapter(chapter)
         viewModelScope.launch {
             readerAdjacentLoadJob?.cancel()
+            cancelReaderPageCacheJobs()
+            latestReaderPosition = null
             _state.update {
                 it.copy(
                     busy = true,
@@ -3489,6 +3498,7 @@ class MainViewModel(
                 _state.update {
                     if (it.activeChapter?.url == chapter.url) {
                         readerStillOpen = true
+                        recordReaderPosition(chapter.url, startPageIndex, startPageScrollOffset)
                         it.copy(
                             activeChapter = chapter,
                             readerPages = pages,
@@ -3504,8 +3514,14 @@ class MainViewModel(
                     }
                 }
                 if (!readerStillOpen) return@onSuccess
-                saveReaderProgress()
-                cacheReaderWindow(media.id, chapter, pages, startPageIndex, source)
+                cacheReaderWindow(
+                    mediaId = media.id,
+                    chapter = chapter,
+                    pages = pages,
+                    pageIndex = startPageIndex,
+                    source = source,
+                    preferredDirection = 1,
+                )
                 loadAdjacentReaderSegments(media.id, chapter)
             }.onFailure { error ->
                 Log.w(TAG, "Page load failed for ${source?.name ?: "cached source"}/${chapter.name}", error)
@@ -3665,6 +3681,9 @@ class MainViewModel(
 
     fun closeReader() {
         saveReaderProgress()
+        readerAdjacentLoadJob?.cancel()
+        readerAdjacentLoadJob = null
+        cancelReaderPageCacheJobs()
         _state.update {
             it.copy(
                 activeChapter = null,
@@ -3676,6 +3695,11 @@ class MainViewModel(
                 busy = false,
             )
         }
+        latestReaderPosition = null
+    }
+
+    fun persistReaderProgress() {
+        saveReaderProgress()
     }
 
     fun moveReaderPage(delta: Int) {
@@ -3689,8 +3713,7 @@ class MainViewModel(
         }
         val nextIndex = targetIndex.coerceIn(0, pages.lastIndex)
         if (nextIndex == snapshot.currentPageIndex) return
-        _state.update { it.copy(currentPageIndex = nextIndex, currentPageScrollOffset = 0) }
-        saveReaderProgress()
+        setReaderPage(nextIndex)
     }
 
     fun setReaderPage(index: Int, pageScrollOffset: Int = 0) {
@@ -3700,12 +3723,21 @@ class MainViewModel(
         val nextIndex = index.coerceIn(0, pages.lastIndex)
         val nextOffset = pageScrollOffset.coerceAtLeast(0)
         if (nextIndex == snapshot.currentPageIndex && nextOffset == snapshot.currentPageScrollOffset) return
-        _state.update { it.copy(currentPageIndex = nextIndex, currentPageScrollOffset = nextOffset) }
-        saveReaderProgress()
-        val media = snapshot.selectedMedia
         val chapter = snapshot.activeChapter
+        if (chapter != null) {
+            recordReaderPosition(chapter.url, nextIndex, nextOffset)
+        }
+        _state.update { it.copy(currentPageIndex = nextIndex, currentPageScrollOffset = nextOffset) }
+        val media = snapshot.selectedMedia
         if (media != null && chapter != null) {
-            cacheReaderWindow(media.id, chapter, pages, nextIndex, snapshot.readerSourceForChapter(chapter))
+            cacheReaderWindow(
+                mediaId = media.id,
+                chapter = chapter,
+                pages = pages,
+                pageIndex = nextIndex,
+                source = snapshot.readerSourceForChapter(chapter),
+                preferredDirection = nextIndex.compareTo(snapshot.currentPageIndex),
+            )
         }
     }
 
@@ -3713,7 +3745,7 @@ class MainViewModel(
         val snapshot = _state.value
         val activeChapter = snapshot.activeChapter ?: return
         when (chapterUrl) {
-            activeChapter.url -> setReaderPage(pageIndex, pageScrollOffset)
+            activeChapter.url -> setActiveWebtoonReaderPosition(pageIndex, pageScrollOffset)
             snapshot.readerPreviousSegment?.chapter?.url -> activateContinuousReaderSegment(
                 segment = snapshot.readerPreviousSegment,
                 pageIndex = pageIndex,
@@ -3725,6 +3757,31 @@ class MainViewModel(
                 pageIndex = pageIndex,
                 pageScrollOffset = pageScrollOffset,
                 direction = ReaderSegmentDirection.NEXT,
+            )
+        }
+    }
+
+    private fun setActiveWebtoonReaderPosition(pageIndex: Int, pageScrollOffset: Int) {
+        val snapshot = _state.value
+        val pages = snapshot.readerPages
+        if (pages.isEmpty()) return
+        val nextIndex = pageIndex.coerceIn(0, pages.lastIndex)
+        val nextOffset = pageScrollOffset.coerceAtLeast(0)
+        val chapter = snapshot.activeChapter ?: return
+        recordReaderPosition(chapter.url, nextIndex, nextOffset)
+        val pageChanged = nextIndex != snapshot.currentPageIndex
+        if (!pageChanged) return
+
+        _state.update { it.copy(currentPageIndex = nextIndex, currentPageScrollOffset = nextOffset) }
+        val media = snapshot.selectedMedia
+        if (media != null) {
+            cacheReaderWindow(
+                mediaId = media.id,
+                chapter = chapter,
+                pages = pages,
+                pageIndex = nextIndex,
+                source = snapshot.readerSourceForChapter(chapter),
+                preferredDirection = nextIndex.compareTo(snapshot.currentPageIndex),
             )
         }
     }
@@ -3756,6 +3813,7 @@ class MainViewModel(
 
         val nextIndex = pageIndex.coerceIn(0, targetSegment.pages.lastIndex)
         val oldActiveSegment = ReaderChapterSegment(activeChapter, activePages)
+        recordReaderPosition(targetSegment.chapter.url, nextIndex, pageScrollOffset)
         _state.update {
             it.copy(
                 activeChapter = targetSegment.chapter,
@@ -3766,19 +3824,16 @@ class MainViewModel(
                 currentPageScrollOffset = pageScrollOffset.coerceAtLeast(0),
             )
         }
-        saveReaderProgressFor(
-            media = media,
-            chapter = targetSegment.chapter,
-            pages = targetSegment.pages,
-            pageIndex = nextIndex,
-            pageScrollOffset = pageScrollOffset,
-        )
         cacheReaderWindow(
             mediaId = media.id,
             chapter = targetSegment.chapter,
             pages = targetSegment.pages,
             pageIndex = nextIndex,
             source = snapshot.readerSourceForChapter(targetSegment.chapter),
+            preferredDirection = when (direction) {
+                ReaderSegmentDirection.PREVIOUS -> -1
+                ReaderSegmentDirection.NEXT -> 1
+            },
         )
         loadAdjacentReaderSegments(media.id, targetSegment.chapter)
     }
@@ -3789,20 +3844,54 @@ class MainViewModel(
         pages: List<ReaderPage>,
         pageIndex: Int,
         source: SourceDescriptor? = _state.value.readerSourceForChapter(chapter),
+        preferredDirection: Int = 1,
     ) {
         if (pages.isEmpty()) return
         source ?: return
         val start = (pageIndex - READER_CACHE_BACK_PAGES).coerceAtLeast(0)
         val end = (pageIndex + READER_CACHE_FORWARD_PAGES).coerceAtMost(pages.lastIndex)
+        val windowPages = orderedReaderCacheWindow(
+            pages = pages,
+            pageIndex = pageIndex.coerceIn(0, pages.lastIndex),
+            start = start,
+            end = end,
+            preferredDirection = preferredDirection,
+        )
         startReaderPageCache(
             source = source,
             mediaId = mediaId,
             chapter = chapter,
-            pages = pages.subList(start, end + 1),
+            pages = windowPages,
             cacheKeySuffix = "window",
             replaceExisting = true,
             initialDelayMillis = READER_CACHE_INITIAL_DELAY_MILLIS,
         )
+    }
+
+    private fun orderedReaderCacheWindow(
+        pages: List<ReaderPage>,
+        pageIndex: Int,
+        start: Int,
+        end: Int,
+        preferredDirection: Int,
+    ): List<ReaderPage> {
+        val forwardFirst = preferredDirection >= 0
+        val orderedIndexes = buildList {
+            add(pageIndex)
+            val radius = maxOf(pageIndex - start, end - pageIndex)
+            for (offset in 1..radius) {
+                val forward = pageIndex + offset
+                val backward = pageIndex - offset
+                if (forwardFirst) {
+                    if (forward <= end) add(forward)
+                    if (backward >= start) add(backward)
+                } else {
+                    if (backward >= start) add(backward)
+                    if (forward <= end) add(forward)
+                }
+            }
+        }
+        return orderedIndexes.distinct().map { pages[it] }
     }
 
     private fun startReaderPageCache(
@@ -3848,6 +3937,11 @@ class MainViewModel(
         }
         readerPageCacheJobs[key] = job
         job.invokeOnCompletion { readerPageCacheJobs.remove(key, job) }
+    }
+
+    private fun cancelReaderPageCacheJobs() {
+        readerPageCacheJobs.values.forEach { it.cancel() }
+        readerPageCacheJobs.clear()
     }
 
     fun openNextChapter() {
@@ -4051,6 +4145,7 @@ class MainViewModel(
         chapters: List<SourceChapter>,
         retryFailed: Boolean = true,
     ): BulkDownloadResult {
+        cancelReaderPageCacheJobs()
         var queued = 0
         var resumed = 0
         var retried = 0
@@ -4240,12 +4335,21 @@ class MainViewModel(
         val chapter = _state.value.activeChapter ?: return
         val pages = _state.value.readerPages
         if (pages.isEmpty()) return
+        val position = latestReaderPosition?.takeIf { it.chapterUrl == chapter.url }
         saveReaderProgressFor(
             media = media,
             chapter = chapter,
             pages = pages,
-            pageIndex = _state.value.currentPageIndex,
-            pageScrollOffset = _state.value.currentPageScrollOffset,
+            pageIndex = position?.pageIndex ?: _state.value.currentPageIndex,
+            pageScrollOffset = position?.pageScrollOffset ?: _state.value.currentPageScrollOffset,
+        )
+    }
+
+    private fun recordReaderPosition(chapterUrl: String, pageIndex: Int, pageScrollOffset: Int) {
+        latestReaderPosition = ReaderPagePosition(
+            chapterUrl = chapterUrl,
+            pageIndex = pageIndex.coerceAtLeast(0),
+            pageScrollOffset = pageScrollOffset.coerceAtLeast(0),
         )
     }
 
@@ -4328,12 +4432,12 @@ class MainViewModel(
         private const val SOURCE_MAX_CANDIDATES_PER_SOURCE = 40
         private const val SOURCE_STRONG_MATCH_SCORE = 0.9
         private const val TRACKING_AUTO_SAVE_DELAY_MILLIS = 1_200L
-        private const val READER_CACHE_BACK_PAGES = 4
-        private const val READER_CACHE_FORWARD_PAGES = 4
+        private const val READER_CACHE_BACK_PAGES = 5
+        private const val READER_CACHE_FORWARD_PAGES = 10
         private const val READER_ADJACENT_CACHE_PAGE_COUNT = 2
-        private const val READER_CACHE_INITIAL_DELAY_MILLIS = 5_000L
+        private const val READER_CACHE_INITIAL_DELAY_MILLIS = 500L
         private const val READER_ADJACENT_CACHE_INITIAL_DELAY_MILLIS = 12_000L
-        private const val READER_CACHE_REQUEST_SPACING_MILLIS = 3_000L
+        private const val READER_CACHE_REQUEST_SPACING_MILLIS = 250L
     }
 }
 

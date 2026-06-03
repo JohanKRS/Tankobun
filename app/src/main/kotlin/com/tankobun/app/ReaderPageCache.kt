@@ -106,19 +106,22 @@ object ReaderPageCache {
         file.absolutePath
     }
 
-    fun withCachedPaths(
+    suspend fun withCachedPaths(
         context: Context,
         mediaId: Int,
         chapter: SourceChapter,
         pages: List<ReaderPage>,
-    ): List<ReaderPage> =
+    ): List<ReaderPage> = withContext(Dispatchers.IO) {
         pages.map { page ->
-            page.cachedFilePath?.let { return@map page }
-            cachedFile(context, mediaId, chapter, page)
-                ?.absolutePath
-                ?.let { page.copy(cachedFilePath = it) }
-                ?: page
+            val cachedFile = page.cachedFilePath
+                ?.let(::File)
+                ?.takeIf { it.isFile && it.length() > 0L }
+                ?: cachedFile(context, mediaId, chapter, page)
+            cachedFile?.let { file ->
+                page.copy(cachedFilePath = file.absolutePath)
+            } ?: page
         }
+    }
 
     suspend fun prune(
         context: Context,

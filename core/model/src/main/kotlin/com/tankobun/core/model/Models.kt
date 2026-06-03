@@ -179,6 +179,8 @@ data class ReaderPage(
     val headers: Map<String, String> = emptyMap(),
     val sourcePageUrl: String = "",
     val imageUrlResolved: Boolean = true,
+    val imageWidth: Int? = null,
+    val imageHeight: Int? = null,
 )
 
 data class SourceBinding(

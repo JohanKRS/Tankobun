@@ -42,6 +42,11 @@ class MainActivity : ComponentActivity() {
         viewModel.refreshInstalledSources()
     }
 
+    override fun onStop() {
+        viewModel.persistReaderProgress()
+        super.onStop()
+    }
+
     private fun handleIntent(intent: Intent?) {
         val data = intent?.data ?: return
         viewModel.handleOAuthRedirect(data.toString())

@@ -72,6 +72,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -225,6 +226,7 @@ import com.tankobun.app.ui.reader.*
 import com.tankobun.app.ui.settings.*
 import com.tankobun.app.ui.shell.*
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     val chapter = state.activeChapter ?: return
@@ -244,7 +246,12 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     var flingJob by remember(transformKey) { mutableStateOf<Job?>(null) }
     var zoomAnimationJob by remember(transformKey) { mutableStateOf<Job?>(null) }
     val pageGap = readerPageGap(state.readerPageGapLevel)
-    val webtoonListState = rememberLazyListState()
+    val webtoonListState = rememberLazyListState(
+        cacheWindow = LazyLayoutCacheWindow(
+            ahead = WEBTOON_READER_CACHE_AHEAD_DP.dp,
+            behind = WEBTOON_READER_CACHE_BEHIND_DP.dp,
+        ),
+    )
     val zoomPercent = (readerScale * 100).toInt()
     val pageCount = state.readerPages.size
     val lastPageIndex = (pageCount - 1).coerceAtLeast(0)
@@ -279,6 +286,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     var scrubberSeeking by remember(chapter.url) { mutableStateOf(false) }
     var webtoonInitialScrollDoneFor by remember { mutableStateOf<String?>(null) }
     var preserveWebtoonScrollOnChapterChange by remember { mutableStateOf(false) }
+    var continuousWebtoonAnchor by remember { mutableStateOf<WebtoonReaderAnchor?>(null) }
     var suppressWebtoonPositionUpdates by remember { mutableStateOf(false) }
     val displayedPageIndex = scrubberValue.roundToInt().coerceIn(0, lastPageIndex)
     fun cancelFling() {
@@ -402,7 +410,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         viewModel.setReaderPage(targetIndex)
         if (state.readerMode == ReaderMode.WEBTOON) {
             coroutineScope.launch {
-                webtoonListState.animateScrollToItem(currentWebtoonStartIndex + targetIndex)
+                webtoonListState.scrollToItem(currentWebtoonStartIndex + targetIndex)
             }
         }
     }
@@ -429,13 +437,6 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         }
     }
 
-    LaunchedEffect(scrubberSeeking, scrubberValue) {
-        if (scrubberSeeking) {
-            delay(420L)
-            scrubberSeeking = false
-        }
-    }
-
     LaunchedEffect(
         chapter.url,
         state.readerMode,
@@ -443,6 +444,17 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     ) {
         if (state.readerMode == ReaderMode.WEBTOON) {
             if (preserveWebtoonScrollOnChapterChange) {
+                continuousWebtoonAnchor?.let { anchor ->
+                    val anchorIndex = webtoonPageItems.indexOfFirst { item ->
+                        item.chapter.url == anchor.chapterUrl && item.pageIndex == anchor.pageIndex
+                    }
+                    if (anchorIndex >= 0) {
+                        suppressWebtoonPositionUpdates = true
+                        webtoonListState.scrollToItem(anchorIndex, anchor.scrollOffset)
+                        withFrameNanos { }
+                    }
+                }
+                continuousWebtoonAnchor = null
                 preserveWebtoonScrollOnChapterChange = false
                 webtoonInitialScrollDoneFor = chapter.url
                 suppressWebtoonPositionUpdates = false
@@ -491,12 +503,19 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 .collect { visiblePage ->
                     val (item, scrollOffset) = visiblePage ?: return@collect
                     if (
-                        !scrubberSeeking &&
                         !suppressWebtoonPositionUpdates &&
                         webtoonInitialScrollDoneFor == chapter.url
                     ) {
+                        if (!scrubberSeeking && item.chapter.url == chapter.url) {
+                            scrubberValue = item.pageIndex.coerceIn(0, lastPageIndex).toFloat()
+                        }
                         if (item.chapter.url != chapter.url) {
                             preserveWebtoonScrollOnChapterChange = true
+                            continuousWebtoonAnchor = WebtoonReaderAnchor(
+                                chapterUrl = item.chapter.url,
+                                pageIndex = item.pageIndex,
+                                scrollOffset = scrollOffset,
+                            )
                         }
                         viewModel.setWebtoonReaderPosition(item.chapter.url, item.pageIndex, scrollOffset)
                     }
@@ -594,6 +613,8 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                         contentDescription = item.chapter.name,
                         modifier = Modifier.fillMaxWidth(),
                         contentScale = ContentScale.FillWidth,
+                        placeholderAspectRatio = item.page.readerPageAspectRatio()
+                            ?: DEFAULT_WEBTOON_READER_PAGE_ASPECT_RATIO,
                     )
                 }
                 if (nextChapter != null && state.readerNextSegment == null) {
@@ -688,7 +709,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
-                                "${if (state.readerMode == ReaderMode.WEBTOON) "Webtoon" else "Paged"} / Page ${state.currentPageIndex + 1} of $pageCount",
+                                "${if (state.readerMode == ReaderMode.WEBTOON) "Webtoon" else "Paged"} / Page ${displayedPageIndex + 1} of $pageCount",
                                 color = Color.White.copy(alpha = 0.74f),
                                 style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,
@@ -763,8 +784,9 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                             }
                                         },
                                         onValueChangeFinished = {
+                                            val targetIndex = scrubberValue.roundToInt().coerceIn(0, lastPageIndex)
                                             scrubberSeeking = false
-                                            commitScrubbedPage()
+                                            goToReaderPage(targetIndex)
                                         },
                                         valueRange = 0f..lastPageIndex.toFloat(),
                                         modifier = Modifier.fillMaxWidth(),
@@ -896,13 +918,16 @@ internal fun ReaderPageImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale,
     fillViewportWhileLoading: Boolean = false,
+    placeholderAspectRatio: Float? = null,
 ) {
     var retryAttempt by remember { mutableIntStateOf(0) }
     val imageRequest = model(retryAttempt)
-    val loadingModifier = if (fillViewportWhileLoading) {
-        Modifier.fillMaxSize()
-    } else {
-        Modifier
+    val loadingModifier = when {
+        fillViewportWhileLoading -> Modifier.fillMaxSize()
+        placeholderAspectRatio != null -> Modifier
+            .fillMaxWidth()
+            .aspectRatio(placeholderAspectRatio)
+        else -> Modifier
             .fillMaxWidth()
             .heightIn(min = 320.dp)
     }
@@ -1000,11 +1025,27 @@ internal fun readerPageGap(level: Int): Dp = when (level) {
     else -> 0.dp
 }
 
+internal const val DEFAULT_WEBTOON_READER_PAGE_ASPECT_RATIO = 0.68f
+internal const val WEBTOON_READER_CACHE_AHEAD_DP = 3600
+internal const val WEBTOON_READER_CACHE_BEHIND_DP = 2400
+
+private data class WebtoonReaderAnchor(
+    val chapterUrl: String,
+    val pageIndex: Int,
+    val scrollOffset: Int,
+)
+
 internal fun readerGapLabel(level: Int): String = when (level) {
     1 -> "Small gaps"
     2 -> "Medium gaps"
     3 -> "Large gaps"
     else -> "No gaps"
+}
+
+internal fun ReaderPage.readerPageAspectRatio(): Float? {
+    val width = imageWidth?.takeIf { it > 0 } ?: return null
+    val height = imageHeight?.takeIf { it > 0 } ?: return null
+    return (width.toFloat() / height.toFloat()).coerceIn(0.2f, 2.5f)
 }
 
 internal fun readerLerp(start: Float, stop: Float, fraction: Float): Float = start + (stop - start) * fraction

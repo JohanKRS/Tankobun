@@ -18,12 +18,20 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import uy.kohesive.injekt.TankobunInjektRegistry
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicInteger
 
 class TachiyomiSourceHost(
     private val context: Context,
@@ -225,63 +233,158 @@ class TachiyomiSourceHost(
             RespectfulRateLimiter(minSpacingMillis = SOURCE_IMAGE_REQUEST_SPACING_MILLIS)
         }
         semaphore.withPermit {
-            rateLimiter.run {
-                runSourceAction(source, sourceInstance, "image") {
-                    val sourcePageUrl = page.sourcePageUrl.ifBlank { page.imageUrl }
-                    val imageUrlCandidate = page.imageUrl.takeIf { it.isNotBlank() }
-                    val sourcePage = Page(
-                        index = page.index,
-                        url = sourcePageUrl,
-                        imageUrl = imageUrlCandidate.takeIf {
-                            page.imageUrlResolved || it != sourcePageUrl || it.looksLikeImageUrl()
-                        },
+            runSourceAction(source, sourceInstance, "image") {
+                fetchImageBytesWithRetries(
+                    sourceInstance = sourceInstance,
+                    page = page,
+                    rateLimiter = rateLimiter,
+                )
+            }
+        }
+    }
+
+    private suspend fun fetchImageBytesWithRetries(
+        sourceInstance: HttpSource,
+        page: ReaderPage,
+        rateLimiter: RespectfulRateLimiter,
+    ): ByteArray {
+        val sourcePageUrl = page.sourcePageUrl.ifBlank { page.imageUrl }
+        val imageUrlCandidate = page.imageUrl.takeIf { it.isNotBlank() }
+        val sourcePage = Page(
+            index = page.index,
+            url = sourcePageUrl,
+            imageUrl = imageUrlCandidate.takeIf {
+                page.imageUrlResolved || it != sourcePageUrl || it.looksLikeImageUrl()
+            },
+        )
+        val resolutionError = if (sourcePage.imageUrl == null) {
+            sourceInstance.resolveImageUrl(sourcePage)
+        } else {
+            null
+        }
+        if (sourcePage.imageUrl == null) {
+            sourcePage.imageUrl = sourcePageUrl.takeIf { it.isHttpUrl() }
+        }
+        val usingDirectFallback = sourcePage.imageUrl == sourcePageUrl && resolutionError != null
+        var attempt = 1
+        var delayMillis = SOURCE_IMAGE_RETRY_INITIAL_DELAY_MILLIS
+        var lastError: Throwable? = null
+
+        while (attempt <= SOURCE_IMAGE_RETRY_ATTEMPTS) {
+            try {
+                return rateLimiter.run {
+                    fetchImageBytesOnce(
+                        sourceInstance = sourceInstance,
+                        sourcePage = sourcePage,
+                        page = page,
+                        rateLimiter = rateLimiter,
+                        usingDirectFallback = usingDirectFallback,
+                        resolutionError = resolutionError,
                     )
-                    val resolutionError = if (sourcePage.imageUrl == null) {
-                        sourceInstance.resolveImageUrl(sourcePage)
-                    } else {
-                        null
+                }
+            } catch (error: SourceImageTimeoutException) {
+                throw error
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                lastError = error
+                if (attempt >= SOURCE_IMAGE_RETRY_ATTEMPTS || !error.isTransientSourceImageFailure()) {
+                    throw error
+                }
+                delay(delayMillis)
+                delayMillis = (delayMillis * 2).coerceAtMost(SOURCE_IMAGE_RETRY_MAX_DELAY_MILLIS)
+                attempt += 1
+            }
+        }
+
+        throw lastError ?: IllegalStateException("Page ${page.index + 1} failed")
+    }
+
+    private suspend fun fetchImageBytesOnce(
+        sourceInstance: HttpSource,
+        sourcePage: Page,
+        page: ReaderPage,
+        rateLimiter: RespectfulRateLimiter,
+        usingDirectFallback: Boolean,
+        resolutionError: Throwable?,
+    ): ByteArray =
+        withContext(Dispatchers.IO) {
+            val future = SOURCE_IMAGE_EXECUTOR.submit<ByteArray> {
+                fetchImageBytesBlocking(
+                    sourceInstance = sourceInstance,
+                    sourcePage = sourcePage,
+                    page = page,
+                    rateLimiter = rateLimiter,
+                    usingDirectFallback = usingDirectFallback,
+                    resolutionError = resolutionError,
+                )
+            }
+            try {
+                future.get(SOURCE_IMAGE_ATTEMPT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+            } catch (error: TimeoutException) {
+                future.cancel(true)
+                throw SourceImageTimeoutException(page.index, error)
+            } catch (error: ExecutionException) {
+                throw error.cause ?: error
+            } catch (error: InterruptedException) {
+                future.cancel(true)
+                Thread.currentThread().interrupt()
+                throw CancellationException("Image fetch interrupted").apply { initCause(error) }
+            }
+        }
+
+    private fun fetchImageBytesBlocking(
+        sourceInstance: HttpSource,
+        sourcePage: Page,
+        page: ReaderPage,
+        rateLimiter: RespectfulRateLimiter,
+        usingDirectFallback: Boolean,
+        resolutionError: Throwable?,
+    ): ByteArray =
+        runCatching {
+            sourceInstance.fetchImage(sourcePage).toBlocking().first()
+        }.getOrElse { error ->
+            if (usingDirectFallback && resolutionError != null) {
+                error.addSuppressed(resolutionError)
+            }
+            throw error
+        }.use { response ->
+            rateLimiter.recordResponse(response.headers, response.code)
+            if (!response.isSuccessful) {
+                throw SourceImageHttpException(page.index, response.code).also { error ->
+                    if (usingDirectFallback && resolutionError != null) {
+                        error.addSuppressed(resolutionError)
                     }
-                    if (sourcePage.imageUrl == null) {
-                        sourcePage.imageUrl = sourcePageUrl.takeIf { it.isHttpUrl() }
-                    }
-                    val usingDirectFallback = sourcePage.imageUrl == sourcePageUrl && resolutionError != null
-                    runCatching {
-                        sourceInstance.fetchImage(sourcePage).toBlocking().first()
-                    }.getOrElse { error ->
-                        if (usingDirectFallback) {
+                }
+            }
+            val contentType = response.body.contentType()?.toString().orEmpty()
+            response.body.bytes().also { bytes ->
+                if (!bytes.looksLikeImage() && !contentType.startsWith("image/", ignoreCase = true)) {
+                    throw IllegalStateException("Page ${page.index + 1} did not return an image").also { error ->
+                        if (usingDirectFallback && resolutionError != null) {
                             error.addSuppressed(resolutionError)
-                        }
-                        throw error
-                    }.use { response ->
-                        if (!response.isSuccessful) {
-                            throw IllegalStateException("Page ${page.index + 1} failed: HTTP ${response.code}").also { error ->
-                                if (usingDirectFallback) {
-                                    error.addSuppressed(resolutionError)
-                                }
-                            }
-                        }
-                        val contentType = response.body.contentType()?.toString().orEmpty()
-                        response.body.bytes().also { bytes ->
-                            if (!bytes.looksLikeImage() && !contentType.startsWith("image/", ignoreCase = true)) {
-                                throw IllegalStateException("Page ${page.index + 1} did not return an image").also { error ->
-                                    if (usingDirectFallback) {
-                                        error.addSuppressed(resolutionError)
-                                    }
-                                }
-                            }
                         }
                     }
                 }
             }
         }
-    }
 
     private fun SourceDescriptor.imageFetchKey(): String = "$packageName:$id"
 
     companion object {
         private const val TAG = "TankobunSources"
-        private const val SOURCE_IMAGE_FETCH_CONCURRENCY = 2
-        private const val SOURCE_IMAGE_REQUEST_SPACING_MILLIS = 250L
+        private const val SOURCE_IMAGE_FETCH_CONCURRENCY = 1
+        private const val SOURCE_IMAGE_REQUEST_SPACING_MILLIS = 1_500L
+        private const val SOURCE_IMAGE_RETRY_ATTEMPTS = 3
+        private const val SOURCE_IMAGE_ATTEMPT_TIMEOUT_MILLIS = 25_000L
+        private const val SOURCE_IMAGE_RETRY_INITIAL_DELAY_MILLIS = 2_500L
+        private const val SOURCE_IMAGE_RETRY_MAX_DELAY_MILLIS = 15_000L
+        private val SOURCE_IMAGE_THREAD_COUNT = AtomicInteger()
+        private val SOURCE_IMAGE_EXECUTOR = Executors.newCachedThreadPool { runnable ->
+            Thread(runnable, "TankobunSourceImage-${SOURCE_IMAGE_THREAD_COUNT.incrementAndGet()}").apply {
+                isDaemon = true
+            }
+        }
     }
 
     private fun findCatalogueSource(source: SourceDescriptor): CatalogueSource? =
@@ -358,27 +461,66 @@ class SourceActionException(
     cause: Throwable,
 ) : RuntimeException(message, cause)
 
+private class SourceImageHttpException(
+    pageIndex: Int,
+    val statusCode: Int,
+) : IllegalStateException("Page ${pageIndex + 1} failed: HTTP $statusCode")
+
+private class SourceImageTimeoutException(
+    pageIndex: Int,
+    cause: Throwable,
+) : IOException("Page ${pageIndex + 1} timed out while loading", cause)
+
+private fun Throwable.isTransientSourceImageFailure(): Boolean {
+    var current: Throwable? = this
+    while (current != null) {
+        when (current) {
+            is SourceImageHttpException -> return current.statusCode in TRANSIENT_SOURCE_IMAGE_STATUS_CODES
+            is IOException -> return true
+        }
+        current = current.cause
+    }
+    return false
+}
+
+private val TRANSIENT_SOURCE_IMAGE_STATUS_CODES = setOf(
+    408,
+    425,
+    429,
+    500,
+    502,
+    503,
+    504,
+    520,
+    521,
+    522,
+    523,
+    524,
+)
+
 private suspend fun <T> runSourceAction(
     descriptor: SourceDescriptor,
     source: Source,
     action: String,
     block: suspend () -> T,
-): T =
-    runCatching {
-        block()
-    }.onFailure { error ->
+): T {
+    try {
+        return block()
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Throwable) {
         logSourceFailure(
             action = action,
             packageName = descriptor.packageName,
             source = source,
             error = error,
         )
-    }.getOrElse { error ->
         throw SourceActionException(
             "${source.name} $action failed: ${error.javaClass.simpleName}",
             error,
         )
     }
+}
 
 private fun CatalogueSource.searchManga(
     page: Int,
