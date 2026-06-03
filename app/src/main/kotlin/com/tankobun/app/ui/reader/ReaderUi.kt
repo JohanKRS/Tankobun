@@ -443,14 +443,16 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     ) {
         if (state.readerMode == ReaderMode.WEBTOON) {
             if (preserveWebtoonScrollOnChapterChange) {
-                continuousWebtoonAnchor?.let { anchor ->
-                    val anchorIndex = webtoonPageItems.indexOfFirst { item ->
-                        item.chapter.url == anchor.chapterUrl && item.pageIndex == anchor.pageIndex
-                    }
-                    if (anchorIndex >= 0) {
-                        suppressWebtoonPositionUpdates = true
-                        webtoonListState.scrollToItem(anchorIndex, anchor.scrollOffset)
-                        withFrameNanos { }
+                if (!webtoonListState.isScrollInProgress) {
+                    continuousWebtoonAnchor?.let { anchor ->
+                        val anchorIndex = webtoonPageItems.indexOfFirst { item ->
+                            item.chapter.url == anchor.chapterUrl && item.pageIndex == anchor.pageIndex
+                        }
+                        if (anchorIndex >= 0) {
+                            suppressWebtoonPositionUpdates = true
+                            webtoonListState.scrollToItem(anchorIndex, anchor.scrollOffset)
+                            withFrameNanos { }
+                        }
                     }
                 }
                 continuousWebtoonAnchor = null
@@ -501,10 +503,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 .distinctUntilChanged()
                 .collect { visiblePage ->
                     val (item, scrollOffset) = visiblePage ?: return@collect
-                    if (
-                        !suppressWebtoonPositionUpdates &&
-                        webtoonInitialScrollDoneFor == chapter.url
-                    ) {
+                    if (!suppressWebtoonPositionUpdates) {
                         if (item.chapter.url != chapter.url) {
                             preserveWebtoonScrollOnChapterChange = true
                             continuousWebtoonAnchor = WebtoonReaderAnchor(
@@ -549,10 +548,8 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 .distinctUntilChanged()
                 .collect { position ->
                     val item = position?.item ?: return@collect
-                    if (
-                        !suppressWebtoonPositionUpdates &&
-                        webtoonInitialScrollDoneFor == chapter.url
-                    ) {
+                    if (!suppressWebtoonPositionUpdates) {
+                        webtoonInitialScrollDoneFor = chapter.url
                         if (!scrubberSeeking) {
                             scrubberValue = item.pageIndex.coerceIn(0, lastPageIndex).toFloat()
                         }
