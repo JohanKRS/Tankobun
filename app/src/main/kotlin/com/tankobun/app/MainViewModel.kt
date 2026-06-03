@@ -190,6 +190,7 @@ class MainViewModel(
             showAppStatusBar = container.settingsStore.showAppStatusBar(),
             dockAlignment = container.settingsStore.dockAlignment(),
             onboardingVisible = !container.settingsStore.onboardingCompleted(),
+            readerTutorialVisible = !container.settingsStore.readerTutorialCompleted(),
             readerMode = container.settingsStore.readerMode(),
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
             readerFitWidth = container.settingsStore.readerFitWidth(),
@@ -273,6 +274,11 @@ class MainViewModel(
     fun dismissOnboarding() {
         container.settingsStore.saveOnboardingCompleted(true)
         _state.update { it.copy(onboardingVisible = false) }
+    }
+
+    fun dismissReaderTutorial() {
+        container.settingsStore.saveReaderTutorialCompleted(true)
+        _state.update { it.copy(readerTutorialVisible = false) }
     }
 
     private fun refreshAniListViewer() {

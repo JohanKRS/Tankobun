@@ -32,6 +32,7 @@ data class TankobunUiState(
     val showAppStatusBar: Boolean = true,
     val dockAlignment: DockAlignment = DockAlignment.CENTER,
     val onboardingVisible: Boolean = false,
+    val readerTutorialVisible: Boolean = false,
     val viewerName: String? = null,
     val anilistScoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
     val anilistTitleLanguage: AnilistTitleLanguage = AnilistTitleLanguage.ROMAJI,

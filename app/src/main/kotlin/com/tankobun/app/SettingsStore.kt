@@ -59,6 +59,13 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean(KEY_ONBOARDING_COMPLETED, completed).apply()
     }
 
+    fun readerTutorialCompleted(): Boolean =
+        preferences.getBoolean(KEY_READER_TUTORIAL_COMPLETED, false)
+
+    fun saveReaderTutorialCompleted(completed: Boolean) {
+        preferences.edit().putBoolean(KEY_READER_TUTORIAL_COMPLETED, completed).apply()
+    }
+
     fun libraryViewMode(): MediaViewMode =
         preferences.getString(KEY_LIBRARY_VIEW_MODE, null)
             ?.let { stored -> runCatching { MediaViewMode.valueOf(stored) }.getOrNull() }
@@ -309,6 +316,7 @@ class SettingsStore(context: Context) {
         const val KEY_SHOW_APP_STATUS_BAR = "layout.show.app.status.bar"
         const val KEY_DOCK_ALIGNMENT = "layout.dock.alignment"
         const val KEY_ONBOARDING_COMPLETED = "onboarding.completed"
+        const val KEY_READER_TUTORIAL_COMPLETED = "reader.tutorial.completed"
         const val KEY_LIBRARY_VIEW_MODE = "library.view.mode"
         const val KEY_LIBRARY_COVER_COLUMNS = "library.cover.columns"
         const val KEY_LIBRARY_SHOW_WHOLE_COVERS = "library.show.whole.covers"

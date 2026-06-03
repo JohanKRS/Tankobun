@@ -440,7 +440,6 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     LaunchedEffect(
         chapter.url,
         state.readerMode,
-        currentWebtoonStartIndex,
     ) {
         if (state.readerMode == ReaderMode.WEBTOON) {
             if (preserveWebtoonScrollOnChapterChange) {
@@ -506,9 +505,6 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                         !suppressWebtoonPositionUpdates &&
                         webtoonInitialScrollDoneFor == chapter.url
                     ) {
-                        if (!scrubberSeeking && item.chapter.url == chapter.url) {
-                            scrubberValue = item.pageIndex.coerceIn(0, lastPageIndex).toFloat()
-                        }
                         if (item.chapter.url != chapter.url) {
                             preserveWebtoonScrollOnChapterChange = true
                             continuousWebtoonAnchor = WebtoonReaderAnchor(
@@ -516,8 +512,51 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 pageIndex = item.pageIndex,
                                 scrollOffset = scrollOffset,
                             )
+                            viewModel.setWebtoonReaderPosition(item.chapter.url, item.pageIndex, scrollOffset)
                         }
-                        viewModel.setWebtoonReaderPosition(item.chapter.url, item.pageIndex, scrollOffset)
+                    }
+                }
+        }
+    }
+
+    LaunchedEffect(chapter.url, state.readerMode, webtoonPageItems) {
+        if (state.readerMode == ReaderMode.WEBTOON) {
+            snapshotFlow {
+                val layoutInfo = webtoonListState.layoutInfo
+                val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+                val anchor = layoutInfo.viewportStartOffset +
+                    (viewportHeight * WEBTOON_READER_POSITION_ANCHOR_FRACTION).roundToInt()
+                layoutInfo.visibleItemsInfo
+                    .mapNotNull { itemInfo ->
+                        val item = webtoonPageItems.getOrNull(itemInfo.index)
+                            ?.takeIf { it.chapter.url == chapter.url }
+                            ?: return@mapNotNull null
+                        val itemStart = itemInfo.offset
+                        val itemEnd = itemInfo.offset + itemInfo.size
+                        val distanceToAnchor = when {
+                            anchor < itemStart -> itemStart - anchor
+                            anchor > itemEnd -> anchor - itemEnd
+                            else -> 0
+                        }
+                        WebtoonReaderViewportPosition(
+                            item = item,
+                            scrollOffset = (layoutInfo.viewportStartOffset - itemInfo.offset).coerceAtLeast(0),
+                            distanceToAnchor = distanceToAnchor,
+                        )
+                    }
+                    .minByOrNull { it.distanceToAnchor }
+            }
+                .distinctUntilChanged()
+                .collect { position ->
+                    val item = position?.item ?: return@collect
+                    if (
+                        !suppressWebtoonPositionUpdates &&
+                        webtoonInitialScrollDoneFor == chapter.url
+                    ) {
+                        if (!scrubberSeeking) {
+                            scrubberValue = item.pageIndex.coerceIn(0, lastPageIndex).toFloat()
+                        }
+                        viewModel.setWebtoonReaderPosition(chapter.url, item.pageIndex, position.scrollOffset)
                     }
                 }
         }
@@ -635,6 +674,17 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                             onGestureStart = ::stopReaderMotion,
                             onGestureEnd = { velocity, width, height ->
                                 launchReaderFling(velocity, width, height, ReaderPanAxis.BOTH)
+                            },
+                            onSingleFingerSwipe = { drag, velocity, width, _ ->
+                                if (readerScale > 1.01f) return@detectReaderTransformGestures
+                                val horizontalDrag = abs(drag.x) > width * PAGED_READER_SWIPE_DISTANCE_FRACTION &&
+                                    abs(drag.x) > abs(drag.y) * PAGED_READER_SWIPE_AXIS_RATIO
+                                val horizontalFling = abs(velocity.x) > PAGED_READER_SWIPE_VELOCITY_THRESHOLD &&
+                                    abs(velocity.x) > abs(velocity.y) * PAGED_READER_SWIPE_AXIS_RATIO
+                                if (horizontalDrag || horizontalFling) {
+                                    val directionSignal = if (horizontalFling) velocity.x else drag.x
+                                    moveReaderPageFromControls(if (directionSignal < 0f) 1 else -1)
+                                }
                             },
                         ) { centroid, pan, zoom ->
                             val nextScale = (readerScale * zoom).coerceIn(1f, 5f)
@@ -869,6 +919,132 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 }
             }
         }
+
+        if (state.readerTutorialVisible) {
+            BackHandler { viewModel.dismissReaderTutorial() }
+            ReaderTutorialOverlay(
+                readerMode = state.readerMode,
+                onDismiss = viewModel::dismissReaderTutorial,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun ReaderTutorialOverlay(readerMode: ReaderMode, onDismiss: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.62f))
+            .padding(WindowInsets.safeDrawing.asPaddingValues()),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                ),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 96.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ReaderTapZoneHint(
+                label = "Previous",
+                detail = "tap or swipe",
+                modifier = Modifier.weight(1f),
+            )
+            ReaderTapZoneHint(
+                label = "Controls",
+                detail = "tap center",
+                modifier = Modifier.weight(1.15f),
+            )
+            ReaderTapZoneHint(
+                label = "Next",
+                detail = "tap or swipe",
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+            color = Color.Black.copy(alpha = 0.86f),
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    "Reader basics",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ReaderModeBadge(label = "Paged", selected = readerMode == ReaderMode.PAGED)
+                    ReaderModeBadge(label = "Webtoon", selected = readerMode == ReaderMode.WEBTOON)
+                }
+                Text(
+                    "Paged mode turns pages with side taps or horizontal swipes. Webtoon mode scrolls vertically for long-strip chapters. Center tap toggles controls; pinch or double-tap to zoom.",
+                    color = Color.White.copy(alpha = 0.78f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Text("Got it")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ReaderTapZoneHint(label: String, detail: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.panel))
+            .background(Color.White.copy(alpha = 0.11f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                label,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                detail,
+                color = Color.White.copy(alpha = 0.74f),
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun ReaderModeBadge(label: String, selected: Boolean) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = if (selected) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.10f),
+    ) {
+        Text(
+            label,
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+        )
     }
 }
 
@@ -1028,6 +1204,16 @@ internal fun readerPageGap(level: Int): Dp = when (level) {
 internal const val DEFAULT_WEBTOON_READER_PAGE_ASPECT_RATIO = 0.68f
 internal const val WEBTOON_READER_CACHE_AHEAD_DP = 3600
 internal const val WEBTOON_READER_CACHE_BEHIND_DP = 2400
+internal const val WEBTOON_READER_POSITION_ANCHOR_FRACTION = 0.38f
+internal const val PAGED_READER_SWIPE_DISTANCE_FRACTION = 0.14f
+internal const val PAGED_READER_SWIPE_VELOCITY_THRESHOLD = 760f
+internal const val PAGED_READER_SWIPE_AXIS_RATIO = 1.25f
+
+private data class WebtoonReaderViewportPosition(
+    val item: WebtoonReaderPageItem,
+    val scrollOffset: Int,
+    val distanceToAnchor: Int,
+)
 
 private data class WebtoonReaderAnchor(
     val chapterUrl: String,
@@ -1091,13 +1277,18 @@ private suspend fun PointerInputScope.detectReaderTransformGestures(
     panAxis: ReaderPanAxis,
     onGestureStart: () -> Unit = {},
     onGestureEnd: (velocity: Velocity, width: Float, height: Float) -> Unit = { _, _, _ -> },
+    onSingleFingerSwipe: (drag: Offset, velocity: Velocity, width: Float, height: Float) -> Unit = { _, _, _, _ -> },
     onGesture: (centroid: Offset, pan: Offset, zoom: Float) -> Unit,
 ) {
     awaitEachGesture {
         val velocityTracker = VelocityTracker()
+        val swipeVelocityTracker = VelocityTracker()
         awaitFirstDown(requireUnconsumed = false)
         var transforming = false
         var trackingVelocity = false
+        var trackingSwipe = false
+        var swiping = false
+        var swipeDrag = Offset.Zero
         do {
             val event = awaitPointerEvent()
             val pressedPointers = event.changes.count { it.pressed }
@@ -1142,12 +1333,48 @@ private suspend fun PointerInputScope.detectReaderTransformGestures(
                 }
                 onGesture(event.calculateCentroid(true), pan, zoom)
                 event.changes.forEach { change -> change.consume() }
+            } else if (!multiTouch && currentScale <= 1.01f) {
+                val swipeChange = event.changes.firstOrNull { it.pressed }
+                if (swipeChange != null) {
+                    if (!trackingSwipe) {
+                        swipeVelocityTracker.resetTracking()
+                        swipeVelocityTracker.addPosition(
+                            swipeChange.previousUptimeMillis,
+                            swipeChange.previousPosition,
+                        )
+                        trackingSwipe = true
+                    }
+                    swipeVelocityTracker.addPosition(swipeChange.uptimeMillis, swipeChange.position)
+                    swipeDrag += rawPan
+                    if (
+                        !swiping &&
+                        abs(swipeDrag.x) > viewConfiguration.touchSlop &&
+                        abs(swipeDrag.x) > abs(swipeDrag.y) * PAGED_READER_SWIPE_AXIS_RATIO
+                    ) {
+                        swiping = true
+                    }
+                    if (swiping) {
+                        event.changes.forEach { change -> change.consume() }
+                    }
+                }
+            } else {
+                trackingSwipe = false
+                swiping = false
+                swipeDrag = Offset.Zero
+                swipeVelocityTracker.resetTracking()
             }
         } while (event.changes.any { it.pressed })
 
         if (transforming && trackingVelocity) {
             val velocity = velocityTracker.calculateVelocity().readerVelocityForAxis(panAxis)
             onGestureEnd(velocity, size.width.toFloat(), size.height.toFloat())
+        } else if (!transforming && swiping && trackingSwipe) {
+            onSingleFingerSwipe(
+                swipeDrag,
+                swipeVelocityTracker.calculateVelocity(),
+                size.width.toFloat(),
+                size.height.toFloat(),
+            )
         }
     }
 }
