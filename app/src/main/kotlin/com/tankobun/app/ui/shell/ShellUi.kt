@@ -831,27 +831,26 @@ internal fun TankobunScaffold(
                 ) {
                     Row(Modifier.fillMaxSize()) {
                         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            if (selectedMedia != null) {
+                            when (selectedTab) {
+                                0 -> LibraryScreen(state, viewModel, onSelectMedia = onSelectMedia)
+                                1 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
+                                2 -> DownloadsScreen(state, viewModel)
+                                3 -> SettingsScreen(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    route = settingsRoute,
+                                    onOpenRoute = onOpenSettingsRoute,
+                                )
+                            }
+                            selectedMedia?.let { media ->
                                 MangaDetailScreen(
                                     state = state,
                                     viewModel = viewModel,
-                                    media = selectedMedia,
+                                    media = media,
                                     onSelectMedia = onSelectMedia,
                                     onBrowseTag = onBrowseTag,
                                     onBrowseAuthor = onBrowseAuthor,
                                 )
-                            } else {
-                                when (selectedTab) {
-                                    0 -> LibraryScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                                    1 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                                    2 -> DownloadsScreen(state, viewModel)
-                                    3 -> SettingsScreen(
-                                        state = state,
-                                        viewModel = viewModel,
-                                        route = settingsRoute,
-                                        onOpenRoute = onOpenSettingsRoute,
-                                    )
-                                }
                             }
                         }
                         if (quickDrawerMode == QuickDrawerMode.PINNED) {
