@@ -102,7 +102,6 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -482,7 +481,6 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                             repositoryCount = visibleRepositoryEntries.size,
                             onRepositoryUrlChange = viewModel::setExtensionRepositoryUrl,
                             onRefreshRepository = viewModel::refreshExtensionIndex,
-                            onRefreshInstalled = viewModel::refreshInstalledSources,
                         )
                     }
                     if (repositoryEntries.isEmpty()) {
@@ -650,7 +648,6 @@ internal fun SourceRepositoryControls(
     repositoryCount: Int,
     onRepositoryUrlChange: (String) -> Unit,
     onRefreshRepository: () -> Unit,
-    onRefreshInstalled: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
@@ -658,21 +655,22 @@ internal fun SourceRepositoryControls(
             style = LocalTankobunStyle.current.typography.sectionLabel,
             color = LocalTankobunStyle.current.colors.accent,
         )
-        OutlinedTextField(
-            value = repositoryUrl,
-            onValueChange = onRepositoryUrlChange,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("Repository index URL") },
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
-        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TankobunActionButton(label = "Load", icon = Icons.Default.Refresh, onClick = onRefreshRepository)
+            OutlinedTextField(
+                value = repositoryUrl,
+                onValueChange = onRepositoryUrlChange,
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                label = { Text("Repository index URL") },
+                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            )
             TankobunActionButton(
-                label = "Rescan",
-                icon = Icons.Default.Tune,
-                onClick = onRefreshInstalled,
-                filled = false,
+                label = "Load",
+                icon = Icons.Default.Refresh,
+                onClick = onRefreshRepository,
+                modifier = Modifier
+                    .height(56.dp)
+                    .widthIn(min = 96.dp),
             )
         }
         if (repositoryCount > 0) {

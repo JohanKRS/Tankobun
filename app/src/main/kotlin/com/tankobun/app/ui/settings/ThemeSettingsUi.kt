@@ -243,7 +243,7 @@ internal fun ThemePicker(
         }
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val minCellWidth = 176.dp
-            val rowHeight = 108.dp
+            val rowHeight = 76.dp
             val rowGap = 10.dp
             val columnCount = ((maxWidth + rowGap) / (minCellWidth + rowGap)).toInt().coerceAtLeast(1)
             val rowCount = ((choices.size + columnCount - 1) / columnCount).coerceAtLeast(1)
@@ -287,10 +287,15 @@ internal fun ThemeChoiceCard(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val typeLabel = when (choice.dark) {
+        true -> "Dark"
+        false -> "Light"
+        null -> "Auto"
+    }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(108.dp)
+            .height(76.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -309,39 +314,32 @@ internal fun ThemeChoiceCard(
                     .width(5.dp)
                     .background(previewAccent),
             )
-            Column(
-                modifier = Modifier.padding(start = 13.dp, top = 10.dp, end = 10.dp, bottom = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 13.dp, top = 9.dp, end = 10.dp, bottom = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                    ThemeSwatches(choice.swatches)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            choice.name,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            choice.description,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = secondaryTextColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ThemeSwatches(choice.swatches)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
-                        when (choice.dark) {
-                            true -> "Dark"
-                            false -> "Light"
-                            null -> "Auto"
-                        },
+                        choice.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        choice.description,
                         style = MaterialTheme.typography.labelSmall,
                         color = secondaryTextColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                }
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(typeLabel, style = MaterialTheme.typography.labelSmall, color = secondaryTextColor)
                     if (selected) {
                         Text("Selected", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }

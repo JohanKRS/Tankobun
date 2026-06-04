@@ -233,6 +233,9 @@ internal fun DownloadsScreen(
     onOpenStorageManager: () -> Unit,
 ) {
     val chromeInsets = LocalTankobunChromeInsets.current
+    val hasActiveDownloads = state.downloads.any { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }
+    val hasPausedDownloads = state.downloads.any { it.state == DownloadState.PAUSED }
+    val hasFailedDownloads = state.downloads.any { it.state == DownloadState.FAILED }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -244,17 +247,28 @@ internal fun DownloadsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            TankobunSectionHeader(title = "Downloads", trailing = state.downloadSummaryLabel())
-        }
-        item {
-            FlowRowCompat {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TankobunSectionHeader(
+                    title = "Downloads",
+                    trailing = state.downloadSummaryLabel(),
+                    modifier = Modifier.weight(1f),
+                )
                 TankobunActionButton(
                     label = "Storage manager",
                     icon = Icons.Default.Settings,
                     onClick = onOpenStorageManager,
+                    modifier = Modifier.widthIn(max = 190.dp),
                     filled = false,
                 )
-                if (state.downloads.any { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }) {
+            }
+        }
+        if (hasActiveDownloads || hasPausedDownloads || hasFailedDownloads) item {
+            FlowRowCompat {
+                if (hasActiveDownloads) {
                     TankobunActionButton(
                         label = "Pause active",
                         icon = Icons.Default.Pause,
@@ -262,14 +276,14 @@ internal fun DownloadsScreen(
                         filled = false,
                     )
                 }
-                if (state.downloads.any { it.state == DownloadState.PAUSED }) {
+                if (hasPausedDownloads) {
                     TankobunActionButton(
                         label = "Resume paused",
                         icon = Icons.Default.PlayArrow,
                         onClick = viewModel::resumePausedDownloads,
                     )
                 }
-                if (state.downloads.any { it.state == DownloadState.FAILED }) {
+                if (hasFailedDownloads) {
                     TankobunActionButton(
                         label = "Retry failed",
                         icon = Icons.Default.Replay,
