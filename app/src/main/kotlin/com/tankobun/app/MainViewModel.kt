@@ -1,8 +1,11 @@
 package com.tankobun.app
 
-import com.tankobun.app.backup.AniListBackupService
+import com.tankobun.app.backup.BackupDataSource
 import com.tankobun.app.backup.isDue
+import com.tankobun.app.anilist.AniListDataSource
 import com.tankobun.app.browse.BrowseDataSource
+import com.tankobun.app.extensions.ExtensionDataSource
+import com.tankobun.app.extensions.InstalledExtensionVersion
 import com.tankobun.app.logic.BROWSE_LANDING_SECTION_SIZE
 import com.tankobun.app.logic.BROWSE_MANHWA_CACHE_KEY
 import com.tankobun.app.logic.BROWSE_POPULAR_CACHE_KEY
@@ -11,7 +14,6 @@ import com.tankobun.app.logic.BROWSE_TOP_MANGA_CACHE_KEY
 import com.tankobun.app.logic.BROWSE_TRENDING_CACHE_KEY
 import com.tankobun.app.logic.BulkDownloadResult
 import com.tankobun.app.logic.BrowseLandingData
-import com.tankobun.app.logic.RECOMMENDATIONS_PAGE_SIZE
 import com.tankobun.app.logic.SOURCE_CANDIDATES_TO_VERIFY
 import com.tankobun.app.logic.VerifiedSourceMatches
 import com.tankobun.app.logic.browseCacheKey
@@ -38,7 +40,6 @@ import com.tankobun.app.logic.preferredVisibleSources
 import com.tankobun.app.logic.previousInReadingOrderBefore
 import com.tankobun.app.logic.readerLoadErrorFor
 import com.tankobun.app.logic.readerSourceForChapter
-import com.tankobun.app.logic.recommendationPageCount
 import com.tankobun.app.logic.renamedCustomList
 import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.logic.sourcePickerDefaultSearchTitle
@@ -49,6 +50,7 @@ import com.tankobun.app.logic.toAniListScore
 import com.tankobun.app.logic.userMessage
 import com.tankobun.app.logic.visibleSources
 import com.tankobun.app.logic.withAniListTitleLanguage
+import com.tankobun.app.logic.withSelectedAniListDetails
 import com.tankobun.app.logic.withRecomputedTrackingDirty
 import com.tankobun.app.logic.withoutCustomList
 import com.tankobun.app.source.SourceDataSource
@@ -59,11 +61,8 @@ import com.tankobun.app.state.ReaderLoadError
 import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
 
-import android.content.Intent
 import android.net.Uri
 import android.util.Log
-import com.tankobun.core.anilist.AnilistViewer
-import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -75,7 +74,6 @@ import com.tankobun.core.database.toReaderPage
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMediaTag
-import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.reader.ReaderProgressCalculator
@@ -111,7 +109,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
@@ -122,11 +119,6 @@ private data class ReaderPagePosition(
     val chapterUrl: String,
     val pageIndex: Int,
     val pageScrollOffset: Int,
-)
-
-private data class InstalledExtensionVersion(
-    val versionCode: Int,
-    val versionName: String,
 )
 
 private enum class ReaderSegmentDirection {
@@ -142,7 +134,9 @@ class MainViewModel(
     private val syncMutationFactory = SyncMutationFactory()
     private val syncBackoff = SyncBackoff()
     private val cachePolicy = CachePolicy()
-    private val backupService = AniListBackupService(container)
+    private val aniListDataSource = AniListDataSource(container, cachePolicy)
+    private val backupDataSource = BackupDataSource(container)
+    private val extensionDataSource = ExtensionDataSource(container)
     private var trackingAutoSaveJob: Job? = null
     private var pendingAniListSyncJob: Job? = null
     private var scheduledBackupJob: Job? = null
@@ -275,9 +269,8 @@ class MainViewModel(
         val token = container.tokenStore.accessToken() ?: return
         viewModelScope.launch {
             runCatching {
-                container.anilistRepository.viewer(token)
+                aniListDataSource.refreshViewer(token)
             }.onSuccess { viewer ->
-                saveAniListViewerSettings(viewer)
                 _state.update {
                     it.withAniListTitleLanguage(viewer.titleLanguage).copy(
                         viewerName = viewer.name,
@@ -291,41 +284,20 @@ class MainViewModel(
         }
     }
 
-    private fun saveAniListViewerSettings(viewer: AnilistViewer) {
-        container.settingsStore.saveViewerName(viewer.name)
-        container.settingsStore.saveAnilistScoreFormat(viewer.scoreFormat)
-        container.settingsStore.saveAnilistTitleLanguage(viewer.titleLanguage)
-        container.settingsStore.saveAnilistCustomLists(viewer.mangaCustomLists)
-    }
-
     fun refreshInstalledSources() {
         viewModelScope.launch {
-            val packages = container.extensionScanner.installedExtensions()
-            container.sourceHost.retainInstalledPackages(packages.map { it.packageName }.toSet())
-            val discoveredSources = packages.flatMap { descriptor ->
-                runCatching {
-                    container.sourceHost.loadSources(descriptor.packageName).map { source ->
-                        descriptor.copy(
-                            id = source.id,
-                            name = source.name,
-                            lang = source.lang,
-                        )
-                    }
-                }.getOrDefault(emptyList()).ifEmpty { listOf(descriptor) }
-            }
-            val allSources = discoveredSources.visibleSources()
-            val sources = allSources.preferredVisibleSources(
+            val sourceState = extensionDataSource.installedSourceState(
                 preferredLanguages = _state.value.sourceLanguages,
                 disabledSourceKeys = _state.value.disabledSourceKeys,
             )
             val selectedSourceId = _state.value.selectedSourceId
             _state.update {
                 it.copy(
-                    allInstalledSources = allSources,
-                    installedSources = sources,
+                    allInstalledSources = sourceState.allSources,
+                    installedSources = sourceState.preferredSources,
                     selectedSourceId = selectedSourceId
-                        ?.takeIf { current -> sources.any { source -> source.id == current } }
-                        ?: sources.firstOrNull()?.id,
+                        ?.takeIf { current -> sourceState.preferredSources.any { source -> source.id == current } }
+                        ?: sourceState.preferredSources.firstOrNull()?.id,
                 )
             }
         }
@@ -460,7 +432,7 @@ class MainViewModel(
                 _state.update { it.copy(busy = true, message = null) }
             }
             runCatching {
-                container.extensionRepository.fetchIndex(repositoryUrl)
+                extensionDataSource.fetchExtensionIndex(repositoryUrl)
             }.onSuccess { extensions ->
                 _state.update {
                     it.copy(
@@ -481,12 +453,12 @@ class MainViewModel(
     }
 
     fun extensionApkUrl(entry: ExtensionIndexEntry): String =
-        container.extensionRepository.apkUrl(_state.value.extensionRepositoryUrl.trim(), entry)
+        extensionDataSource.extensionApkUrl(_state.value.extensionRepositoryUrl.trim(), entry)
 
     fun extensionIconUrl(entry: ExtensionIndexEntry): String? =
         _state.value.extensionRepositoryUrl.trim()
             .takeIf { it.isNotBlank() }
-            ?.let { container.extensionRepository.iconUrl(it, entry) }
+            ?.let { extensionDataSource.extensionIconUrl(it, entry) }
 
     fun installExtension(entry: ExtensionIndexEntry) {
         val apkUrl = extensionApkUrl(entry)
@@ -499,7 +471,7 @@ class MainViewModel(
                 )
             }
             runCatching {
-                downloadExtensionApk(apkUrl, entry)
+                extensionDataSource.downloadExtensionApk(apkUrl, entry)
             }.onSuccess { apkUri ->
                 _state.update {
                     it.copy(
@@ -551,7 +523,7 @@ class MainViewModel(
             var installedVersion: InstalledExtensionVersion? = null
             for (attempt in 0 until 5) {
                 refreshInstalledSources()
-                installedVersion = installedExtensionVersion(request.packageName)
+                installedVersion = extensionDataSource.installedExtensionVersion(request.packageName)
                 if ((installedVersion?.versionCode ?: -1) >= request.expectedVersionCode) {
                     break
                 }
@@ -572,75 +544,16 @@ class MainViewModel(
         }
     }
 
-    private fun installedExtensionVersion(packageName: String): InstalledExtensionVersion? =
-        runCatching {
-            val packageInfo = container.application.packageManager.getPackageInfo(packageName, 0)
-            InstalledExtensionVersion(
-                versionCode = if (android.os.Build.VERSION.SDK_INT >= 28) {
-                    packageInfo.longVersionCode.toInt()
-                } else {
-                    @Suppress("DEPRECATION")
-                    packageInfo.versionCode
-                },
-                versionName = packageInfo.versionName.orEmpty(),
-            )
-        }.getOrNull()
-
-    private suspend fun downloadExtensionApk(apkUrl: String, entry: ExtensionIndexEntry): Uri =
-        withContext(Dispatchers.IO) {
-            val cacheDir = File(container.application.cacheDir, "extension_apks").also { it.mkdirs() }
-            val safeName = "${entry.packageName}-${entry.versionCode}.apk"
-                .replace(Regex("[^A-Za-z0-9._-]"), "_")
-            val apkFile = File(cacheDir, safeName)
-            val partialFile = File(cacheDir, "$safeName.part")
-
-            cacheDir.listFiles()
-                ?.filter { it.name.startsWith(entry.packageName) && it.name != apkFile.name }
-                ?.forEach { it.delete() }
-
-            val request = Request.Builder().url(apkUrl).build()
-            container.okHttpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    error("APK download failed: HTTP ${response.code}")
-                }
-                val body = response.body
-                partialFile.outputStream().use { output ->
-                    body.byteStream().use { input -> input.copyTo(output) }
-                }
-            }
-
-            if (partialFile.length() <= 0L) {
-                partialFile.delete()
-                error("APK download failed: empty file")
-            }
-            if (apkFile.exists()) apkFile.delete()
-            check(partialFile.renameTo(apkFile)) { "APK download failed: could not finalize file" }
-
-            FileProvider.getUriForFile(
-                container.application,
-                "${container.application.packageName}.fileprovider",
-                apkFile,
-            )
-        }
-
     private fun loadCachedLibrary(syncIfEmpty: Boolean = false) {
         viewModelScope.launch {
-            val titleLanguage = _state.value.anilistTitleLanguage
-            val media = container.database.mediaDao().cachedMedia().associateBy { it.id }
-            val entries = container.database.listEntryDao().cachedEntries()
-            val items = entries.mapNotNull { entry ->
-                media[entry.mediaId]?.toModel(titleLanguage)?.let { cachedMedia ->
-                    LibraryItem(cachedMedia, entry.toModel())
-                }
-            }.distinctBy { it.media.id }
-                .sortedBy { it.media.title.userPreferred.lowercase(Locale.ROOT) }
-
+            val cached = aniListDataSource.cachedLibrary(_state.value.anilistTitleLanguage)
+            val items = cached.items
             if (items.isNotEmpty()) {
                 _state.update {
                     it.copy(
                         library = items.map { item -> item.media },
                         libraryItems = items,
-                        librarySyncedAtEpochMillis = container.settingsStore.librarySyncedAtEpochMillis(),
+                        librarySyncedAtEpochMillis = cached.syncedAtEpochMillis,
                     )
                 }
                 loadRecentReadingProgress()
@@ -653,24 +566,11 @@ class MainViewModel(
 
     private fun loadRecentReadingProgress() {
         viewModelScope.launch {
-            val items = recentReadingProgressItems()
-            _state.update { it.copy(recentReadingProgress = items) }
-        }
-    }
-
-    private suspend fun recentReadingProgressItems(): List<RecentReadingProgress> {
-        val latestProgress = container.database.progressDao().latestReadingProgress(RECENT_READING_LIMIT)
-            .map { it.toModel() }
-        if (latestProgress.isEmpty()) return emptyList()
-        val titleLanguage = _state.value.anilistTitleLanguage
-        val mediaById = container.database.mediaDao().cachedMedia().associateBy { it.id }
-        return latestProgress.mapNotNull { progress ->
-            val media = mediaById[progress.mediaId]?.toModel(titleLanguage) ?: return@mapNotNull null
-            RecentReadingProgress(
-                media = media,
-                progress = progress,
-                chapter = container.database.chapterDao().cachedChapterByUrl(progress.chapterUrl)?.toModel(),
+            val items = aniListDataSource.recentReadingProgressItems(
+                titleLanguage = _state.value.anilistTitleLanguage,
+                limit = RECENT_READING_LIMIT,
             )
+            _state.update { it.copy(recentReadingProgress = items) }
         }
     }
 
@@ -684,35 +584,19 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                val viewer = container.anilistRepository.viewer(token)
-                val entries = container.anilistRepository.mangaList(
-                    accessToken = token,
-                    userId = viewer.id,
-                    scoreFormat = viewer.scoreFormat,
-                )
-                val preferredEntries = entries.map { (media, entry) ->
-                    media.withTitleLanguage(viewer.titleLanguage) to entry
-                }
-                val now = System.currentTimeMillis()
-                container.database.mediaDao().upsertMedia(preferredEntries.map { it.first.toEntity(now) })
-                container.database.listEntryDao().upsertEntries(preferredEntries.map { it.second.toEntity(now) })
-                val entryIds = preferredEntries.map { it.second.id }
-                if (entryIds.isEmpty()) {
-                    container.database.listEntryDao().deleteAllEntries()
-                } else {
-                    container.database.listEntryDao().deleteEntriesNotIn(entryIds)
-                }
-                saveAniListViewerSettings(viewer)
-                container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
+                aniListDataSource.syncLibrary(token)
+            }.onSuccess { synced ->
+                val viewer = synced.viewer
+                val items = synced.items
                 _state.update {
                     it.copy(
                         viewerName = viewer.name,
                         anilistScoreFormat = viewer.scoreFormat,
                         anilistTitleLanguage = viewer.titleLanguage,
                         anilistCustomLists = viewer.mangaCustomLists,
-                        library = preferredEntries.map { pair -> pair.first },
-                        libraryItems = preferredEntries.map { (media, entry) -> LibraryItem(media, entry) },
-                        librarySyncedAtEpochMillis = now,
+                        library = items.map { item -> item.media },
+                        libraryItems = items,
+                        librarySyncedAtEpochMillis = synced.syncedAtEpochMillis,
                         busy = false,
                         message = "Library synced",
                     )
@@ -740,7 +624,7 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                backupService.saveBackup(
+                backupDataSource.saveBackup(
                     uri = uri,
                     items = items,
                     viewerName = snapshot.viewerName,
@@ -770,7 +654,7 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                backupService.restoreBackup(
+                backupDataSource.restoreBackup(
                     uri = uri,
                     accessToken = token,
                     scoreFormat = _state.value.anilistScoreFormat,
@@ -797,13 +681,8 @@ class MainViewModel(
     }
 
     fun setScheduledBackupFolder(uri: Uri) {
-        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        val persisted = runCatching {
-            container.application.contentResolver.takePersistableUriPermission(uri, flags)
-        }.onFailure { error ->
-            Log.w(TAG, "Could not persist backup folder permission", error)
-        }.isSuccess
-        if (!persisted) {
+        if (!backupDataSource.persistBackupFolderPermission(uri)) {
+            Log.w(TAG, "Could not persist backup folder permission")
             _state.update {
                 it.copy(message = "Could not keep access to that folder. Choose another writable folder.")
             }
@@ -872,7 +751,7 @@ class MainViewModel(
                 _state.update { it.copy(busy = true, message = null) }
             }
             runCatching {
-                backupService.writeScheduledBackup(folderUri = folderUri, snapshot = snapshot)
+                backupDataSource.writeScheduledBackup(folderUri = folderUri, snapshot = snapshot)
             }.onSuccess { count ->
                 container.settingsStore.saveLastScheduledBackupAtEpochMillis(now)
                 _state.update {
@@ -1584,12 +1463,8 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                container.anilistRepository.updateUserPreferences(
-                    accessToken = token,
-                    titleLanguage = language,
-                )
+                aniListDataSource.updateTitleLanguage(token, language)
             }.onSuccess { viewer ->
-                saveAniListViewerSettings(viewer)
                 _state.update {
                     it.withAniListTitleLanguage(viewer.titleLanguage).copy(
                         viewerName = viewer.name,
@@ -1621,12 +1496,8 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                container.anilistRepository.updateUserPreferences(
-                    accessToken = token,
-                    scoreFormat = format,
-                )
+                aniListDataSource.updateScoreFormat(token, format)
             }.onSuccess { viewer ->
-                saveAniListViewerSettings(viewer)
                 _state.update {
                     it.copy(
                         viewerName = viewer.name,
@@ -2106,129 +1977,42 @@ class MainViewModel(
 
     private fun loadAnilistDetails(mediaId: Int) {
         viewModelScope.launch {
-            val token = container.tokenStore.accessToken()
-            val now = System.currentTimeMillis()
-            val cachedMedia = container.database.mediaDao().cachedMedia(mediaId)
-            val cachedEntry = container.database.listEntryDao().cachedEntry(mediaId)?.toModel()
-            val cachedRecommendations = cachedRecommendations(mediaId)
-            if (cachedMedia != null || cachedEntry != null || cachedRecommendations.isNotEmpty()) {
+            val cached = aniListDataSource.cachedMediaDetails(
+                mediaId = mediaId,
+                titleLanguage = _state.value.anilistTitleLanguage,
+            )
+            if (cached.media != null || cached.entry != null || cached.recommendations.isNotEmpty()) {
                 _state.update {
-                    if (it.selectedMedia?.id != mediaId) {
-                        it
-                    } else {
-                        val preserveTrackingForm = it.trackingDirty || it.trackingSaveInProgress || it.trackingSaveFailed
-                        it.copy(
-                            selectedMedia = cachedMedia?.toModel(it.anilistTitleLanguage) ?: it.selectedMedia,
-                            selectedListEntry = cachedEntry,
-                            selectedRecommendations = cachedRecommendations,
-                            selectedRecommendationsPage = cachedRecommendations.recommendationPageCount(),
-                            selectedRecommendationsHasMore = cachedRecommendations.size >= RECOMMENDATIONS_PAGE_SIZE,
-                            trackingStatus = if (preserveTrackingForm) it.trackingStatus else cachedEntry?.status ?: it.trackingStatus,
-                            trackingProgress = if (preserveTrackingForm) {
-                                it.trackingProgress
-                            } else {
-                                cachedEntry?.progress?.toString() ?: it.trackingProgress
-                            },
-                            trackingScore = if (preserveTrackingForm) {
-                                it.trackingScore
-                            } else {
-                                cachedEntry?.score.formatTrackingScore(it.anilistScoreFormat)
-                                    .takeIf { score -> score.isNotBlank() }
-                                    ?: it.trackingScore
-                            },
-                            trackingNotes = if (preserveTrackingForm) it.trackingNotes else cachedEntry?.notes ?: it.trackingNotes,
-                            trackingPrivate = if (preserveTrackingForm) it.trackingPrivate else cachedEntry?.private ?: it.trackingPrivate,
-                            trackingCustomLists = if (preserveTrackingForm) {
-                                it.trackingCustomLists
-                            } else {
-                                cachedEntry?.customLists?.toSet() ?: it.trackingCustomLists
-                            },
-                        )
-                    }
+                    it.withSelectedAniListDetails(
+                        mediaId = mediaId,
+                        media = cached.media,
+                        entry = cached.entry,
+                        recommendations = cached.recommendations,
+                        recommendationsPage = cached.recommendationsPage,
+                        recommendationsHasMore = cached.recommendationsHasMore,
+                    )
                 }
             }
 
-            val cachedMediaHasEnrichedDetails = cachedMedia?.let { it.staff.isNotEmpty() && it.tags.isNotEmpty() } ?: false
-            val cachedMediaIsFresh = cachedMedia != null &&
-                cachedMediaHasEnrichedDetails &&
-                now - cachedMedia.fetchedAtEpochMillis <= cachePolicy.mediaDetailsTtlMillis
-            val cachedRecommendationsAreFresh = container.database.recommendationDao()
-                .cachedRecommendations(mediaId)
-                .firstOrNull()
-                ?.let { now - it.fetchedAtEpochMillis <= cachePolicy.mediaDetailsTtlMillis }
-                ?: false
-            if (cachedMediaIsFresh && cachedRecommendationsAreFresh) {
-                return@launch
-            }
+            if (cached.isFresh) return@launch
 
             runCatching {
-                container.anilistRepository.mediaDetailsWithEntry(
+                aniListDataSource.fetchMediaDetails(
                     mediaId = mediaId,
-                    accessToken = token,
+                    accessToken = container.tokenStore.accessToken(),
                     scoreFormat = _state.value.anilistScoreFormat,
-                    recommendationsPage = 1,
-                    recommendationsPerPage = RECOMMENDATIONS_PAGE_SIZE,
+                    titleLanguage = _state.value.anilistTitleLanguage,
                 )
-            }.onSuccess { result ->
-                val titleLanguage = _state.value.anilistTitleLanguage
-                val details = result.media.withTitleLanguage(titleLanguage)
-                val entry = result.listEntry
-                val recommendationPage = result.recommendationPage
-                val recommendations = recommendationPage.recommendations.map { recommendation ->
-                    recommendation.copy(media = recommendation.media.withTitleLanguage(titleLanguage))
-                }
-                container.database.mediaDao().upsertMedia(details.toEntity(now))
-                container.database.mediaDao().upsertMedia(recommendations.map { it.media.toEntity(now) })
-                container.database.recommendationDao().deleteForMedia(mediaId)
-                container.database.recommendationDao().upsertRecommendations(
-                    recommendations.map { it.toEntity(mediaId, now) },
-                )
-                if (entry != null) {
-                    container.database.listEntryDao().upsertEntry(entry.toEntity(now))
-                }
+            }.onSuccess { details ->
                 _state.update {
-                    if (it.selectedMedia?.id != mediaId) {
-                        it
-                    } else {
-                        val effectiveEntry = entry ?: cachedEntry
-                        val preserveTrackingForm = it.trackingDirty || it.trackingSaveInProgress || it.trackingSaveFailed
-                        val nextItems = if (effectiveEntry == null) {
-                            it.libraryItems
-                        } else {
-                            (it.libraryItems.filterNot { item -> item.media.id == mediaId } + LibraryItem(details, effectiveEntry))
-                                .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
-                        }
-                        it.copy(
-                            selectedMedia = details,
-                            selectedListEntry = effectiveEntry,
-                            selectedRecommendations = recommendations,
-                            selectedRecommendationsPage = recommendationPage.currentPage,
-                            selectedRecommendationsHasMore = recommendationPage.hasNextPage,
-                            recommendationsLoading = false,
-                            library = nextItems.map { item -> item.media },
-                            libraryItems = nextItems,
-                            trackingStatus = if (preserveTrackingForm) it.trackingStatus else effectiveEntry?.status ?: it.trackingStatus,
-                            trackingProgress = if (preserveTrackingForm) {
-                                it.trackingProgress
-                            } else {
-                                effectiveEntry?.progress?.toString() ?: it.trackingProgress
-                            },
-                            trackingScore = if (preserveTrackingForm) {
-                                it.trackingScore
-                            } else {
-                                effectiveEntry?.score.formatTrackingScore(it.anilistScoreFormat)
-                                    .takeIf { score -> score.isNotBlank() }
-                                    ?: it.trackingScore
-                            },
-                            trackingNotes = if (preserveTrackingForm) it.trackingNotes else effectiveEntry?.notes ?: it.trackingNotes,
-                            trackingPrivate = if (preserveTrackingForm) it.trackingPrivate else effectiveEntry?.private ?: it.trackingPrivate,
-                            trackingCustomLists = if (preserveTrackingForm) {
-                                it.trackingCustomLists
-                            } else {
-                                effectiveEntry?.customLists?.toSet() ?: it.trackingCustomLists
-                            },
-                        )
-                    }
+                    it.withSelectedAniListDetails(
+                        mediaId = mediaId,
+                        media = details.media,
+                        entry = details.entry ?: cached.entry,
+                        recommendations = details.recommendations,
+                        recommendationsPage = details.recommendationsPage,
+                        recommendationsHasMore = details.recommendationsHasMore,
+                    )
                 }
             }.onFailure { error ->
                 Log.w(TAG, "AniList details failed for $mediaId", error)
@@ -2249,27 +2033,18 @@ class MainViewModel(
             val token = container.tokenStore.accessToken()
             _state.update { it.copy(recommendationsLoading = true, message = null) }
             runCatching {
-                container.anilistRepository.mediaRecommendations(
+                aniListDataSource.fetchRecommendationPage(
                     mediaId = mediaId,
                     page = nextPage,
-                    perPage = RECOMMENDATIONS_PAGE_SIZE,
                     accessToken = token,
+                    titleLanguage = _state.value.anilistTitleLanguage,
                 )
             }.onSuccess { recommendationPage ->
-                val now = System.currentTimeMillis()
-                val titleLanguage = _state.value.anilistTitleLanguage
-                val recommendations = recommendationPage.recommendations.map { recommendation ->
-                    recommendation.copy(media = recommendation.media.withTitleLanguage(titleLanguage))
-                }
-                container.database.mediaDao().upsertMedia(recommendations.map { it.media.toEntity(now) })
-                container.database.recommendationDao().upsertRecommendations(
-                    recommendations.map { it.toEntity(mediaId, now) },
-                )
                 _state.update {
                     if (it.selectedMedia?.id != mediaId) {
                         it
                     } else {
-                        val combined = (it.selectedRecommendations + recommendations)
+                        val combined = (it.selectedRecommendations + recommendationPage.recommendations)
                             .distinctBy { recommendation -> recommendation.media.id }
                         it.copy(
                             selectedRecommendations = combined,
@@ -2291,21 +2066,6 @@ class MainViewModel(
                         it
                     }
                 }
-            }
-        }
-    }
-
-    private suspend fun cachedRecommendations(mediaId: Int): List<AnilistRecommendation> {
-        val recommendationEntities = container.database.recommendationDao().cachedRecommendations(mediaId)
-        if (recommendationEntities.isEmpty()) return emptyList()
-        val mediaById = container.database.recommendationDao()
-            .cachedRecommendationMedia(mediaId)
-            .associateBy { it.id }
-        return recommendationEntities.mapNotNull { recommendation ->
-            mediaById[recommendation.recommendationMediaId]
-                ?.toModel(_state.value.anilistTitleLanguage)
-                ?.let { media ->
-                AnilistRecommendation(media = media, rating = recommendation.rating)
             }
         }
     }
