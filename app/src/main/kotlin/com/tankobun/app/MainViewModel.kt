@@ -3448,7 +3448,11 @@ class MainViewModel(
         }
     }
 
-    fun openChapter(chapter: SourceChapter, startFromSavedProgress: Boolean = true) {
+    fun openChapter(
+        chapter: SourceChapter,
+        startFromSavedProgress: Boolean = true,
+        startPageIndexOverride: Int? = null,
+    ) {
         val state = _state.value
         val media = state.selectedMedia ?: return
         val source = state.readerSourceForChapter(chapter)
@@ -3519,7 +3523,10 @@ class MainViewModel(
                 } else {
                     null
                 }
-                val startPageIndex = savedProgress?.pageIndex?.coerceIn(0, pages.lastIndex.coerceAtLeast(0)) ?: 0
+                val startPageIndex = startPageIndexOverride
+                    ?.coerceIn(0, pages.lastIndex.coerceAtLeast(0))
+                    ?: savedProgress?.pageIndex?.coerceIn(0, pages.lastIndex.coerceAtLeast(0))
+                    ?: 0
                 val startPageScrollOffset = savedProgress?.pageScrollOffset?.coerceAtLeast(0) ?: 0
                 Log.i(TAG, "Page load ${source?.name ?: "downloaded"}/${chapter.name}: pages=${pages.size}")
                 var readerStillOpen = false
@@ -3746,6 +3753,10 @@ class MainViewModel(
         val pages = snapshot.readerPages
         if (pages.isEmpty() || delta == 0) return
         val targetIndex = snapshot.currentPageIndex + delta
+        if (delta < 0 && targetIndex < 0) {
+            openPreviousChapter()
+            return
+        }
         if (delta > 0 && targetIndex > pages.lastIndex) {
             openNextChapter()
             return
@@ -3991,6 +4002,31 @@ class MainViewModel(
         }
         saveReaderProgress()
         openChapter(nextChapter, startFromSavedProgress = false)
+    }
+
+    fun openPreviousChapter() {
+        val snapshot = _state.value
+        val previousChapter = snapshot.sourceChapters.previousInReadingOrderBefore(snapshot.activeChapter ?: return) ?: return
+        snapshot.readerPreviousSegment
+            ?.takeIf { it.chapter.url == previousChapter.url && it.pages.isNotEmpty() }
+            ?.let { previousSegment ->
+                activateContinuousReaderSegment(
+                    segment = previousSegment,
+                    pageIndex = previousSegment.pages.lastIndex,
+                    pageScrollOffset = 0,
+                    direction = ReaderSegmentDirection.PREVIOUS,
+                )
+                return
+            }
+        if (snapshot.readerPages.isNotEmpty()) {
+            _state.update { it.copy(currentPageIndex = 0, currentPageScrollOffset = 0) }
+        }
+        saveReaderProgress()
+        openChapter(
+            chapter = previousChapter,
+            startFromSavedProgress = false,
+            startPageIndexOverride = Int.MAX_VALUE,
+        )
     }
 
     fun setChapterRead(chapter: SourceChapter, read: Boolean) {

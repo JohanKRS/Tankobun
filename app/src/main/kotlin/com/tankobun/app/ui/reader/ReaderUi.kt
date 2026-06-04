@@ -185,6 +185,7 @@ import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import com.tankobun.app.logic.nextInReadingOrderAfter
+import com.tankobun.app.logic.previousInReadingOrderBefore
 import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.state.DownloadStorageItem
 import com.tankobun.app.state.ExtensionInstallRequest
@@ -278,6 +279,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     val pageCount = state.readerPages.size
     val lastPageIndex = (pageCount - 1).coerceAtLeast(0)
     val nextChapter = state.nextReaderChapter()
+    val previousChapter = state.sourceChapters.previousInReadingOrderBefore(chapter)
     val webtoonPageItems = remember(
         state.readerPreviousSegment,
         chapter,
@@ -301,6 +303,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         }
     }
     val currentWebtoonStartIndex = state.readerPreviousSegment?.pages?.size ?: 0
+    val canGoBack = state.currentPageIndex > 0 || previousChapter != null
     val canGoForward = state.currentPageIndex < lastPageIndex || nextChapter != null
     var scrubberValue by remember(chapter.url, pageCount) {
         mutableStateOf(state.currentPageIndex.coerceIn(0, lastPageIndex).toFloat())
@@ -455,11 +458,16 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     }
     fun moveReaderPageFromControls(delta: Int) {
         val targetIndex = state.currentPageIndex + delta
-        if (delta > 0 && targetIndex > lastPageIndex && nextChapter != null) {
-            resetZoom()
-            viewModel.openNextChapter()
-        } else {
-            goToReaderPage(targetIndex)
+        when {
+            delta < 0 && targetIndex < 0 && previousChapter != null -> {
+                resetZoom()
+                viewModel.openPreviousChapter()
+            }
+            delta > 0 && targetIndex > lastPageIndex && nextChapter != null -> {
+                resetZoom()
+                viewModel.openNextChapter()
+            }
+            else -> goToReaderPage(targetIndex)
         }
     }
 
@@ -865,13 +873,17 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             IconButton(
-                                enabled = state.currentPageIndex > 0,
+                                enabled = canGoBack,
                                 onClick = { moveReaderPageFromControls(-1) },
                             ) {
                                 Icon(
                                     Icons.Default.SkipPrevious,
-                                    contentDescription = "Previous page",
-                                    tint = Color.White.copy(alpha = if (state.currentPageIndex > 0) 1f else 0.34f),
+                                    contentDescription = if (state.currentPageIndex <= 0 && previousChapter != null) {
+                                        "Previous chapter"
+                                    } else {
+                                        "Previous page"
+                                    },
+                                    tint = Color.White.copy(alpha = if (canGoBack) 1f else 0.34f),
                                 )
                             }
                             Column(
