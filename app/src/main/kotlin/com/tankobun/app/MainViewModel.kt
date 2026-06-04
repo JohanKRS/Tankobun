@@ -4284,6 +4284,17 @@ class MainViewModel(
         }
     }
 
+    fun removeDownloadsForMediaSource(mediaId: Int, sourceId: Long) {
+        viewModelScope.launch {
+            val snapshot = _state.value
+            val title = snapshot.mediaTitle(mediaId)
+            val sourceName = snapshot.downloadSourceName(sourceId)
+            container.downloadCoordinator.removeMediaSource(mediaId, sourceId)
+            refreshDownloadState()
+            _state.update { it.copy(message = "Removed $sourceName downloads for $title") }
+        }
+    }
+
     fun removeAllDownloads() {
         viewModelScope.launch {
             container.downloadCoordinator.removeAll()
@@ -4336,23 +4347,27 @@ class MainViewModel(
     private suspend fun buildDownloadStorageSummary(downloads: List<DownloadJob>): DownloadStorageSummary =
         withContext(Dispatchers.IO) {
             val pages = container.database.downloadPageDao().allPages()
-            val bytesByMedia = mutableMapOf<Int, Long>()
-            val pageCountByMedia = mutableMapOf<Int, Int>()
+            val bytesByGroup = mutableMapOf<DownloadStorageGroupKey, Long>()
+            val pageCountByGroup = mutableMapOf<DownloadStorageGroupKey, Int>()
+            val pageChapterUrlsByGroup = mutableMapOf<DownloadStorageGroupKey, MutableSet<String>>()
             pages.forEach { page ->
+                val key = DownloadStorageGroupKey(page.mediaId, page.sourceId)
                 val file = File(page.filePath)
                 val bytes = if (file.exists()) file.length().coerceAtLeast(0L) else 0L
-                bytesByMedia[page.mediaId] = bytesByMedia.getOrDefault(page.mediaId, 0L) + bytes
-                pageCountByMedia[page.mediaId] = pageCountByMedia.getOrDefault(page.mediaId, 0) + 1
+                bytesByGroup[key] = bytesByGroup.getOrDefault(key, 0L) + bytes
+                pageCountByGroup[key] = pageCountByGroup.getOrDefault(key, 0) + 1
+                pageChapterUrlsByGroup.getOrPut(key) { mutableSetOf() }.add(page.chapterUrl)
             }
-            val jobsByMedia = downloads.groupBy { it.mediaId }
-            val mediaIds = (bytesByMedia.keys + jobsByMedia.keys).toSet()
-            val items = mediaIds
-                .map { mediaId ->
-                    val jobs = jobsByMedia[mediaId].orEmpty()
-                    val chapterUrls = jobs.map { it.chapterUrl }.distinct()
+            val jobsByGroup = downloads.groupBy { DownloadStorageGroupKey(it.mediaId, it.sourceId) }
+            val groupKeys = (bytesByGroup.keys + jobsByGroup.keys + pageChapterUrlsByGroup.keys).toSet()
+            val items = groupKeys
+                .map { key ->
+                    val jobs = jobsByGroup[key].orEmpty()
+                    val chapterUrls = (jobs.map { it.chapterUrl } + pageChapterUrlsByGroup[key].orEmpty()).distinct()
                     DownloadStorageItem(
-                        mediaId = mediaId,
-                        bytes = bytesByMedia.getOrDefault(mediaId, 0L),
+                        mediaId = key.mediaId,
+                        sourceId = key.sourceId,
+                        bytes = bytesByGroup.getOrDefault(key, 0L),
                         chapterCount = chapterUrls.size,
                         completedChapterCount = jobs
                             .filter { it.state == DownloadState.COMPLETE }
@@ -4364,11 +4379,15 @@ class MainViewModel(
                             .map { it.chapterUrl }
                             .distinct()
                             .size,
-                        pageCount = pageCountByMedia.getOrDefault(mediaId, 0),
+                        pageCount = pageCountByGroup.getOrDefault(key, 0),
                     )
                 }
                 .filter { it.bytes > 0L || it.chapterCount > 0 }
-                .sortedWith(compareByDescending<DownloadStorageItem> { it.bytes }.thenBy { it.mediaId })
+                .sortedWith(
+                    compareByDescending<DownloadStorageItem> { it.bytes }
+                        .thenBy { it.mediaId }
+                        .thenBy { it.sourceId },
+                )
             DownloadStorageSummary(
                 totalBytes = items.sumOf { it.bytes },
                 items = items,
@@ -4709,6 +4728,11 @@ private val HTTP_STATUS_PATTERN = Regex("""HTTP(?: error)?\s+(\d{3})""", RegexOp
 private const val SOURCE_READABLE_MATCH_SCORE = 0.9
 private const val NEXT_DOWNLOAD_WINDOW_SIZE = 10
 
+private data class DownloadStorageGroupKey(
+    val mediaId: Int,
+    val sourceId: Long,
+)
+
 
 
 
@@ -4717,6 +4741,12 @@ private fun TankobunUiState.mediaTitle(mediaId: Int): String =
         ?: library.firstOrNull { it.id == mediaId }?.title?.userPreferred
         ?: selectedMedia?.takeIf { it.id == mediaId }?.title?.userPreferred
         ?: "Manga $mediaId"
+
+private fun TankobunUiState.downloadSourceName(sourceId: Long): String =
+    installedSources.firstOrNull { it.id == sourceId }?.name
+        ?: allInstalledSources.firstOrNull { it.id == sourceId }?.name
+        ?: selectedSource?.takeIf { it.id == sourceId }?.name
+        ?: "Source $sourceId"
 
 private fun bulkDownloadMessage(label: String, result: BulkDownloadResult): String {
     if (result.changed == 0) return "No new $label to download"

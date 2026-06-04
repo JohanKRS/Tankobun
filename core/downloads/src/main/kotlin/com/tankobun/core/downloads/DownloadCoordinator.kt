@@ -19,6 +19,7 @@ class DownloadCoordinator(
     private val downloadPageDao: DownloadPageDao,
     private val deleteFilesForJobs: suspend (List<String>) -> Unit = {},
     private val deleteFilesForMedia: suspend (Int) -> Unit = {},
+    private val deleteFilesForMediaSource: suspend (Int, Long) -> Unit = { _, _ -> },
     private val deleteAllFiles: suspend () -> Unit = {},
     private val nowMillis: () -> Long = { System.currentTimeMillis() },
 ) {
@@ -77,6 +78,14 @@ class DownloadCoordinator(
         deleteFilesForMedia(mediaId)
         downloadPageDao.deletePagesForMedia(mediaId)
         downloadDao.deleteDownloadsForMedia(mediaId)
+    }
+
+    suspend fun removeMediaSource(mediaId: Int, sourceId: Long) {
+        val jobs = downloadDao.downloadsForMediaSource(mediaId, sourceId)
+        jobs.forEach { workManager.cancelUniqueWork(workName(it.id)) }
+        deleteFilesForMediaSource(mediaId, sourceId)
+        downloadPageDao.deletePagesForMediaSource(mediaId, sourceId)
+        downloadDao.deleteDownloadsForMediaSource(mediaId, sourceId)
     }
 
     suspend fun removeAll() {

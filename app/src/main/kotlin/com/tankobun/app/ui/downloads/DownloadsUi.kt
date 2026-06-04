@@ -227,7 +227,11 @@ import com.tankobun.app.ui.settings.*
 import com.tankobun.app.ui.shell.*
 
 @Composable
-internal fun DownloadsScreen(state: TankobunUiState, viewModel: MainViewModel) {
+internal fun DownloadsScreen(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    onOpenStorageManager: () -> Unit,
+) {
     val chromeInsets = LocalTankobunChromeInsets.current
     LazyColumn(
         modifier = Modifier
@@ -242,31 +246,35 @@ internal fun DownloadsScreen(state: TankobunUiState, viewModel: MainViewModel) {
         item {
             TankobunSectionHeader(title = "Downloads", trailing = state.downloadSummaryLabel())
         }
-        if (state.downloads.any { it.state == DownloadState.FAILED || it.state == DownloadState.PAUSED || it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }) {
-            item {
-                FlowRowCompat {
-                    if (state.downloads.any { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }) {
-                        TankobunActionButton(
-                            label = "Pause active",
-                            icon = Icons.Default.Pause,
-                            onClick = viewModel::pauseActiveDownloads,
-                            filled = false,
-                        )
-                    }
-                    if (state.downloads.any { it.state == DownloadState.PAUSED }) {
-                        TankobunActionButton(
-                            label = "Resume paused",
-                            icon = Icons.Default.PlayArrow,
-                            onClick = viewModel::resumePausedDownloads,
-                        )
-                    }
-                    if (state.downloads.any { it.state == DownloadState.FAILED }) {
-                        TankobunActionButton(
-                            label = "Retry failed",
-                            icon = Icons.Default.Replay,
-                            onClick = viewModel::retryFailedDownloads,
-                        )
-                    }
+        item {
+            FlowRowCompat {
+                TankobunActionButton(
+                    label = "Storage manager",
+                    icon = Icons.Default.Settings,
+                    onClick = onOpenStorageManager,
+                    filled = false,
+                )
+                if (state.downloads.any { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }) {
+                    TankobunActionButton(
+                        label = "Pause active",
+                        icon = Icons.Default.Pause,
+                        onClick = viewModel::pauseActiveDownloads,
+                        filled = false,
+                    )
+                }
+                if (state.downloads.any { it.state == DownloadState.PAUSED }) {
+                    TankobunActionButton(
+                        label = "Resume paused",
+                        icon = Icons.Default.PlayArrow,
+                        onClick = viewModel::resumePausedDownloads,
+                    )
+                }
+                if (state.downloads.any { it.state == DownloadState.FAILED }) {
+                    TankobunActionButton(
+                        label = "Retry failed",
+                        icon = Icons.Default.Replay,
+                        onClick = viewModel::retryFailedDownloads,
+                    )
                 }
             }
         }

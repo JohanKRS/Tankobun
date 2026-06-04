@@ -834,7 +834,11 @@ internal fun TankobunScaffold(
                             when (selectedTab) {
                                 0 -> LibraryScreen(state, viewModel, onSelectMedia = onSelectMedia)
                                 1 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                                2 -> DownloadsScreen(state, viewModel)
+                                2 -> DownloadsScreen(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    onOpenStorageManager = { onOpenSettingsRoute(SettingsRoute.DOWNLOADS) },
+                                )
                                 3 -> SettingsScreen(
                                     state = state,
                                     viewModel = viewModel,

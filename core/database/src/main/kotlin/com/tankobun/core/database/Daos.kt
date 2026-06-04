@@ -199,6 +199,9 @@ interface DownloadDao {
     @Query("SELECT * FROM download_jobs WHERE mediaId = :mediaId")
     suspend fun downloadsForMedia(mediaId: Int): List<DownloadJobEntity>
 
+    @Query("SELECT * FROM download_jobs WHERE mediaId = :mediaId AND sourceId = :sourceId")
+    suspend fun downloadsForMediaSource(mediaId: Int, sourceId: Long): List<DownloadJobEntity>
+
     @Query("SELECT * FROM download_jobs WHERE mediaId = :mediaId AND chapterUrl = :chapterUrl ORDER BY updatedAtEpochMillis DESC LIMIT 1")
     suspend fun latestForChapter(mediaId: Int, chapterUrl: String): DownloadJobEntity?
 
@@ -220,6 +223,9 @@ interface DownloadDao {
     @Query("DELETE FROM download_jobs WHERE mediaId = :mediaId")
     suspend fun deleteDownloadsForMedia(mediaId: Int)
 
+    @Query("DELETE FROM download_jobs WHERE mediaId = :mediaId AND sourceId = :sourceId")
+    suspend fun deleteDownloadsForMediaSource(mediaId: Int, sourceId: Long)
+
     @Query("DELETE FROM download_jobs")
     suspend fun deleteAllDownloads()
 }
@@ -238,6 +244,9 @@ interface DownloadPageDao {
     @Query("SELECT * FROM download_pages WHERE mediaId = :mediaId ORDER BY chapterUrl ASC, pageIndex ASC")
     suspend fun pagesForMedia(mediaId: Int): List<DownloadPageEntity>
 
+    @Query("SELECT * FROM download_pages WHERE mediaId = :mediaId AND sourceId = :sourceId ORDER BY chapterUrl ASC, pageIndex ASC")
+    suspend fun pagesForMediaSource(mediaId: Int, sourceId: Long): List<DownloadPageEntity>
+
     @Upsert
     suspend fun upsertPage(page: DownloadPageEntity)
 
@@ -246,6 +255,9 @@ interface DownloadPageDao {
 
     @Query("DELETE FROM download_pages WHERE mediaId = :mediaId")
     suspend fun deletePagesForMedia(mediaId: Int)
+
+    @Query("DELETE FROM download_pages WHERE mediaId = :mediaId AND sourceId = :sourceId")
+    suspend fun deletePagesForMediaSource(mediaId: Int, sourceId: Long)
 
     @Query("DELETE FROM download_pages")
     suspend fun deleteAllPages()

@@ -252,7 +252,7 @@ internal fun DownloadsSettingsScreen(
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Local storage", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text(
-                        "${summary.items.size} manga / ${summary.items.sumOf { it.chapterCount }} chapters",
+                        "${summary.items.size} source groups / ${summary.items.sumOf { it.chapterCount }} chapters",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -270,7 +270,7 @@ internal fun DownloadsSettingsScreen(
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    "By manga",
+                    "By manga and source",
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -292,14 +292,18 @@ internal fun DownloadsSettingsScreen(
             }
             summary.items.forEach { item ->
                 val title = state.downloadedMediaTitle(item.mediaId)
+                val sourceLabel = state.downloadedSourceLabel(item.sourceId)
                 DownloadStorageRow(
                     title = title,
+                    sourceLabel = sourceLabel,
                     item = item,
                     onDelete = {
                         pendingDelete = PendingDownloadDelete(
                             mediaId = item.mediaId,
+                            sourceId = item.sourceId,
                             title = title,
-                            detail = item.bytes.formatFileSize(),
+                            sourceLabel = sourceLabel,
+                            detail = "${item.bytes.formatFileSize()} / ${item.downloadStorageDetailLine()}",
                         )
                     },
                 )
@@ -314,7 +318,9 @@ internal fun DownloadsSettingsScreen(
                 if (target.mediaId == null) {
                     viewModel.removeAllDownloads()
                 } else {
-                    viewModel.removeDownloadsForMedia(target.mediaId)
+                    target.sourceId?.let { sourceId ->
+                        viewModel.removeDownloadsForMediaSource(target.mediaId, sourceId)
+                    } ?: viewModel.removeDownloadsForMedia(target.mediaId)
                 }
                 pendingDelete = null
             },
@@ -324,7 +330,9 @@ internal fun DownloadsSettingsScreen(
 
 internal data class PendingDownloadDelete(
     val mediaId: Int?,
+    val sourceId: Long? = null,
     val title: String,
+    val sourceLabel: String? = null,
     val detail: String,
 )
 
@@ -337,7 +345,11 @@ internal fun DeleteDownloadsDialog(
     TankobunDialog(onDismiss = onDismiss, maxWidth = 520.dp, maxHeight = 520.dp) {
         TankobunDialogHeader(title = "Delete downloads?", onDismiss = onDismiss)
         Text(
-            "${target.title} / ${target.detail}",
+            buildList {
+                add(target.title)
+                target.sourceLabel?.let { add(it) }
+                add(target.detail)
+            }.joinToString(" / "),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -358,6 +370,7 @@ internal fun DeleteDownloadsDialog(
 @Composable
 internal fun DownloadStorageRow(
     title: String,
+    sourceLabel: String,
     item: DownloadStorageItem,
     onDelete: () -> Unit,
 ) {
@@ -382,6 +395,13 @@ internal fun DownloadStorageRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
+                    sourceLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = LocalTankobunStyle.current.colors.accent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
                     item.downloadStorageDetailLine(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -395,7 +415,7 @@ internal fun DownloadStorageRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete downloads for $title")
+                Icon(Icons.Default.Delete, contentDescription = "Delete downloads for $title from $sourceLabel")
             }
         }
     }
@@ -582,6 +602,15 @@ internal fun TankobunUiState.downloadedMediaTitle(mediaId: Int): String =
         ?: library.firstOrNull { it.id == mediaId }?.title?.userPreferred
         ?: selectedMedia?.takeIf { it.id == mediaId }?.title?.userPreferred
         ?: "Manga $mediaId"
+
+internal fun TankobunUiState.downloadedSourceLabel(sourceId: Long): String {
+    val source = installedSources.firstOrNull { it.id == sourceId }
+        ?: allInstalledSources.firstOrNull { it.id == sourceId }
+        ?: selectedSource?.takeIf { it.id == sourceId }
+    return source?.let {
+        "${it.name.extensionDisplayName()} / ${sourceLanguageDisplay(it.lang)}"
+    } ?: "Source $sourceId"
+}
 
 internal fun DownloadStorageItem.downloadStorageDetailLine(): String =
     buildList {

@@ -93,6 +93,7 @@ class AppContainer(application: Application) {
         downloadPageDao = database.downloadPageDao(),
         deleteFilesForJobs = { jobIds -> deleteDownloadedFilesForJobs(jobIds) },
         deleteFilesForMedia = { mediaId -> deleteDownloadedFilesForMedia(mediaId) },
+        deleteFilesForMediaSource = { mediaId, sourceId -> deleteDownloadedFilesForMediaSource(mediaId, sourceId) },
         deleteAllFiles = { deleteAllDownloadedFiles() },
     )
     private val downloadSemaphores = ConcurrentHashMap<Long, Semaphore>()
@@ -207,6 +208,11 @@ class AppContainer(application: Application) {
     private suspend fun deleteDownloadedFilesForMedia(mediaId: Int) =
         withContext(Dispatchers.IO) {
             deleteDownloadedFiles(database.downloadPageDao().pagesForMedia(mediaId).map { it.filePath })
+        }
+
+    private suspend fun deleteDownloadedFilesForMediaSource(mediaId: Int, sourceId: Long) =
+        withContext(Dispatchers.IO) {
+            deleteDownloadedFiles(database.downloadPageDao().pagesForMediaSource(mediaId, sourceId).map { it.filePath })
         }
 
     private suspend fun deleteAllDownloadedFiles() =

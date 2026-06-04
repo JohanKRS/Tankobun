@@ -48,6 +48,7 @@ data class DownloadStorageSummary(
 
 data class DownloadStorageItem(
     val mediaId: Int,
+    val sourceId: Long,
     val bytes: Long,
     val chapterCount: Int,
     val completedChapterCount: Int,
