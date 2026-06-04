@@ -27,6 +27,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -260,167 +262,213 @@ internal fun MangaDetailScreen(
     val backdrop = mediaDetailBackdropColor()
     val listState = rememberLazyListState()
     val trackedStatuses = remember(state.libraryItems) { state.libraryItems.trackedMediaStatuses() }
+    var coverZoomOpen by remember(media.id) { mutableStateOf(false) }
+    val detailBlur by animateDpAsState(
+        targetValue = when {
+            state.sourcePickerOpen -> 8.dp
+            coverZoomOpen -> QuickDrawerBackdropBlurDp.dp
+            else -> 0.dp
+        },
+        animationSpec = tween(durationMillis = QuickDrawerSnapMillis),
+        label = "Manga detail backdrop blur",
+    )
+    val coverZoomScrimAlpha by animateFloatAsState(
+        targetValue = if (coverZoomOpen) QuickDrawerScrimAlpha else 0f,
+        animationSpec = tween(durationMillis = QuickDrawerSnapMillis),
+        label = "Cover zoom scrim",
+    )
     LaunchedEffect(media.id) {
         listState.scrollToItem(0)
+    }
+    BackHandler(enabled = coverZoomOpen) {
+        coverZoomOpen = false
     }
     Box(
         Modifier
             .fillMaxSize()
             .background(backdrop),
     ) {
-        AsyncImage(
-            model = media.bannerImage ?: media.coverImage,
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(420.dp)
-                .blur(18.dp)
-                .graphicsLayer { alpha = 0.24f },
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.TopCenter,
-        )
         Box(
             Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to backdrop.copy(alpha = 0.30f),
-                        0.42f to backdrop.copy(alpha = 0.88f),
-                        1f to backdrop,
-                    ),
-                ),
-        )
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(if (state.sourcePickerOpen) 8.dp else 0.dp),
-            contentPadding = PaddingValues(
-                top = MediaDetailTopOverlayPadding,
-                bottom = MediaDetailContentPadding + 12.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+                .blur(detailBlur),
         ) {
-            item {
-                Column(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                    Spacer(Modifier.height(4.dp))
-                    MangaHeroSection(
-                        media = media,
-                        onTagClick = onBrowseTag,
-                        onAuthorClick = onBrowseAuthor,
-                    )
-                }
-            }
-
-            if (state.selectedRecommendations.isNotEmpty()) {
+            AsyncImage(
+                model = media.bannerImage ?: media.coverImage,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(420.dp)
+                    .blur(18.dp)
+                    .graphicsLayer { alpha = 0.24f },
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to backdrop.copy(alpha = 0.30f),
+                            0.42f to backdrop.copy(alpha = 0.88f),
+                            1f to backdrop,
+                        ),
+                    ),
+            )
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = MediaDetailTopOverlayPadding,
+                    bottom = MediaDetailContentPadding + 12.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
                 item {
-                    RecommendationsSection(
-                        recommendations = state.selectedRecommendations,
-                        hasMore = state.selectedRecommendationsHasMore,
-                        loadingMore = state.recommendationsLoading,
-                        onLoadMore = viewModel::loadMoreRecommendations,
-                        onSelectMedia = onSelectMedia,
-                        trackedStatuses = trackedStatuses,
-                    )
-                }
-            }
-
-            item {
-                Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                    state.message?.let {
-                        Text(it, color = MaterialTheme.colorScheme.secondary)
+                    Column(Modifier.padding(horizontal = MediaDetailContentPadding)) {
+                        Spacer(Modifier.height(4.dp))
+                        MangaHeroSection(
+                            media = media,
+                            onTagClick = onBrowseTag,
+                            onAuthorClick = onBrowseAuthor,
+                            onCoverClick = { coverZoomOpen = true },
+                        )
                     }
                 }
-            }
 
-            item {
-                Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                    SourceSummarySection(state, viewModel)
+                if (state.selectedRecommendations.isNotEmpty()) {
+                    item {
+                        RecommendationsSection(
+                            recommendations = state.selectedRecommendations,
+                            hasMore = state.selectedRecommendationsHasMore,
+                            loadingMore = state.recommendationsLoading,
+                            onLoadMore = viewModel::loadMoreRecommendations,
+                            onSelectMedia = onSelectMedia,
+                            trackedStatuses = trackedStatuses,
+                        )
+                    }
                 }
-            }
 
-            item {
-                Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                    var downloadActionsOpen by remember { mutableStateOf(false) }
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DetailSectionTitle("Chapters")
-                        if (state.selectedSourceManga == null) {
-                            DetailPlaceholderCard(
-                                icon = Icons.AutoMirrored.Filled.MenuBook,
-                                title = "No chapters loaded yet.",
-                                subtitle = "Select a source to view chapters.",
-                            )
-                        } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                ChapterActionsBar(
-                                    readingActionChapter = state.primaryReadingActionChapter(),
-                                    hasProgress = state.latestProgress != null,
-                                    hasChapters = state.sourceChapters.isNotEmpty(),
-                                    onOpenChapter = viewModel::openChapter,
-                                    onLoadChapters = viewModel::loadChaptersForCurrentMatch,
-                                    onOpenDownloadActions = { downloadActionsOpen = true },
+                item {
+                    Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
+                        state.message?.let {
+                            Text(it, color = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+                }
+
+                item {
+                    Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
+                        SourceSummarySection(state, viewModel)
+                    }
+                }
+
+                item {
+                    Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
+                        var downloadActionsOpen by remember { mutableStateOf(false) }
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            DetailSectionTitle("Chapters")
+                            if (state.selectedSourceManga == null) {
+                                DetailPlaceholderCard(
+                                    icon = Icons.AutoMirrored.Filled.MenuBook,
+                                    title = "No chapters loaded yet.",
+                                    subtitle = "Select a source to view chapters.",
                                 )
-                                if (state.selectingDownloadChapters) {
-                                    ChapterManualDownloadBar(
-                                        selectedCount = state.selectedDownloadChapterUrls.size,
-                                        onDownloadSelected = viewModel::downloadSelectedChapters,
-                                        onCancel = viewModel::cancelManualDownloadSelection,
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    ChapterActionsBar(
+                                        readingActionChapter = state.primaryReadingActionChapter(),
+                                        hasProgress = state.latestProgress != null,
+                                        hasChapters = state.sourceChapters.isNotEmpty(),
+                                        onOpenChapter = viewModel::openChapter,
+                                        onLoadChapters = viewModel::loadChaptersForCurrentMatch,
+                                        onOpenDownloadActions = { downloadActionsOpen = true },
                                     )
+                                    if (state.selectingDownloadChapters) {
+                                        ChapterManualDownloadBar(
+                                            selectedCount = state.selectedDownloadChapterUrls.size,
+                                            onDownloadSelected = viewModel::downloadSelectedChapters,
+                                            onCancel = viewModel::cancelManualDownloadSelection,
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                    if (downloadActionsOpen) {
-                        ChapterDownloadActionsDialog(
-                            keepNextTenDownloads = state.keepNextTenDownloads,
-                            onDismiss = { downloadActionsOpen = false },
-                            onDownloadAll = {
-                                downloadActionsOpen = false
-                                viewModel.downloadAllChapters()
-                            },
-                            onDownloadUnread = {
-                                downloadActionsOpen = false
-                                viewModel.downloadUnreadChapters()
-                            },
-                            onDownloadNextTen = {
-                                downloadActionsOpen = false
-                                viewModel.downloadNextTenChapters()
-                            },
-                            onKeepNextTenChange = viewModel::setKeepNextTenDownloads,
-                            onSelectManually = {
-                                downloadActionsOpen = false
-                                viewModel.startManualDownloadSelection()
-                            },
-                        )
+                        if (downloadActionsOpen) {
+                            ChapterDownloadActionsDialog(
+                                keepNextTenDownloads = state.keepNextTenDownloads,
+                                onDismiss = { downloadActionsOpen = false },
+                                onDownloadAll = {
+                                    downloadActionsOpen = false
+                                    viewModel.downloadAllChapters()
+                                },
+                                onDownloadUnread = {
+                                    downloadActionsOpen = false
+                                    viewModel.downloadUnreadChapters()
+                                },
+                                onDownloadNextTen = {
+                                    downloadActionsOpen = false
+                                    viewModel.downloadNextTenChapters()
+                                },
+                                onKeepNextTenChange = viewModel::setKeepNextTenDownloads,
+                                onSelectManually = {
+                                    downloadActionsOpen = false
+                                    viewModel.startManualDownloadSelection()
+                                },
+                            )
+                        }
                     }
                 }
-            }
 
-            if (state.selectedSourceManga != null && state.sourceChapters.isEmpty()) {
-                item {
-                    Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                        DetailPlaceholderCard(
-                            icon = Icons.AutoMirrored.Filled.MenuBook,
-                            title = "No chapters loaded yet.",
-                            subtitle = "Load chapters from the selected source.",
-                        )
+                if (state.selectedSourceManga != null && state.sourceChapters.isEmpty()) {
+                    item {
+                        Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
+                            DetailPlaceholderCard(
+                                icon = Icons.AutoMirrored.Filled.MenuBook,
+                                title = "No chapters loaded yet.",
+                                subtitle = "Load chapters from the selected source.",
+                            )
+                        }
                     }
-                }
-            } else {
-                items(state.sourceChapters, key = { "${it.sourceId}:${it.url}" }) { chapter ->
-                    Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                        ChapterRow(
-                            chapter = chapter,
-                            viewModel = viewModel,
-                            read = chapter.isReadBy(state.chapterProgress),
-                            download = state.downloadForChapter(chapter),
-                            selectingForDownload = state.selectingDownloadChapters,
-                            selectedForDownload = chapter.url in state.selectedDownloadChapterUrls,
-                            onToggleDownloadSelection = { viewModel.toggleDownloadChapterSelection(chapter) },
-                        )
+                } else {
+                    items(state.sourceChapters, key = { "${it.sourceId}:${it.url}" }) { chapter ->
+                        Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
+                            ChapterRow(
+                                chapter = chapter,
+                                viewModel = viewModel,
+                                read = chapter.isReadBy(state.chapterProgress),
+                                download = state.downloadForChapter(chapter),
+                                selectingForDownload = state.selectingDownloadChapters,
+                                selectedForDownload = chapter.url in state.selectedDownloadChapterUrls,
+                                onToggleDownloadSelection = { viewModel.toggleDownloadChapterSelection(chapter) },
+                            )
+                        }
                     }
                 }
             }
+        }
+
+        if (coverZoomScrimAlpha > 0f) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = coverZoomScrimAlpha))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { coverZoomOpen = false },
+                    ),
+            )
+        }
+
+        AnimatedVisibility(
+            visible = coverZoomOpen,
+            enter = fadeIn(animationSpec = tween(durationMillis = QuickDrawerSnapMillis)) +
+                scaleIn(initialScale = 0.90f, animationSpec = tween(durationMillis = QuickDrawerSnapMillis)),
+            exit = fadeOut(animationSpec = tween(durationMillis = QuickDrawerSnapMillis)) +
+                scaleOut(targetScale = 0.92f, animationSpec = tween(durationMillis = QuickDrawerSnapMillis)),
+        ) {
+            CoverZoomOverlay(media = media, onDismiss = { coverZoomOpen = false })
         }
 
         if (state.sourcePickerOpen) {
@@ -717,6 +765,7 @@ internal fun MangaHeroSection(
     media: AnilistMedia,
     onTagClick: (String) -> Unit,
     onAuthorClick: (String) -> Unit,
+    onCoverClick: () -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val compact = maxWidth < 620.dp
@@ -740,6 +789,7 @@ internal fun MangaHeroSection(
             ) {
                 MangaCoverFrame(
                     media = media,
+                    onClick = onCoverClick,
                     modifier = Modifier.size(width = coverWidth, height = coverHeight),
                 )
                 Column(
@@ -768,9 +818,18 @@ internal fun MangaHeroSection(
 }
 
 @Composable
-internal fun MangaCoverFrame(media: AnilistMedia, modifier: Modifier = Modifier) {
+internal fun MangaCoverFrame(media: AnilistMedia, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    val coverModifier = if (onClick != null) {
+        modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = onClick,
+        )
+    } else {
+        modifier
+    }
     Surface(
-        modifier = modifier,
+        modifier = coverModifier,
         shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
         color = Color.Transparent,
         shadowElevation = 8.dp,
@@ -1961,7 +2020,9 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
         matches.mapTo(mutableSetOf()) { it.source.sourceSettingsKey() }
     }
     val diagnostics = state.sourcePickerDiagnostics
-    val showSearchTitleEditor = matches.isEmpty() && availableSources.isNotEmpty() && !state.sourcePickerLoading
+    var searchTitleEditorOpen by remember(media.id) { mutableStateOf(false) }
+    val showSearchTitleEditor = searchTitleEditorOpen ||
+        (matches.isEmpty() && availableSources.isNotEmpty() && !state.sourcePickerLoading)
 
     Dialog(
         onDismissRequest = viewModel::closeSourcePicker,
@@ -1995,7 +2056,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                 AnimatedVisibility(showSearchTitleEditor) {
                     SourcePickerSearchTitleEditor(
                         title = state.sourcePickerSearchTitle,
-                        enabled = !state.sourcePickerLoading,
+                        enabled = availableSources.isNotEmpty(),
                         onTitleChange = viewModel::updateSourcePickerSearchTitle,
                         onSearch = viewModel::findSourceMatchesWithEditedTitle,
                     )
@@ -2057,20 +2118,81 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(onClick = { viewModel.findSourceMatches(forceRefresh = true) }) {
-                        Icon(Icons.Default.Search, contentDescription = null)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { searchTitleEditorOpen = true },
+                        enabled = availableSources.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Tune, contentDescription = null)
                         Spacer(Modifier.size(8.dp))
-                        Text("Refresh")
+                        Text("Edit search title")
                     }
-                    if (state.sourcePickerLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (state.sourcePickerLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.size(8.dp))
+                        }
+                        Text(
+                            "${matches.size} readable / ${availableSources.size} enabled",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
-                    Text(
-                        "${matches.size} readable / ${availableSources.size} enabled",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
+        }
+    }
+}
+
+@Composable
+internal fun CoverZoomOverlay(media: AnilistMedia, onDismiss: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 48.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            val availableWidth = maxWidth
+            val availableHeight = maxHeight
+            val widthFromHeight = availableHeight * (2f / 3f)
+            val coverWidth = minOf(availableWidth, widthFromHeight).coerceAtLeast(180.dp)
+            Surface(
+                modifier = Modifier
+                    .width(coverWidth)
+                    .aspectRatio(2f / 3f)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                    ),
+                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+                color = Color.Transparent,
+                shadowElevation = 18.dp,
+            ) {
+                CoverImage(
+                    url = media.coverImage,
+                    title = media.title.userPreferred,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    imageAlignment = Alignment.TopCenter,
+                    cornerRadius = LocalTankobunStyle.current.radii.panel,
+                )
+            }
         }
     }
 }
