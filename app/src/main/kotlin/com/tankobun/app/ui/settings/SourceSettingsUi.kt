@@ -656,24 +656,28 @@ internal fun SourceRepositoryControls(
             style = LocalTankobunStyle.current.typography.sectionLabel,
             color = LocalTankobunStyle.current.colors.accent,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-            OutlinedTextField(
-                value = repositoryUrl,
-                onValueChange = onRepositoryUrlChange,
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                label = { Text("Repository index URL") },
-                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
-            )
-            TankobunActionButton(
-                label = "Load",
-                icon = Icons.Default.Refresh,
-                onClick = onRefreshRepository,
-                modifier = Modifier
-                    .height(64.dp)
-                    .widthIn(min = 96.dp),
-            )
-        }
+        OutlinedTextField(
+            value = repositoryUrl,
+            onValueChange = onRepositoryUrlChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Repository index URL") },
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            trailingIcon = {
+                Button(
+                    onClick = onRefreshRepository,
+                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                    contentPadding = PaddingValues(horizontal = 10.dp),
+                    modifier = Modifier
+                        .padding(end = 6.dp)
+                        .height(40.dp),
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Load", maxLines = 1)
+                }
+            },
+        )
         if (repositoryCount > 0) {
             Text(
                 "$repositoryCount extensions shown",
@@ -776,7 +780,7 @@ internal fun SourceSettingsRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(displayName, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
             Text(
-                sourceMetadata(source, active),
+                sourceMetadata(source),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -851,11 +855,8 @@ internal fun ExtensionRepositoryRow(
     val installedVersionCode = installedSources.mapNotNull { it.versionCode }.maxOrNull()
     val installed = installedSources.isNotEmpty()
     val updateAvailable = installedVersionCode?.let { extension.versionCode > it } == true
-    val actionLabel = when {
-        updateAvailable -> "Update"
-        installed -> "Reinstall"
-        else -> "Install"
-    }
+    val showInstallAction = !installed || updateAvailable
+    val actionLabel = if (updateAvailable) "Update" else "Install"
     TankobunPanel(
         modifier = Modifier.fillMaxWidth(),
         color = LocalTankobunStyle.current.colors.panel,
@@ -889,32 +890,34 @@ internal fun ExtensionRepositoryRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Button(
-                    enabled = !installing,
-                    onClick = onInstall,
-                    modifier = if (iconOnlyInstallAction) {
-                        Modifier.size(LocalTankobunStyle.current.sizes.iconAction)
-                    } else {
-                        Modifier
-                    },
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
-                    contentPadding = if (iconOnlyInstallAction) PaddingValues(0.dp) else ButtonDefaults.ContentPadding,
-                ) {
-                    if (installing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.Download,
-                            contentDescription = if (iconOnlyInstallAction) actionLabel else null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        if (!iconOnlyInstallAction) {
-                            Spacer(Modifier.width(6.dp))
-                            Text(actionLabel)
+                if (showInstallAction) {
+                    Button(
+                        enabled = !installing,
+                        onClick = onInstall,
+                        modifier = if (iconOnlyInstallAction) {
+                            Modifier.size(LocalTankobunStyle.current.sizes.iconAction)
+                        } else {
+                            Modifier
+                        },
+                        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                        contentPadding = if (iconOnlyInstallAction) PaddingValues(0.dp) else ButtonDefaults.ContentPadding,
+                    ) {
+                        if (installing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.Download,
+                                contentDescription = if (iconOnlyInstallAction) actionLabel else null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            if (!iconOnlyInstallAction) {
+                                Spacer(Modifier.width(6.dp))
+                                Text(actionLabel)
+                            }
                         }
                     }
                 }
@@ -975,11 +978,10 @@ internal fun ExtensionIndexEntry.matchesSourceSettingsQuery(query: String): Bool
 internal fun String.matchesSourceSettingsQuery(query: String): Boolean =
     lowercase().contains(query)
 
-internal fun sourceMetadata(source: SourceDescriptor, active: Boolean): String =
+internal fun sourceMetadata(source: SourceDescriptor): String =
     listOfNotNull(
         source.versionName?.let { "v$it" },
         if (source.isNsfw) "NSFW" else null,
-        if (active) "active" else "off",
     ).joinToString(" / ")
 
 @Composable

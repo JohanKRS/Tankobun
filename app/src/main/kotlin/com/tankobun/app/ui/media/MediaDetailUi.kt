@@ -2216,7 +2216,7 @@ internal fun SourceCandidateRow(
             headlineContent = { Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = {
                 Text(
-                    sourceMetadata(source, active = true),
+                    sourceMetadata(source),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

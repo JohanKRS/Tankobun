@@ -177,6 +177,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -590,7 +591,7 @@ internal fun MediaCoverTile(
             Column(verticalArrangement = Arrangement.spacedBy(titleGap)) {
                 Text(
                     media.title.userPreferred,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelLarge.copy(lineHeight = 16.sp),
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -609,18 +610,32 @@ internal fun MediaRow(media: AnilistMedia, trackedStatus: MediaStatus? = null, o
     ElevatedCard(onClick = onClick, shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
         ListItem(
             headlineContent = {
-                Text(media.title.userPreferred, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    media.title.userPreferred,
+                    style = MaterialTheme.typography.labelLarge.copy(lineHeight = 16.sp),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             },
             supportingContent = {
                 Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    TankobunMediaStatusLabel(text = media.status.statusLabel())
                     Text(
-                        media.chapters?.let { "$it chapters" } ?: media.format.mediaFormatLabel(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        "${media.mediaTypeLabel()} / ${media.status.statusLabel()}".uppercase(Locale.getDefault()),
+                        style = LocalTankobunStyle.current.typography.compactStatus,
+                        color = LocalTankobunStyle.current.colors.accent,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    media.chapters?.let { chapters ->
+                        Text(
+                            "$chapters chapters",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             },
             leadingContent = {
