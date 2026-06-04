@@ -162,8 +162,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
@@ -298,9 +301,23 @@ internal fun MangaDetailScreen(
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(420.dp)
+                    .height(520.dp)
                     .blur(18.dp)
-                    .graphicsLayer { alpha = 0.24f },
+                    .graphicsLayer {
+                        alpha = 0.32f
+                        compositingStrategy = CompositingStrategy.Offscreen
+                    }
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                0f to Color.Black,
+                                0.70f to Color.Black,
+                                1f to Color.Transparent,
+                            ),
+                            blendMode = BlendMode.DstIn,
+                        )
+                    },
                 contentScale = ContentScale.Crop,
                 alignment = Alignment.TopCenter,
             )
@@ -309,8 +326,8 @@ internal fun MangaDetailScreen(
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            0f to backdrop.copy(alpha = 0.30f),
-                            0.42f to backdrop.copy(alpha = 0.88f),
+                            0f to backdrop.copy(alpha = 0.22f),
+                            0.52f to backdrop.copy(alpha = 0.82f),
                             1f to backdrop,
                         ),
                     ),
