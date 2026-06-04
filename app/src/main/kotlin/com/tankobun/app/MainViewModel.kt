@@ -30,10 +30,14 @@ import com.tankobun.app.state.DownloadStorageSummary
 import com.tankobun.app.state.ExtensionInstallRequest
 import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.state.ReaderChapterSegment
+import com.tankobun.app.state.ReaderLoadError
 import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
 
+import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.util.Log
 import com.tankobun.core.anilist.AnilistGraphQlException
@@ -76,6 +80,7 @@ import com.tankobun.core.sync.SyncBackoff
 import com.tankobun.core.sync.SyncMutationFactory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.Dispatchers
@@ -92,7 +97,14 @@ import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import javax.net.ssl.SSLException
 import java.util.Locale
+import java.util.concurrent.TimeoutException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
@@ -1589,6 +1601,7 @@ class MainViewModel(
                 readerPages = emptyList(),
                 readerPreviousSegment = null,
                 readerNextSegment = null,
+                readerError = null,
                 currentPageIndex = 0,
                 currentPageScrollOffset = 0,
                 selectingDownloadChapters = false,
@@ -1615,6 +1628,7 @@ class MainViewModel(
                 readerPages = emptyList(),
                 readerPreviousSegment = null,
                 readerNextSegment = null,
+                readerError = null,
                 currentPageIndex = 0,
                 currentPageScrollOffset = 0,
                 selectingDownloadChapters = false,
@@ -1653,6 +1667,7 @@ class MainViewModel(
                     readerPages = emptyList(),
                     readerPreviousSegment = null,
                     readerNextSegment = null,
+                    readerError = null,
                     currentPageIndex = 0,
                     currentPageScrollOffset = 0,
                     selectingDownloadChapters = false,
@@ -3455,6 +3470,7 @@ class MainViewModel(
                     readerPages = emptyList(),
                     readerPreviousSegment = null,
                     readerNextSegment = null,
+                    readerError = null,
                     currentPageIndex = 0,
                     currentPageScrollOffset = 0,
                 )
@@ -3463,13 +3479,19 @@ class MainViewModel(
                 loadReaderPagesForChapter(media.id, chapter, source)
             }.onSuccess { pages ->
                 if (pages.isEmpty() && source == null) {
+                    val readerError = ReaderLoadError(
+                        title = "Source not installed",
+                        message = "This chapter belongs to a source that is not installed anymore. Install the source again or choose another one.",
+                    )
                     _state.update {
                         if (it.activeChapter?.url == chapter.url) {
                             it.copy(
-                                activeChapter = null,
                                 readerPages = emptyList(),
+                                readerPreviousSegment = null,
+                                readerNextSegment = null,
+                                readerError = readerError,
                                 busy = false,
-                                message = "Source is not installed",
+                                message = readerError.title,
                             )
                         } else {
                             it
@@ -3478,13 +3500,19 @@ class MainViewModel(
                     return@onSuccess
                 }
                 if (pages.isEmpty()) {
+                    val readerError = ReaderLoadError(
+                        title = "No pages found",
+                        message = "The source opened this chapter, but it did not return any pages. The chapter may have been removed, or the source may need an update.",
+                    )
                     _state.update {
                         if (it.activeChapter?.url == chapter.url) {
                             it.copy(
-                                activeChapter = null,
                                 readerPages = emptyList(),
+                                readerPreviousSegment = null,
+                                readerNextSegment = null,
+                                readerError = readerError,
                                 busy = false,
-                                message = "No pages found",
+                                message = readerError.title,
                             )
                         } else {
                             it
@@ -3510,6 +3538,7 @@ class MainViewModel(
                             readerPages = pages,
                             readerPreviousSegment = null,
                             readerNextSegment = null,
+                            readerError = null,
                             currentPageIndex = startPageIndex,
                             currentPageScrollOffset = startPageScrollOffset,
                             busy = false,
@@ -3531,13 +3560,16 @@ class MainViewModel(
                 loadAdjacentReaderSegments(media.id, chapter)
             }.onFailure { error ->
                 Log.w(TAG, "Page load failed for ${source?.name ?: "cached source"}/${chapter.name}", error)
+                val readerError = readerLoadErrorFor(container.application, error, source)
                 _state.update {
                     if (it.activeChapter?.url == chapter.url) {
                         it.copy(
-                            activeChapter = null,
                             readerPages = emptyList(),
+                            readerPreviousSegment = null,
+                            readerNextSegment = null,
+                            readerError = readerError,
                             busy = false,
-                            message = error.message ?: "Reader failed",
+                            message = readerError.title,
                         )
                     } else {
                         it
@@ -3545,6 +3577,11 @@ class MainViewModel(
                 }
             }
         }
+    }
+
+    fun retryReaderChapter() {
+        val chapter = _state.value.activeChapter ?: return
+        openChapter(chapter)
     }
 
     private suspend fun loadReaderPagesForChapter(
@@ -3670,6 +3707,7 @@ class MainViewModel(
                 readerPages = emptyList(),
                 readerPreviousSegment = null,
                 readerNextSegment = null,
+                readerError = null,
                 currentPageIndex = 0,
                 currentPageScrollOffset = 0,
                 message = null,
@@ -3696,6 +3734,7 @@ class MainViewModel(
                 readerPages = emptyList(),
                 readerPreviousSegment = null,
                 readerNextSegment = null,
+                readerError = null,
                 currentPageIndex = 0,
                 currentPageScrollOffset = 0,
                 busy = false,
@@ -4519,6 +4558,125 @@ private fun Double?.sameAniListScore(other: Double?): Boolean = when {
     else -> abs(this - other) < 0.0001
 }
 
+private fun readerLoadErrorFor(context: Context, error: Throwable, source: SourceDescriptor?): ReaderLoadError {
+    val sourceName = source?.name ?: "this source"
+    return when (context.readerNetworkState()) {
+        ReaderNetworkState.OFFLINE -> ReaderLoadError(
+            title = "No internet connection",
+            message = "Your device looks offline. Check Wi-Fi or mobile data, then try again.",
+        )
+        ReaderNetworkState.NO_INTERNET -> ReaderLoadError(
+            title = "No internet access",
+            message = "Your device is connected, but it cannot reach the internet right now. Check the connection and try again.",
+        )
+        ReaderNetworkState.ONLINE -> error.readerLoadErrorForOnlineSource(sourceName)
+    }
+}
+
+private fun Throwable.readerLoadErrorForOnlineSource(sourceName: String): ReaderLoadError {
+    val statusCode = httpStatusCode()
+    if (statusCode != null) {
+        return when (statusCode) {
+            403 -> ReaderLoadError(
+                title = "Source blocked the request",
+                message = "$sourceName refused to send this chapter. This can happen when a site changes its protection or region rules.",
+            )
+            404, 410 -> ReaderLoadError(
+                title = "Chapter not found",
+                message = "$sourceName says this chapter is no longer available. It may have been removed or moved.",
+            )
+            408, 429 -> ReaderLoadError(
+                title = "Source is busy",
+                message = "$sourceName is asking us to slow down. Wait a little, then try again.",
+            )
+            521, 522, 523, 524 -> ReaderLoadError(
+                title = "Source server is down",
+                message = "$sourceName is reachable through the internet, but its own server is not answering right now. Try again later or choose another source.",
+            )
+            in 500..599 -> ReaderLoadError(
+                title = "Source is having trouble",
+                message = "$sourceName is not responding properly right now. The site may be down or overloaded.",
+            )
+            else -> ReaderLoadError(
+                title = "Source could not load the chapter",
+                message = "$sourceName returned a problem while opening this chapter. Try again, or choose another source if it keeps happening.",
+            )
+        }
+    }
+
+    val causes = causeChain()
+    val messageText = causes.mapNotNull { it.message }.joinToString(" ")
+    return when {
+        causes.any { it is UnknownHostException } -> ReaderLoadError(
+            title = "Source cannot be found",
+            message = "Your connection works, but $sourceName cannot be reached. The site may be offline or may have changed address.",
+        )
+        causes.any { it is SocketTimeoutException || it is TimeoutCancellationException || it is TimeoutException } ||
+            messageText.contains("timed out", ignoreCase = true) ||
+            messageText.contains("too long", ignoreCase = true) -> ReaderLoadError(
+            title = "Source is not responding",
+            message = "$sourceName did not answer in time. The site may be down, overloaded, or having server trouble right now.",
+        )
+        causes.any { it is ConnectException || it is NoRouteToHostException } -> ReaderLoadError(
+            title = "Source cannot be reached",
+            message = "$sourceName is not accepting connections right now. The site may be down or temporarily unavailable.",
+        )
+        causes.any { it is SocketException } -> ReaderLoadError(
+            title = "Connection was interrupted",
+            message = "The connection dropped while opening this chapter. Try again in a moment.",
+        )
+        causes.any { it is SSLException } -> ReaderLoadError(
+            title = "Secure connection failed",
+            message = "$sourceName could not make a safe connection. The site may have changed something on their side.",
+        )
+        messageText.contains("cloudflare", ignoreCase = true) ||
+            messageText.contains("bypass", ignoreCase = true) -> ReaderLoadError(
+            title = "Source protection stopped the request",
+            message = "$sourceName is asking for a browser check that Tankobun could not pass right now. Try again later or use another source.",
+        )
+        else -> ReaderLoadError(
+            title = "Chapter could not be loaded",
+            message = "Tankobun could not open this chapter from $sourceName. The source may be temporarily down, or this chapter may no longer be available there.",
+        )
+    }
+}
+
+private fun Context.readerNetworkState(): ReaderNetworkState {
+    val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        ?: return ReaderNetworkState.ONLINE
+    val network = connectivityManager.activeNetwork ?: return ReaderNetworkState.OFFLINE
+    val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return ReaderNetworkState.OFFLINE
+    if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+        return ReaderNetworkState.OFFLINE
+    }
+    return if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+        ReaderNetworkState.ONLINE
+    } else {
+        ReaderNetworkState.NO_INTERNET
+    }
+}
+
+private fun Throwable.httpStatusCode(): Int? =
+    causeChain()
+        .asSequence()
+        .flatMap { cause -> listOfNotNull(cause.message, cause.toString()).asSequence() }
+        .mapNotNull { text -> HTTP_STATUS_PATTERN.find(text)?.groupValues?.getOrNull(1)?.toIntOrNull() }
+        .firstOrNull()
+
+private fun Throwable.causeChain(): List<Throwable> = buildList {
+    var current: Throwable? = this@causeChain
+    while (current != null && current !in this) {
+        add(current)
+        current = current.cause
+    }
+}
+
+private enum class ReaderNetworkState {
+    ONLINE,
+    OFFLINE,
+    NO_INTERNET,
+}
+
 private fun Throwable.userMessage(fallback: String): String = when (this) {
     is AnilistGraphQlException -> when (statusCode) {
         401 -> "AniList session expired. Sign in again."
@@ -4545,6 +4703,8 @@ private fun SourceSearchResult.isReadableMatchCandidate(): Boolean =
 
 private fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
     "$sourceId:$mangaUrl"
+
+private val HTTP_STATUS_PATTERN = Regex("""HTTP(?: error)?\s+(\d{3})""", RegexOption.IGNORE_CASE)
 
 private const val SOURCE_READABLE_MATCH_SCORE = 0.9
 private const val NEXT_DOWNLOAD_WINDOW_SIZE = 10

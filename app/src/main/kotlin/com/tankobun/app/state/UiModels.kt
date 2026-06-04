@@ -36,6 +36,11 @@ data class ReaderChapterSegment(
     val pages: List<ReaderPage>,
 )
 
+data class ReaderLoadError(
+    val title: String,
+    val message: String,
+)
+
 data class DownloadStorageSummary(
     val totalBytes: Long = 0L,
     val items: List<DownloadStorageItem> = emptyList(),

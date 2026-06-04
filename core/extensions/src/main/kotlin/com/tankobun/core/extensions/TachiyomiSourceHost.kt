@@ -21,6 +21,7 @@ import eu.kanade.tachiyomi.source.online.HttpSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -182,11 +183,7 @@ class TachiyomiSourceHost(
         val sourceInstance = findSource(source) ?: return@withContext emptyList()
         runSourceAction(source, sourceInstance, "pages") {
             val sourceChapter = chapter.toSChapter()
-            val pages = runCatching {
-                sourceInstance.fetchPageList(sourceChapter).toBlocking().first()
-            }.getOrElse {
-                sourceInstance.getPageList(sourceChapter)
-            }
+            val pages = sourceInstance.fetchPageListWithTimeout(sourceChapter)
             pages.map { page ->
                 val imageRequest = if (sourceInstance is HttpSource && page.imageUrl != null) {
                     runCatching {
@@ -371,14 +368,46 @@ class TachiyomiSourceHost(
 
     private fun SourceDescriptor.imageFetchKey(): String = "$packageName:$id"
 
+    private fun Source.fetchPageListWithTimeout(sourceChapter: SChapter): List<Page> {
+        val future = SOURCE_PAGE_LIST_EXECUTOR.submit<List<Page>> {
+            runCatching {
+                fetchPageList(sourceChapter).toBlocking().first()
+            }.getOrElse { error ->
+                if (error.isSourcePageListTimeout()) {
+                    throw SourcePageListTimeoutException(name, error)
+                }
+                runBlocking { getPageList(sourceChapter) }
+            }
+        }
+        return try {
+            future.get(SOURCE_PAGE_LIST_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+        } catch (error: TimeoutException) {
+            future.cancel(true)
+            throw SourcePageListTimeoutException(name, error)
+        } catch (error: ExecutionException) {
+            throw error.cause ?: error
+        } catch (error: InterruptedException) {
+            future.cancel(true)
+            Thread.currentThread().interrupt()
+            throw CancellationException("Page list fetch interrupted").apply { initCause(error) }
+        }
+    }
+
     companion object {
         private const val TAG = "TankobunSources"
+        private const val SOURCE_PAGE_LIST_TIMEOUT_MILLIS = 8_000L
         private const val SOURCE_IMAGE_FETCH_CONCURRENCY = 1
         private const val SOURCE_IMAGE_REQUEST_SPACING_MILLIS = 1_500L
         private const val SOURCE_IMAGE_RETRY_ATTEMPTS = 3
         private const val SOURCE_IMAGE_ATTEMPT_TIMEOUT_MILLIS = 25_000L
         private const val SOURCE_IMAGE_RETRY_INITIAL_DELAY_MILLIS = 2_500L
         private const val SOURCE_IMAGE_RETRY_MAX_DELAY_MILLIS = 15_000L
+        private val SOURCE_PAGE_LIST_THREAD_COUNT = AtomicInteger()
+        private val SOURCE_PAGE_LIST_EXECUTOR = Executors.newCachedThreadPool { runnable ->
+            Thread(runnable, "TankobunSourcePages-${SOURCE_PAGE_LIST_THREAD_COUNT.incrementAndGet()}").apply {
+                isDaemon = true
+            }
+        }
         private val SOURCE_IMAGE_THREAD_COUNT = AtomicInteger()
         private val SOURCE_IMAGE_EXECUTOR = Executors.newCachedThreadPool { runnable ->
             Thread(runnable, "TankobunSourceImage-${SOURCE_IMAGE_THREAD_COUNT.incrementAndGet()}").apply {
@@ -471,6 +500,18 @@ private class SourceImageTimeoutException(
     cause: Throwable,
 ) : IOException("Page ${pageIndex + 1} timed out while loading", cause)
 
+private class SourcePageListTimeoutException(
+    sourceName: String,
+    cause: Throwable,
+) : IOException("$sourceName took too long to open the chapter", cause)
+
+private fun Throwable.isSourcePageListTimeout(): Boolean =
+    causeChain().any { error ->
+        error is TimeoutException ||
+            error.message?.contains("timed out", ignoreCase = true) == true ||
+            error.message?.contains("timeout", ignoreCase = true) == true
+    }
+
 private fun Throwable.isTransientSourceImageFailure(): Boolean {
     var current: Throwable? = this
     while (current != null) {
@@ -497,6 +538,15 @@ private val TRANSIENT_SOURCE_IMAGE_STATUS_CODES = setOf(
     523,
     524,
 )
+
+private fun Throwable.causeChain(): Sequence<Throwable> = sequence {
+    var current: Throwable? = this@causeChain
+    val seen = mutableSetOf<Throwable>()
+    while (current != null && seen.add(current)) {
+        yield(current)
+        current = current.cause
+    }
+}
 
 private suspend fun <T> runSourceAction(
     descriptor: SourceDescriptor,

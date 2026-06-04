@@ -108,6 +108,7 @@ data class TankobunUiState(
     val readerPages: List<ReaderPage> = emptyList(),
     val readerPreviousSegment: ReaderChapterSegment? = null,
     val readerNextSegment: ReaderChapterSegment? = null,
+    val readerError: ReaderLoadError? = null,
     val currentPageIndex: Int = 0,
     val currentPageScrollOffset: Int = 0,
     val downloads: List<DownloadJob> = emptyList(),

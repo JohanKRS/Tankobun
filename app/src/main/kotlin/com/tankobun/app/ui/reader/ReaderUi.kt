@@ -171,6 +171,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
@@ -231,7 +232,12 @@ import com.tankobun.app.ui.shell.*
 internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     val chapter = state.activeChapter ?: return
     if (state.readerPages.isEmpty()) {
-        ReaderLoadingScreen(chapter = chapter, onClose = viewModel::closeReader)
+        ReaderLoadingScreen(
+            chapter = chapter,
+            error = state.readerError,
+            onRetry = viewModel::retryReaderChapter,
+            onClose = viewModel::closeReader,
+        )
         return
     }
     var controlsVisible by remember { mutableStateOf(false) }
@@ -1046,7 +1052,12 @@ internal fun ReaderModeBadge(label: String, selected: Boolean) {
 }
 
 @Composable
-internal fun ReaderLoadingScreen(chapter: SourceChapter, onClose: () -> Unit) {
+internal fun ReaderLoadingScreen(
+    chapter: SourceChapter,
+    error: ReaderLoadError?,
+    onRetry: () -> Unit,
+    onClose: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1070,16 +1081,49 @@ internal fun ReaderLoadingScreen(chapter: SourceChapter, onClose: () -> Unit) {
                 .align(Alignment.Center)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            CircularProgressIndicator(color = Color.White.copy(alpha = 0.86f))
-            Text(
-                "Loading ${chapter.name}",
-                color = Color.White.copy(alpha = 0.72f),
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (error == null) {
+                CircularProgressIndicator(color = Color.White.copy(alpha = 0.86f))
+                Text(
+                    "Loading ${chapter.name}",
+                    color = Color.White.copy(alpha = 0.72f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+            } else {
+                Text(
+                    error.title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    error.message,
+                    color = Color.White.copy(alpha = 0.78f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedButton(onClick = onClose) {
+                        Text("Close reader")
+                    }
+                    Button(onClick = onRetry) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = null,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Try again")
+                    }
+                }
+            }
         }
     }
 }
