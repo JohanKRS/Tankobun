@@ -4,6 +4,18 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.SourceSearchResult
 import java.util.Locale
 
+internal data class VerifiedSourceMatches(
+    val matches: List<SourceSearchResult>,
+    val chapterCounts: Map<String, Int>,
+)
+
+internal data class VerifiedReadableMatch(
+    val match: SourceSearchResult,
+    val chapterCount: Int,
+)
+
+internal class SourceQueryTimeoutException(query: String) : RuntimeException("Search timed out for '$query'")
+
 internal fun sourceSearchQueries(
     media: AnilistMedia,
     titleOverride: String? = null,

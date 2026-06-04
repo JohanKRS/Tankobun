@@ -2,22 +2,27 @@ package com.tankobun.app
 
 import com.tankobun.app.backup.AniListBackupService
 import com.tankobun.app.backup.isDue
+import com.tankobun.app.browse.BrowseDataSource
+import com.tankobun.app.logic.BROWSE_LANDING_SECTION_SIZE
 import com.tankobun.app.logic.BROWSE_MANHWA_CACHE_KEY
 import com.tankobun.app.logic.BROWSE_POPULAR_CACHE_KEY
 import com.tankobun.app.logic.BROWSE_SORT_SEARCH_MATCH
 import com.tankobun.app.logic.BROWSE_TOP_MANGA_CACHE_KEY
 import com.tankobun.app.logic.BROWSE_TRENDING_CACHE_KEY
 import com.tankobun.app.logic.BulkDownloadResult
+import com.tankobun.app.logic.BrowseLandingData
 import com.tankobun.app.logic.RECOMMENDATIONS_PAGE_SIZE
+import com.tankobun.app.logic.SourceQueryTimeoutException
+import com.tankobun.app.logic.VerifiedReadableMatch
+import com.tankobun.app.logic.VerifiedSourceMatches
 import com.tankobun.app.logic.browseCacheKey
 import com.tankobun.app.logic.buildDownloadStorageSummary
 import com.tankobun.app.logic.bulkDownloadMessage
 import com.tankobun.app.logic.downloadSourceName
-import com.tankobun.app.logic.effectiveBrowseSort
 import com.tankobun.app.logic.filteredScoreInput
 import com.tankobun.app.logic.formatTrackingScore
-import com.tankobun.app.logic.hasBrowseFilters
 import com.tankobun.app.logic.hasBrowseQueryOrFilters
+import com.tankobun.app.logic.hasContent
 import com.tankobun.app.logic.isReadableMatchCandidate
 import com.tankobun.app.logic.languageSortPriority
 import com.tankobun.app.logic.mediaTitle
@@ -70,10 +75,8 @@ import com.tankobun.core.database.SyncMutationEntity
 import com.tankobun.core.database.toEntity
 import com.tankobun.core.database.toModel
 import com.tankobun.core.database.toReaderPage
-import com.tankobun.core.database.AnilistSearchResultEntity
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
-import com.tankobun.core.model.AnilistMediaPage
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistScoreFormat
@@ -119,32 +122,10 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-private const val BROWSE_LANDING_SECTION_SIZE = 12
-private const val BROWSE_RESULTS_PAGE_SIZE = 50
-
 private data class ReaderPagePosition(
     val chapterUrl: String,
     val pageIndex: Int,
     val pageScrollOffset: Int,
-)
-
-private data class VerifiedSourceMatches(
-    val matches: List<SourceSearchResult>,
-    val chapterCounts: Map<String, Int>,
-)
-
-private data class VerifiedReadableMatch(
-    val match: SourceSearchResult,
-    val chapterCount: Int,
-)
-
-private class SourceQueryTimeoutException(query: String) : RuntimeException("Search timed out for '$query'")
-
-private data class BrowseLandingData(
-    val trending: List<AnilistMedia>,
-    val popular: List<AnilistMedia>,
-    val popularManhwa: List<AnilistMedia>,
-    val topManga: List<AnilistMedia>,
 )
 
 private data class InstalledExtensionVersion(
@@ -211,6 +192,7 @@ class MainViewModel(
             anilistSyncManualReadProgress = container.settingsStore.anilistSyncManualReadProgress(),
         ),
     )
+    private val browseDataSource = BrowseDataSource(container, cachePolicy) { _state.value.anilistTitleLanguage }
     val state: StateFlow<TankobunUiState> = _state
 
     init {
@@ -1238,10 +1220,10 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             val cachedLanding = BrowseLandingData(
-                trending = cachedBrowseMedia(BROWSE_TRENDING_CACHE_KEY),
-                popular = cachedBrowseMedia(BROWSE_POPULAR_CACHE_KEY),
-                popularManhwa = cachedBrowseMedia(BROWSE_MANHWA_CACHE_KEY),
-                topManga = cachedBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY).take(BROWSE_LANDING_SECTION_SIZE),
+                trending = browseDataSource.cachedBrowseMedia(BROWSE_TRENDING_CACHE_KEY),
+                popular = browseDataSource.cachedBrowseMedia(BROWSE_POPULAR_CACHE_KEY),
+                popularManhwa = browseDataSource.cachedBrowseMedia(BROWSE_MANHWA_CACHE_KEY),
+                topManga = browseDataSource.cachedBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY).take(BROWSE_LANDING_SECTION_SIZE),
             )
             val hasCachedLanding = cachedLanding.hasContent()
             if (hasCachedLanding) {
@@ -1258,21 +1240,21 @@ class MainViewModel(
             }
             runCatching {
                 val accessToken = container.tokenStore.accessToken()
-                val trending = cachedAnilistBrowseMedia(BROWSE_TRENDING_CACHE_KEY) {
+                val trending = browseDataSource.cachedAnilistBrowseMedia(BROWSE_TRENDING_CACHE_KEY) {
                     container.anilistRepository.browseManga(
                         sort = "TRENDING_DESC",
                         perPage = BROWSE_LANDING_SECTION_SIZE,
                         accessToken = accessToken,
                     )
                 }
-                val popular = cachedAnilistBrowseMedia(BROWSE_POPULAR_CACHE_KEY) {
+                val popular = browseDataSource.cachedAnilistBrowseMedia(BROWSE_POPULAR_CACHE_KEY) {
                     container.anilistRepository.browseManga(
                         sort = "POPULARITY_DESC",
                         perPage = BROWSE_LANDING_SECTION_SIZE,
                         accessToken = accessToken,
                     )
                 }
-                val popularManhwa = cachedAnilistBrowseMedia(BROWSE_MANHWA_CACHE_KEY) {
+                val popularManhwa = browseDataSource.cachedAnilistBrowseMedia(BROWSE_MANHWA_CACHE_KEY) {
                     container.anilistRepository.browseManga(
                         countryOfOrigin = "KR",
                         sort = "POPULARITY_DESC",
@@ -1280,7 +1262,7 @@ class MainViewModel(
                         accessToken = accessToken,
                     )
                 }
-                val topManga = cachedAnilistBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY) {
+                val topManga = browseDataSource.cachedAnilistBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY) {
                     container.anilistRepository.browseManga(
                         sort = "SCORE_DESC",
                         perPage = BROWSE_LANDING_SECTION_SIZE,
@@ -1361,8 +1343,8 @@ class MainViewModel(
                 )
             }
             runCatching {
-                cachedAnilistBrowseMediaPage(cacheKey) {
-                    fetchBrowseResultsPage(snapshot, page = 1)
+                browseDataSource.cachedAnilistBrowseMediaPage(cacheKey) {
+                    browseDataSource.fetchBrowseResultsPage(snapshot, page = 1)
                 }
             }.onSuccess { page ->
                 if (_state.value.browseCacheKey() == cacheKey) {
@@ -1418,11 +1400,11 @@ class MainViewModel(
                 }
             }
             runCatching {
-                fetchBrowseResultsPage(snapshot, page = nextPage)
+                browseDataSource.fetchBrowseResultsPage(snapshot, page = nextPage)
             }.onSuccess { page ->
                 if (_state.value.browseCacheKey() != cacheKey) return@onSuccess
                 val merged = (_state.value.searchResults + page.media).distinctBy { it.id }
-                cacheBrowseMedia(cacheKey, merged)
+                browseDataSource.cacheBrowseMedia(cacheKey, merged)
                 _state.update {
                     it.copy(
                         searchResults = merged,
@@ -1444,125 +1426,6 @@ class MainViewModel(
             }
         }
     }
-
-    private suspend fun cachedAnilistBrowseMedia(
-        cacheKey: String,
-        fetch: suspend () -> List<AnilistMedia>,
-    ): List<AnilistMedia> {
-        val now = System.currentTimeMillis()
-        val cachedRows = container.database.searchResultDao().cachedSearchRows(cacheKey)
-        val cachedIsFresh = cachedRows.isNotEmpty() &&
-            cachedRows.all { now - it.fetchedAtEpochMillis <= cachePolicy.anilistSearchTtlMillis }
-        if (cachedIsFresh) {
-            val titleLanguage = _state.value.anilistTitleLanguage
-            return container.database.searchResultDao().cachedSearchMedia(cacheKey).map { it.toModel(titleLanguage) }
-        }
-        val titleLanguage = _state.value.anilistTitleLanguage
-        val results = fetch().map { it.withTitleLanguage(titleLanguage) }
-        container.database.mediaDao().upsertMedia(results.map { it.toEntity(now) })
-        container.database.searchResultDao().deleteForQuery(cacheKey)
-        container.database.searchResultDao().upsertResults(
-            results.mapIndexed { index, media ->
-                AnilistSearchResultEntity(
-                    query = cacheKey,
-                    mediaId = media.id,
-                    orderIndex = index,
-                    fetchedAtEpochMillis = now,
-                )
-            },
-        )
-        return results
-    }
-
-    private suspend fun cachedAnilistBrowseMediaPage(
-        cacheKey: String,
-        fetch: suspend () -> AnilistMediaPage,
-    ): AnilistMediaPage {
-        val now = System.currentTimeMillis()
-        val cachedRows = container.database.searchResultDao().cachedSearchRows(cacheKey)
-        val cachedIsFresh = cachedRows.isNotEmpty() &&
-            cachedRows.all { now - it.fetchedAtEpochMillis <= cachePolicy.anilistSearchTtlMillis }
-        if (cachedIsFresh) {
-            val titleLanguage = _state.value.anilistTitleLanguage
-            val cachedMedia = container.database.searchResultDao()
-                .cachedSearchMedia(cacheKey)
-                .map { it.toModel(titleLanguage) }
-            val cachedPage = if (cachedMedia.size < BROWSE_RESULTS_PAGE_SIZE) {
-                0
-            } else {
-                ((cachedMedia.size - 1) / BROWSE_RESULTS_PAGE_SIZE + 1).coerceAtLeast(1)
-            }
-            return AnilistMediaPage(
-                media = cachedMedia,
-                currentPage = cachedPage,
-                hasNextPage = cachedMedia.isNotEmpty() &&
-                    (cachedMedia.size < BROWSE_RESULTS_PAGE_SIZE || cachedMedia.size % BROWSE_RESULTS_PAGE_SIZE == 0),
-            )
-        }
-        val page = fetch()
-        cacheBrowseMedia(cacheKey, page.media)
-        return page
-    }
-
-    private suspend fun fetchBrowseResultsPage(snapshot: TankobunUiState, page: Int): AnilistMediaPage {
-        val query = snapshot.searchQuery.trim()
-        val staffName = snapshot.browseStaffName?.trim().orEmpty()
-        val accessToken = container.tokenStore.accessToken()
-        return when {
-            staffName.isNotBlank() -> container.anilistRepository.staffMangaPage(
-                staffName = staffName,
-                sort = snapshot.effectiveBrowseSort(),
-                page = page,
-                perPage = BROWSE_RESULTS_PAGE_SIZE,
-                accessToken = accessToken,
-            )
-            !snapshot.hasBrowseFilters() && snapshot.browseSort == BROWSE_SORT_SEARCH_MATCH -> {
-                container.anilistRepository.searchMangaPage(
-                    query = query,
-                    page = page,
-                    perPage = BROWSE_RESULTS_PAGE_SIZE,
-                    accessToken = accessToken,
-                )
-            }
-            else -> container.anilistRepository.browseMangaPage(
-                search = query.takeIf { it.isNotBlank() },
-                genres = snapshot.browseGenres,
-                tags = snapshot.browseTags,
-                format = snapshot.browseFormat,
-                status = snapshot.browsePublishingStatus,
-                countryOfOrigin = snapshot.browseCountryOfOrigin,
-                year = snapshot.browseYear,
-                sort = snapshot.effectiveBrowseSort(),
-                page = page,
-                perPage = BROWSE_RESULTS_PAGE_SIZE,
-                accessToken = accessToken,
-            )
-        }.withTitleLanguage(snapshot.anilistTitleLanguage)
-    }
-
-    private suspend fun cacheBrowseMedia(cacheKey: String, media: List<AnilistMedia>) {
-        val now = System.currentTimeMillis()
-        container.database.mediaDao().upsertMedia(media.map { it.toEntity(now) })
-        container.database.searchResultDao().deleteForQuery(cacheKey)
-        container.database.searchResultDao().upsertResults(
-            media.mapIndexed { index, item ->
-                AnilistSearchResultEntity(
-                    query = cacheKey,
-                    mediaId = item.id,
-                    orderIndex = index,
-                    fetchedAtEpochMillis = now,
-                )
-            },
-        )
-    }
-
-    private suspend fun cachedBrowseMedia(cacheKey: String): List<AnilistMedia> =
-        container.database.searchResultDao()
-            .cachedSearchMedia(cacheKey)
-            .map { it.toModel(_state.value.anilistTitleLanguage) }
-
-    private fun BrowseLandingData.hasContent(): Boolean =
-        trending.isNotEmpty() || popular.isNotEmpty() || popularManhwa.isNotEmpty() || topManga.isNotEmpty()
 
     fun selectMedia(media: AnilistMedia) {
         val titleLanguage = _state.value.anilistTitleLanguage
