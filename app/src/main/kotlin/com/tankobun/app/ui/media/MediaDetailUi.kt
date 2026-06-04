@@ -209,6 +209,7 @@ import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.tankobun.app.logic.nextInReadingOrderAfter
 import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.state.DownloadStorageItem
@@ -263,6 +264,14 @@ internal fun MangaDetailScreen(
     onBrowseAuthor: (String) -> Unit,
 ) {
     val backdrop = mediaDetailBackdropColor()
+    val context = LocalContext.current
+    val heroBackdropImage = media.bannerImage ?: media.coverImage
+    val heroBackdropRequest = remember(context, heroBackdropImage) {
+        ImageRequest.Builder(context)
+            .data(heroBackdropImage)
+            .crossfade(450)
+            .build()
+    }
     val listState = rememberLazyListState()
     val trackedStatuses = remember(state.libraryItems) { state.libraryItems.trackedMediaStatuses() }
     var coverZoomOpen by remember(media.id) { mutableStateOf(false) }
@@ -297,7 +306,7 @@ internal fun MangaDetailScreen(
                 .blur(detailBlur),
         ) {
             AsyncImage(
-                model = media.bannerImage ?: media.coverImage,
+                model = heroBackdropRequest,
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxWidth()
