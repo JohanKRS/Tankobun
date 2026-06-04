@@ -54,6 +54,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -252,6 +253,21 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     var flingJob by remember(transformKey) { mutableStateOf<Job?>(null) }
     var zoomAnimationJob by remember(transformKey) { mutableStateOf<Job?>(null) }
     val pageGap = readerPageGap(state.readerPageGapLevel)
+    val pagedPagePadding = if (state.readerPageGapLevel == 0) 8.dp else pageGap
+    val density = LocalDensity.current
+    val pagedPagePaddingPx = with(density) { pagedPagePadding.toPx() }
+    var loadedPagedPageAspectRatio by remember(transformKey) { mutableStateOf<Float?>(null) }
+    val currentPagedPageMetadataAspectRatio = state.readerPages
+        .getOrNull(state.currentPageIndex)
+        ?.readerPageAspectRatio()
+    val currentPagedPageAspectRatio = currentPagedPageMetadataAspectRatio ?: loadedPagedPageAspectRatio
+    fun pagedFrameHeight(width: Float, height: Float): Float =
+        pagedFitWidthFrameHeight(
+            pageAspectRatio = currentPagedPageAspectRatio,
+            viewportWidth = width,
+            viewportHeight = height,
+            paddingPx = pagedPagePaddingPx,
+        )
     val webtoonListState = rememberLazyListState(
         cacheWindow = LazyLayoutCacheWindow(
             ahead = WEBTOON_READER_CACHE_AHEAD_DP.dp,
@@ -332,13 +348,21 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     fun resetZoom() {
         animateReaderTransform(1f, Offset.Zero)
     }
-    fun launchReaderFling(velocity: Velocity, width: Float, height: Float, panAxis: ReaderPanAxis) {
+    fun launchReaderFling(
+        velocity: Velocity,
+        width: Float,
+        height: Float,
+        panAxis: ReaderPanAxis,
+        contentWidth: Float = width,
+        contentHeight: Float = height,
+    ) {
         val initialVelocity = when (panAxis) {
             ReaderPanAxis.BOTH -> Offset(velocity.x, velocity.y)
             ReaderPanAxis.HORIZONTAL,
             ReaderPanAxis.WEBTOON -> Offset(velocity.x, 0f)
         }
-        if (readerScale <= 1.01f || (abs(initialVelocity.x) < 90f && abs(initialVelocity.y) < 90f)) return
+        val panBounds = readerPanBounds(readerScale, width, height, contentWidth, contentHeight)
+        if (!panBounds.canPan || (abs(initialVelocity.x) < 90f && abs(initialVelocity.y) < 90f)) return
         stopReaderMotion()
         flingJob = coroutineScope.launch {
             var velocityOffset = initialVelocity
@@ -353,7 +377,13 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 val deltaSeconds = ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0f, 0.05f)
                 lastFrameNanos = frameNanos
                 val proposedOffset = readerOffset + velocityOffset * deltaSeconds
-                val clampedOffset = proposedOffset.clampedReaderOffset(readerScale, width, height)
+                val clampedOffset = proposedOffset.clampedReaderOffset(
+                    scale = readerScale,
+                    width = width,
+                    height = height,
+                    contentWidth = contentWidth,
+                    contentHeight = contentHeight,
+                )
                 readerOffset = when (panAxis) {
                     ReaderPanAxis.BOTH -> clampedOffset
                     ReaderPanAxis.HORIZONTAL,
@@ -569,7 +599,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(transformKey, controlsVisible, readerScale) {
+            .pointerInput(transformKey, controlsVisible, readerScale, currentPagedPageAspectRatio, pagedPagePaddingPx) {
                 detectTapGestures(
                     onDoubleTap = { tapOffset ->
                         val nextScale = if (readerScale > 1.05f) 1f else 2.5f
@@ -581,6 +611,12 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 scale = nextScale,
                                 width = size.width.toFloat(),
                                 height = size.height.toFloat(),
+                                contentWidth = size.width.toFloat(),
+                                contentHeight = if (state.readerMode == ReaderMode.PAGED) {
+                                    pagedFrameHeight(size.width.toFloat(), size.height.toFloat())
+                                } else {
+                                    size.height.toFloat()
+                                },
                             )
                             if (state.readerMode == ReaderMode.WEBTOON) Offset(zoomOffset.x, 0f) else zoomOffset
                         }
@@ -670,13 +706,29 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(transformKey) {
+                    .pointerInput(transformKey, currentPagedPageAspectRatio, pagedPagePaddingPx) {
                         detectReaderTransformGestures(
                             scaleProvider = { readerScale },
                             panAxis = ReaderPanAxis.BOTH,
+                            panBoundsProvider = { scale, width, height ->
+                                readerPanBounds(
+                                    scale = scale,
+                                    width = width,
+                                    height = height,
+                                    contentWidth = width,
+                                    contentHeight = pagedFrameHeight(width, height),
+                                )
+                            },
                             onGestureStart = ::stopReaderMotion,
                             onGestureEnd = { velocity, width, height ->
-                                launchReaderFling(velocity, width, height, ReaderPanAxis.BOTH)
+                                launchReaderFling(
+                                    velocity = velocity,
+                                    width = width,
+                                    height = height,
+                                    panAxis = ReaderPanAxis.BOTH,
+                                    contentWidth = width,
+                                    contentHeight = pagedFrameHeight(width, height),
+                                )
                             },
                             onSingleFingerSwipe = { drag, velocity, width, _ ->
                                 if (readerScale > 1.01f) return@detectReaderTransformGestures
@@ -699,28 +751,52 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 nextScale = nextScale,
                                 width = size.width.toFloat(),
                                 height = size.height.toFloat(),
+                                contentWidth = size.width.toFloat(),
+                                contentHeight = pagedFrameHeight(size.width.toFloat(), size.height.toFloat()),
                             )
                             readerScale = nextScale
                             readerOffset = nextOffset
                         }
-                    }
-                    .graphicsLayer {
-                        scaleX = readerScale
-                        scaleY = readerScale
-                        translationX = readerOffset.x
-                        translationY = readerOffset.y
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                ReaderPageImage(
-                    model = { retryAttempt -> readerImageRequest(state, chapter, page, retryAttempt) },
-                    contentDescription = chapter.name,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(if (state.readerPageGapLevel == 0) 8.dp else pageGap),
-                    contentScale = if (state.readerFitWidth) ContentScale.FillWidth else ContentScale.Fit,
-                    fillViewportWhileLoading = true,
-                )
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val pageFrameHeight = pagedFitWidthFrameHeight(
+                        pageAspectRatio = currentPagedPageAspectRatio,
+                        viewportWidth = maxWidth,
+                        viewportHeight = maxHeight,
+                        padding = pagedPagePadding,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .requiredHeight(pageFrameHeight)
+                            .graphicsLayer {
+                                scaleX = readerScale
+                                scaleY = readerScale
+                                translationX = readerOffset.x
+                                translationY = readerOffset.y
+                            },
+                    ) {
+                        ReaderPageImage(
+                            model = { retryAttempt -> readerImageRequest(state, chapter, page, retryAttempt) },
+                            contentDescription = chapter.name,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(pagedPagePadding),
+                            contentScale = ContentScale.FillWidth,
+                            fillViewportWhileLoading = currentPagedPageAspectRatio == null,
+                            onImageAspectRatio = { aspectRatio ->
+                                if (currentPagedPageMetadataAspectRatio == null) {
+                                    loadedPagedPageAspectRatio = aspectRatio
+                                }
+                            },
+                        )
+                    }
+                }
             }
         }
 
@@ -890,15 +966,6 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                         viewModel.setReaderMode(ReaderMode.WEBTOON)
                                     },
                                     label = { Text("Webtoon") },
-                                )
-                                TankobunChip(
-                                    selected = state.readerFitWidth,
-                                    enabled = state.readerMode == ReaderMode.PAGED,
-                                    onClick = {
-                                        viewModel.setReaderFitWidth(!state.readerFitWidth)
-                                        resetZoom()
-                                    },
-                                    label = { Text("Fit width") },
                                 )
                                 TankobunChip(
                                     selected = state.readerPageGapLevel > 0,
@@ -1136,6 +1203,7 @@ internal fun ReaderPageImage(
     contentScale: ContentScale,
     fillViewportWhileLoading: Boolean = false,
     placeholderAspectRatio: Float? = null,
+    onImageAspectRatio: ((Float) -> Unit)? = null,
 ) {
     var retryAttempt by remember { mutableIntStateOf(0) }
     val imageRequest = model(retryAttempt)
@@ -1153,6 +1221,14 @@ internal fun ReaderPageImage(
         contentDescription = contentDescription,
         modifier = modifier,
         contentScale = contentScale,
+        onSuccess = { success ->
+            val image = success.result.image
+            val width = image.width
+            val height = image.height
+            if (width > 0 && height > 0) {
+                onImageAspectRatio?.invoke((width.toFloat() / height.toFloat()).coerceIn(0.2f, 2.5f))
+            }
+        },
         loading = {
             ReaderImagePlaceholder(
                 modifier = loadingModifier,
@@ -1262,6 +1338,18 @@ private data class WebtoonReaderAnchor(
     val scrollOffset: Int,
 )
 
+internal data class ReaderPanBounds(
+    val maxX: Float,
+    val maxY: Float,
+) {
+    val canPan: Boolean
+        get() = maxX > 0.5f || maxY > 0.5f
+
+    fun allows(pan: Offset): Boolean =
+        (maxX > 0.5f && abs(pan.x) >= abs(pan.y)) ||
+            (maxY > 0.5f && abs(pan.y) > abs(pan.x))
+}
+
 internal fun readerGapLabel(level: Int): String = when (level) {
     1 -> "Small gaps"
     2 -> "Medium gaps"
@@ -1282,9 +1370,17 @@ internal fun readerDoubleTapOffset(
     scale: Float,
     width: Float,
     height: Float,
+    contentWidth: Float = width,
+    contentHeight: Float = height,
 ): Offset {
     val center = Offset(width / 2f, height / 2f)
-    return ((center - tapOffset) * (scale - 1f)).clampedReaderOffset(scale, width, height)
+    return ((center - tapOffset) * (scale - 1f)).clampedReaderOffset(
+        scale = scale,
+        width = width,
+        height = height,
+        contentWidth = contentWidth,
+        contentHeight = contentHeight,
+    )
 }
 
 internal fun readerTransformOffset(
@@ -1295,27 +1391,76 @@ internal fun readerTransformOffset(
     nextScale: Float,
     width: Float,
     height: Float,
+    contentWidth: Float = width,
+    contentHeight: Float = height,
 ): Offset {
-    if (nextScale <= 1.01f) return Offset.Zero
     val center = Offset(width / 2f, height / 2f)
     val scaleChange = nextScale / scale.coerceAtLeast(0.01f)
     return (currentOffset * scaleChange + (centroid - center) * (1f - scaleChange) + pan)
-        .clampedReaderOffset(nextScale, width, height)
+        .clampedReaderOffset(
+            scale = nextScale,
+            width = width,
+            height = height,
+            contentWidth = contentWidth,
+            contentHeight = contentHeight,
+        )
 }
 
-internal fun Offset.clampedReaderOffset(scale: Float, width: Float, height: Float): Offset {
-    if (scale <= 1.01f) return Offset.Zero
-    val maxX = width * (scale - 1f) / 2f
-    val maxY = height * (scale - 1f) / 2f
+internal fun readerPanBounds(
+    scale: Float,
+    width: Float,
+    height: Float,
+    contentWidth: Float = width,
+    contentHeight: Float = height,
+): ReaderPanBounds {
+    val maxX = ((contentWidth * scale) - width).coerceAtLeast(0f) / 2f
+    val maxY = ((contentHeight * scale) - height).coerceAtLeast(0f) / 2f
+    return ReaderPanBounds(maxX = maxX, maxY = maxY)
+}
+
+internal fun Offset.clampedReaderOffset(
+    scale: Float,
+    width: Float,
+    height: Float,
+    contentWidth: Float = width,
+    contentHeight: Float = height,
+): Offset {
+    val bounds = readerPanBounds(scale, width, height, contentWidth, contentHeight)
     return Offset(
-        x = x.coerceIn(-maxX, maxX),
-        y = y.coerceIn(-maxY, maxY),
+        x = x.coerceIn(-bounds.maxX, bounds.maxX),
+        y = y.coerceIn(-bounds.maxY, bounds.maxY),
     )
+}
+
+internal fun pagedFitWidthFrameHeight(
+    pageAspectRatio: Float?,
+    viewportWidth: Float,
+    viewportHeight: Float,
+    paddingPx: Float,
+): Float {
+    val aspectRatio = pageAspectRatio?.takeIf { it > 0f } ?: return viewportHeight
+    val imageWidth = (viewportWidth - paddingPx * 2f).coerceAtLeast(1f)
+    val imageHeight = imageWidth / aspectRatio
+    return (imageHeight + paddingPx * 2f).coerceAtLeast(viewportHeight)
+}
+
+internal fun pagedFitWidthFrameHeight(
+    pageAspectRatio: Float?,
+    viewportWidth: Dp,
+    viewportHeight: Dp,
+    padding: Dp,
+): Dp {
+    val aspectRatio = pageAspectRatio?.takeIf { it > 0f } ?: return viewportHeight
+    val imageWidth = (viewportWidth - padding * 2).coerceAtLeast(1.dp)
+    val imageHeight = imageWidth / aspectRatio
+    return (imageHeight + padding * 2).coerceAtLeast(viewportHeight)
 }
 
 private suspend fun PointerInputScope.detectReaderTransformGestures(
     scaleProvider: () -> Float,
     panAxis: ReaderPanAxis,
+    panBoundsProvider: (scale: Float, width: Float, height: Float) -> ReaderPanBounds =
+        { scale, width, height -> readerPanBounds(scale, width, height) },
     onGestureStart: () -> Unit = {},
     onGestureEnd: (velocity: Velocity, width: Float, height: Float) -> Unit = { _, _, _ -> },
     onSingleFingerSwipe: (drag: Offset, velocity: Velocity, width: Float, height: Float) -> Unit = { _, _, _, _ -> },
@@ -1338,16 +1483,21 @@ private suspend fun PointerInputScope.detectReaderTransformGestures(
             val currentScale = scaleProvider()
             val multiTouch = pressedPointers > 1
             val rawPan = event.calculatePan()
-            val oneFingerZoomPan = currentScale > 1.01f && !multiTouch
+            val panBounds = panBoundsProvider(
+                currentScale,
+                size.width.toFloat(),
+                size.height.toFloat(),
+            )
+            val oneFingerPan = panBounds.canPan && !multiTouch
             val singleFingerPanAllowed = when (panAxis) {
                 ReaderPanAxis.BOTH,
-                ReaderPanAxis.WEBTOON -> oneFingerZoomPan
-                ReaderPanAxis.HORIZONTAL -> oneFingerZoomPan && abs(rawPan.x) > abs(rawPan.y)
+                ReaderPanAxis.WEBTOON -> oneFingerPan && panBounds.allows(rawPan)
+                ReaderPanAxis.HORIZONTAL -> oneFingerPan && panBounds.maxX > 0.5f && abs(rawPan.x) > abs(rawPan.y)
             }
             val shouldTransform = multiTouch || singleFingerPanAllowed
             if (shouldTransform) {
                 val zoom = if (multiTouch) event.calculateZoom() else 1f
-                val pan = if (currentScale > 1.01f || transforming) rawPan.readerPanForAxis(panAxis) else Offset.Zero
+                val pan = if (panBounds.canPan || transforming) rawPan.readerPanForAxis(panAxis) else Offset.Zero
                 if (!transforming) {
                     transforming = true
                     onGestureStart()

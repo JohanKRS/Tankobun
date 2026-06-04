@@ -132,13 +132,6 @@ class SettingsStore(context: Context) {
         preferences.edit().putInt(KEY_READER_PAGE_GAP_LEVEL, level.coerceIn(0, 3)).apply()
     }
 
-    fun readerFitWidth(): Boolean =
-        preferences.getBoolean(KEY_READER_FIT_WIDTH, false)
-
-    fun saveReaderFitWidth(enabled: Boolean) {
-        preferences.edit().putBoolean(KEY_READER_FIT_WIDTH, enabled).apply()
-    }
-
     fun keepNextTenDownloads(): Boolean =
         preferences.getBoolean(KEY_KEEP_NEXT_TEN_DOWNLOADS, false)
 
@@ -325,7 +318,6 @@ class SettingsStore(context: Context) {
         const val KEY_BROWSE_SHOW_WHOLE_COVERS = "browse.show.whole.covers"
         const val KEY_READER_MODE = "reader.mode"
         const val KEY_READER_PAGE_GAP_LEVEL = "reader.page.gap.level"
-        const val KEY_READER_FIT_WIDTH = "reader.fit.width"
         const val KEY_KEEP_NEXT_TEN_DOWNLOADS = "downloads.keep.next.ten"
         const val KEY_ANILIST_AUTO_SAVE_TRACKING_CHANGES = "anilist.auto.save.tracking.changes"
         const val KEY_ANILIST_AUTO_SYNC_READER_PROGRESS = "anilist.auto.sync.reader.progress"

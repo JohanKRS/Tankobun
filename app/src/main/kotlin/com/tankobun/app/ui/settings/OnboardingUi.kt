@@ -85,7 +85,7 @@ private val TankobunOnboardingPages = listOf(
         title = "Read your way",
         body = "Use paged or webtoon reading, resume from the chapter list, and let progress update as you finish chapters.",
         points = listOf(
-            "Reader settings control spacing, fit, and reading mode.",
+            "Reader settings control spacing and reading mode.",
             "Downloads can queue all, unread, next 10, or hand-picked chapters.",
         ),
     ),

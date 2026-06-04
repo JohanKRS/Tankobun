@@ -122,7 +122,6 @@ data class TankobunUiState(
     val selectedSourceId: Long? = null,
     val readerMode: ReaderMode = ReaderMode.PAGED,
     val readerPageGapLevel: Int = 0,
-    val readerFitWidth: Boolean = false,
     val busy: Boolean = false,
     val message: String? = null,
 ) {

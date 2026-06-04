@@ -512,7 +512,6 @@ internal fun SettingsDetailContent(
                     selected = state.readerMode == ReaderMode.PAGED,
                     onClick = { viewModel.setReaderMode(ReaderMode.PAGED) },
                     label = { Text("Paged") },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
                 )
                 TankobunChip(
                     selected = state.readerMode == ReaderMode.WEBTOON,
@@ -529,11 +528,6 @@ internal fun SettingsDetailContent(
                         label = { Text(readerGapLabel(level)) },
                     )
                 }
-                TankobunChip(
-                    selected = state.readerFitWidth,
-                    onClick = { viewModel.setReaderFitWidth(!state.readerFitWidth) },
-                    label = { Text("Fit paged width") },
-                )
             }
         }
         SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(state, viewModel, modifier)

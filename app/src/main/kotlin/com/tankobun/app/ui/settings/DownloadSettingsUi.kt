@@ -548,7 +548,6 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
         SettingsRoute.READER -> buildList {
             add(if (state.readerMode == ReaderMode.WEBTOON) "Webtoon" else "Paged")
             add(readerGapLabel(state.readerPageGapLevel))
-            if (state.readerFitWidth) add("Fit width")
         }.joinToString(" / ")
         SettingsRoute.DOWNLOADS -> state.downloadStorageSummary.totalBytes.formatFileSize()
         SettingsRoute.ANILIST -> buildList {

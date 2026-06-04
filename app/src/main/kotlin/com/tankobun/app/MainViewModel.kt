@@ -205,7 +205,6 @@ class MainViewModel(
             readerTutorialVisible = !container.settingsStore.readerTutorialCompleted(),
             readerMode = container.settingsStore.readerMode(),
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
-            readerFitWidth = container.settingsStore.readerFitWidth(),
             keepNextTenDownloads = container.settingsStore.keepNextTenDownloads(),
             anilistAutoSaveTrackingChanges = container.settingsStore.anilistAutoSaveTrackingChanges(),
             anilistAutoSyncReaderProgress = container.settingsStore.anilistAutoSyncReaderProgress(),
@@ -1696,11 +1695,6 @@ class MainViewModel(
         val normalized = level.coerceIn(0, 3)
         container.settingsStore.saveReaderPageGapLevel(normalized)
         _state.update { it.copy(readerPageGapLevel = normalized) }
-    }
-
-    fun setReaderFitWidth(enabled: Boolean) {
-        container.settingsStore.saveReaderFitWidth(enabled)
-        _state.update { it.copy(readerFitWidth = enabled) }
     }
 
     fun setAnilistAutoSaveTrackingChanges(enabled: Boolean) {
