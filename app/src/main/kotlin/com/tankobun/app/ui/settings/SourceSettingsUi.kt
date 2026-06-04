@@ -105,6 +105,7 @@ import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -655,7 +656,7 @@ internal fun SourceRepositoryControls(
             style = LocalTankobunStyle.current.typography.sectionLabel,
             color = LocalTankobunStyle.current.colors.accent,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
             OutlinedTextField(
                 value = repositoryUrl,
                 onValueChange = onRepositoryUrlChange,
@@ -669,7 +670,7 @@ internal fun SourceRepositoryControls(
                 icon = Icons.Default.Refresh,
                 onClick = onRefreshRepository,
                 modifier = Modifier
-                    .height(56.dp)
+                    .height(64.dp)
                     .widthIn(min = 96.dp),
             )
         }
@@ -850,66 +851,80 @@ internal fun ExtensionRepositoryRow(
     val installedVersionCode = installedSources.mapNotNull { it.versionCode }.maxOrNull()
     val installed = installedSources.isNotEmpty()
     val updateAvailable = installedVersionCode?.let { extension.versionCode > it } == true
+    val actionLabel = when {
+        updateAvailable -> "Update"
+        installed -> "Reinstall"
+        else -> "Install"
+    }
     TankobunPanel(
         modifier = Modifier.fillMaxWidth(),
         color = LocalTankobunStyle.current.colors.panel,
         contentColor = LocalTankobunStyle.current.colors.panelContent,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ExtensionIcon(
-                packageName = installedSources.firstOrNull()?.packageName,
-                name = displayName,
-                iconUrl = iconUrl,
-                modifier = Modifier.size(42.dp),
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    listOfNotNull(
-                        sourceLanguageDisplay(extension.lang.normalizedSourceLanguage()),
-                        "v${extension.versionName}",
-                        if (extension.isNsfw) "NSFW" else null,
-                        if (installed) "${installedSources.size} source${if (installedSources.size == 1) "" else "s"} installed" else null,
-                    ).joinToString(" / "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Button(
-                enabled = !installing,
-                onClick = onInstall,
-                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val iconOnlyInstallAction = maxWidth < 520.dp
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (installing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                } else {
-                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
+                ExtensionIcon(
+                    packageName = installedSources.firstOrNull()?.packageName,
+                    name = displayName,
+                    iconUrl = iconUrl,
+                    modifier = Modifier.size(42.dp),
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        when {
-                            updateAvailable -> "Update"
-                            installed -> "Reinstall"
-                            else -> "Install"
-                        },
+                        listOfNotNull(
+                            sourceLanguageDisplay(extension.lang.normalizedSourceLanguage()),
+                            "v${extension.versionName}",
+                            if (extension.isNsfw) "NSFW" else null,
+                            if (installed) "${installedSources.size} source${if (installedSources.size == 1) "" else "s"} installed" else null,
+                        ).joinToString(" / "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
-            if (installed) {
-                SourceSettingsIconActionButton(
-                    icon = Icons.Default.Delete,
-                    contentDescription = "Uninstall $displayName",
-                    onClick = onUninstall,
-                )
+                Button(
+                    enabled = !installing,
+                    onClick = onInstall,
+                    modifier = if (iconOnlyInstallAction) {
+                        Modifier.size(LocalTankobunStyle.current.sizes.iconAction)
+                    } else {
+                        Modifier
+                    },
+                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                    contentPadding = if (iconOnlyInstallAction) PaddingValues(0.dp) else ButtonDefaults.ContentPadding,
+                ) {
+                    if (installing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = if (iconOnlyInstallAction) actionLabel else null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        if (!iconOnlyInstallAction) {
+                            Spacer(Modifier.width(6.dp))
+                            Text(actionLabel)
+                        }
+                    }
+                }
+                if (installed) {
+                    SourceSettingsIconActionButton(
+                        icon = Icons.Default.Delete,
+                        contentDescription = "Uninstall $displayName",
+                        onClick = onUninstall,
+                    )
+                }
             }
         }
     }
@@ -962,7 +977,6 @@ internal fun String.matchesSourceSettingsQuery(query: String): Boolean =
 
 internal fun sourceMetadata(source: SourceDescriptor, active: Boolean): String =
     listOfNotNull(
-        sourceLanguageDisplay(source.lang.normalizedSourceLanguage()),
         source.versionName?.let { "v$it" },
         if (source.isNsfw) "NSFW" else null,
         if (active) "active" else "off",

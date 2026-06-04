@@ -797,7 +797,7 @@ internal fun AutoResizingMangaTitle(
         val textMeasurer = rememberTextMeasurer()
         val maxFontSize = if (compact) 82f else 92f
         val minFontSize = if (compact) 16f else 22f
-        val maxLines = if (compact) 3 else 4
+        val maxLines = if (compact) 5 else 6
         val maxWidthPx = with(density) { maxWidth.toPx() }
         val maxHeightPx = with(density) { maxHeight.toPx() }
         val verticalClipGuardPx = with(density) { if (compact) 0.dp.toPx() else 3.dp.toPx() }
@@ -888,7 +888,11 @@ private fun buildMangaTitleLayout(
         }
         fontSize -= 1f
     }
-    return MangaTitleLayout(minFontSize, fallbackTitleLines(words, maxLines))
+    val fallbackStyle = tankobunMangaTitleTextStyle(minFontSize)
+    return MangaTitleLayout(
+        minFontSize,
+        truncatedTitleLinesForWidth(words, maxWidthPx, maxLines, fallbackStyle, textMeasurer),
+    )
 }
 
 private fun preferredTitleLinesForWidth(
@@ -933,6 +937,75 @@ private fun titleLinesForWidth(
     return lines.takeIf { it.size <= maxLines }
 }
 
+private fun truncatedTitleLinesForWidth(
+    words: List<String>,
+    maxWidthPx: Float,
+    maxLines: Int,
+    style: TextStyle,
+    textMeasurer: androidx.compose.ui.text.TextMeasurer,
+): List<String> {
+    if (words.isEmpty() || maxLines <= 0) return listOf("")
+    val lines = mutableListOf<String>()
+    var wordIndex = 0
+    while (wordIndex < words.size && lines.size < maxLines) {
+        val lastAllowedLine = lines.size == maxLines - 1
+        var currentLine = ""
+        var nextWordIndex = wordIndex
+        while (nextWordIndex < words.size) {
+            val candidate = if (currentLine.isBlank()) {
+                words[nextWordIndex]
+            } else {
+                "$currentLine ${words[nextWordIndex]}"
+            }
+            val hasRemainingWords = nextWordIndex < words.lastIndex
+            val measuredCandidate = if (lastAllowedLine && hasRemainingWords) {
+                candidate.withTitleEllipsis()
+            } else {
+                candidate
+            }
+            if (measuredTitleWidth(measuredCandidate, style, textMeasurer) > maxWidthPx) {
+                break
+            }
+            currentLine = candidate
+            nextWordIndex += 1
+        }
+        if (currentLine.isBlank()) {
+            lines += words[wordIndex].fitTitleLineWithEllipsis(maxWidthPx, style, textMeasurer)
+            wordIndex += 1
+        } else {
+            wordIndex = nextWordIndex
+            val hasMoreWords = wordIndex < words.size
+            lines += if (lastAllowedLine && hasMoreWords) {
+                currentLine.fitTitleLineWithEllipsis(maxWidthPx, style, textMeasurer)
+            } else {
+                currentLine
+            }
+        }
+        if (lastAllowedLine) return lines
+    }
+    return lines.ifEmpty { listOf("") }
+}
+
+private fun String.withTitleEllipsis(): String = "$this..."
+
+private fun String.fitTitleLineWithEllipsis(
+    maxWidthPx: Float,
+    style: TextStyle,
+    textMeasurer: androidx.compose.ui.text.TextMeasurer,
+): String {
+    val trimmed = trim()
+    if (trimmed.isBlank()) return ""
+    var candidate = trimmed.withTitleEllipsis()
+    if (measuredTitleWidth(candidate, style, textMeasurer) <= maxWidthPx) return candidate
+    var endIndex = trimmed.length
+    while (endIndex > 0) {
+        candidate = trimmed.take(endIndex).trimEnd().withTitleEllipsis()
+        if (measuredTitleWidth(candidate, style, textMeasurer) <= maxWidthPx) return candidate
+        endIndex -= 1
+    }
+    return if (measuredTitleWidth("...", style, textMeasurer) <= maxWidthPx) "..." else ""
+}
+
 private fun measuredTitleWidth(
     text: String,
     style: TextStyle,
@@ -956,9 +1029,6 @@ private fun measuredTitleHeight(
         softWrap = false,
         maxLines = lines.size,
     ).size.height
-
-private fun fallbackTitleLines(words: List<String>, maxLines: Int): List<String> =
-    words.take(maxLines).ifEmpty { listOf("") }
 
 @Composable
 internal fun MangaHeroMetaLine(media: AnilistMedia) {
