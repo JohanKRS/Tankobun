@@ -4,6 +4,8 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.SourceSearchResult
 import java.util.Locale
 
+internal const val SOURCE_CANDIDATES_TO_VERIFY = 5
+
 internal data class VerifiedSourceMatches(
     val matches: List<SourceSearchResult>,
     val chapterCounts: Map<String, Int>,
