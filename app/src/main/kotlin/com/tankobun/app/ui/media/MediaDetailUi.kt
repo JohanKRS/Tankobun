@@ -20,8 +20,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,12 +33,15 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -116,7 +121,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -132,23 +136,22 @@ import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -2262,7 +2265,6 @@ internal fun TankobunUiState.downloadForChapter(chapter: SourceChapter): Downloa
         .maxByOrNull { it.updatedAtEpochMillis }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ChapterRow(
     chapter: SourceChapter,
@@ -2273,34 +2275,56 @@ internal fun ChapterRow(
     selectedForDownload: Boolean,
     onToggleDownloadSelection: () -> Unit,
 ) {
-    key(chapter.url, read, download?.state, download?.completedPages, download?.pageCount, selectingForDownload, selectedForDownload) {
-        val dismissState = rememberSwipeToDismissBoxState(
-            confirmValueChange = { value ->
-                when (value) {
-                    SwipeToDismissBoxValue.StartToEnd,
-                    SwipeToDismissBoxValue.EndToStart -> {
-                        viewModel.setChapterRead(chapter, read = !read)
-                        false
-                    }
-
-                    SwipeToDismissBoxValue.Settled -> false
-                }
+    key(chapter.url, download?.state, download?.completedPages, download?.pageCount, selectingForDownload, selectedForDownload) {
+        val chapterShape = RoundedCornerShape(8.dp)
+        val latestRead by rememberUpdatedState(read)
+        var swipeActionRead by remember(chapter.url) { mutableStateOf(read) }
+        var dragOffset by remember(chapter.url) { mutableFloatStateOf(0f) }
+        var dragging by remember(chapter.url) { mutableStateOf(false) }
+        val swipeActionLabel = if (swipeActionRead) "Mark as\nunread" else "Mark as\nread"
+        val swipeActionIcon = if (swipeActionRead) Icons.Default.Replay else Icons.Default.Check
+        val swipeActionColor = LocalTankobunStyle.current.colors.accent
+        val density = LocalDensity.current
+        val maxRevealPx = with(density) { 132.dp.toPx() }
+        val hardRevealPx = with(density) { 164.dp.toPx() }
+        val actionThresholdPx = with(density) { 76.dp.toPx() }
+        fun resistedSwipeOffset(proposedOffset: Float): Float {
+            val distance = abs(proposedOffset)
+            if (distance <= maxRevealPx) return proposedOffset
+            val direction = if (proposedOffset < 0f) -1f else 1f
+            val extra = ((distance - maxRevealPx) * 0.22f).coerceAtMost(hardRevealPx - maxRevealPx)
+            return direction * (maxRevealPx + extra)
+        }
+        val draggableState = rememberDraggableState { delta ->
+            dragOffset = resistedSwipeOffset(dragOffset + delta)
+        }
+        val animatedDragOffset by animateFloatAsState(
+            targetValue = dragOffset,
+            animationSpec = if (dragging) {
+                tween(durationMillis = 0)
+            } else {
+                spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                )
             },
-            positionalThreshold = { distance -> distance * 0.32f },
+            label = "chapterSwipeOffset",
         )
+        LaunchedEffect(read, dragging, dragOffset) {
+            if (!dragging && dragOffset == 0f) {
+                swipeActionRead = read
+            }
+        }
         @Composable
         fun ChapterCard() {
             ElevatedCard(
-                shape = RoundedCornerShape(8.dp),
+                shape = chapterShape,
                 onClick = {
                     if (selectingForDownload) {
                         onToggleDownloadSelection()
                     } else {
                         viewModel.openChapter(chapter)
                     }
-                },
-                modifier = Modifier.graphicsLayer {
-                    alpha = if (read) 0.70f else 1f
                 },
             ) {
                 ListItem(
@@ -2318,6 +2342,7 @@ internal fun ChapterRow(
                         Text(
                             chapter.name,
                             style = bebasNeueChapterTitleStyle(),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (read) 0.66f else 1f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -2336,15 +2361,80 @@ internal fun ChapterRow(
         if (selectingForDownload) {
             ChapterCard()
         } else {
-            SwipeToDismissBox(
-                state = dismissState,
-                enableDismissFromStartToEnd = true,
-                enableDismissFromEndToStart = true,
-                backgroundContent = {},
+            val actionAlignment = if (animatedDragOffset < 0f) Alignment.CenterEnd else Alignment.CenterStart
+            val actionAlpha = (abs(animatedDragOffset) / with(density) { 72.dp.toPx() }).coerceIn(0f, 1f)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(chapterShape)
+                    .draggable(
+                        state = draggableState,
+                        orientation = Orientation.Horizontal,
+                        onDragStarted = {
+                            swipeActionRead = latestRead
+                            dragging = true
+                        },
+                        onDragStopped = {
+                            val shouldToggle = abs(dragOffset) >= actionThresholdPx
+                            val targetRead = !swipeActionRead
+                            dragging = false
+                            dragOffset = 0f
+                            if (shouldToggle) {
+                                viewModel.setChapterRead(chapter, read = targetRead)
+                            }
+                        },
+                    ),
             ) {
-                ChapterCard()
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(swipeActionColor.copy(alpha = 0.18f))
+                        .padding(horizontal = 18.dp),
+                ) {
+                    ChapterSwipeAction(
+                        label = swipeActionLabel,
+                        icon = swipeActionIcon,
+                        color = swipeActionColor,
+                        modifier = Modifier
+                            .align(actionAlignment)
+                            .graphicsLayer { alpha = actionAlpha },
+                    )
+                }
+                Box(
+                    modifier = Modifier.graphicsLayer {
+                        translationX = animatedDragOffset
+                    },
+                ) {
+                    ChapterCard()
+                }
             }
         }
+    }
+}
+
+@Composable
+internal fun ChapterSwipeAction(
+    label: String,
+    icon: ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(22.dp),
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = color,
+        )
     }
 }
 
