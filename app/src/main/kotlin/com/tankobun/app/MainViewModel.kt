@@ -7,26 +7,49 @@ import com.tankobun.app.logic.BROWSE_POPULAR_CACHE_KEY
 import com.tankobun.app.logic.BROWSE_SORT_SEARCH_MATCH
 import com.tankobun.app.logic.BROWSE_TOP_MANGA_CACHE_KEY
 import com.tankobun.app.logic.BROWSE_TRENDING_CACHE_KEY
+import com.tankobun.app.logic.BulkDownloadResult
 import com.tankobun.app.logic.RECOMMENDATIONS_PAGE_SIZE
 import com.tankobun.app.logic.browseCacheKey
+import com.tankobun.app.logic.buildDownloadStorageSummary
+import com.tankobun.app.logic.bulkDownloadMessage
+import com.tankobun.app.logic.downloadSourceName
 import com.tankobun.app.logic.effectiveBrowseSort
 import com.tankobun.app.logic.filteredScoreInput
 import com.tankobun.app.logic.formatTrackingScore
 import com.tankobun.app.logic.hasBrowseFilters
 import com.tankobun.app.logic.hasBrowseQueryOrFilters
+import com.tankobun.app.logic.isReadableMatchCandidate
 import com.tankobun.app.logic.languageSortPriority
+import com.tankobun.app.logic.mediaTitle
 import com.tankobun.app.logic.nextInReadingOrderAfter
 import com.tankobun.app.logic.nextTenDownloadCandidates
+import com.tankobun.app.logic.nullableBoolean
+import com.tankobun.app.logic.nullableDouble
+import com.tankobun.app.logic.nullableInt
+import com.tankobun.app.logic.nullableString
+import com.tankobun.app.logic.nullableStringList
 import com.tankobun.app.logic.normalizedLanguage
 import com.tankobun.app.logic.normalizedCustomLists
 import com.tankobun.app.logic.preferredVisibleSources
 import com.tankobun.app.logic.previousInReadingOrderBefore
+import com.tankobun.app.logic.readerLoadErrorFor
+import com.tankobun.app.logic.readerSourceForChapter
 import com.tankobun.app.logic.recommendationPageCount
+import com.tankobun.app.logic.renamedCustomList
 import com.tankobun.app.logic.sourceSettingsKey
+import com.tankobun.app.logic.isFatalSourceSearchError
+import com.tankobun.app.logic.sourcePickerDefaultSearchTitle
+import com.tankobun.app.logic.sourcePickerDiagnosticDetail
+import com.tankobun.app.logic.sourcePickerErrorMessage
+import com.tankobun.app.logic.sourceMatchKey
+import com.tankobun.app.logic.sourceSearchQueries
+import com.tankobun.app.logic.sourceSearchRankTitleVariants
 import com.tankobun.app.logic.toAniListScore
+import com.tankobun.app.logic.userMessage
 import com.tankobun.app.logic.visibleSources
-import com.tankobun.app.state.DownloadStorageItem
-import com.tankobun.app.state.DownloadStorageSummary
+import com.tankobun.app.logic.withAniListTitleLanguage
+import com.tankobun.app.logic.withRecomputedTrackingDirty
+import com.tankobun.app.logic.withoutCustomList
 import com.tankobun.app.state.ExtensionInstallRequest
 import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.state.ReaderChapterSegment
@@ -34,13 +57,9 @@ import com.tankobun.app.state.ReaderLoadError
 import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
 
-import android.content.Context
 import android.content.Intent
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.net.Uri
 import android.util.Log
-import com.tankobun.core.anilist.AnilistGraphQlException
 import com.tankobun.core.anilist.AnilistViewer
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
@@ -80,7 +99,6 @@ import com.tankobun.core.sync.SyncBackoff
 import com.tankobun.core.sync.SyncMutationFactory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.Dispatchers
@@ -97,30 +115,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
-import java.net.ConnectException
-import java.net.NoRouteToHostException
-import java.net.SocketException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
-import javax.net.ssl.SSLException
 import java.util.Locale
-import java.util.concurrent.TimeoutException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.abs
 
 private const val BROWSE_LANDING_SECTION_SIZE = 12
 private const val BROWSE_RESULTS_PAGE_SIZE = 50
-
-private data class BulkDownloadResult(
-    val queued: Int = 0,
-    val resumed: Int = 0,
-    val retried: Int = 0,
-    val skipped: Int = 0,
-) {
-    val changed: Int
-        get() = queued + resumed + retried
-}
 
 private data class ReaderPagePosition(
     val chapterUrl: String,
@@ -217,7 +217,7 @@ class MainViewModel(
         viewModelScope.launch {
             container.database.downloadDao().observeDownloads().collect { rows ->
                 val downloads = rows.map { row -> row.toModel() }
-                val storageSummary = buildDownloadStorageSummary(downloads)
+                val storageSummary = loadDownloadStorageSummary(downloads)
                 _state.update {
                     it.copy(
                         downloads = downloads,
@@ -2766,259 +2766,6 @@ class MainViewModel(
         }
     }
 
-    private fun sourceSearchQueries(media: AnilistMedia, titleOverride: String? = null): List<String> {
-        val rawTitles = titleOverride
-            ?.takeIf { it.isNotBlank() }
-            ?.let(::listOf)
-            ?: buildList {
-                add(media.title.userPreferred)
-                media.title.romaji?.let(::add)
-                media.title.english?.let(::add)
-                media.title.native?.let(::add)
-                addAll(media.synonyms)
-            }
-
-        return rawTitles
-            .flatMap(::sourceSearchQueryVariants)
-            .map(::cleanSourceSearchQuery)
-            .filter { it.length >= 2 }
-            .distinctBy { it.lowercase(Locale.ROOT) }
-            .take(SOURCE_SEARCH_QUERY_LIMIT)
-    }
-
-    private fun sourceSearchRankTitleVariants(title: String): List<String> =
-        sourceSearchQueryVariants(title)
-            .flatMap { variant -> listOf(variant, cleanSourceSearchQuery(variant)) }
-            .filter { it.isNotBlank() }
-            .distinctBy { it.lowercase(Locale.ROOT) }
-
-    private fun sourcePickerDefaultSearchTitle(media: AnilistMedia): String =
-        listOf(
-            media.title.userPreferred,
-            media.title.romaji,
-            media.title.english,
-            media.title.native,
-        ).firstOrNull { !it.isNullOrBlank() }.orEmpty()
-
-    private fun sourceSearchQueryVariants(title: String): List<String> {
-        val withoutHtml = title.withoutHtmlTags()
-        val withoutParenthetical = withoutHtml.withoutBracketedText()
-        val subtitlePrefix = withoutHtml.mainTitlePrefix()
-        val spacedNumber = withoutHtml.withSpacedNoNumber()
-        val withoutNumberPrefix = withoutHtml.withoutNoNumberPrefix()
-        val words = cleanSourceSearchQuery(withoutHtml)
-            .split(' ')
-            .filter { it.isNotBlank() }
-        val acronym = words
-            .takeIf { it.size >= 3 }
-            ?.joinToString(separator = "") { it.first().uppercaseChar().toString() }
-        val leadingWords = words
-            .takeIf { it.size >= 4 }
-            ?.take(4)
-            ?.joinToString(" ")
-
-        return buildList {
-            add(withoutHtml)
-            add(withoutParenthetical)
-            add(subtitlePrefix)
-            add(spacedNumber)
-            add(withoutNumberPrefix)
-            leadingWords?.let(::add)
-            acronym?.let(::add)
-        }.distinctBy { it.lowercase(Locale.ROOT) }
-    }
-
-    private fun cleanSourceSearchQuery(query: String): String =
-        buildString {
-            var previousWasSpace = true
-            query.forEach { char ->
-                val replacement = when {
-                    char == '&' -> " and "
-                    char.isLetterOrDigit() -> char.toString()
-                    char.isWhitespace() -> " "
-                    else -> " "
-                }
-                replacement.forEach { next ->
-                    if (next.isWhitespace()) {
-                        if (!previousWasSpace) append(' ')
-                        previousWasSpace = true
-                    } else {
-                        append(next)
-                        previousWasSpace = false
-                    }
-                }
-            }
-        }.trim()
-
-    private fun String.withoutHtmlTags(): String = buildString {
-        var insideTag = false
-        this@withoutHtmlTags.forEach { char ->
-            when (char) {
-                '<' -> {
-                    insideTag = true
-                    append(' ')
-                }
-                '>' -> {
-                    insideTag = false
-                    append(' ')
-                }
-                else -> if (!insideTag) append(char)
-            }
-        }
-    }
-
-    private fun String.withoutBracketedText(): String = buildString {
-        var closingBracket: Char? = null
-        this@withoutBracketedText.forEach { char ->
-            when {
-                closingBracket == null && char == '(' -> {
-                    closingBracket = ')'
-                    append(' ')
-                }
-                closingBracket == null && char == '[' -> {
-                    closingBracket = ']'
-                    append(' ')
-                }
-                closingBracket == null && char == '{' -> {
-                    closingBracket = '}'
-                    append(' ')
-                }
-                closingBracket != null && char == closingBracket -> {
-                    closingBracket = null
-                    append(' ')
-                }
-                closingBracket == null -> append(char)
-            }
-        }
-    }
-
-    private fun String.mainTitlePrefix(): String {
-        val separators = listOf(
-            ":",
-            "\uFF1A",
-            " - ",
-            " \u2010 ",
-            " \u2011 ",
-            " \u2012 ",
-            " \u2013 ",
-            " \u2014 ",
-            " \u2015 ",
-        )
-        val splitAt = separators.mapNotNull { separator ->
-            indexOf(separator).takeIf { it >= 0 }
-        }.minOrNull()
-        return splitAt?.let { take(it) }.orEmpty()
-    }
-
-    private fun String.withSpacedNoNumber(): String = buildString {
-        var index = 0
-        while (index < this@withSpacedNoNumber.length) {
-            val char = this@withSpacedNoNumber[index]
-            val next = this@withSpacedNoNumber.getOrNull(index + 1)
-            if ((char == 'N' || char == 'n') && (next == 'O' || next == 'o')) {
-                var cursor = index + 2
-                if (this@withSpacedNoNumber.getOrNull(cursor) == '.') cursor += 1
-                if (this@withSpacedNoNumber.getOrNull(cursor)?.isDigit() == true) {
-                    append("No. ")
-                    index = cursor
-                    continue
-                }
-            }
-            append(char)
-            index += 1
-        }
-    }
-
-    private fun String.withoutNoNumberPrefix(): String = buildString {
-        var index = 0
-        while (index < this@withoutNoNumberPrefix.length) {
-            val char = this@withoutNoNumberPrefix[index]
-            val next = this@withoutNoNumberPrefix.getOrNull(index + 1)
-            if ((char == 'N' || char == 'n') && (next == 'O' || next == 'o')) {
-                var cursor = index + 2
-                if (this@withoutNoNumberPrefix.getOrNull(cursor) == '.') cursor += 1
-                while (this@withoutNoNumberPrefix.getOrNull(cursor)?.isWhitespace() == true) {
-                    cursor += 1
-                }
-                if (this@withoutNoNumberPrefix.getOrNull(cursor)?.isDigit() == true) {
-                    index = cursor
-                    continue
-                }
-            }
-            append(char)
-            index += 1
-        }
-    }
-
-    private fun sourcePickerErrorMessage(sourceName: String, error: Throwable): String {
-        val detail = errorDetail(error)
-            ?: error.javaClass.simpleName
-        return when {
-            isMissingSourceCompatibilityClass(error) ->
-                "$sourceName needs a compatibility library that was missing from the app. Update the app and try again."
-            isDirectUrlRequiredError(error) ->
-                "$sourceName needs a direct source URL instead of a title search. Paste a supported URL or choose another source."
-            isUnexpectedSourceResponseError(error) ->
-                "$sourceName returned data the extension could not parse. Try updating that extension or choose another source."
-            detail.contains("syntax error in regexp pattern", ignoreCase = true) ->
-                "$sourceName failed while parsing source data. The extension reported a regexp error; try another source or update that extension."
-            detail.contains("timeout", ignoreCase = true) || detail.contains("timed out", ignoreCase = true) ->
-                "$sourceName took too long to respond. Try again or choose another source."
-            detail.contains("No readable manga found", ignoreCase = true) ->
-                detail
-            else -> "$sourceName failed: $detail"
-        }
-    }
-
-    private fun sourcePickerDiagnosticDetail(error: Throwable): String {
-        val detail = errorDetail(error) ?: error.javaClass.simpleName
-        return when {
-            isMissingSourceCompatibilityClass(error) -> "missing compatibility class"
-            isDirectUrlRequiredError(error) -> "requires a direct URL"
-            isUnexpectedSourceResponseError(error) -> "unexpected source response"
-            detail.contains("HTTP error", ignoreCase = true) -> detail
-            detail.contains("syntax error in regexp pattern", ignoreCase = true) -> "regexp parse error"
-            detail.contains("timeout", ignoreCase = true) -> "timed out"
-            else -> detail.take(120)
-        }
-    }
-
-    private fun errorDetail(error: Throwable): String? =
-        errorDetails(error)
-            .firstOrNull { it.contains("HTTP error", ignoreCase = true) }
-            ?: errorDetails(error).firstOrNull()
-
-    private fun errorDetails(error: Throwable): List<String> =
-        generateSequence(error) { it.cause }
-            .mapNotNull { it.message?.takeIf(String::isNotBlank) }
-            .toList()
-
-    private fun isMissingSourceCompatibilityClass(error: Throwable): Boolean =
-        generateSequence(error) { it.cause }.any { cause ->
-            cause is NoClassDefFoundError ||
-                cause.message?.contains("OkioStreamsKt", ignoreCase = true) == true
-        }
-
-    private fun isDirectUrlRequiredError(error: Throwable): Boolean =
-        errorDetails(error).any { detail ->
-            detail.contains("enter a valid", ignoreCase = true) &&
-                detail.contains("url", ignoreCase = true)
-        }
-
-    private fun isUnexpectedSourceResponseError(error: Throwable): Boolean =
-        generateSequence(error) { it.cause }.any { cause ->
-            cause.javaClass.name == "kotlinx.serialization.MissingFieldException"
-        }
-
-    private fun isFatalSourceSearchError(error: Throwable): Boolean {
-        val details = errorDetails(error).joinToString(separator = "\n")
-        return isMissingSourceCompatibilityClass(error) ||
-            isDirectUrlRequiredError(error) ||
-            isUnexpectedSourceResponseError(error) ||
-            details.contains("HTTP error 401", ignoreCase = true) ||
-            details.contains("HTTP error 403", ignoreCase = true)
-    }
-
     fun findSourceMatches(forceRefresh: Boolean = false, titleOverride: String? = null) {
         val media = _state.value.selectedMedia ?: return
         val sources = sourcePickerSources()
@@ -4365,7 +4112,7 @@ class MainViewModel(
 
     private suspend fun refreshDownloadState() {
         val downloads = container.database.downloadDao().allDownloads().map { it.toModel() }
-        val storageSummary = buildDownloadStorageSummary(downloads)
+        val storageSummary = loadDownloadStorageSummary(downloads)
         _state.update {
             it.copy(
                 downloads = downloads,
@@ -4374,54 +4121,10 @@ class MainViewModel(
         }
     }
 
-    private suspend fun buildDownloadStorageSummary(downloads: List<DownloadJob>): DownloadStorageSummary =
+    private suspend fun loadDownloadStorageSummary(downloads: List<DownloadJob>) =
         withContext(Dispatchers.IO) {
             val pages = container.database.downloadPageDao().allPages()
-            val bytesByGroup = mutableMapOf<DownloadStorageGroupKey, Long>()
-            val pageCountByGroup = mutableMapOf<DownloadStorageGroupKey, Int>()
-            val pageChapterUrlsByGroup = mutableMapOf<DownloadStorageGroupKey, MutableSet<String>>()
-            pages.forEach { page ->
-                val key = DownloadStorageGroupKey(page.mediaId, page.sourceId)
-                val file = File(page.filePath)
-                val bytes = if (file.exists()) file.length().coerceAtLeast(0L) else 0L
-                bytesByGroup[key] = bytesByGroup.getOrDefault(key, 0L) + bytes
-                pageCountByGroup[key] = pageCountByGroup.getOrDefault(key, 0) + 1
-                pageChapterUrlsByGroup.getOrPut(key) { mutableSetOf() }.add(page.chapterUrl)
-            }
-            val jobsByGroup = downloads.groupBy { DownloadStorageGroupKey(it.mediaId, it.sourceId) }
-            val groupKeys = (bytesByGroup.keys + jobsByGroup.keys + pageChapterUrlsByGroup.keys).toSet()
-            val items = groupKeys
-                .map { key ->
-                    val jobs = jobsByGroup[key].orEmpty()
-                    val chapterUrls = (jobs.map { it.chapterUrl } + pageChapterUrlsByGroup[key].orEmpty()).distinct()
-                    DownloadStorageItem(
-                        mediaId = key.mediaId,
-                        sourceId = key.sourceId,
-                        bytes = bytesByGroup.getOrDefault(key, 0L),
-                        chapterCount = chapterUrls.size,
-                        completedChapterCount = jobs
-                            .filter { it.state == DownloadState.COMPLETE }
-                            .map { it.chapterUrl }
-                            .distinct()
-                            .size,
-                        activeChapterCount = jobs
-                            .filter { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING || it.state == DownloadState.PAUSED }
-                            .map { it.chapterUrl }
-                            .distinct()
-                            .size,
-                        pageCount = pageCountByGroup.getOrDefault(key, 0),
-                    )
-                }
-                .filter { it.bytes > 0L || it.chapterCount > 0 }
-                .sortedWith(
-                    compareByDescending<DownloadStorageItem> { it.bytes }
-                        .thenBy { it.mediaId }
-                        .thenBy { it.sourceId },
-                )
-            DownloadStorageSummary(
-                totalBytes = items.sumOf { it.bytes },
-                items = items,
-            )
+            buildDownloadStorageSummary(downloads, pages)
         }
 
     private fun saveReaderProgress() {
@@ -4520,7 +4223,6 @@ class MainViewModel(
         private const val SOURCE_CHAPTER_TIMEOUT_MILLIS = 10_000L
         private const val RECENT_READING_LIMIT = 3
         private const val SOURCE_SEARCH_CONCURRENCY = 4
-        private const val SOURCE_SEARCH_QUERY_LIMIT = 12
         private const val SOURCE_CANDIDATES_TO_VERIFY = 5
         private const val SOURCE_FALLBACK_CANDIDATES_PER_SOURCE = 5
         private const val SOURCE_MAX_CANDIDATES_PER_SOURCE = 40
@@ -4533,257 +4235,4 @@ class MainViewModel(
         private const val READER_ADJACENT_CACHE_INITIAL_DELAY_MILLIS = 12_000L
         private const val READER_CACHE_REQUEST_SPACING_MILLIS = 250L
     }
-}
-
-private fun JSONObject.nullableString(name: String): String? =
-    if (!has(name) || isNull(name)) null else optString(name)
-
-private fun JSONObject.nullableInt(name: String): Int? =
-    if (!has(name) || isNull(name)) null else optInt(name)
-
-private fun JSONObject.nullableDouble(name: String): Double? =
-    if (!has(name) || isNull(name)) null else optDouble(name)
-
-private fun JSONObject.nullableBoolean(name: String): Boolean? =
-    if (!has(name) || isNull(name)) null else optBoolean(name)
-
-private fun JSONObject.nullableStringList(name: String): List<String>? {
-    if (!has(name) || isNull(name)) return null
-    val array = optJSONArray(name) ?: return null
-    return buildList {
-        for (index in 0 until array.length()) {
-            val value = array.optString(index).trim()
-            if (value.isNotBlank()) add(value)
-        }
-    }
-}
-
-private fun TankobunUiState.readerSourceForChapter(chapter: SourceChapter): SourceDescriptor? =
-    installedSources.firstOrNull { it.id == chapter.sourceId }
-        ?: allInstalledSources.firstOrNull { it.id == chapter.sourceId }
-        ?: selectedSource?.takeIf { it.id == chapter.sourceId }
-
-private fun TankobunUiState.withAniListTitleLanguage(language: AnilistTitleLanguage): TankobunUiState =
-    copy(
-        anilistTitleLanguage = language,
-        library = library.map { it.withTitleLanguage(language) },
-        libraryItems = libraryItems.map { item -> item.copy(media = item.media.withTitleLanguage(language)) },
-        recentReadingProgress = recentReadingProgress.map { item ->
-            item.copy(media = item.media.withTitleLanguage(language))
-        },
-        searchResults = searchResults.map { it.withTitleLanguage(language) },
-        browseTrending = browseTrending.map { it.withTitleLanguage(language) },
-        browsePopular = browsePopular.map { it.withTitleLanguage(language) },
-        browsePopularManhwa = browsePopularManhwa.map { it.withTitleLanguage(language) },
-        browseTopManga = browseTopManga.map { it.withTitleLanguage(language) },
-        selectedMedia = selectedMedia?.withTitleLanguage(language),
-        selectedRecommendations = selectedRecommendations.map { recommendation ->
-            recommendation.copy(media = recommendation.media.withTitleLanguage(language))
-        },
-    )
-
-private fun TankobunUiState.withRecomputedTrackingDirty(): TankobunUiState =
-    copy(
-        trackingDirty = trackingSaveFailed || hasTrackingFormChanges(),
-        trackingSaveFailed = false,
-    )
-
-private fun TankobunUiState.hasTrackingFormChanges(): Boolean {
-    val entry = selectedListEntry ?: return false
-    val progress = trackingProgress.toIntOrNull()?.coerceAtLeast(0) ?: 0
-    val score = trackingScore.toAniListScore(anilistScoreFormat)
-    val notes = trackingNotes.trim().ifBlank { null }
-    return trackingStatus != entry.status ||
-        progress != entry.progress ||
-        !score.sameAniListScore(entry.score) ||
-        notes != entry.notes?.trim()?.ifBlank { null } ||
-        trackingPrivate != entry.private ||
-        trackingCustomLists.normalizedCustomLists() != entry.customLists.normalizedCustomLists()
-}
-
-private fun Double?.sameAniListScore(other: Double?): Boolean = when {
-    this == null && other == null -> true
-    this == null || other == null -> false
-    else -> abs(this - other) < 0.0001
-}
-
-private fun readerLoadErrorFor(context: Context, error: Throwable, source: SourceDescriptor?): ReaderLoadError {
-    val sourceName = source?.name ?: "this source"
-    return when (context.readerNetworkState()) {
-        ReaderNetworkState.OFFLINE -> ReaderLoadError(
-            title = "No internet connection",
-            message = "Your device looks offline. Check Wi-Fi or mobile data, then try again.",
-        )
-        ReaderNetworkState.NO_INTERNET -> ReaderLoadError(
-            title = "No internet access",
-            message = "Your device is connected, but it cannot reach the internet right now. Check the connection and try again.",
-        )
-        ReaderNetworkState.ONLINE -> error.readerLoadErrorForOnlineSource(sourceName)
-    }
-}
-
-private fun Throwable.readerLoadErrorForOnlineSource(sourceName: String): ReaderLoadError {
-    val statusCode = httpStatusCode()
-    if (statusCode != null) {
-        return when (statusCode) {
-            403 -> ReaderLoadError(
-                title = "Source blocked the request",
-                message = "$sourceName refused to send this chapter. This can happen when a site changes its protection or region rules.",
-            )
-            404, 410 -> ReaderLoadError(
-                title = "Chapter not found",
-                message = "$sourceName says this chapter is no longer available. It may have been removed or moved.",
-            )
-            408, 429 -> ReaderLoadError(
-                title = "Source is busy",
-                message = "$sourceName is asking us to slow down. Wait a little, then try again.",
-            )
-            521, 522, 523, 524 -> ReaderLoadError(
-                title = "Source server is down",
-                message = "$sourceName is reachable through the internet, but its own server is not answering right now. Try again later or choose another source.",
-            )
-            in 500..599 -> ReaderLoadError(
-                title = "Source is having trouble",
-                message = "$sourceName is not responding properly right now. The site may be down or overloaded.",
-            )
-            else -> ReaderLoadError(
-                title = "Source could not load the chapter",
-                message = "$sourceName returned a problem while opening this chapter. Try again, or choose another source if it keeps happening.",
-            )
-        }
-    }
-
-    val causes = causeChain()
-    val messageText = causes.mapNotNull { it.message }.joinToString(" ")
-    return when {
-        causes.any { it is UnknownHostException } -> ReaderLoadError(
-            title = "Source cannot be found",
-            message = "Your connection works, but $sourceName cannot be reached. The site may be offline or may have changed address.",
-        )
-        causes.any { it is SocketTimeoutException || it is TimeoutCancellationException || it is TimeoutException } ||
-            messageText.contains("timed out", ignoreCase = true) ||
-            messageText.contains("too long", ignoreCase = true) -> ReaderLoadError(
-            title = "Source is not responding",
-            message = "$sourceName did not answer in time. The site may be down, overloaded, or having server trouble right now.",
-        )
-        causes.any { it is ConnectException || it is NoRouteToHostException } -> ReaderLoadError(
-            title = "Source cannot be reached",
-            message = "$sourceName is not accepting connections right now. The site may be down or temporarily unavailable.",
-        )
-        causes.any { it is SocketException } -> ReaderLoadError(
-            title = "Connection was interrupted",
-            message = "The connection dropped while opening this chapter. Try again in a moment.",
-        )
-        causes.any { it is SSLException } -> ReaderLoadError(
-            title = "Secure connection failed",
-            message = "$sourceName could not make a safe connection. The site may have changed something on their side.",
-        )
-        messageText.contains("cloudflare", ignoreCase = true) ||
-            messageText.contains("bypass", ignoreCase = true) -> ReaderLoadError(
-            title = "Source protection stopped the request",
-            message = "$sourceName is asking for a browser check that Tankobun could not pass right now. Try again later or use another source.",
-        )
-        else -> ReaderLoadError(
-            title = "Chapter could not be loaded",
-            message = "Tankobun could not open this chapter from $sourceName. The source may be temporarily down, or this chapter may no longer be available there.",
-        )
-    }
-}
-
-private fun Context.readerNetworkState(): ReaderNetworkState {
-    val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-        ?: return ReaderNetworkState.ONLINE
-    val network = connectivityManager.activeNetwork ?: return ReaderNetworkState.OFFLINE
-    val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return ReaderNetworkState.OFFLINE
-    if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-        return ReaderNetworkState.OFFLINE
-    }
-    return if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
-        ReaderNetworkState.ONLINE
-    } else {
-        ReaderNetworkState.NO_INTERNET
-    }
-}
-
-private fun Throwable.httpStatusCode(): Int? =
-    causeChain()
-        .asSequence()
-        .flatMap { cause -> listOfNotNull(cause.message, cause.toString()).asSequence() }
-        .mapNotNull { text -> HTTP_STATUS_PATTERN.find(text)?.groupValues?.getOrNull(1)?.toIntOrNull() }
-        .firstOrNull()
-
-private fun Throwable.causeChain(): List<Throwable> = buildList {
-    var current: Throwable? = this@causeChain
-    while (current != null && current !in this) {
-        add(current)
-        current = current.cause
-    }
-}
-
-private enum class ReaderNetworkState {
-    ONLINE,
-    OFFLINE,
-    NO_INTERNET,
-}
-
-private fun Throwable.userMessage(fallback: String): String = when (this) {
-    is AnilistGraphQlException -> when (statusCode) {
-        401 -> "AniList session expired. Sign in again."
-        429 -> "AniList is rate limiting requests. Try again in a minute."
-        500 -> "AniList returned a server error while syncing. Try again in a moment."
-        else -> "AniList request failed${statusCode?.let { " ($it)" }.orEmpty()}."
-    }
-    else -> message ?: fallback
-}
-
-private fun Iterable<String>.renamedCustomList(oldName: String, newName: String): List<String> =
-    map { if (it.equals(oldName, ignoreCase = true)) newName else it }
-        .normalizedCustomLists()
-
-private fun Iterable<String>.withoutCustomList(name: String): List<String> =
-    filterNot { it.equals(name, ignoreCase = true) }
-        .normalizedCustomLists()
-
-private fun SourceSearchResult.sourceMatchKey(): String =
-    sourceMatchKey(source.id, manga.url)
-
-private fun SourceSearchResult.isReadableMatchCandidate(): Boolean =
-    score >= SOURCE_READABLE_MATCH_SCORE
-
-private fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
-    "$sourceId:$mangaUrl"
-
-private val HTTP_STATUS_PATTERN = Regex("""HTTP(?: error)?\s+(\d{3})""", RegexOption.IGNORE_CASE)
-
-private const val SOURCE_READABLE_MATCH_SCORE = 0.9
-private const val NEXT_DOWNLOAD_WINDOW_SIZE = 10
-
-private data class DownloadStorageGroupKey(
-    val mediaId: Int,
-    val sourceId: Long,
-)
-
-
-
-
-private fun TankobunUiState.mediaTitle(mediaId: Int): String =
-    libraryItems.firstOrNull { it.media.id == mediaId }?.media?.title?.userPreferred
-        ?: library.firstOrNull { it.id == mediaId }?.title?.userPreferred
-        ?: selectedMedia?.takeIf { it.id == mediaId }?.title?.userPreferred
-        ?: "Manga $mediaId"
-
-private fun TankobunUiState.downloadSourceName(sourceId: Long): String =
-    installedSources.firstOrNull { it.id == sourceId }?.name
-        ?: allInstalledSources.firstOrNull { it.id == sourceId }?.name
-        ?: selectedSource?.takeIf { it.id == sourceId }?.name
-        ?: "Source $sourceId"
-
-private fun bulkDownloadMessage(label: String, result: BulkDownloadResult): String {
-    if (result.changed == 0) return "No new $label to download"
-    val parts = buildList {
-        if (result.queued > 0) add("queued ${result.queued}")
-        if (result.resumed > 0) add("resumed ${result.resumed}")
-        if (result.retried > 0) add("retrying ${result.retried}")
-    }
-    return "${parts.joinToString(" / ")} $label"
 }
