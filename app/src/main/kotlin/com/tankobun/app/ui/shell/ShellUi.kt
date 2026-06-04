@@ -1332,7 +1332,7 @@ internal fun TankobunBottomNavigationBar(
                     .width(indicatorWidth)
                     .height(indicatorSize)
                     .clip(CircleShape)
-                    .background(styleColors.selectedChip.copy(alpha = 0.86f)),
+                    .background(styleColors.accent.copy(alpha = 0.88f)),
             )
         }
         Row(
@@ -1344,7 +1344,7 @@ internal fun TankobunBottomNavigationBar(
                 val selected = selectedTab == index
                 val iconColor by animateColorAsState(
                     targetValue = if (selected) {
-                        styleColors.selectedChipContent
+                        MaterialTheme.colorScheme.onPrimary
                     } else {
                         styleColors.panelContent.copy(alpha = 0.72f)
                     },

@@ -23,6 +23,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -241,16 +242,18 @@ internal fun ThemePicker(
             )
         }
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val minCellWidth = 210.dp
-            val columnCount = (maxWidth / minCellWidth).toInt().coerceAtLeast(1)
+            val minCellWidth = 176.dp
+            val rowHeight = 108.dp
+            val rowGap = 10.dp
+            val columnCount = ((maxWidth + rowGap) / (minCellWidth + rowGap)).toInt().coerceAtLeast(1)
             val rowCount = ((choices.size + columnCount - 1) / columnCount).coerceAtLeast(1)
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minCellWidth),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(164.dp * rowCount.toFloat()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .height((rowHeight * rowCount.toFloat()) + (rowGap * (rowCount - 1).coerceAtLeast(0).toFloat())),
+                verticalArrangement = Arrangement.spacedBy(rowGap),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 userScrollEnabled = false,
             ) {
                 gridItems(choices, key = { it.mode.name }) { choice ->
@@ -276,6 +279,7 @@ internal fun ThemeChoiceCard(
         label = "Theme card scale",
     )
     val style = LocalTankobunStyle.current
+    val previewAccent = choice.swatches.getOrNull(1) ?: style.colors.accent
     val cardColor = if (selected) style.colors.selectedChip else style.colors.panel
     val cardContentColor = if (selected) style.colors.selectedChipContent else style.colors.panelContent
     val secondaryTextColor = if (selected) {
@@ -286,7 +290,7 @@ internal fun ThemeChoiceCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(152.dp)
+            .height(108.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -298,41 +302,49 @@ internal fun ThemeChoiceCard(
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ThemeSwatches(choice.swatches)
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        choice.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        choice.description,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = secondaryTextColor,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+        Box {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(5.dp)
+                    .background(previewAccent),
+            )
+            Column(
+                modifier = Modifier.padding(start = 13.dp, top = 10.dp, end = 10.dp, bottom = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    ThemeSwatches(choice.swatches)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            choice.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            choice.description,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = secondaryTextColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    when (choice.dark) {
-                        true -> "Dark"
-                        false -> "Light"
-                        null -> "Auto"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = secondaryTextColor,
-                )
-                if (selected) {
-                    Text("Selected", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        when (choice.dark) {
+                            true -> "Dark"
+                            false -> "Light"
+                            null -> "Auto"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = secondaryTextColor,
+                    )
+                    if (selected) {
+                        Text("Selected", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -340,14 +352,15 @@ internal fun ThemeChoiceCard(
 }
 @Composable
 internal fun ThemeSwatches(colors: List<Color>) {
-    Row(horizontalArrangement = Arrangement.spacedBy((-8).dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(horizontalArrangement = Arrangement.spacedBy((-7).dp), verticalAlignment = Alignment.CenterVertically) {
         colors.take(3).forEach { color ->
             Surface(
-                modifier = Modifier.size(28.dp),
+                modifier = Modifier.size(24.dp),
                 shape = RoundedCornerShape(999.dp),
                 color = color,
-                tonalElevation = 1.dp,
-                shadowElevation = 1.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
             ) {}
         }
     }
