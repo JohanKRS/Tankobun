@@ -32,7 +32,6 @@ import com.tankobun.app.logic.preferredVisibleSources
 import com.tankobun.app.logic.previousInReadingOrderBefore
 import com.tankobun.app.logic.readerLoadErrorFor
 import com.tankobun.app.logic.readerSourceForChapter
-import com.tankobun.app.logic.renamedCustomList
 import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.logic.sourcePickerDefaultSearchTitle
 import com.tankobun.app.logic.sourcePickerErrorMessage
@@ -40,16 +39,22 @@ import com.tankobun.app.logic.sourceMatchKey
 import com.tankobun.app.logic.toAniListScore
 import com.tankobun.app.logic.userMessage
 import com.tankobun.app.logic.visibleSources
+import com.tankobun.app.logic.withDeletedAniListCustomList
+import com.tankobun.app.logic.withAddedTrackingCustomList
 import com.tankobun.app.logic.withAniListTitleLanguage
+import com.tankobun.app.logic.withRenamedAniListCustomList
 import com.tankobun.app.logic.withSelectedAniListDetails
 import com.tankobun.app.logic.withSyncedListEntry
 import com.tankobun.app.logic.withRecomputedTrackingDirty
-import com.tankobun.app.logic.withoutCustomList
+import com.tankobun.app.logic.withTrackingCustomListSelected
+import com.tankobun.app.logic.withTrackingCustomListSaveResult
+import com.tankobun.app.logic.withTrackingSaveFailure
+import com.tankobun.app.logic.withTrackingSaveResult
+import com.tankobun.app.logic.withTrackingSaveStarted
 import com.tankobun.app.reader.ReaderDataSource
 import com.tankobun.app.source.SourceDataSource
 import com.tankobun.app.source.SourcePickerSearchUpdate
 import com.tankobun.app.state.ExtensionInstallRequest
-import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.state.ReaderChapterSegment
 import com.tankobun.app.state.ReaderLoadError
 import com.tankobun.app.state.RecentReadingProgress
@@ -1455,22 +1460,11 @@ class MainViewModel(
                 )
             }.onSuccess { result ->
                 _state.update {
-                    val nextItems = it.libraryItems.map { item ->
-                        val entry = result.updatedEntries[item.media.id]
-                            ?: item.entry.copy(customLists = item.entry.customLists.renamedCustomList(normalizedOldName, normalizedNewName))
-                        item.copy(entry = entry)
-                    }.sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
-                    it.copy(
-                        anilistCustomLists = result.customLists,
-                        libraryItems = nextItems,
-                        library = nextItems.map { item -> item.media },
-                        selectedListEntry = it.selectedListEntry?.let { entry ->
-                            result.updatedEntries[entry.mediaId]
-                                ?: entry.copy(customLists = entry.customLists.renamedCustomList(normalizedOldName, normalizedNewName))
-                        },
-                        trackingCustomLists = it.trackingCustomLists.renamedCustomList(normalizedOldName, normalizedNewName).toSet(),
-                        busy = false,
-                        message = "Custom list renamed",
+                    it.withRenamedAniListCustomList(
+                        customLists = result.customLists,
+                        updatedEntries = result.updatedEntries,
+                        oldName = normalizedOldName,
+                        newName = normalizedNewName,
                     )
                 }
             }.onFailure { error ->
@@ -1505,22 +1499,10 @@ class MainViewModel(
                 )
             }.onSuccess { result ->
                 _state.update {
-                    val nextItems = it.libraryItems.map { item ->
-                        val entry = result.updatedEntries[item.media.id]
-                            ?: item.entry.copy(customLists = item.entry.customLists.withoutCustomList(normalizedName))
-                        item.copy(entry = entry)
-                    }.sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
-                    it.copy(
-                        anilistCustomLists = result.customLists,
-                        libraryItems = nextItems,
-                        library = nextItems.map { item -> item.media },
-                        selectedListEntry = it.selectedListEntry?.let { entry ->
-                            result.updatedEntries[entry.mediaId]
-                                ?: entry.copy(customLists = entry.customLists.withoutCustomList(normalizedName))
-                        },
-                        trackingCustomLists = it.trackingCustomLists.withoutCustomList(normalizedName).toSet(),
-                        busy = false,
-                        message = "Custom list deleted",
+                    it.withDeletedAniListCustomList(
+                        customLists = result.customLists,
+                        updatedEntries = result.updatedEntries,
+                        name = normalizedName,
                     )
                 }
             }.onFailure { error ->
@@ -1558,30 +1540,14 @@ class MainViewModel(
     fun setTrackingCustomListSelected(name: String, selected: Boolean) {
         val normalizedName = name.trim()
         if (normalizedName.isBlank()) return
-        _state.update {
-            it.copy(
-                trackingCustomLists = if (selected) {
-                    it.trackingCustomLists + normalizedName
-                } else {
-                    it.trackingCustomLists - normalizedName
-                },
-            ).withRecomputedTrackingDirty()
-        }
+        _state.update { it.withTrackingCustomListSelected(normalizedName, selected) }
         scheduleTrackingCustomListSave()
     }
 
     fun addTrackingCustomList(name: String) {
         val normalizedName = name.trim()
         if (normalizedName.isBlank()) return
-        _state.update {
-            val knownLists = (it.anilistCustomLists + normalizedName).distinctBy { listName ->
-                listName.lowercase(Locale.ROOT)
-            }
-            it.copy(
-                anilistCustomLists = knownLists,
-                trackingCustomLists = it.trackingCustomLists + normalizedName,
-            ).withRecomputedTrackingDirty()
-        }
+        _state.update { it.withAddedTrackingCustomList(normalizedName) }
         scheduleTrackingCustomListSave()
     }
 
@@ -1615,21 +1581,10 @@ class MainViewModel(
                 )
             }.onSuccess { result ->
                 _state.update {
-                    val entry = result.entry
-                    val nextItem = LibraryItem(media, entry)
-                    val nextItems = (it.libraryItems.filterNot { item -> item.media.id == media.id } + nextItem)
-                        .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
-                    it.copy(
-                        anilistCustomLists = result.knownCustomLists,
-                        library = nextItems.map { item -> item.media },
-                        libraryItems = nextItems,
-                        selectedListEntry = entry,
-                        trackingStatus = entry.status,
-                        trackingProgress = entry.progress.toString(),
-                        trackingScore = entry.score.formatTrackingScore(it.anilistScoreFormat),
-                        trackingNotes = entry.notes.orEmpty(),
-                        trackingPrivate = entry.private,
-                        trackingCustomLists = entry.customLists.toSet(),
+                    it.withTrackingCustomListSaveResult(
+                        media = media,
+                        entry = result.entry,
+                        knownCustomLists = result.knownCustomLists,
                     )
                 }
             }.onFailure { error ->
@@ -1653,31 +1608,6 @@ class MainViewModel(
 
     fun saveTracking() {
         saveTracking(autoSave = false)
-    }
-
-    private fun applyOptimisticTrackingEntry(
-        media: AnilistMedia,
-        entry: AnilistListEntry,
-        knownCustomLists: List<String>,
-        autoSave: Boolean,
-    ) {
-        _state.update {
-            val selected = it.selectedMedia?.id == media.id
-            val nextItem = LibraryItem(media, entry)
-            val nextItems = (it.libraryItems.filterNot { item -> item.media.id == media.id } + nextItem)
-                .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
-            it.copy(
-                anilistCustomLists = knownCustomLists,
-                library = nextItems.map { item -> item.media },
-                libraryItems = nextItems,
-                selectedListEntry = if (selected) entry else it.selectedListEntry,
-                trackingDirty = if (selected) false else it.trackingDirty,
-                trackingSaveInProgress = if (selected) true else it.trackingSaveInProgress,
-                trackingSaveFailed = if (selected) false else it.trackingSaveFailed,
-                busy = if (autoSave) it.busy else true,
-                message = null,
-            )
-        }
     }
 
     private fun saveTracking(autoSave: Boolean) {
@@ -1713,12 +1643,14 @@ class MainViewModel(
         )
 
         viewModelScope.launch {
-            applyOptimisticTrackingEntry(
-                media = media,
-                entry = optimisticEntry,
-                knownCustomLists = optimisticKnownCustomLists,
-                autoSave = autoSave,
-            )
+            _state.update {
+                it.withTrackingSaveStarted(
+                    media = media,
+                    entry = optimisticEntry,
+                    knownCustomLists = optimisticKnownCustomLists,
+                    autoSave = autoSave,
+                )
+            }
             runCatching {
                 aniListDataSource.saveTracking(
                     token = token,
@@ -1734,44 +1666,22 @@ class MainViewModel(
                 )
             }.onSuccess { result ->
                 _state.update {
-                    val entry = result.entry
-                    val nextItem = LibraryItem(media, entry)
-                    val nextItems = (it.libraryItems.filterNot { item -> item.media.id == media.id } + nextItem)
-                        .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
-                    val selected = it.selectedMedia?.id == media.id
-                    val preserveEditedForm = selected && it.trackingDirty
-                    it.copy(
-                        anilistCustomLists = result.knownCustomLists,
-                        library = nextItems.map { item -> item.media },
-                        libraryItems = nextItems,
-                        selectedListEntry = if (selected) entry else it.selectedListEntry,
-                        trackingStatus = if (!selected || preserveEditedForm) it.trackingStatus else entry.status,
-                        trackingProgress = if (!selected || preserveEditedForm) it.trackingProgress else entry.progress.toString(),
-                        trackingScore = if (!selected || preserveEditedForm) {
-                            it.trackingScore
-                        } else {
-                            entry.score.formatTrackingScore(it.anilistScoreFormat)
-                        },
-                        trackingNotes = if (!selected || preserveEditedForm) it.trackingNotes else entry.notes.orEmpty(),
-                        trackingPrivate = if (!selected || preserveEditedForm) it.trackingPrivate else entry.private,
-                        trackingCustomLists = if (!selected || preserveEditedForm) it.trackingCustomLists else entry.customLists.toSet(),
-                        trackingDirty = if (selected) preserveEditedForm else it.trackingDirty,
-                        trackingSaveInProgress = if (selected) false else it.trackingSaveInProgress,
-                        trackingSaveFailed = if (selected) false else it.trackingSaveFailed,
-                        busy = if (autoSave) it.busy else false,
-                        message = if (autoSave) it.message else "AniList tracking saved",
+                    it.withTrackingSaveResult(
+                        media = media,
+                        entry = result.entry,
+                        knownCustomLists = result.knownCustomLists,
+                        autoSave = autoSave,
                     )
                 }
             }.onFailure { error ->
                 Log.e(TAG, "AniList tracking save failed for ${media.id}", error)
                 _state.update {
-                    val selected = it.selectedMedia?.id == media.id
-                    it.copy(
-                        trackingDirty = if (selected) true else it.trackingDirty,
-                        trackingSaveInProgress = if (selected) false else it.trackingSaveInProgress,
-                        trackingSaveFailed = if (selected) true else it.trackingSaveFailed,
-                        busy = if (autoSave) it.busy else false,
-                        message = error.userMessage(if (autoSave) "Tracking auto-save failed. Tap save to retry" else "Tracking save failed"),
+                    it.withTrackingSaveFailure(
+                        mediaId = media.id,
+                        autoSave = autoSave,
+                        message = error.userMessage(
+                            if (autoSave) "Tracking auto-save failed. Tap save to retry" else "Tracking save failed",
+                        ),
                     )
                 }
             }

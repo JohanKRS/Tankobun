@@ -162,6 +162,94 @@ class MainStateLogicTest {
         assertFalse(next.trackingSaveFailed)
     }
 
+    @Test
+    fun renamedAniListCustomListUpdatesLibrarySelectionAndTrackingForm() {
+        val selectedEntry = entry(mediaId = 42, customLists = listOf("Favorites", "Keep"))
+        val serverEntry = selectedEntry.copy(customLists = listOf("Best", "Keep"))
+        val otherEntry = entry(mediaId = 7, customLists = listOf("Favorites"))
+
+        val next = TankobunUiState(
+            selectedMedia = media(42, "Selected"),
+            selectedListEntry = selectedEntry,
+            libraryItems = listOf(
+                LibraryItem(media(42, "Selected"), selectedEntry),
+                LibraryItem(media(7, "Other"), otherEntry),
+            ),
+            trackingCustomLists = setOf("Favorites", "Draft"),
+            busy = true,
+        ).withRenamedAniListCustomList(
+            customLists = listOf("Best"),
+            updatedEntries = mapOf(42 to serverEntry),
+            oldName = "Favorites",
+            newName = "Best",
+        )
+
+        assertEquals(listOf("Best"), next.anilistCustomLists)
+        assertEquals(serverEntry, next.selectedListEntry)
+        assertEquals(listOf("Best"), next.libraryItems.first { it.media.id == 7 }.entry.customLists)
+        assertEquals(setOf("Best", "Draft"), next.trackingCustomLists)
+        assertFalse(next.busy)
+        assertEquals("Custom list renamed", next.message)
+    }
+
+    @Test
+    fun trackingSaveResultPreservesEditsMadeWhileSaveWasInFlight() {
+        val media = media(42, "Manga")
+        val serverEntry = entry(
+            mediaId = 42,
+            status = MediaStatus.COMPLETED,
+            progress = 12,
+            score = 90.0,
+            notes = "server",
+            private = true,
+            customLists = listOf("Server"),
+        )
+
+        val next = TankobunUiState(
+            selectedMedia = media,
+            trackingProgress = "17",
+            trackingScore = "55",
+            trackingNotes = "local draft",
+            trackingPrivate = false,
+            trackingCustomLists = setOf("Draft"),
+            trackingDirty = true,
+            trackingSaveInProgress = true,
+            busy = true,
+            anilistScoreFormat = AnilistScoreFormat.POINT_100,
+        ).withTrackingSaveResult(
+            media = media,
+            entry = serverEntry,
+            knownCustomLists = listOf("Server"),
+            autoSave = false,
+        )
+
+        assertEquals(serverEntry, next.selectedListEntry)
+        assertEquals("17", next.trackingProgress)
+        assertEquals("55", next.trackingScore)
+        assertEquals("local draft", next.trackingNotes)
+        assertFalse(next.trackingPrivate)
+        assertEquals(setOf("Draft"), next.trackingCustomLists)
+        assertTrue(next.trackingDirty)
+        assertFalse(next.trackingSaveInProgress)
+        assertFalse(next.trackingSaveFailed)
+        assertFalse(next.busy)
+        assertEquals("AniList tracking saved", next.message)
+    }
+
+    @Test
+    fun addedTrackingCustomListDoesNotMarkListAsKnownBeforeServerSave() {
+        val entry = entry(mediaId = 42, customLists = emptyList())
+
+        val next = TankobunUiState(
+            selectedListEntry = entry,
+            anilistCustomLists = listOf("Existing"),
+        ).withAddedTrackingCustomList("New List")
+
+        assertEquals(listOf("Existing"), next.anilistCustomLists)
+        assertEquals(setOf("New List"), next.trackingCustomLists)
+        assertTrue(next.trackingDirty)
+    }
+
     private fun media(id: Int, title: String): AnilistMedia =
         AnilistMedia(
             id = id,
