@@ -3,17 +3,31 @@ package com.tankobun.app.reader
 import android.util.Log
 import com.tankobun.app.AppContainer
 import com.tankobun.app.ReaderPageCache
+import com.tankobun.core.database.toEntity
+import com.tankobun.core.database.toModel
 import com.tankobun.core.database.toReaderPage
+import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.ReaderPage
+import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
+import com.tankobun.core.reader.ReaderProgressCalculator
+import com.tankobun.core.reader.ReaderSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import java.io.File
 
+internal data class ChapterReadUpdate(
+    val latestProgress: ReadingProgress?,
+    val chapterProgress: Map<String, ReadingProgress>,
+    val syncProgress: Int?,
+)
+
 internal class ReaderDataSource(
     private val container: AppContainer,
 ) {
+    private val progressCalculator = ReaderProgressCalculator()
+
     suspend fun loadPagesForChapter(
         mediaId: Int,
         chapter: SourceChapter,
@@ -86,8 +100,73 @@ internal class ReaderDataSource(
         ReaderPageCache.prune(container.application)
     }
 
-    suspend fun cachedProgressForChapter(mediaId: Int, chapterUrl: String) =
-        container.database.progressDao().progressForChapter(mediaId, chapterUrl)
+    suspend fun cachedProgressForChapter(mediaId: Int, chapterUrl: String): ReadingProgress? =
+        container.database.progressDao().progressForChapter(mediaId, chapterUrl)?.toModel()
+
+    suspend fun markChapterRead(
+        mediaId: Int,
+        chapter: SourceChapter,
+        read: Boolean,
+        readerMode: ReaderMode,
+        nowMillis: Long,
+    ): ChapterReadUpdate {
+        val progressDao = container.database.progressDao()
+        val syncProgress = if (read) {
+            val existing = progressDao.progressForChapter(mediaId, chapter.url)?.toModel()
+            val totalPages = existing?.totalPages?.takeIf { it > 0 } ?: 1
+            val progress = ReadingProgress(
+                mediaId = mediaId,
+                chapterUrl = chapter.url,
+                chapterNumber = chapter.chapterNumber,
+                pageIndex = totalPages - 1,
+                pageScrollOffset = 0,
+                totalPages = totalPages,
+                readerMode = existing?.readerMode ?: readerMode,
+                completed = true,
+                updatedAtEpochMillis = nowMillis,
+            )
+            progressDao.upsertProgress(progress.toEntity())
+            chapter.chapterNumber.toInt().takeIf { it > 0 }
+        } else {
+            progressDao.deleteProgressForChapter(mediaId, chapter.url)
+            null
+        }
+
+        return ChapterReadUpdate(
+            latestProgress = progressDao.latestProgress(mediaId)?.toModel(),
+            chapterProgress = progressByChapter(mediaId),
+            syncProgress = syncProgress,
+        )
+    }
+
+    suspend fun saveProgress(
+        mediaId: Int,
+        chapter: SourceChapter,
+        pages: List<ReaderPage>,
+        readerMode: ReaderMode,
+        pageIndex: Int,
+        pageScrollOffset: Int,
+        updatedAtMillis: Long,
+    ): ReadingProgress {
+        val normalizedPageIndex = pageIndex.coerceIn(0, pages.lastIndex)
+        val session = ReaderSession(
+            mediaId = mediaId,
+            chapter = chapter,
+            pages = pages,
+            mode = readerMode,
+            currentPageIndex = normalizedPageIndex,
+            currentPageScrollOffset = pageScrollOffset.coerceAtLeast(0),
+        )
+        val progress = progressCalculator.progressFor(session, updatedAtMillis)
+        container.database.progressDao().upsertProgress(progress.toEntity())
+        return progress
+    }
+
+    private suspend fun progressByChapter(mediaId: Int): Map<String, ReadingProgress> =
+        container.database.progressDao()
+            .progressForMedia(mediaId)
+            .map { it.toModel() }
+            .associateBy { it.chapterUrl }
 
     private suspend fun cachedDownloadedPages(mediaId: Int, chapter: SourceChapter): List<ReaderPage> {
         container.database.downloadDao().completedForChapter(mediaId, chapter.url) ?: return emptyList()

@@ -7,7 +7,9 @@ import com.tankobun.app.logic.SourceQueryTimeoutException
 import com.tankobun.app.logic.VerifiedReadableMatch
 import com.tankobun.app.logic.VerifiedSourceMatches
 import com.tankobun.app.logic.isFatalSourceSearchError
+import com.tankobun.app.logic.isReadableMatchCandidate
 import com.tankobun.app.logic.sourceMatchKey
+import com.tankobun.app.logic.sourcePickerDiagnosticDetail
 import com.tankobun.app.logic.sourceSearchQueries
 import com.tankobun.app.logic.sourceSearchRankTitleVariants
 import com.tankobun.core.database.SourceSearchResultEntity
@@ -22,7 +24,18 @@ import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceManga
 import com.tankobun.core.model.SourceSearchResult
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
+
+internal data class LoadedSourceChapters(
+    val manga: SourceManga,
+    val chapters: List<SourceChapter>,
+    val chapterProgress: Map<String, ReadingProgress>,
+)
 
 internal data class CachedSourceState(
     val sourceMatches: List<SourceSearchResult>,
@@ -33,6 +46,11 @@ internal data class CachedSourceState(
     val latestProgress: ReadingProgress?,
     val chapterProgress: Map<String, ReadingProgress>,
 )
+
+internal sealed class SourcePickerSearchUpdate {
+    data class Match(val match: SourceSearchResult, val chapterCount: Int) : SourcePickerSearchUpdate()
+    data class Diagnostic(val source: SourceDescriptor, val detail: String) : SourcePickerSearchUpdate()
+}
 
 internal class SourceDataSource(
     private val container: AppContainer,
@@ -117,6 +135,72 @@ internal class SourceDataSource(
         )
     }
 
+    suspend fun searchVerifiedMatches(
+        media: AnilistMedia,
+        sources: List<SourceDescriptor>,
+        now: Long,
+        titleOverride: String? = null,
+        onUpdate: suspend (SourcePickerSearchUpdate) -> Unit = {},
+    ): VerifiedSourceMatches = supervisorScope {
+        val semaphore = Semaphore(SOURCE_SEARCH_CONCURRENCY)
+        val verified = sources
+            .map { source ->
+                async {
+                    semaphore.withPermit {
+                        try {
+                            val searchResults = withTimeoutOrNull(SOURCE_MATCH_TIMEOUT_MILLIS) {
+                                searchSourceMatches(media, source, now, titleOverride)
+                            }
+                            val candidates = searchResults
+                                .orEmpty()
+                                .filter { it.isReadableMatchCandidate() }
+                                .take(SOURCE_CANDIDATES_TO_VERIFY)
+                            when {
+                                searchResults == null -> {
+                                    onUpdate(SourcePickerSearchUpdate.Diagnostic(source, "search timed out"))
+                                    null
+                                }
+                                searchResults.isEmpty() -> {
+                                    onUpdate(SourcePickerSearchUpdate.Diagnostic(source, "no search results"))
+                                    null
+                                }
+                                candidates.isEmpty() -> {
+                                    onUpdate(SourcePickerSearchUpdate.Diagnostic(source, "no confident title match"))
+                                    null
+                                }
+                                else -> {
+                                    val readable = withTimeoutOrNull(SOURCE_VERIFY_TIMEOUT_MILLIS) {
+                                        firstReadableMatch(source, candidates, now)
+                                    }
+                                    if (readable == null) {
+                                        onUpdate(SourcePickerSearchUpdate.Diagnostic(source, "no readable chapters"))
+                                    } else {
+                                        onUpdate(SourcePickerSearchUpdate.Match(readable.match, readable.chapterCount))
+                                    }
+                                    readable
+                                }
+                            }
+                        } catch (error: Throwable) {
+                            if (error is CancellationException) throw error
+                            Log.w(TAG, "Source verification failed for ${source.name}", error)
+                            onUpdate(SourcePickerSearchUpdate.Diagnostic(source, sourcePickerDiagnosticDetail(error)))
+                            null
+                        }
+                    }
+                }
+            }
+            .awaitAll()
+            .filterNotNull()
+
+        val matches = verified.map { it.match }
+        val counts = verified.associate { it.match.sourceMatchKey() to it.chapterCount }
+
+        VerifiedSourceMatches(
+            matches = matches.distinctBy { "${it.source.id}:${it.manga.url}" }.sortedByDescending { it.score },
+            chapterCounts = counts,
+        )
+    }
+
     suspend fun progressByChapter(mediaId: Int): Map<String, ReadingProgress> =
         container.database.progressDao()
             .progressForMedia(mediaId)
@@ -196,6 +280,18 @@ internal class SourceDataSource(
                 )
             }
         }
+    }
+
+    suspend fun readableSourceMatch(
+        media: AnilistMedia,
+        source: SourceDescriptor,
+        now: Long,
+    ): SourceSearchResult {
+        val matches = searchSourceMatches(media, source, now)
+            .filter { it.isReadableMatchCandidate() }
+        val verified = firstReadableMatch(source, matches, now)
+            ?: error("No readable manga found on ${source.name}")
+        return verified.match
     }
 
     suspend fun cachedVerifiedMatches(
@@ -289,6 +385,23 @@ internal class SourceDataSource(
         container.database.sourceBindingDao().upsertBinding(binding.toEntity())
     }
 
+    suspend fun loadChapters(
+        source: SourceDescriptor,
+        manga: SourceManga,
+        mediaId: Int?,
+        now: Long,
+    ): LoadedSourceChapters {
+        val detailedManga = resolveMangaDetails(source, manga)
+        val chapters = cachedChapters(source, detailedManga, now, requireFresh = false)
+            ?: fetchAndCacheChapters(source, detailedManga, now)
+        val chapterProgress = mediaId?.let { progressByChapter(it) }.orEmpty()
+        return LoadedSourceChapters(
+            manga = detailedManga,
+            chapters = chapters,
+            chapterProgress = chapterProgress,
+        )
+    }
+
     private suspend fun verifyReadableMatch(
         source: SourceDescriptor,
         candidate: SourceSearchResult,
@@ -337,6 +450,9 @@ internal class SourceDataSource(
         private const val SOURCE_QUERY_TIMEOUT_MILLIS = 6_000L
         private const val SOURCE_DETAILS_TIMEOUT_MILLIS = 6_000L
         private const val SOURCE_CHAPTER_TIMEOUT_MILLIS = 10_000L
+        private const val SOURCE_MATCH_TIMEOUT_MILLIS = 20_000L
+        private const val SOURCE_VERIFY_TIMEOUT_MILLIS = 20_000L
+        private const val SOURCE_SEARCH_CONCURRENCY = 4
         private const val SOURCE_FALLBACK_CANDIDATES_PER_SOURCE = 5
         private const val SOURCE_MAX_CANDIDATES_PER_SOURCE = 40
         private const val SOURCE_STRONG_MATCH_SCORE = 0.9

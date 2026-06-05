@@ -15,8 +15,6 @@ import com.tankobun.app.logic.BROWSE_TOP_MANGA_CACHE_KEY
 import com.tankobun.app.logic.BROWSE_TRENDING_CACHE_KEY
 import com.tankobun.app.logic.BulkDownloadResult
 import com.tankobun.app.logic.BrowseLandingData
-import com.tankobun.app.logic.SOURCE_CANDIDATES_TO_VERIFY
-import com.tankobun.app.logic.VerifiedSourceMatches
 import com.tankobun.app.logic.browseCacheKey
 import com.tankobun.app.logic.bulkDownloadMessage
 import com.tankobun.app.logic.downloadSourceName
@@ -24,7 +22,6 @@ import com.tankobun.app.logic.filteredScoreInput
 import com.tankobun.app.logic.formatTrackingScore
 import com.tankobun.app.logic.hasBrowseQueryOrFilters
 import com.tankobun.app.logic.hasContent
-import com.tankobun.app.logic.isReadableMatchCandidate
 import com.tankobun.app.logic.languageSortPriority
 import com.tankobun.app.logic.mediaTitle
 import com.tankobun.app.logic.nextInReadingOrderAfter
@@ -38,7 +35,6 @@ import com.tankobun.app.logic.readerSourceForChapter
 import com.tankobun.app.logic.renamedCustomList
 import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.logic.sourcePickerDefaultSearchTitle
-import com.tankobun.app.logic.sourcePickerDiagnosticDetail
 import com.tankobun.app.logic.sourcePickerErrorMessage
 import com.tankobun.app.logic.sourceMatchKey
 import com.tankobun.app.logic.toAniListScore
@@ -51,6 +47,7 @@ import com.tankobun.app.logic.withRecomputedTrackingDirty
 import com.tankobun.app.logic.withoutCustomList
 import com.tankobun.app.reader.ReaderDataSource
 import com.tankobun.app.source.SourceDataSource
+import com.tankobun.app.source.SourcePickerSearchUpdate
 import com.tankobun.app.state.ExtensionInstallRequest
 import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.state.ReaderChapterSegment
@@ -64,40 +61,29 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tankobun.core.anilist.AnilistOAuth
-import com.tankobun.core.database.toEntity
-import com.tankobun.core.database.toModel
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistTitleLanguage
-import com.tankobun.core.reader.ReaderProgressCalculator
-import com.tankobun.core.reader.ReaderSession
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.CachePolicy
 import com.tankobun.core.model.DownloadState
 import com.tankobun.core.model.MediaStatus
-import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
-import com.tankobun.core.model.SourceManga
 import com.tankobun.core.model.SourceSearchResult
 import com.tankobun.core.model.withTitleLanguage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
@@ -116,7 +102,6 @@ private enum class ReaderSegmentDirection {
 class MainViewModel(
     private val container: AppContainer,
 ) : ViewModel() {
-    private val progressCalculator = ReaderProgressCalculator()
     private val cachePolicy = CachePolicy()
     private val aniListDataSource = AniListDataSource(container, cachePolicy)
     private val backupDataSource = BackupDataSource(container)
@@ -2000,13 +1985,9 @@ class MainViewModel(
             }
             try {
                 val now = System.currentTimeMillis()
-                val matches = sourceDataSource.searchSourceMatches(media, source, now)
-                    .filter { it.isReadableMatchCandidate() }
-                val verified = sourceDataSource.firstReadableMatch(source, matches, now)
-                    ?: error("No readable manga found on ${source.name}")
+                val match = sourceDataSource.readableSourceMatch(media, source, now)
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
-                sourceDataSource.saveSourceBinding(verified.match)
-                val match = verified.match
+                sourceDataSource.saveSourceBinding(match)
                 _state.update {
                     it.copy(
                         sourceMatches = (listOf(match) + it.sourceMatches).distinctBy { result ->
@@ -2065,11 +2046,22 @@ class MainViewModel(
                 val verified = if (editedTitle == null) {
                     sourceDataSource.cachedVerifiedMatches(media.id, sources, now)
                         .takeIf { !forceRefresh && it.matches.isNotEmpty() }
-                        ?: searchVerifiedMatches(media, sources, now, requestId).also { verified ->
+                        ?: sourceDataSource.searchVerifiedMatches(
+                            media = media,
+                            sources = sources,
+                            now = now,
+                            onUpdate = { update -> publishSourcePickerUpdate(requestId, media.id, update) },
+                        ).also { verified ->
                             sourceDataSource.cacheVerifiedMatches(media.id, verified.matches)
                         }
                 } else {
-                    searchVerifiedMatches(media, sources, now, requestId, editedTitle)
+                    sourceDataSource.searchVerifiedMatches(
+                        media = media,
+                        sources = sources,
+                        now = now,
+                        titleOverride = editedTitle,
+                        onUpdate = { update -> publishSourcePickerUpdate(requestId, media.id, update) },
+                    )
                 }
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 _state.update {
@@ -2128,70 +2120,13 @@ class MainViewModel(
             )
     }
 
-    private suspend fun searchVerifiedMatches(
-        media: AnilistMedia,
-        sources: List<SourceDescriptor>,
-        now: Long,
-        requestId: Long,
-        titleOverride: String? = null,
-    ): VerifiedSourceMatches = supervisorScope {
-        val semaphore = Semaphore(SOURCE_SEARCH_CONCURRENCY)
-        val verified = sources
-            .map { source ->
-                async {
-                    semaphore.withPermit {
-                        try {
-                            val searchResults = withTimeoutOrNull(SOURCE_MATCH_TIMEOUT_MILLIS) {
-                                sourceDataSource.searchSourceMatches(media, source, now, titleOverride)
-                            }
-                            val candidates = searchResults
-                                .orEmpty()
-                                .filter { it.isReadableMatchCandidate() }
-                                .take(SOURCE_CANDIDATES_TO_VERIFY)
-                            when {
-                                searchResults == null -> {
-                                    publishSourcePickerDiagnostic(requestId, media.id, source, "search timed out")
-                                    null
-                                }
-                                searchResults.isEmpty() -> {
-                                    publishSourcePickerDiagnostic(requestId, media.id, source, "no search results")
-                                    null
-                                }
-                                candidates.isEmpty() -> {
-                                    publishSourcePickerDiagnostic(requestId, media.id, source, "no confident title match")
-                                    null
-                                }
-                                else -> {
-                                    val readable = withTimeoutOrNull(SOURCE_VERIFY_TIMEOUT_MILLIS) {
-                                        sourceDataSource.firstReadableMatch(source, candidates, now)
-                                    }
-                                    if (readable == null) {
-                                        publishSourcePickerDiagnostic(requestId, media.id, source, "no readable chapters")
-                                    } else {
-                                        publishSourcePickerMatch(requestId, media.id, readable.match, readable.chapterCount)
-                                    }
-                                    readable
-                                }
-                            }
-                        } catch (error: Throwable) {
-                            if (error is CancellationException) throw error
-                            Log.w(TAG, "Source verification failed for ${source.name}", error)
-                            publishSourcePickerDiagnostic(requestId, media.id, source, sourcePickerDiagnosticDetail(error))
-                            null
-                        }
-                    }
-                }
-            }
-            .awaitAll()
-            .filterNotNull()
-
-        val matches = verified.map { it.match }
-        val counts = verified.associate { it.match.sourceMatchKey() to it.chapterCount }
-
-        VerifiedSourceMatches(
-            matches = matches.distinctBy { "${it.source.id}:${it.manga.url}" }.sortedByDescending { it.score },
-            chapterCounts = counts,
-        )
+    private fun publishSourcePickerUpdate(requestId: Long, mediaId: Int, update: SourcePickerSearchUpdate) {
+        when (update) {
+            is SourcePickerSearchUpdate.Match ->
+                publishSourcePickerMatch(requestId, mediaId, update.match, update.chapterCount)
+            is SourcePickerSearchUpdate.Diagnostic ->
+                publishSourcePickerDiagnostic(requestId, mediaId, update.source, update.detail)
+        }
     }
 
     private fun publishSourcePickerMatch(requestId: Long, mediaId: Int, match: SourceSearchResult, chapterCount: Int) {
@@ -2306,12 +2241,12 @@ class MainViewModel(
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
                 val now = System.currentTimeMillis()
-                val detailedManga = sourceDataSource.resolveMangaDetails(source, manga)
-                val chapters = sourceDataSource.cachedChapters(source, detailedManga, now, requireFresh = false)
-                    ?: sourceDataSource.fetchAndCacheChapters(source, detailedManga, now)
-                val mediaId = _state.value.selectedMedia?.id
-                val chapterProgress = mediaId?.let { sourceDataSource.progressByChapter(it) }.orEmpty()
-                Triple(detailedManga, chapters, chapterProgress)
+                sourceDataSource.loadChapters(
+                    source = source,
+                    manga = manga,
+                    mediaId = _state.value.selectedMedia?.id,
+                    now = now,
+                )
             }.onSuccess { (detailedManga, chapters, chapterProgress) ->
                 Log.i(TAG, "Chapter load ${source.name}/${detailedManga.title}: chapters=${chapters.size}")
                 _state.update {
@@ -2855,47 +2790,34 @@ class MainViewModel(
     fun setChapterRead(chapter: SourceChapter, read: Boolean) {
         val media = _state.value.selectedMedia ?: return
         viewModelScope.launch {
-            val progressDao = container.database.progressDao()
-            val now = System.currentTimeMillis()
-            if (read) {
-                val existing = progressDao.progressForChapter(media.id, chapter.url)?.toModel()
-                val totalPages = existing?.totalPages?.takeIf { it > 0 } ?: 1
-                val progress = ReadingProgress(
-                    mediaId = media.id,
-                    chapterUrl = chapter.url,
-                    chapterNumber = chapter.chapterNumber,
-                    pageIndex = totalPages - 1,
-                    pageScrollOffset = 0,
-                    totalPages = totalPages,
-                    readerMode = existing?.readerMode ?: _state.value.readerMode,
-                    completed = true,
-                    updatedAtEpochMillis = now,
-                )
-                progressDao.upsertProgress(progress.toEntity())
+            val result = readerDataSource.markChapterRead(
+                mediaId = media.id,
+                chapter = chapter,
+                read = read,
+                readerMode = _state.value.readerMode,
+                nowMillis = System.currentTimeMillis(),
+            )
+            val syncProgress = result.syncProgress
+            if (syncProgress != null) {
                 val trackedProgress = _state.value.trackingProgress.toIntOrNull()
                     ?: _state.value.selectedListEntry?.progress
                     ?: 0
-                val chapterProgress = chapter.chapterNumber.toInt()
-                if (chapterProgress > trackedProgress) {
+                if (syncProgress > trackedProgress) {
                     syncAniListProgressFromChapter(
                         media = media,
-                        chapterProgress = chapterProgress,
+                        chapterProgress = syncProgress,
                         triggeredByManualRead = true,
                     )
                 }
-            } else {
-                progressDao.deleteProgressForChapter(media.id, chapter.url)
             }
 
-            val latestProgress = progressDao.latestProgress(media.id)?.toModel()
-            val chapterProgress = sourceDataSource.progressByChapter(media.id)
             _state.update {
                 if (it.selectedMedia?.id == media.id) {
                     it.copy(
-                        latestProgress = latestProgress,
-                        chapterProgress = chapterProgress,
-                        trackingProgress = if (read && chapter.chapterNumber.toInt() > (it.trackingProgress.toIntOrNull() ?: 0)) {
-                            chapter.chapterNumber.toInt().toString()
+                        latestProgress = result.latestProgress,
+                        chapterProgress = result.chapterProgress,
+                        trackingProgress = if (syncProgress != null && syncProgress > (it.trackingProgress.toIntOrNull() ?: 0)) {
+                            syncProgress.toString()
                         } else {
                             it.trackingProgress
                         },
@@ -3180,18 +3102,18 @@ class MainViewModel(
         pageScrollOffset: Int = 0,
     ) {
         if (pages.isEmpty()) return
-        val normalizedPageIndex = pageIndex.coerceIn(0, pages.lastIndex)
-        val session = ReaderSession(
-            mediaId = media.id,
-            chapter = chapter,
-            pages = pages,
-            mode = _state.value.readerMode,
-            currentPageIndex = normalizedPageIndex,
-            currentPageScrollOffset = pageScrollOffset.coerceAtLeast(0),
-        )
-        val progress = progressCalculator.progressFor(session, nextReaderProgressTimestamp())
+        val readerMode = _state.value.readerMode
+        val updatedAtMillis = nextReaderProgressTimestamp()
         viewModelScope.launch {
-            container.database.progressDao().upsertProgress(progress.toEntity())
+            val progress = readerDataSource.saveProgress(
+                mediaId = media.id,
+                chapter = chapter,
+                pages = pages,
+                readerMode = readerMode,
+                pageIndex = pageIndex,
+                pageScrollOffset = pageScrollOffset,
+                updatedAtMillis = updatedAtMillis,
+            )
             _state.update {
                 if (it.selectedMedia?.id == media.id) {
                     it.copy(
@@ -3238,10 +3160,7 @@ class MainViewModel(
 
     companion object {
         private const val TAG = "TankobunMain"
-        private const val SOURCE_MATCH_TIMEOUT_MILLIS = 20_000L
-        private const val SOURCE_VERIFY_TIMEOUT_MILLIS = 20_000L
         private const val RECENT_READING_LIMIT = 3
-        private const val SOURCE_SEARCH_CONCURRENCY = 4
         private const val TRACKING_AUTO_SAVE_DELAY_MILLIS = 1_200L
     }
 }
