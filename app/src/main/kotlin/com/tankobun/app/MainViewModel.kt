@@ -4,6 +4,7 @@ import com.tankobun.app.backup.BackupDataSource
 import com.tankobun.app.backup.isDue
 import com.tankobun.app.anilist.AniListDataSource
 import com.tankobun.app.browse.BrowseDataSource
+import com.tankobun.app.download.DownloadDataSource
 import com.tankobun.app.extensions.ExtensionDataSource
 import com.tankobun.app.extensions.InstalledExtensionVersion
 import com.tankobun.app.logic.BROWSE_LANDING_SECTION_SIZE
@@ -17,7 +18,6 @@ import com.tankobun.app.logic.BrowseLandingData
 import com.tankobun.app.logic.SOURCE_CANDIDATES_TO_VERIFY
 import com.tankobun.app.logic.VerifiedSourceMatches
 import com.tankobun.app.logic.browseCacheKey
-import com.tankobun.app.logic.buildDownloadStorageSummary
 import com.tankobun.app.logic.bulkDownloadMessage
 import com.tankobun.app.logic.downloadSourceName
 import com.tankobun.app.logic.filteredScoreInput
@@ -53,6 +53,7 @@ import com.tankobun.app.logic.withAniListTitleLanguage
 import com.tankobun.app.logic.withSelectedAniListDetails
 import com.tankobun.app.logic.withRecomputedTrackingDirty
 import com.tankobun.app.logic.withoutCustomList
+import com.tankobun.app.reader.ReaderDataSource
 import com.tankobun.app.source.SourceDataSource
 import com.tankobun.app.state.ExtensionInstallRequest
 import com.tankobun.app.state.LibraryItem
@@ -70,7 +71,6 @@ import com.tankobun.core.anilist.AnilistOAuth
 import com.tankobun.core.database.SyncMutationEntity
 import com.tankobun.core.database.toEntity
 import com.tankobun.core.database.toModel
-import com.tankobun.core.database.toReaderPage
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMediaTag
@@ -80,7 +80,6 @@ import com.tankobun.core.reader.ReaderProgressCalculator
 import com.tankobun.core.reader.ReaderSession
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.CachePolicy
-import com.tankobun.core.model.DownloadJob
 import com.tankobun.core.model.DownloadState
 import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.ReadingProgress
@@ -98,7 +97,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -107,12 +105,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
-import java.io.File
 import java.util.Locale
-import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 private data class ReaderPagePosition(
@@ -136,7 +131,9 @@ class MainViewModel(
     private val cachePolicy = CachePolicy()
     private val aniListDataSource = AniListDataSource(container, cachePolicy)
     private val backupDataSource = BackupDataSource(container)
+    private val downloadDataSource = DownloadDataSource(container)
     private val extensionDataSource = ExtensionDataSource(container)
+    private val readerDataSource = ReaderDataSource(container)
     private var trackingAutoSaveJob: Job? = null
     private var pendingAniListSyncJob: Job? = null
     private var scheduledBackupJob: Job? = null
@@ -188,9 +185,8 @@ class MainViewModel(
 
     init {
         viewModelScope.launch {
-            container.database.downloadDao().observeDownloads().collect { rows ->
-                val downloads = rows.map { row -> row.toModel() }
-                val storageSummary = loadDownloadStorageSummary(downloads)
+            downloadDataSource.observeDownloads().collect { downloads ->
+                val storageSummary = downloadDataSource.storageSummary(downloads)
                 _state.update {
                     it.copy(
                         downloads = downloads,
@@ -2547,7 +2543,7 @@ class MainViewModel(
                 )
             }
             runCatching {
-                loadReaderPagesForChapter(media.id, chapter, source)
+                readerDataSource.loadPagesForChapter(media.id, chapter, source)
             }.onSuccess { pages ->
                 if (pages.isEmpty() && source == null) {
                     val readerError = ReaderLoadError(
@@ -2592,7 +2588,7 @@ class MainViewModel(
                     return@onSuccess
                 }
                 val savedProgress = if (startFromSavedProgress) {
-                    container.database.progressDao().progressForChapter(media.id, chapter.url)
+                    readerDataSource.cachedProgressForChapter(media.id, chapter.url)
                 } else {
                     null
                 }
@@ -2658,22 +2654,6 @@ class MainViewModel(
         openChapter(chapter)
     }
 
-    private suspend fun loadReaderPagesForChapter(
-        mediaId: Int,
-        chapter: SourceChapter,
-        source: SourceDescriptor?,
-    ): List<ReaderPage> {
-        val cachedPages = cachedDownloadedPages(mediaId, chapter)
-        if (cachedPages.isNotEmpty()) return cachedPages
-        if (source == null) return emptyList()
-        return ReaderPageCache.withCachedPaths(
-            context = container.application,
-            mediaId = mediaId,
-            chapter = chapter,
-            pages = container.sourceHost.pages(source, chapter),
-        )
-    }
-
     private fun loadAdjacentReaderSegments(mediaId: Int, chapter: SourceChapter) {
         val snapshot = _state.value
         val previousChapter = snapshot.sourceChapters.previousInReadingOrderBefore(chapter)
@@ -2686,14 +2666,14 @@ class MainViewModel(
             val previousDeferred = previousChapter?.let { adjacentChapter ->
                 async {
                     runCatching {
-                        loadReaderPagesForChapter(mediaId, adjacentChapter, previousSource)
+                        readerDataSource.loadPagesForChapter(mediaId, adjacentChapter, previousSource)
                     }.getOrDefault(emptyList())
                 }
             }
             val nextDeferred = nextChapter?.let { adjacentChapter ->
                 async {
                     runCatching {
-                        loadReaderPagesForChapter(mediaId, adjacentChapter, nextSource)
+                        readerDataSource.loadPagesForChapter(mediaId, adjacentChapter, nextSource)
                     }.getOrDefault(emptyList())
                 }
             }
@@ -2712,9 +2692,9 @@ class MainViewModel(
                     source = previousSource,
                     mediaId = mediaId,
                     chapter = segment.chapter,
-                    pages = segment.pages.takeLast(READER_ADJACENT_CACHE_PAGE_COUNT),
+                    pages = readerDataSource.adjacentTailPages(segment.pages),
                     cacheKeySuffix = "tail",
-                    initialDelayMillis = READER_ADJACENT_CACHE_INITIAL_DELAY_MILLIS,
+                    initialDelayMillis = ReaderDataSource.ADJACENT_CACHE_INITIAL_DELAY_MILLIS,
                 )
             }
             nextSegment?.let { segment ->
@@ -2722,9 +2702,9 @@ class MainViewModel(
                     source = nextSource,
                     mediaId = mediaId,
                     chapter = segment.chapter,
-                    pages = segment.pages.take(READER_ADJACENT_CACHE_PAGE_COUNT),
+                    pages = readerDataSource.adjacentHeadPages(segment.pages),
                     cacheKeySuffix = "head",
-                    initialDelayMillis = READER_ADJACENT_CACHE_INITIAL_DELAY_MILLIS,
+                    initialDelayMillis = ReaderDataSource.ADJACENT_CACHE_INITIAL_DELAY_MILLIS,
                 )
             }
             _state.update {
@@ -2738,14 +2718,6 @@ class MainViewModel(
                 }
             }
         }
-    }
-
-    private suspend fun cachedDownloadedPages(mediaId: Int, chapter: SourceChapter): List<ReaderPage> {
-        container.database.downloadDao().completedForChapter(mediaId, chapter.url) ?: return emptyList()
-        return container.database.downloadPageDao()
-            .pagesForChapter(mediaId, chapter.url)
-            .filter { File(it.filePath).isFile }
-            .map { it.toReaderPage() }
     }
 
     fun openRecentProgress(item: RecentReadingProgress) {
@@ -2971,13 +2943,9 @@ class MainViewModel(
     ) {
         if (pages.isEmpty()) return
         source ?: return
-        val start = (pageIndex - READER_CACHE_BACK_PAGES).coerceAtLeast(0)
-        val end = (pageIndex + READER_CACHE_FORWARD_PAGES).coerceAtMost(pages.lastIndex)
-        val windowPages = orderedReaderCacheWindow(
+        val windowPages = readerDataSource.cacheWindowPages(
             pages = pages,
             pageIndex = pageIndex.coerceIn(0, pages.lastIndex),
-            start = start,
-            end = end,
             preferredDirection = preferredDirection,
         )
         startReaderPageCache(
@@ -2987,34 +2955,8 @@ class MainViewModel(
             pages = windowPages,
             cacheKeySuffix = "window",
             replaceExisting = true,
-            initialDelayMillis = READER_CACHE_INITIAL_DELAY_MILLIS,
+            initialDelayMillis = ReaderDataSource.CACHE_INITIAL_DELAY_MILLIS,
         )
-    }
-
-    private fun orderedReaderCacheWindow(
-        pages: List<ReaderPage>,
-        pageIndex: Int,
-        start: Int,
-        end: Int,
-        preferredDirection: Int,
-    ): List<ReaderPage> {
-        val forwardFirst = preferredDirection >= 0
-        val orderedIndexes = buildList {
-            add(pageIndex)
-            val radius = maxOf(pageIndex - start, end - pageIndex)
-            for (offset in 1..radius) {
-                val forward = pageIndex + offset
-                val backward = pageIndex - offset
-                if (forwardFirst) {
-                    if (forward <= end) add(forward)
-                    if (backward >= start) add(backward)
-                } else {
-                    if (backward >= start) add(backward)
-                    if (forward <= end) add(forward)
-                }
-            }
-        }
-        return orderedIndexes.distinct().map { pages[it] }
     }
 
     private fun startReaderPageCache(
@@ -3035,28 +2977,14 @@ class MainViewModel(
         } else if (readerPageCacheJobs[key]?.isActive == true) {
             return
         }
-        val job = viewModelScope.launch(Dispatchers.IO) {
-            if (initialDelayMillis > 0L) {
-                delay(initialDelayMillis)
-            }
-            pagesToCache.forEachIndexed { index, page ->
-                if (index > 0) delay(READER_CACHE_REQUEST_SPACING_MILLIS)
-                runCatching {
-                    ReaderPageCache.cachedOrFetch(
-                        context = container.application,
-                        mediaId = mediaId,
-                        chapter = chapter,
-                        page = page,
-                    ) {
-                        container.sourceHost.imageBytes(source, page)
-                    }
-                }.onFailure { error ->
-                    if (error !is CancellationException) {
-                        Log.w(TAG, "Reader cache failed for ${chapter.name} page ${page.index + 1}", error)
-                    }
-                }
-            }
-            ReaderPageCache.prune(container.application)
+        val job = viewModelScope.launch {
+            readerDataSource.cachePages(
+                source = source,
+                mediaId = mediaId,
+                chapter = chapter,
+                pages = pagesToCache,
+                initialDelayMillis = initialDelayMillis,
+            )
         }
         readerPageCacheJobs[key] = job
         job.invokeOnCompletion { readerPageCacheJobs.remove(key, job) }
@@ -3171,7 +3099,7 @@ class MainViewModel(
                 result.resumed > 0 -> "Resumed ${chapter.name}"
                 result.retried > 0 -> "Retrying ${chapter.name}"
                 else -> {
-                    val existing = container.database.downloadDao().latestForChapter(media.id, chapter.url)?.toModel()
+                    val existing = downloadDataSource.latestForChapter(media.id, chapter.url)
                     when (existing?.state) {
                         DownloadState.COMPLETE -> "${chapter.name} is already downloaded"
                         DownloadState.QUEUED,
@@ -3294,85 +3222,37 @@ class MainViewModel(
         retryFailed: Boolean = true,
     ): BulkDownloadResult {
         cancelReaderPageCacheJobs()
-        var queued = 0
-        var resumed = 0
-        var retried = 0
-        var skipped = 0
-        chapters.distinctBy { "${it.sourceId}:${it.url}" }.forEach { chapter ->
-            val existing = container.database.downloadDao().latestForChapter(mediaId, chapter.url)?.toModel()
-            when (existing?.state) {
-                DownloadState.QUEUED,
-                DownloadState.RUNNING,
-                DownloadState.COMPLETE -> skipped += 1
-
-                DownloadState.PAUSED -> {
-                    container.downloadCoordinator.resume(existing.id)
-                    resumed += 1
-                }
-
-                DownloadState.FAILED -> {
-                    if (retryFailed) {
-                        container.downloadCoordinator.retry(existing.id)
-                        retried += 1
-                    } else {
-                        skipped += 1
-                    }
-                }
-
-                null -> {
-                    val now = System.currentTimeMillis()
-                    container.downloadCoordinator.enqueue(
-                        DownloadJob(
-                            id = UUID.randomUUID().toString(),
-                            mediaId = mediaId,
-                            sourceId = chapter.sourceId,
-                            mangaUrl = chapter.mangaUrl,
-                            chapterUrl = chapter.url,
-                            chapterName = chapter.name,
-                            state = DownloadState.QUEUED,
-                            pageCount = 0,
-                            completedPages = 0,
-                            retryCount = 0,
-                            createdAtEpochMillis = now,
-                            updatedAtEpochMillis = now,
-                        ),
-                    )
-                    queued += 1
-                }
-            }
-        }
-        return BulkDownloadResult(
-            queued = queued,
-            resumed = resumed,
-            retried = retried,
-            skipped = skipped,
+        return downloadDataSource.enqueueChapters(
+            mediaId = mediaId,
+            chapters = chapters,
+            retryFailed = retryFailed,
         )
     }
 
     fun pauseDownload(jobId: String) {
         viewModelScope.launch {
-            container.downloadCoordinator.pause(jobId)
+            downloadDataSource.pause(jobId)
             _state.update { it.copy(message = "Paused download") }
         }
     }
 
     fun resumeDownload(jobId: String) {
         viewModelScope.launch {
-            container.downloadCoordinator.resume(jobId)
+            downloadDataSource.resume(jobId)
             _state.update { it.copy(message = "Resumed download") }
         }
     }
 
     fun retryDownload(jobId: String) {
         viewModelScope.launch {
-            container.downloadCoordinator.retry(jobId)
+            downloadDataSource.retry(jobId)
             _state.update { it.copy(message = "Retrying download") }
         }
     }
 
     fun removeDownload(jobId: String) {
         viewModelScope.launch {
-            container.downloadCoordinator.remove(jobId)
+            downloadDataSource.remove(jobId)
             refreshDownloadState()
             _state.update { it.copy(message = "Removed download") }
         }
@@ -3381,7 +3261,7 @@ class MainViewModel(
     fun removeDownloadsForMedia(mediaId: Int) {
         viewModelScope.launch {
             val title = _state.value.mediaTitle(mediaId)
-            container.downloadCoordinator.removeMedia(mediaId)
+            downloadDataSource.removeMedia(mediaId)
             refreshDownloadState()
             _state.update { it.copy(message = "Removed downloads for $title") }
         }
@@ -3392,7 +3272,7 @@ class MainViewModel(
             val snapshot = _state.value
             val title = snapshot.mediaTitle(mediaId)
             val sourceName = snapshot.downloadSourceName(sourceId)
-            container.downloadCoordinator.removeMediaSource(mediaId, sourceId)
+            downloadDataSource.removeMediaSource(mediaId, sourceId)
             refreshDownloadState()
             _state.update { it.copy(message = "Removed $sourceName downloads for $title") }
         }
@@ -3400,7 +3280,7 @@ class MainViewModel(
 
     fun removeAllDownloads() {
         viewModelScope.launch {
-            container.downloadCoordinator.removeAll()
+            downloadDataSource.removeAll()
             refreshDownloadState()
             _state.update { it.copy(message = "Removed all downloads") }
         }
@@ -3409,7 +3289,7 @@ class MainViewModel(
     fun retryFailedDownloads() {
         val failed = _state.value.downloads.filter { it.state == DownloadState.FAILED }
         viewModelScope.launch {
-            failed.forEach { container.downloadCoordinator.retry(it.id) }
+            failed.forEach { downloadDataSource.retry(it.id) }
             if (failed.isNotEmpty()) {
                 _state.update { it.copy(message = "Retrying ${failed.size} failed downloads") }
             }
@@ -3419,7 +3299,7 @@ class MainViewModel(
     fun pauseActiveDownloads() {
         val active = _state.value.downloads.filter { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }
         viewModelScope.launch {
-            active.forEach { container.downloadCoordinator.pause(it.id) }
+            active.forEach { downloadDataSource.pause(it.id) }
             if (active.isNotEmpty()) {
                 _state.update { it.copy(message = "Paused ${active.size} downloads") }
             }
@@ -3429,7 +3309,7 @@ class MainViewModel(
     fun resumePausedDownloads() {
         val paused = _state.value.downloads.filter { it.state == DownloadState.PAUSED }
         viewModelScope.launch {
-            paused.forEach { container.downloadCoordinator.resume(it.id) }
+            paused.forEach { downloadDataSource.resume(it.id) }
             if (paused.isNotEmpty()) {
                 _state.update { it.copy(message = "Resumed ${paused.size} downloads") }
             }
@@ -3437,8 +3317,8 @@ class MainViewModel(
     }
 
     private suspend fun refreshDownloadState() {
-        val downloads = container.database.downloadDao().allDownloads().map { it.toModel() }
-        val storageSummary = loadDownloadStorageSummary(downloads)
+        val downloads = downloadDataSource.allDownloads()
+        val storageSummary = downloadDataSource.storageSummary(downloads)
         _state.update {
             it.copy(
                 downloads = downloads,
@@ -3446,12 +3326,6 @@ class MainViewModel(
             )
         }
     }
-
-    private suspend fun loadDownloadStorageSummary(downloads: List<DownloadJob>) =
-        withContext(Dispatchers.IO) {
-            val pages = container.database.downloadPageDao().allPages()
-            buildDownloadStorageSummary(downloads, pages)
-        }
 
     private fun saveReaderProgress() {
         val media = _state.value.selectedMedia ?: return
@@ -3547,11 +3421,5 @@ class MainViewModel(
         private const val RECENT_READING_LIMIT = 3
         private const val SOURCE_SEARCH_CONCURRENCY = 4
         private const val TRACKING_AUTO_SAVE_DELAY_MILLIS = 1_200L
-        private const val READER_CACHE_BACK_PAGES = 5
-        private const val READER_CACHE_FORWARD_PAGES = 10
-        private const val READER_ADJACENT_CACHE_PAGE_COUNT = 2
-        private const val READER_CACHE_INITIAL_DELAY_MILLIS = 500L
-        private const val READER_ADJACENT_CACHE_INITIAL_DELAY_MILLIS = 12_000L
-        private const val READER_CACHE_REQUEST_SPACING_MILLIS = 250L
     }
 }
