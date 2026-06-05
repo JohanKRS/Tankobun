@@ -106,6 +106,62 @@ class MainStateLogicTest {
         assertSame(state, next)
     }
 
+    @Test
+    fun syncedListEntryMergesLibraryAndKeepsHigherLocalProgress() {
+        val media = media(42, "Manga")
+        val entry = entry(mediaId = 42, progress = 4)
+
+        val next = TankobunUiState(
+            selectedMedia = media,
+            trackingProgress = "8",
+        ).withSyncedListEntry(
+            media = media,
+            entry = entry,
+            updateTrackingForm = false,
+        )
+
+        assertEquals(listOf(42), next.libraryItems.map { it.media.id })
+        assertEquals(entry, next.selectedListEntry)
+        assertEquals("8", next.trackingProgress)
+        assertFalse(next.trackingSaveInProgress)
+    }
+
+    @Test
+    fun syncedListEntryCanRefreshTrackingForm() {
+        val media = media(42, "Manga")
+        val entry = entry(
+            mediaId = 42,
+            status = MediaStatus.COMPLETED,
+            progress = 22,
+            score = 90.0,
+            notes = "done",
+            private = true,
+            customLists = listOf("Favorites"),
+        )
+
+        val next = TankobunUiState(
+            selectedMedia = media,
+            trackingDirty = true,
+            trackingSaveInProgress = true,
+            trackingSaveFailed = true,
+            anilistScoreFormat = AnilistScoreFormat.POINT_100,
+        ).withSyncedListEntry(
+            media = media,
+            entry = entry,
+            updateTrackingForm = true,
+        )
+
+        assertEquals(MediaStatus.COMPLETED, next.trackingStatus)
+        assertEquals("22", next.trackingProgress)
+        assertEquals("90", next.trackingScore)
+        assertEquals("done", next.trackingNotes)
+        assertTrue(next.trackingPrivate)
+        assertEquals(setOf("Favorites"), next.trackingCustomLists)
+        assertFalse(next.trackingDirty)
+        assertFalse(next.trackingSaveInProgress)
+        assertFalse(next.trackingSaveFailed)
+    }
+
     private fun media(id: Int, title: String): AnilistMedia =
         AnilistMedia(
             id = id,

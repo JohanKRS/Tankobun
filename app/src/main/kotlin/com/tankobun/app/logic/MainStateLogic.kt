@@ -94,3 +94,46 @@ internal fun TankobunUiState.withSelectedAniListDetails(
         trackingCustomLists = if (preserveTrackingForm) trackingCustomLists else entry?.customLists?.toSet() ?: trackingCustomLists,
     )
 }
+
+internal fun TankobunUiState.withSyncedListEntry(
+    media: AnilistMedia?,
+    entry: AnilistListEntry,
+    updateTrackingForm: Boolean,
+): TankobunUiState {
+    val existingMedia = media
+        ?: libraryItems.firstOrNull { it.media.id == entry.mediaId }?.media
+        ?: selectedMedia?.takeIf { it.id == entry.mediaId }
+    val nextItems = if (existingMedia == null) {
+        libraryItems
+    } else {
+        (libraryItems.filterNot { item -> item.media.id == entry.mediaId } + LibraryItem(existingMedia, entry))
+            .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
+    }
+    val selected = selectedMedia?.id == entry.mediaId
+    return copy(
+        library = nextItems.map { it.media },
+        libraryItems = nextItems,
+        selectedListEntry = if (selected) entry else selectedListEntry,
+        trackingStatus = if (selected && updateTrackingForm) entry.status else trackingStatus,
+        trackingProgress = if (selected) {
+            if (updateTrackingForm) {
+                entry.progress.toString()
+            } else {
+                maxOf(trackingProgress.toIntOrNull() ?: 0, entry.progress).toString()
+            }
+        } else {
+            trackingProgress
+        },
+        trackingScore = if (selected && updateTrackingForm) {
+            entry.score.formatTrackingScore(anilistScoreFormat)
+        } else {
+            trackingScore
+        },
+        trackingNotes = if (selected && updateTrackingForm) entry.notes.orEmpty() else trackingNotes,
+        trackingPrivate = if (selected && updateTrackingForm) entry.private else trackingPrivate,
+        trackingCustomLists = if (selected && updateTrackingForm) entry.customLists.toSet() else trackingCustomLists,
+        trackingDirty = if (selected && updateTrackingForm) false else trackingDirty,
+        trackingSaveInProgress = if (selected) false else trackingSaveInProgress,
+        trackingSaveFailed = if (selected && updateTrackingForm) false else trackingSaveFailed,
+    )
+}
