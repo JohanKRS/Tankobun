@@ -352,18 +352,6 @@ internal enum class LibraryPicker {
     YEAR,
 }
 
-internal enum class ReaderPanAxis {
-    BOTH,
-    HORIZONTAL,
-    WEBTOON,
-}
-
-internal data class WebtoonReaderPageItem(
-    val chapter: SourceChapter,
-    val page: ReaderPage,
-    val pageIndex: Int,
-)
-
 internal const val SOURCE_LANGUAGE_FILTER_ACTIVE = "__active__"
 internal const val SOURCE_LANGUAGE_FILTER_ALL = "__all__"
 internal const val LIBRARY_SORT_LIST_ORDER = "LIST_ORDER"

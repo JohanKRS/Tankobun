@@ -134,11 +134,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -207,13 +205,11 @@ import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceSearchResult
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.pow
 import kotlin.math.roundToInt
 
 
@@ -248,11 +244,10 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     } else {
         "${chapter.url}:${state.readerMode}:${state.currentPageIndex}"
     }
-    var readerScale by remember(transformKey) { mutableStateOf(1f) }
-    var readerOffset by remember(transformKey) { mutableStateOf(Offset.Zero) }
+    val readerMotion = rememberReaderMotionState(transformKey)
+    val readerScale = readerMotion.scale
+    val readerOffset = readerMotion.offset
     val coroutineScope = rememberCoroutineScope()
-    var flingJob by remember(transformKey) { mutableStateOf<Job?>(null) }
-    var zoomAnimationJob by remember(transformKey) { mutableStateOf<Job?>(null) }
     val pageGap = readerPageGap(state.readerPageGapLevel)
     val pagedPagePadding = if (state.readerPageGapLevel == 0) 8.dp else pageGap
     val density = LocalDensity.current
@@ -280,27 +275,13 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     val lastPageIndex = (pageCount - 1).coerceAtLeast(0)
     val nextChapter = state.nextReaderChapter()
     val previousChapter = state.sourceChapters.previousInReadingOrderBefore(chapter)
-    val webtoonPageItems = remember(
-        state.readerPreviousSegment,
-        chapter,
-        state.readerPages,
-        state.readerNextSegment,
-    ) {
-        buildList {
-            state.readerPreviousSegment?.let { segment ->
-                segment.pages.forEachIndexed { index, page ->
-                    add(WebtoonReaderPageItem(segment.chapter, page, index))
-                }
-            }
-            state.readerPages.forEachIndexed { index, page ->
-                add(WebtoonReaderPageItem(chapter, page, index))
-            }
-            state.readerNextSegment?.let { segment ->
-                segment.pages.forEachIndexed { index, page ->
-                    add(WebtoonReaderPageItem(segment.chapter, page, index))
-                }
-            }
-        }
+    val webtoonPageItems = remember(state.readerPreviousSegment, chapter, state.readerPages, state.readerNextSegment) {
+        webtoonReaderPageItems(
+            previousSegment = state.readerPreviousSegment,
+            chapter = chapter,
+            pages = state.readerPages,
+            nextSegment = state.readerNextSegment,
+        )
     }
     val currentWebtoonStartIndex = state.readerPreviousSegment?.pages?.size ?: 0
     val canGoBack = state.currentPageIndex > 0 || previousChapter != null
@@ -314,133 +295,11 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     var continuousWebtoonAnchor by remember { mutableStateOf<WebtoonReaderAnchor?>(null) }
     var suppressWebtoonPositionUpdates by remember { mutableStateOf(false) }
     val displayedPageIndex = scrubberValue.roundToInt().coerceIn(0, lastPageIndex)
-    fun cancelFling() {
-        flingJob?.cancel()
-        flingJob = null
-    }
-    fun cancelZoomAnimation() {
-        zoomAnimationJob?.cancel()
-        zoomAnimationJob = null
-    }
     fun stopReaderMotion() {
-        cancelFling()
-        cancelZoomAnimation()
-    }
-    fun animateReaderTransform(targetScale: Float, targetOffset: Offset) {
-        stopReaderMotion()
-        zoomAnimationJob = coroutineScope.launch {
-            val startScale = readerScale
-            val startOffset = readerOffset
-            val startNanos = withFrameNanos { it }
-            val durationNanos = 180_000_000L
-            do {
-                val frameNanos = withFrameNanos { it }
-                val progress = ((frameNanos - startNanos).toFloat() / durationNanos).coerceIn(0f, 1f)
-                val eased = 1f - (1f - progress).pow(3)
-                readerScale = readerLerp(startScale, targetScale, eased)
-                readerOffset = Offset(
-                    x = readerLerp(startOffset.x, targetOffset.x, eased),
-                    y = readerLerp(startOffset.y, targetOffset.y, eased),
-                )
-            } while (progress < 1f)
-            readerScale = targetScale
-            readerOffset = targetOffset
-            zoomAnimationJob = null
-        }
+        readerMotion.stop()
     }
     fun resetZoom() {
-        animateReaderTransform(1f, Offset.Zero)
-    }
-    fun launchReaderFling(
-        velocity: Velocity,
-        width: Float,
-        height: Float,
-        panAxis: ReaderPanAxis,
-        contentWidth: Float = width,
-        contentHeight: Float = height,
-    ) {
-        val initialVelocity = when (panAxis) {
-            ReaderPanAxis.BOTH -> Offset(velocity.x, velocity.y)
-            ReaderPanAxis.HORIZONTAL,
-            ReaderPanAxis.WEBTOON -> Offset(velocity.x, 0f)
-        }
-        val panBounds = readerPanBounds(readerScale, width, height, contentWidth, contentHeight)
-        if (!panBounds.canPan || (abs(initialVelocity.x) < 90f && abs(initialVelocity.y) < 90f)) return
-        stopReaderMotion()
-        flingJob = coroutineScope.launch {
-            var velocityOffset = initialVelocity
-            var lastFrameNanos = 0L
-            while (abs(velocityOffset.x) > 20f || abs(velocityOffset.y) > 20f) {
-                val frameNanos = withFrameNanos { it }
-                if (lastFrameNanos == 0L) {
-                    lastFrameNanos = frameNanos
-                    continue
-                }
-
-                val deltaSeconds = ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0f, 0.05f)
-                lastFrameNanos = frameNanos
-                val proposedOffset = readerOffset + velocityOffset * deltaSeconds
-                val clampedOffset = proposedOffset.clampedReaderOffset(
-                    scale = readerScale,
-                    width = width,
-                    height = height,
-                    contentWidth = contentWidth,
-                    contentHeight = contentHeight,
-                )
-                readerOffset = when (panAxis) {
-                    ReaderPanAxis.BOTH -> clampedOffset
-                    ReaderPanAxis.HORIZONTAL,
-                    ReaderPanAxis.WEBTOON -> Offset(clampedOffset.x, 0f)
-                }
-
-                velocityOffset = Offset(
-                    x = if (clampedOffset.x != proposedOffset.x) 0f else velocityOffset.x,
-                    y = if (clampedOffset.y != proposedOffset.y || panAxis != ReaderPanAxis.BOTH) {
-                        0f
-                    } else {
-                        velocityOffset.y
-                    },
-                )
-                val decay = 0.88f.pow(deltaSeconds * 60f)
-                velocityOffset *= decay
-            }
-        }
-    }
-    fun launchWebtoonFling(velocity: Velocity, width: Float, height: Float) {
-        val horizontalVelocity = velocity.x
-        val verticalVelocity = -velocity.y / readerScale.coerceAtLeast(1f)
-        if (readerScale <= 1.01f || (abs(horizontalVelocity) < 90f && abs(verticalVelocity) < 90f)) return
-        stopReaderMotion()
-        flingJob = coroutineScope.launch {
-            var velocityX = horizontalVelocity
-            var scrollVelocityY = verticalVelocity
-            var lastFrameNanos = 0L
-            while (abs(velocityX) > 20f || abs(scrollVelocityY) > 20f) {
-                val frameNanos = withFrameNanos { it }
-                if (lastFrameNanos == 0L) {
-                    lastFrameNanos = frameNanos
-                    continue
-                }
-
-                val deltaSeconds = ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0f, 0.05f)
-                lastFrameNanos = frameNanos
-
-                if (abs(velocityX) > 20f) {
-                    val proposedOffset = readerOffset + Offset(velocityX * deltaSeconds, 0f)
-                    val clampedOffset = proposedOffset.clampedReaderOffset(readerScale, width, height)
-                    readerOffset = Offset(clampedOffset.x, 0f)
-                    if (clampedOffset.x != proposedOffset.x) velocityX = 0f
-                }
-
-                if (abs(scrollVelocityY) > 20f) {
-                    webtoonListState.dispatchRawDelta(scrollVelocityY * deltaSeconds)
-                }
-
-                val decay = 0.88f.pow(deltaSeconds * 60f)
-                velocityX *= decay
-                scrollVelocityY *= decay
-            }
-        }
+        readerMotion.resetZoom(coroutineScope)
     }
     fun goToReaderPage(index: Int) {
         val targetIndex = index.coerceIn(0, lastPageIndex)
@@ -469,10 +328,6 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
             }
             else -> goToReaderPage(targetIndex)
         }
-    }
-
-    DisposableEffect(transformKey) {
-        onDispose { stopReaderMotion() }
     }
 
     LaunchedEffect(chapter.url, state.currentPageIndex, pageCount, scrubberSeeking) {
@@ -628,7 +483,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                             )
                             if (state.readerMode == ReaderMode.WEBTOON) Offset(zoomOffset.x, 0f) else zoomOffset
                         }
-                        animateReaderTransform(nextScale, nextOffset)
+                        readerMotion.animateTransform(coroutineScope, nextScale, nextOffset)
                     },
                     onTap = { offset ->
                         val centerX = size.width / 3f..size.width * 2f / 3f
@@ -655,27 +510,33 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     .fillMaxSize()
                     .pointerInput(transformKey) {
                         detectReaderTransformGestures(
-                            scaleProvider = { readerScale },
+                            scaleProvider = { readerMotion.scale },
                             panAxis = ReaderPanAxis.WEBTOON,
                             onGestureStart = {
                                 stopReaderMotion()
                             },
                             onGestureEnd = { velocity, width, height ->
-                                launchWebtoonFling(velocity, width, height)
+                                readerMotion.launchZoomedWebtoonFling(
+                                    scope = coroutineScope,
+                                    velocity = velocity,
+                                    width = width,
+                                    height = height,
+                                    dispatchRawDelta = webtoonListState::dispatchRawDelta,
+                                )
                             },
                         ) { centroid, pan, zoom ->
-                            val nextScale = (readerScale * zoom).coerceIn(1f, 5f)
+                            val nextScale = (readerMotion.scale * zoom).coerceIn(1f, 5f)
                             val nextOffset = readerTransformOffset(
-                                currentOffset = readerOffset,
+                                currentOffset = readerMotion.offset,
                                 centroid = centroid,
                                 pan = Offset(pan.x, 0f),
-                                scale = readerScale,
+                                scale = readerMotion.scale,
                                 nextScale = nextScale,
                                 width = size.width.toFloat(),
                                 height = size.height.toFloat(),
                             )
-                            readerScale = nextScale
-                            readerOffset = Offset(nextOffset.x, 0f)
+                            readerMotion.scale = nextScale
+                            readerMotion.offset = Offset(nextOffset.x, 0f)
                             if (zoom == 1f && pan.y != 0f) {
                                 webtoonListState.dispatchRawDelta(-pan.y / nextScale.coerceAtLeast(1f))
                             }
@@ -716,7 +577,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     .fillMaxSize()
                     .pointerInput(transformKey, currentPagedPageAspectRatio, pagedPagePaddingPx) {
                         detectReaderTransformGestures(
-                            scaleProvider = { readerScale },
+                            scaleProvider = { readerMotion.scale },
                             panAxis = ReaderPanAxis.BOTH,
                             panBoundsProvider = { scale, width, height ->
                                 readerPanBounds(
@@ -729,7 +590,8 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                             },
                             onGestureStart = ::stopReaderMotion,
                             onGestureEnd = { velocity, width, height ->
-                                launchReaderFling(
+                                readerMotion.launchPagedFling(
+                                    scope = coroutineScope,
                                     velocity = velocity,
                                     width = width,
                                     height = height,
@@ -739,7 +601,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 )
                             },
                             onSingleFingerSwipe = { drag, velocity, width, _ ->
-                                if (readerScale > 1.01f) return@detectReaderTransformGestures
+                                if (readerMotion.scale > 1.01f) return@detectReaderTransformGestures
                                 val horizontalDrag = abs(drag.x) > width * PAGED_READER_SWIPE_DISTANCE_FRACTION &&
                                     abs(drag.x) > abs(drag.y) * PAGED_READER_SWIPE_AXIS_RATIO
                                 val horizontalFling = abs(velocity.x) > PAGED_READER_SWIPE_VELOCITY_THRESHOLD &&
@@ -750,20 +612,20 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 }
                             },
                         ) { centroid, pan, zoom ->
-                            val nextScale = (readerScale * zoom).coerceIn(1f, 5f)
+                            val nextScale = (readerMotion.scale * zoom).coerceIn(1f, 5f)
                             val nextOffset = readerTransformOffset(
-                                currentOffset = readerOffset,
+                                currentOffset = readerMotion.offset,
                                 centroid = centroid,
                                 pan = pan,
-                                scale = readerScale,
+                                scale = readerMotion.scale,
                                 nextScale = nextScale,
                                 width = size.width.toFloat(),
                                 height = size.height.toFloat(),
                                 contentWidth = size.width.toFloat(),
                                 contentHeight = pagedFrameHeight(size.width.toFloat(), size.height.toFloat()),
                             )
-                            readerScale = nextScale
-                            readerOffset = nextOffset
+                            readerMotion.scale = nextScale
+                            readerMotion.offset = nextOffset
                         }
                     },
                 contentAlignment = Alignment.Center,
