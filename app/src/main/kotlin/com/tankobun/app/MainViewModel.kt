@@ -32,6 +32,7 @@ import com.tankobun.app.logic.preferredVisibleSources
 import com.tankobun.app.logic.previousInReadingOrderBefore
 import com.tankobun.app.logic.readerLoadErrorFor
 import com.tankobun.app.logic.readerSourceForChapter
+import com.tankobun.app.logic.ReaderSegmentDirection
 import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.logic.sourcePickerDefaultSearchTitle
 import com.tankobun.app.logic.sourcePickerErrorMessage
@@ -41,8 +42,16 @@ import com.tankobun.app.logic.userMessage
 import com.tankobun.app.logic.visibleSources
 import com.tankobun.app.logic.withDeletedAniListCustomList
 import com.tankobun.app.logic.withAddedTrackingCustomList
+import com.tankobun.app.logic.withActivatedReaderSegment
+import com.tankobun.app.logic.withAdjacentReaderSegments
 import com.tankobun.app.logic.withAniListTitleLanguage
 import com.tankobun.app.logic.withRenamedAniListCustomList
+import com.tankobun.app.logic.withReaderClosed
+import com.tankobun.app.logic.withReaderLoadError
+import com.tankobun.app.logic.withReaderLoading
+import com.tankobun.app.logic.withReaderPagePosition
+import com.tankobun.app.logic.withReaderPagesLoaded
+import com.tankobun.app.logic.withRecentProgressOpened
 import com.tankobun.app.logic.withSelectedAniListDetails
 import com.tankobun.app.logic.withSyncedListEntry
 import com.tankobun.app.logic.withRecomputedTrackingDirty
@@ -97,11 +106,6 @@ private data class ReaderPagePosition(
     val pageIndex: Int,
     val pageScrollOffset: Int,
 )
-
-private enum class ReaderSegmentDirection {
-    PREVIOUS,
-    NEXT,
-}
 
 
 class MainViewModel(
@@ -2196,19 +2200,7 @@ class MainViewModel(
             readerAdjacentLoadJob?.cancel()
             cancelReaderPageCacheJobs()
             latestReaderPosition = null
-            _state.update {
-                it.copy(
-                    busy = true,
-                    message = null,
-                    activeChapter = chapter,
-                    readerPages = emptyList(),
-                    readerPreviousSegment = null,
-                    readerNextSegment = null,
-                    readerError = null,
-                    currentPageIndex = 0,
-                    currentPageScrollOffset = 0,
-                )
-            }
+            _state.update { it.withReaderLoading(chapter) }
             runCatching {
                 readerDataSource.loadPagesForChapter(media.id, chapter, source)
             }.onSuccess { pages ->
@@ -2217,20 +2209,7 @@ class MainViewModel(
                         title = "Source not installed",
                         message = "This chapter belongs to a source that is not installed anymore. Install the source again or choose another one.",
                     )
-                    _state.update {
-                        if (it.activeChapter?.url == chapter.url) {
-                            it.copy(
-                                readerPages = emptyList(),
-                                readerPreviousSegment = null,
-                                readerNextSegment = null,
-                                readerError = readerError,
-                                busy = false,
-                                message = readerError.title,
-                            )
-                        } else {
-                            it
-                        }
-                    }
+                    _state.update { it.withReaderLoadError(chapter, readerError) }
                     return@onSuccess
                 }
                 if (pages.isEmpty()) {
@@ -2238,20 +2217,7 @@ class MainViewModel(
                         title = "No pages found",
                         message = "The source opened this chapter, but it did not return any pages. The chapter may have been removed, or the source may need an update.",
                     )
-                    _state.update {
-                        if (it.activeChapter?.url == chapter.url) {
-                            it.copy(
-                                readerPages = emptyList(),
-                                readerPreviousSegment = null,
-                                readerNextSegment = null,
-                                readerError = readerError,
-                                busy = false,
-                                message = readerError.title,
-                            )
-                        } else {
-                            it
-                        }
-                    }
+                    _state.update { it.withReaderLoadError(chapter, readerError) }
                     return@onSuccess
                 }
                 val savedProgress = if (startFromSavedProgress) {
@@ -2270,16 +2236,11 @@ class MainViewModel(
                     if (it.activeChapter?.url == chapter.url) {
                         readerStillOpen = true
                         recordReaderPosition(chapter.url, startPageIndex, startPageScrollOffset)
-                        it.copy(
-                            activeChapter = chapter,
-                            readerPages = pages,
-                            readerPreviousSegment = null,
-                            readerNextSegment = null,
-                            readerError = null,
-                            currentPageIndex = startPageIndex,
-                            currentPageScrollOffset = startPageScrollOffset,
-                            busy = false,
-                            message = null,
+                        it.withReaderPagesLoaded(
+                            chapter = chapter,
+                            pages = pages,
+                            pageIndex = startPageIndex,
+                            pageScrollOffset = startPageScrollOffset,
                         )
                     } else {
                         it
@@ -2298,20 +2259,7 @@ class MainViewModel(
             }.onFailure { error ->
                 Log.w(TAG, "Page load failed for ${source?.name ?: "cached source"}/${chapter.name}", error)
                 val readerError = readerLoadErrorFor(container.application, error, source)
-                _state.update {
-                    if (it.activeChapter?.url == chapter.url) {
-                        it.copy(
-                            readerPages = emptyList(),
-                            readerPreviousSegment = null,
-                            readerNextSegment = null,
-                            readerError = readerError,
-                            busy = false,
-                            message = readerError.title,
-                        )
-                    } else {
-                        it
-                    }
-                }
+                _state.update { it.withReaderLoadError(chapter, readerError) }
             }
         }
     }
@@ -2374,16 +2322,7 @@ class MainViewModel(
                     initialDelayMillis = ReaderDataSource.ADJACENT_CACHE_INITIAL_DELAY_MILLIS,
                 )
             }
-            _state.update {
-                if (it.activeChapter?.url == chapter.url) {
-                    it.copy(
-                        readerPreviousSegment = previousSegment,
-                        readerNextSegment = nextSegment,
-                    )
-                } else {
-                    it
-                }
-            }
+            _state.update { it.withAdjacentReaderSegments(chapter, previousSegment, nextSegment) }
         }
     }
 
@@ -2391,41 +2330,7 @@ class MainViewModel(
         val existingEntry = _state.value.libraryItems.firstOrNull { libraryItem ->
             libraryItem.media.id == item.media.id
         }?.entry
-        _state.update {
-            it.copy(
-                selectedMedia = item.media,
-                selectedListEntry = existingEntry,
-                sourceMatches = emptyList(),
-                sourceMatchChapterCounts = emptyMap(),
-                sourcePickerOpen = false,
-                sourcePickerLoading = false,
-                sourcePickerMessage = null,
-                sourcePickerDiagnostics = emptyList(),
-                selectedRecommendations = emptyList(),
-                selectedRecommendationsPage = 0,
-                selectedRecommendationsHasMore = false,
-                recommendationsLoading = false,
-                trackingStatus = existingEntry?.status ?: MediaStatus.CURRENT,
-                trackingProgress = (existingEntry?.progress ?: 0).toString(),
-                trackingScore = existingEntry?.score.formatTrackingScore(it.anilistScoreFormat),
-                trackingNotes = existingEntry?.notes.orEmpty(),
-                trackingPrivate = existingEntry?.private ?: false,
-                trackingCustomLists = existingEntry?.customLists.orEmpty().toSet(),
-                selectedSourceId = item.chapter?.sourceId ?: it.selectedSourceId,
-                selectedSourceManga = null,
-                sourceChapters = emptyList(),
-                latestProgress = item.progress,
-                chapterProgress = mapOf(item.progress.chapterUrl to item.progress),
-                activeChapter = null,
-                readerPages = emptyList(),
-                readerPreviousSegment = null,
-                readerNextSegment = null,
-                readerError = null,
-                currentPageIndex = 0,
-                currentPageScrollOffset = 0,
-                message = null,
-            )
-        }
+        _state.update { it.withRecentProgressOpened(item, existingEntry) }
         loadAnilistDetails(item.media.id)
         loadCachedSourceState(item.media.id)
         val chapter = item.chapter
@@ -2441,18 +2346,7 @@ class MainViewModel(
         readerAdjacentLoadJob?.cancel()
         readerAdjacentLoadJob = null
         cancelReaderPageCacheJobs()
-        _state.update {
-            it.copy(
-                activeChapter = null,
-                readerPages = emptyList(),
-                readerPreviousSegment = null,
-                readerNextSegment = null,
-                readerError = null,
-                currentPageIndex = 0,
-                currentPageScrollOffset = 0,
-                busy = false,
-            )
-        }
+        _state.update { it.withReaderClosed() }
         latestReaderPosition = null
     }
 
@@ -2489,7 +2383,7 @@ class MainViewModel(
         if (chapter != null) {
             recordReaderPosition(chapter.url, nextIndex, nextOffset)
         }
-        _state.update { it.copy(currentPageIndex = nextIndex, currentPageScrollOffset = nextOffset) }
+        _state.update { it.withReaderPagePosition(nextIndex, nextOffset) }
         val media = snapshot.selectedMedia
         if (media != null && chapter != null) {
             cacheReaderWindow(
@@ -2534,7 +2428,7 @@ class MainViewModel(
         val pageChanged = nextIndex != snapshot.currentPageIndex
         if (!pageChanged) return
 
-        _state.update { it.copy(currentPageIndex = nextIndex, currentPageScrollOffset = nextOffset) }
+        _state.update { it.withReaderPagePosition(nextIndex, nextOffset) }
         val media = snapshot.selectedMedia
         if (media != null) {
             cacheReaderWindow(
@@ -2577,13 +2471,12 @@ class MainViewModel(
         val oldActiveSegment = ReaderChapterSegment(activeChapter, activePages)
         recordReaderPosition(targetSegment.chapter.url, nextIndex, pageScrollOffset)
         _state.update {
-            it.copy(
-                activeChapter = targetSegment.chapter,
-                readerPages = targetSegment.pages,
-                readerPreviousSegment = if (direction == ReaderSegmentDirection.NEXT) oldActiveSegment else null,
-                readerNextSegment = if (direction == ReaderSegmentDirection.PREVIOUS) oldActiveSegment else null,
-                currentPageIndex = nextIndex,
-                currentPageScrollOffset = pageScrollOffset.coerceAtLeast(0),
+            it.withActivatedReaderSegment(
+                targetSegment = targetSegment,
+                oldActiveSegment = oldActiveSegment,
+                pageIndex = nextIndex,
+                pageScrollOffset = pageScrollOffset,
+                direction = direction,
             )
         }
         cacheReaderWindow(
@@ -2666,7 +2559,7 @@ class MainViewModel(
         val snapshot = _state.value
         val nextChapter = snapshot.sourceChapters.nextInReadingOrderAfter(snapshot.activeChapter ?: return) ?: return
         if (snapshot.readerPages.isNotEmpty()) {
-            _state.update { it.copy(currentPageIndex = snapshot.readerPages.lastIndex, currentPageScrollOffset = 0) }
+            _state.update { it.withReaderPagePosition(snapshot.readerPages.lastIndex, 0) }
         }
         saveReaderProgress()
         openChapter(nextChapter, startFromSavedProgress = false)
@@ -2687,7 +2580,7 @@ class MainViewModel(
                 return
             }
         if (snapshot.readerPages.isNotEmpty()) {
-            _state.update { it.copy(currentPageIndex = 0, currentPageScrollOffset = 0) }
+            _state.update { it.withReaderPagePosition(0, 0) }
         }
         saveReaderProgress()
         openChapter(
