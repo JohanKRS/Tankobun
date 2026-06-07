@@ -1,9 +1,15 @@
 package com.tankobun.app.logic
 
+import com.tankobun.app.state.TankobunUiState
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistTitle
+import com.tankobun.core.model.SourceChapter
+import com.tankobun.core.model.SourceDescriptor
+import com.tankobun.core.model.SourceManga
+import com.tankobun.core.model.SourceSearchResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -51,6 +57,122 @@ class SourceSearchLogicTest {
         assertTrue(isFatalSourceSearchError(forbiddenError))
     }
 
+    @Test
+    fun sourcePickerSourcesDedupesAndPrioritizesSelectedSource() {
+        val selected = source(id = 2, name = "Beta", lang = "ja")
+        val duplicate = selected.copy(name = "Beta Duplicate")
+        val english = source(id = 1, name = "Alpha", lang = "en")
+
+        val sources = TankobunUiState(
+            installedSources = listOf(english, selected, duplicate),
+            selectedSourceId = selected.id,
+        ).sourcePickerSources()
+
+        assertEquals(listOf(selected.id, english.id), sources.map { it.id })
+    }
+
+    @Test
+    fun sourcePickerSearchCompletedPreservesSelectedMatch() {
+        val selectedSource = source(id = 1, name = "Selected")
+        val selectedMatch = match(source = selectedSource, manga = manga(selectedSource, "selected"), score = 0.1)
+        val foundSource = source(id = 2, name = "Found")
+        val foundMatch = match(source = foundSource, manga = manga(foundSource, "found"), score = 0.95)
+
+        val next = TankobunUiState(
+            sourceMatches = listOf(selectedMatch),
+            selectedSourceId = selectedSource.id,
+            selectedSourceManga = selectedMatch.manga,
+            sourcePickerLoading = true,
+        ).withSourcePickerSearchCompleted(
+            verified = VerifiedSourceMatches(
+                matches = listOf(foundMatch),
+                chapterCounts = mapOf(foundMatch.sourceMatchKey() to 7),
+            ),
+            editedTitle = null,
+        )
+
+        assertEquals(listOf(foundMatch, selectedMatch), next.sourceMatches)
+        assertEquals(7, next.sourceMatchChapterCounts[foundMatch.sourceMatchKey()])
+        assertFalse(next.sourcePickerLoading)
+        assertEquals("Found 2 readable sources", next.sourcePickerMessage)
+    }
+
+    @Test
+    fun sourcePickerDiagnosticDoesNotDuplicateMessages() {
+        val source = source(name = "Demo")
+        val state = TankobunUiState()
+            .withSourcePickerDiagnostic(source, "timed out")
+            .withSourcePickerDiagnostic(source, "timed out")
+
+        assertEquals(listOf("Demo: timed out"), state.sourcePickerDiagnostics)
+    }
+
+    @Test
+    fun sourcePickerSourceSelectedCanKeepExistingMatches() {
+        val source = source(id = 5, name = "Chosen")
+        val existing = match(source = source(id = 2, name = "Existing"))
+        val chosen = match(source = source, manga = manga(source, "chosen"))
+
+        val next = TankobunUiState(sourceMatches = listOf(existing))
+            .withSourcePickerSourceSelected(chosen, addToMatches = false)
+
+        assertEquals(listOf(existing), next.sourceMatches)
+        assertEquals(source.id, next.selectedSourceId)
+        assertEquals(chosen.manga, next.selectedSourceManga)
+        assertFalse(next.sourcePickerOpen)
+        assertEquals("Source selected for chosen", next.message)
+    }
+
+    @Test
+    fun selectedSourceChapterSelectionPrefersExactSelectedMangaMatch() {
+        val selectedSource = source(id = 1, name = "Selected")
+        val otherSource = source(id = 2, name = "Other")
+        val selectedManga = manga(selectedSource, "selected")
+        val otherManga = manga(otherSource, "other")
+        val selectedMatch = match(source = selectedSource, manga = selectedManga)
+        val otherMatch = match(source = otherSource, manga = otherManga)
+
+        val selection = TankobunUiState(
+            installedSources = listOf(selectedSource, otherSource),
+            sourceMatches = listOf(otherMatch, selectedMatch),
+            selectedSourceId = selectedSource.id,
+            selectedSourceManga = selectedManga,
+        ).selectedSourceChapterSelection()
+
+        assertEquals(selectedSource, selection?.source)
+        assertEquals(selectedManga, selection?.manga)
+    }
+
+    @Test
+    fun selectedSourceChapterSelectionReturnsNullWithoutSourceAndManga() {
+        assertNull(TankobunUiState().selectedSourceChapterSelection())
+    }
+
+    @Test
+    fun sourceChaptersLoadedResetsManualSelectionAndStoresCount() {
+        val source = source(id = 7)
+        val manga = manga(source, "series")
+        val chapters = listOf(chapter(source, manga, "chapter-1"))
+
+        val next = TankobunUiState(
+            busy = true,
+            selectingDownloadChapters = true,
+            selectedDownloadChapterUrls = setOf("chapter-1"),
+        ).withSourceChaptersLoaded(
+            source = source,
+            manga = manga,
+            chapters = chapters,
+            chapterProgress = emptyMap(),
+        )
+
+        assertEquals(manga, next.selectedSourceManga)
+        assertEquals(chapters, next.sourceChapters)
+        assertFalse(next.selectingDownloadChapters)
+        assertTrue(next.selectedDownloadChapterUrls.isEmpty())
+        assertEquals(1, next.sourceMatchChapterCounts[sourceMatchKey(source.id, manga.url)])
+        assertFalse(next.busy)
+    }
+
     private fun media(
         userPreferred: String,
         romaji: String? = null,
@@ -83,5 +205,58 @@ class SourceSearchLogicTest {
             synonyms = synonyms,
             isAdult = false,
             updatedAtEpochSeconds = null,
+        )
+
+    private fun source(
+        id: Long = 1L,
+        name: String = "Source",
+        lang: String = "en",
+    ): SourceDescriptor =
+        SourceDescriptor(
+            id = id,
+            name = name,
+            lang = lang,
+            packageName = "pkg.$id",
+            versionName = null,
+            versionCode = null,
+            isNsfw = false,
+            installed = true,
+        )
+
+    private fun manga(source: SourceDescriptor, title: String): SourceManga =
+        SourceManga(
+            sourceId = source.id,
+            url = title,
+            title = title,
+            thumbnailUrl = null,
+            description = null,
+            author = null,
+            artist = null,
+            status = null,
+        )
+
+    private fun match(
+        source: SourceDescriptor = source(),
+        manga: SourceManga = manga(source, "manga"),
+        score: Double = 0.9,
+    ): SourceSearchResult =
+        SourceSearchResult(
+            mediaId = 1,
+            source = source,
+            manga = manga,
+            score = score,
+            reasons = emptyList(),
+            searchedAtEpochMillis = 1L,
+        )
+
+    private fun chapter(source: SourceDescriptor, manga: SourceManga, url: String): SourceChapter =
+        SourceChapter(
+            sourceId = source.id,
+            mangaUrl = manga.url,
+            url = url,
+            name = url,
+            chapterNumber = 1f,
+            scanlator = null,
+            uploadedAtEpochMillis = null,
         )
 }

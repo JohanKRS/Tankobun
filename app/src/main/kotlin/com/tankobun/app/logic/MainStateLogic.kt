@@ -6,6 +6,7 @@ import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistTitleLanguage
+import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.withTitleLanguage
@@ -46,6 +47,74 @@ internal fun TankobunUiState.downloadSourceName(sourceId: Long): String =
         ?: allInstalledSources.firstOrNull { it.id == sourceId }?.name
         ?: selectedSource?.takeIf { it.id == sourceId }?.name
         ?: "Source $sourceId"
+
+internal fun TankobunUiState.withSelectedMedia(
+    media: AnilistMedia,
+    existingEntry: AnilistListEntry?,
+): TankobunUiState =
+    copy(
+        selectedMedia = media,
+        sourceMatches = emptyList(),
+        sourceMatchChapterCounts = emptyMap(),
+        sourcePickerOpen = false,
+        sourcePickerLoading = false,
+        sourcePickerMessage = null,
+        sourcePickerDiagnostics = emptyList(),
+        sourcePickerSearchTitle = "",
+        selectedListEntry = existingEntry,
+        selectedRecommendations = emptyList(),
+        selectedRecommendationsPage = 0,
+        selectedRecommendationsHasMore = false,
+        recommendationsLoading = false,
+        trackingStatus = existingEntry?.status ?: MediaStatus.PLANNING,
+        trackingProgress = (existingEntry?.progress ?: 0).toString(),
+        trackingScore = existingEntry?.score.formatTrackingScore(anilistScoreFormat),
+        trackingNotes = existingEntry?.notes.orEmpty(),
+        trackingPrivate = existingEntry?.private ?: false,
+        trackingCustomLists = existingEntry?.customLists.orEmpty().toSet(),
+        trackingDirty = false,
+        trackingSaveInProgress = false,
+        trackingSaveFailed = false,
+        message = null,
+    ).withoutSourceReaderSelection()
+
+internal fun TankobunUiState.withSelectedSource(sourceId: Long): TankobunUiState {
+    val match = sourceMatches.firstOrNull { match -> match.source.id == sourceId }
+    val sameSource = selectedSourceId == sourceId
+    return copy(
+        selectedSourceId = sourceId,
+        selectedSourceManga = match?.manga ?: selectedSourceManga?.takeIf { manga ->
+            sameSource && manga.sourceId == sourceId
+        },
+        sourceChapters = sourceChapters.takeIf { sameSource }.orEmpty(),
+        chapterProgress = chapterProgress.takeIf { sameSource }.orEmpty(),
+    ).withoutReaderAndDownloadSelection()
+}
+
+internal fun TankobunUiState.withoutSelectedMedia(): TankobunUiState =
+    if (selectedMedia == null) {
+        this
+    } else {
+        copy(
+            selectedMedia = null,
+            sourceMatches = emptyList(),
+            sourceMatchChapterCounts = emptyMap(),
+            sourcePickerOpen = false,
+            sourcePickerLoading = false,
+            sourcePickerMessage = null,
+            sourcePickerDiagnostics = emptyList(),
+            sourcePickerSearchTitle = "",
+            selectedListEntry = null,
+            selectedRecommendations = emptyList(),
+            selectedRecommendationsPage = 0,
+            selectedRecommendationsHasMore = false,
+            recommendationsLoading = false,
+            trackingDirty = false,
+            trackingSaveInProgress = false,
+            trackingSaveFailed = false,
+            message = null,
+        ).withoutSourceReaderSelection()
+    }
 
 internal fun TankobunUiState.withSelectedAniListDetails(
     mediaId: Int,
@@ -137,3 +206,24 @@ internal fun TankobunUiState.withSyncedListEntry(
         trackingSaveFailed = if (selected && updateTrackingForm) false else trackingSaveFailed,
     )
 }
+
+private fun TankobunUiState.withoutSourceReaderSelection(): TankobunUiState =
+    copy(
+        selectedSourceManga = null,
+        sourceChapters = emptyList(),
+        latestProgress = null,
+        chapterProgress = emptyMap(),
+    ).withoutReaderAndDownloadSelection()
+
+private fun TankobunUiState.withoutReaderAndDownloadSelection(): TankobunUiState =
+    copy(
+        activeChapter = null,
+        readerPages = emptyList(),
+        readerPreviousSegment = null,
+        readerNextSegment = null,
+        readerError = null,
+        currentPageIndex = 0,
+        currentPageScrollOffset = 0,
+        selectingDownloadChapters = false,
+        selectedDownloadChapterUrls = emptySet(),
+    )

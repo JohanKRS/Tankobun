@@ -8,6 +8,11 @@ import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistTitle
 import com.tankobun.core.model.MediaStatus
+import com.tankobun.core.model.ReaderPage
+import com.tankobun.core.model.SourceChapter
+import com.tankobun.core.model.SourceDescriptor
+import com.tankobun.core.model.SourceManga
+import com.tankobun.core.model.SourceSearchResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -250,6 +255,107 @@ class MainStateLogicTest {
         assertTrue(next.trackingDirty)
     }
 
+    @Test
+    fun selectedMediaResetsDetailSourceReaderAndDownloadState() {
+        val media = media(42, "Manga")
+        val entry = entry(
+            mediaId = 42,
+            status = MediaStatus.CURRENT,
+            progress = 9,
+            score = 80.0,
+            notes = "note",
+            private = true,
+            customLists = listOf("Favorites"),
+        )
+
+        val next = TankobunUiState(
+            sourceMatches = listOf(match(source())),
+            sourcePickerOpen = true,
+            selectedRecommendations = listOf(AnilistRecommendation(media(7, "Other"), rating = 1)),
+            trackingDirty = true,
+            selectedSourceManga = manga(source(), "old"),
+            sourceChapters = listOf(chapter(source(), "old")),
+            activeChapter = chapter(source(), "active"),
+            readerPages = listOf(ReaderPage(0, "https://example.test/0.jpg", null)),
+            selectingDownloadChapters = true,
+            selectedDownloadChapterUrls = setOf("old"),
+            message = "old message",
+            anilistScoreFormat = AnilistScoreFormat.POINT_100,
+        ).withSelectedMedia(media, entry)
+
+        assertEquals(media, next.selectedMedia)
+        assertEquals(entry, next.selectedListEntry)
+        assertEquals(MediaStatus.CURRENT, next.trackingStatus)
+        assertEquals("9", next.trackingProgress)
+        assertEquals("80", next.trackingScore)
+        assertEquals("note", next.trackingNotes)
+        assertTrue(next.trackingPrivate)
+        assertEquals(setOf("Favorites"), next.trackingCustomLists)
+        assertTrue(next.sourceMatches.isEmpty())
+        assertFalse(next.sourcePickerOpen)
+        assertTrue(next.sourceChapters.isEmpty())
+        assertEquals(null, next.activeChapter)
+        assertTrue(next.readerPages.isEmpty())
+        assertFalse(next.selectingDownloadChapters)
+        assertTrue(next.selectedDownloadChapterUrls.isEmpty())
+        assertEquals(null, next.message)
+    }
+
+    @Test
+    fun selectedSourceKeepsChaptersWhenSourceIsUnchanged() {
+        val source = source(id = 3)
+        val manga = manga(source, "manga")
+        val chapters = listOf(chapter(source, "chapter"))
+
+        val next = TankobunUiState(
+            selectedSourceId = source.id,
+            selectedSourceManga = manga,
+            sourceChapters = chapters,
+            chapterProgress = mapOf("chapter" to progress()),
+            activeChapter = chapters.first(),
+            readerPages = listOf(ReaderPage(0, "https://example.test/0.jpg", null)),
+            selectingDownloadChapters = true,
+            selectedDownloadChapterUrls = setOf("chapter"),
+            message = "keep me",
+        ).withSelectedSource(source.id)
+
+        assertEquals(manga, next.selectedSourceManga)
+        assertEquals(chapters, next.sourceChapters)
+        assertEquals(setOf("chapter"), next.chapterProgress.keys)
+        assertEquals(null, next.activeChapter)
+        assertTrue(next.readerPages.isEmpty())
+        assertFalse(next.selectingDownloadChapters)
+        assertTrue(next.selectedDownloadChapterUrls.isEmpty())
+        assertEquals("keep me", next.message)
+    }
+
+    @Test
+    fun selectedSourceSwitchClearsPreviousChaptersAndUsesMatchingManga() {
+        val oldSource = source(id = 1)
+        val newSource = source(id = 2)
+        val newMatch = match(newSource, manga(newSource, "new"))
+
+        val next = TankobunUiState(
+            selectedSourceId = oldSource.id,
+            sourceMatches = listOf(newMatch),
+            selectedSourceManga = manga(oldSource, "old"),
+            sourceChapters = listOf(chapter(oldSource, "old-chapter")),
+            chapterProgress = mapOf("old-chapter" to progress()),
+        ).withSelectedSource(newSource.id)
+
+        assertEquals(newSource.id, next.selectedSourceId)
+        assertEquals(newMatch.manga, next.selectedSourceManga)
+        assertTrue(next.sourceChapters.isEmpty())
+        assertTrue(next.chapterProgress.isEmpty())
+    }
+
+    @Test
+    fun withoutSelectedMediaIsNoopWhenNothingSelected() {
+        val state = TankobunUiState(message = "still here")
+
+        assertSame(state, state.withoutSelectedMedia())
+    }
+
     private fun media(id: Int, title: String): AnilistMedia =
         AnilistMedia(
             id = id,
@@ -297,5 +403,63 @@ class MainStateLogicTest {
             private = private,
             customLists = customLists,
             updatedAtEpochSeconds = null,
+        )
+
+    private fun source(id: Long = 1L, name: String = "Source"): SourceDescriptor =
+        SourceDescriptor(
+            id = id,
+            name = name,
+            lang = "en",
+            packageName = "pkg.$id",
+            versionName = null,
+            versionCode = null,
+            isNsfw = false,
+            installed = true,
+        )
+
+    private fun manga(source: SourceDescriptor, title: String): SourceManga =
+        SourceManga(
+            sourceId = source.id,
+            url = title,
+            title = title,
+            thumbnailUrl = null,
+            description = null,
+            author = null,
+            artist = null,
+            status = null,
+        )
+
+    private fun match(source: SourceDescriptor, manga: SourceManga = manga(source, "manga")): SourceSearchResult =
+        SourceSearchResult(
+            mediaId = 42,
+            source = source,
+            manga = manga,
+            score = 0.9,
+            reasons = emptyList(),
+            searchedAtEpochMillis = 1L,
+        )
+
+    private fun chapter(source: SourceDescriptor, url: String): SourceChapter =
+        SourceChapter(
+            sourceId = source.id,
+            mangaUrl = "manga",
+            url = url,
+            name = url,
+            chapterNumber = 1f,
+            scanlator = null,
+            uploadedAtEpochMillis = null,
+        )
+
+    private fun progress() =
+        com.tankobun.core.model.ReadingProgress(
+            mediaId = 42,
+            chapterUrl = "chapter",
+            chapterNumber = 1f,
+            pageIndex = 0,
+            pageScrollOffset = 0,
+            totalPages = 1,
+            readerMode = com.tankobun.core.model.ReaderMode.PAGED,
+            completed = false,
+            updatedAtEpochMillis = 1L,
         )
 }

@@ -1,6 +1,11 @@
 package com.tankobun.app.logic
 
+import com.tankobun.app.state.TankobunUiState
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.ReadingProgress
+import com.tankobun.core.model.SourceChapter
+import com.tankobun.core.model.SourceDescriptor
+import com.tankobun.core.model.SourceManga
 import com.tankobun.core.model.SourceSearchResult
 import java.util.Locale
 
@@ -14,6 +19,11 @@ internal data class VerifiedSourceMatches(
 internal data class VerifiedReadableMatch(
     val match: SourceSearchResult,
     val chapterCount: Int,
+)
+
+internal data class SourceChapterSelection(
+    val source: SourceDescriptor,
+    val manga: SourceManga,
 )
 
 internal class SourceQueryTimeoutException(query: String) : RuntimeException("Search timed out for '$query'")
@@ -55,6 +65,202 @@ internal fun sourcePickerDefaultSearchTitle(media: AnilistMedia): String =
         media.title.english,
         media.title.native,
     ).firstOrNull { !it.isNullOrBlank() }.orEmpty()
+
+internal fun TankobunUiState.sourcePickerSources(): List<SourceDescriptor> =
+    installedSources
+        .distinctBy { "${it.packageName}:${it.id}" }
+        .sortedWith(
+            compareBy<SourceDescriptor> { if (it.id == selectedSourceId) 0 else 1 }
+                .thenBy { it.languageSortPriority(sourceLanguages) }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.lang },
+        )
+
+internal fun TankobunUiState.withSourcePickerOpened(media: AnilistMedia): TankobunUiState =
+    copy(
+        sourcePickerOpen = true,
+        sourcePickerMessage = null,
+        sourcePickerDiagnostics = emptyList(),
+        sourcePickerSearchTitle = sourcePickerDefaultSearchTitle(media),
+        message = null,
+    )
+
+internal fun TankobunUiState.withSourcePickerNoSources(): TankobunUiState =
+    copy(
+        sourcePickerMessage = SOURCE_PICKER_NO_SOURCES_MESSAGE,
+        message = if (sourcePickerOpen) message else SOURCE_PICKER_NO_SOURCES_MESSAGE,
+    )
+
+internal fun TankobunUiState.withSourcePickerClosed(): TankobunUiState =
+    copy(
+        busy = false,
+        sourcePickerOpen = false,
+        sourcePickerLoading = false,
+        sourcePickerMessage = null,
+        sourcePickerDiagnostics = emptyList(),
+        sourcePickerSearchTitle = "",
+    )
+
+internal fun TankobunUiState.withSourcePickerSearchTitle(title: String): TankobunUiState =
+    copy(sourcePickerSearchTitle = title)
+
+internal fun TankobunUiState.withSourcePickerEditedTitleTooShort(): TankobunUiState =
+    copy(sourcePickerMessage = "Enter at least two characters to search.")
+
+internal fun TankobunUiState.withSourcePickerSourceSearchStarted(source: SourceDescriptor): TankobunUiState =
+    copy(
+        sourcePickerLoading = true,
+        sourcePickerMessage = "Searching ${source.name}...",
+        sourcePickerDiagnostics = emptyList(),
+        message = null,
+    )
+
+internal fun TankobunUiState.withSourcePickerMatchOpening(match: SourceSearchResult): TankobunUiState =
+    copy(
+        sourcePickerLoading = true,
+        sourcePickerMessage = "Opening ${match.manga.title} from ${match.source.name}...",
+        message = null,
+    )
+
+internal fun TankobunUiState.withSourcePickerSearchStarted(editedTitle: String?): TankobunUiState =
+    copy(
+        sourcePickerLoading = true,
+        sourcePickerMessage = editedTitle?.let { title -> "Searching enabled sources for \"$title\"..." }
+            ?: "Searching enabled sources...",
+        sourcePickerDiagnostics = emptyList(),
+        message = null,
+    )
+
+internal fun TankobunUiState.withSourcePickerSearchCompleted(
+    verified: VerifiedSourceMatches,
+    editedTitle: String?,
+): TankobunUiState {
+    val selectedMatches = sourceMatches.filter { match ->
+        selectedSourceId == match.source.id &&
+            selectedSourceManga?.url == match.manga.url
+    }
+    val nextMatches = (selectedMatches + verified.matches)
+        .distinctSourceMatches()
+        .sortedByDescending { match -> match.score }
+    return copy(
+        sourceMatches = nextMatches,
+        sourceMatchChapterCounts = sourceMatchChapterCounts + verified.chapterCounts,
+        busy = false,
+        sourcePickerLoading = false,
+        sourcePickerMessage = sourcePickerSearchCompletedMessage(nextMatches.size, editedTitle),
+        message = null,
+    )
+}
+
+internal fun TankobunUiState.withSourcePickerMatchPublished(
+    match: SourceSearchResult,
+    chapterCount: Int,
+): TankobunUiState {
+    val nextMatches = (sourceMatches + match)
+        .distinctSourceMatches()
+        .sortedByDescending { result -> result.score }
+    return copy(
+        sourceMatches = nextMatches,
+        sourceMatchChapterCounts = sourceMatchChapterCounts + (match.sourceMatchKey() to chapterCount),
+        sourcePickerMessage = "Found ${nextMatches.size} readable sources",
+        message = null,
+    )
+}
+
+internal fun TankobunUiState.withSourcePickerDiagnostic(
+    source: SourceDescriptor,
+    detail: String,
+): TankobunUiState {
+    val diagnostic = "${source.name}: $detail"
+    return if (diagnostic in sourcePickerDiagnostics) {
+        this
+    } else {
+        copy(sourcePickerDiagnostics = sourcePickerDiagnostics + diagnostic)
+    }
+}
+
+internal fun TankobunUiState.withSourcePickerSourceSelected(
+    match: SourceSearchResult,
+    addToMatches: Boolean,
+): TankobunUiState {
+    val nextMatches = if (addToMatches) {
+        (listOf(match) + sourceMatches).distinctSourceMatches()
+    } else {
+        sourceMatches
+    }
+    return copy(
+        sourceMatches = nextMatches,
+        selectedSourceId = match.source.id,
+        selectedSourceManga = match.manga,
+        sourcePickerOpen = false,
+        sourcePickerLoading = false,
+        sourcePickerMessage = null,
+        message = "Source selected for ${match.manga.title}",
+    )
+}
+
+internal fun TankobunUiState.withSourcePickerFailure(sourceName: String, error: Throwable): TankobunUiState =
+    copy(
+        busy = false,
+        sourcePickerLoading = false,
+        sourcePickerMessage = sourcePickerErrorMessage(sourceName, error),
+        message = null,
+    )
+
+internal fun TankobunUiState.selectedSourceChapterSelection(): SourceChapterSelection? {
+    val selectedSourceId = this.selectedSourceId
+    val selectedManga = this.selectedSourceManga
+    val match = sourceMatches.firstOrNull { result ->
+        result.source.id == selectedSourceId &&
+            selectedManga != null &&
+            result.manga.sourceId == selectedManga.sourceId &&
+            result.manga.url == selectedManga.url
+    } ?: sourceMatches.firstOrNull { result ->
+        selectedManga != null &&
+            result.manga.sourceId == selectedManga.sourceId &&
+            result.manga.url == selectedManga.url
+    } ?: sourceMatches.firstOrNull { it.source.id == selectedSourceId }
+    val manga = match?.manga ?: selectedManga?.takeIf { manga ->
+        selectedSourceId == null || manga.sourceId == selectedSourceId
+    }
+    val source = match?.source
+        ?: manga?.let { selected ->
+            installedSources.firstOrNull { it.id == selected.sourceId }
+                ?: allInstalledSources.firstOrNull { it.id == selected.sourceId }
+        }
+        ?: selectedSource
+    return if (source == null || manga == null) {
+        null
+    } else {
+        SourceChapterSelection(source, manga)
+    }
+}
+
+internal fun TankobunUiState.withSourceChapterSelectionMissing(): TankobunUiState =
+    copy(message = "Find and choose a source match first")
+
+internal fun TankobunUiState.withSourceChaptersLoading(): TankobunUiState =
+    copy(busy = true, message = null)
+
+internal fun TankobunUiState.withSourceChaptersLoaded(
+    source: SourceDescriptor,
+    manga: SourceManga,
+    chapters: List<SourceChapter>,
+    chapterProgress: Map<String, ReadingProgress>,
+): TankobunUiState =
+    copy(
+        selectedSourceManga = manga,
+        sourceChapters = chapters,
+        chapterProgress = chapterProgress,
+        selectingDownloadChapters = false,
+        selectedDownloadChapterUrls = emptySet(),
+        busy = false,
+        sourceMatchChapterCounts = sourceMatchChapterCounts + (sourceMatchKey(source.id, manga.url) to chapters.size),
+        message = if (chapters.isEmpty()) "No chapters found" else null,
+    )
+
+internal fun TankobunUiState.withSourceChaptersLoadFailed(error: Throwable): TankobunUiState =
+    copy(busy = false, message = error.message ?: "Chapter load failed")
 
 internal fun sourcePickerErrorMessage(sourceName: String, error: Throwable): String {
     val detail = errorDetail(error)
@@ -128,6 +334,19 @@ internal fun SourceSearchResult.isReadableMatchCandidate(): Boolean =
 
 internal fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
     "$sourceId:$mangaUrl"
+
+private fun List<SourceSearchResult>.distinctSourceMatches(): List<SourceSearchResult> =
+    distinctBy { match -> "${match.source.id}:${match.manga.url}" }
+
+private fun sourcePickerSearchCompletedMessage(matchCount: Int, editedTitle: String?): String =
+    if (matchCount == 0) {
+        editedTitle?.let { title ->
+            "No readable matches found for \"$title\". Edit the search title or tap a source below to try it directly."
+        } ?: "No readable matches found automatically. Edit the search title or tap a source below to try it directly."
+    } else {
+        editedTitle?.let { title -> "Found $matchCount readable sources for \"$title\"" }
+            ?: "Found $matchCount readable sources"
+    }
 
 private fun sourceSearchQueryVariants(title: String): List<String> {
     val withoutHtml = title.withoutHtmlTags()
@@ -286,3 +505,4 @@ private fun isUnexpectedSourceResponseError(error: Throwable): Boolean =
 
 private const val SOURCE_READABLE_MATCH_SCORE = 0.9
 private const val SOURCE_SEARCH_QUERY_LIMIT = 12
+private const val SOURCE_PICKER_NO_SOURCES_MESSAGE = "Enable or install a source extension first"

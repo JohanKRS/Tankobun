@@ -22,7 +22,6 @@ import com.tankobun.app.logic.filteredScoreInput
 import com.tankobun.app.logic.formatTrackingScore
 import com.tankobun.app.logic.hasBrowseQueryOrFilters
 import com.tankobun.app.logic.hasContent
-import com.tankobun.app.logic.languageSortPriority
 import com.tankobun.app.logic.mediaTitle
 import com.tankobun.app.logic.nextInReadingOrderAfter
 import com.tankobun.app.logic.nextTenDownloadCandidates
@@ -33,10 +32,9 @@ import com.tankobun.app.logic.previousInReadingOrderBefore
 import com.tankobun.app.logic.readerLoadErrorFor
 import com.tankobun.app.logic.readerSourceForChapter
 import com.tankobun.app.logic.ReaderSegmentDirection
+import com.tankobun.app.logic.selectedSourceChapterSelection
 import com.tankobun.app.logic.sourceSettingsKey
-import com.tankobun.app.logic.sourcePickerDefaultSearchTitle
-import com.tankobun.app.logic.sourcePickerErrorMessage
-import com.tankobun.app.logic.sourceMatchKey
+import com.tankobun.app.logic.sourcePickerSources
 import com.tankobun.app.logic.toAniListScore
 import com.tankobun.app.logic.userMessage
 import com.tankobun.app.logic.visibleSources
@@ -53,6 +51,25 @@ import com.tankobun.app.logic.withReaderPagePosition
 import com.tankobun.app.logic.withReaderPagesLoaded
 import com.tankobun.app.logic.withRecentProgressOpened
 import com.tankobun.app.logic.withSelectedAniListDetails
+import com.tankobun.app.logic.withSelectedMedia
+import com.tankobun.app.logic.withSelectedSource
+import com.tankobun.app.logic.withSourcePickerClosed
+import com.tankobun.app.logic.withSourcePickerDiagnostic
+import com.tankobun.app.logic.withSourcePickerEditedTitleTooShort
+import com.tankobun.app.logic.withSourcePickerFailure
+import com.tankobun.app.logic.withSourcePickerMatchOpening
+import com.tankobun.app.logic.withSourcePickerMatchPublished
+import com.tankobun.app.logic.withSourcePickerNoSources
+import com.tankobun.app.logic.withSourcePickerOpened
+import com.tankobun.app.logic.withSourcePickerSearchCompleted
+import com.tankobun.app.logic.withSourcePickerSearchStarted
+import com.tankobun.app.logic.withSourcePickerSearchTitle
+import com.tankobun.app.logic.withSourcePickerSourceSearchStarted
+import com.tankobun.app.logic.withSourcePickerSourceSelected
+import com.tankobun.app.logic.withSourceChapterSelectionMissing
+import com.tankobun.app.logic.withSourceChaptersLoaded
+import com.tankobun.app.logic.withSourceChaptersLoadFailed
+import com.tankobun.app.logic.withSourceChaptersLoading
 import com.tankobun.app.logic.withSyncedListEntry
 import com.tankobun.app.logic.withRecomputedTrackingDirty
 import com.tankobun.app.logic.withTrackingCustomListSelected
@@ -60,6 +77,7 @@ import com.tankobun.app.logic.withTrackingCustomListSaveResult
 import com.tankobun.app.logic.withTrackingSaveFailure
 import com.tankobun.app.logic.withTrackingSaveResult
 import com.tankobun.app.logic.withTrackingSaveStarted
+import com.tankobun.app.logic.withoutSelectedMedia
 import com.tankobun.app.reader.ReaderDataSource
 import com.tankobun.app.source.SourceDataSource
 import com.tankobun.app.source.SourcePickerSearchUpdate
@@ -1184,113 +1202,17 @@ class MainViewModel(
         val titleLanguage = _state.value.anilistTitleLanguage
         val displayMedia = media.withTitleLanguage(titleLanguage)
         val existingEntry = _state.value.libraryItems.firstOrNull { item -> item.media.id == media.id }?.entry
-        _state.update {
-            it.copy(
-                selectedMedia = displayMedia,
-                sourceMatches = emptyList(),
-                sourceMatchChapterCounts = emptyMap(),
-                sourcePickerOpen = false,
-                sourcePickerLoading = false,
-                sourcePickerMessage = null,
-                sourcePickerDiagnostics = emptyList(),
-                sourcePickerSearchTitle = "",
-                selectedListEntry = existingEntry,
-                selectedRecommendations = emptyList(),
-                selectedRecommendationsPage = 0,
-                selectedRecommendationsHasMore = false,
-                recommendationsLoading = false,
-                trackingStatus = existingEntry?.status ?: MediaStatus.PLANNING,
-                trackingProgress = (existingEntry?.progress ?: 0).toString(),
-                trackingScore = existingEntry?.score.formatTrackingScore(it.anilistScoreFormat),
-                trackingNotes = existingEntry?.notes.orEmpty(),
-                trackingPrivate = existingEntry?.private ?: false,
-                trackingCustomLists = existingEntry?.customLists.orEmpty().toSet(),
-                trackingDirty = false,
-                trackingSaveInProgress = false,
-                trackingSaveFailed = false,
-                selectedSourceManga = null,
-                sourceChapters = emptyList(),
-                latestProgress = null,
-                chapterProgress = emptyMap(),
-                activeChapter = null,
-                readerPages = emptyList(),
-                readerPreviousSegment = null,
-                readerNextSegment = null,
-                readerError = null,
-                currentPageIndex = 0,
-                currentPageScrollOffset = 0,
-                selectingDownloadChapters = false,
-                selectedDownloadChapterUrls = emptySet(),
-                message = null,
-            )
-        }
+        _state.update { it.withSelectedMedia(displayMedia, existingEntry) }
         loadAnilistDetails(media.id)
         loadCachedSourceState(media.id)
     }
 
     fun selectSource(sourceId: Long) {
-        _state.update {
-            val match = it.sourceMatches.firstOrNull { match -> match.source.id == sourceId }
-            val sameSource = it.selectedSourceId == sourceId
-            it.copy(
-                selectedSourceId = sourceId,
-                selectedSourceManga = match?.manga ?: it.selectedSourceManga?.takeIf { manga ->
-                    sameSource && manga.sourceId == sourceId
-                },
-                sourceChapters = it.sourceChapters.takeIf { sameSource }.orEmpty(),
-                chapterProgress = it.chapterProgress.takeIf { sameSource }.orEmpty(),
-                activeChapter = null,
-                readerPages = emptyList(),
-                readerPreviousSegment = null,
-                readerNextSegment = null,
-                readerError = null,
-                currentPageIndex = 0,
-                currentPageScrollOffset = 0,
-                selectingDownloadChapters = false,
-                selectedDownloadChapterUrls = emptySet(),
-            )
-        }
+        _state.update { it.withSelectedSource(sourceId) }
     }
 
     fun clearSelectedMedia() {
-        _state.update {
-            if (it.selectedMedia == null) {
-                it
-            } else {
-                it.copy(
-                    selectedMedia = null,
-                    sourceMatches = emptyList(),
-                    sourceMatchChapterCounts = emptyMap(),
-                    sourcePickerOpen = false,
-                    sourcePickerLoading = false,
-                    sourcePickerMessage = null,
-                    sourcePickerDiagnostics = emptyList(),
-                    sourcePickerSearchTitle = "",
-                    selectedListEntry = null,
-                    selectedRecommendations = emptyList(),
-                    selectedRecommendationsPage = 0,
-                    selectedRecommendationsHasMore = false,
-                    recommendationsLoading = false,
-                    trackingDirty = false,
-                    trackingSaveInProgress = false,
-                    trackingSaveFailed = false,
-                    selectedSourceManga = null,
-                    sourceChapters = emptyList(),
-                    latestProgress = null,
-                    chapterProgress = emptyMap(),
-                    activeChapter = null,
-                    readerPages = emptyList(),
-                    readerPreviousSegment = null,
-                    readerNextSegment = null,
-                    readerError = null,
-                    currentPageIndex = 0,
-                    currentPageScrollOffset = 0,
-                    selectingDownloadChapters = false,
-                    selectedDownloadChapterUrls = emptySet(),
-                    message = null,
-                )
-            }
-        }
+        _state.update { it.withoutSelectedMedia() }
     }
 
     fun setReaderMode(mode: ReaderMode) {
@@ -1812,17 +1734,9 @@ class MainViewModel(
     fun openSourcePicker() {
         val media = _state.value.selectedMedia ?: return
         val sources = sourcePickerSources()
-        _state.update {
-            it.copy(
-                sourcePickerOpen = true,
-                sourcePickerMessage = null,
-                sourcePickerDiagnostics = emptyList(),
-                sourcePickerSearchTitle = sourcePickerDefaultSearchTitle(media),
-                message = null,
-            )
-        }
+        _state.update { it.withSourcePickerOpened(media) }
         if (sources.isEmpty()) {
-            _state.update { it.copy(sourcePickerMessage = "Enable or install a source extension first") }
+            _state.update { it.withSourcePickerNoSources() }
             return
         }
         if (!_state.value.sourcePickerLoading) {
@@ -1832,26 +1746,17 @@ class MainViewModel(
 
     fun closeSourcePicker() {
         cancelSourcePickerJob()
-        _state.update {
-            it.copy(
-                busy = false,
-                sourcePickerOpen = false,
-                sourcePickerLoading = false,
-                sourcePickerMessage = null,
-                sourcePickerDiagnostics = emptyList(),
-                sourcePickerSearchTitle = "",
-            )
-        }
+        _state.update { it.withSourcePickerClosed() }
     }
 
     fun updateSourcePickerSearchTitle(title: String) {
-        _state.update { it.copy(sourcePickerSearchTitle = title) }
+        _state.update { it.withSourcePickerSearchTitle(title) }
     }
 
     fun findSourceMatchesWithEditedTitle() {
         val title = _state.value.sourcePickerSearchTitle.trim()
         if (title.length < 2) {
-            _state.update { it.copy(sourcePickerMessage = "Enter at least two characters to search.") }
+            _state.update { it.withSourcePickerEditedTitleTooShort() }
             return
         }
         findSourceMatches(forceRefresh = true, titleOverride = title)
@@ -1879,7 +1784,7 @@ class MainViewModel(
     fun bindSelectedSource() {
         val media = _state.value.selectedMedia ?: return
         val source = _state.value.selectedSource ?: run {
-            _state.update { it.copy(message = "Enable or install a source extension first") }
+            _state.update { it.withSourcePickerNoSources() }
             return
         }
         bindSource(source)
@@ -1889,45 +1794,19 @@ class MainViewModel(
         val media = _state.value.selectedMedia ?: return
         val requestId = beginSourcePickerJob()
         sourcePickerJob = viewModelScope.launch {
-            _state.update {
-                it.copy(
-                    sourcePickerLoading = true,
-                    sourcePickerMessage = "Searching ${source.name}...",
-                    sourcePickerDiagnostics = emptyList(),
-                    message = null,
-                )
-            }
+            _state.update { it.withSourcePickerSourceSearchStarted(source) }
             try {
                 val now = System.currentTimeMillis()
                 val match = sourceDataSource.readableSourceMatch(media, source, now)
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 sourceDataSource.saveSourceBinding(match)
-                _state.update {
-                    it.copy(
-                        sourceMatches = (listOf(match) + it.sourceMatches).distinctBy { result ->
-                            "${result.source.id}:${result.manga.url}"
-                        },
-                        selectedSourceId = match.source.id,
-                        selectedSourceManga = match.manga,
-                        sourcePickerOpen = false,
-                        sourcePickerLoading = false,
-                        sourcePickerMessage = null,
-                        message = "Source selected for ${match.manga.title}",
-                    )
-                }
+                _state.update { it.withSourcePickerSourceSelected(match, addToMatches = true) }
                 loadChapters(match.source, match.manga)
             } catch (error: Throwable) {
                 if (error is CancellationException) return@launch
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 Log.w(TAG, "Selected source binding failed for ${source.name}", error)
-                _state.update {
-                    it.copy(
-                        busy = false,
-                        sourcePickerLoading = false,
-                        sourcePickerMessage = sourcePickerErrorMessage(source.name, error),
-                        message = null,
-                    )
-                }
+                _state.update { it.withSourcePickerFailure(source.name, error) }
             } finally {
                 if (sourcePickerRequestId == requestId) {
                     sourcePickerJob = null
@@ -1940,21 +1819,13 @@ class MainViewModel(
         val media = _state.value.selectedMedia ?: return
         val sources = sourcePickerSources()
         if (sources.isEmpty()) {
-            _state.update { it.copy(sourcePickerMessage = "Enable or install a source extension first") }
+            _state.update { it.withSourcePickerNoSources() }
             return
         }
         val editedTitle = titleOverride?.trim()?.takeIf { it.length >= 2 }
         val requestId = beginSourcePickerJob()
         sourcePickerJob = viewModelScope.launch {
-            _state.update {
-                it.copy(
-                    sourcePickerLoading = true,
-                    sourcePickerMessage = editedTitle?.let { title -> "Searching enabled sources for \"$title\"..." }
-                        ?: "Searching enabled sources...",
-                    sourcePickerDiagnostics = emptyList(),
-                    message = null,
-                )
-            }
+            _state.update { it.withSourcePickerSearchStarted(editedTitle) }
             try {
                 val now = System.currentTimeMillis()
                 val verified = if (editedTitle == null) {
@@ -1978,41 +1849,11 @@ class MainViewModel(
                     )
                 }
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
-                _state.update {
-                    val selectedMatches = it.sourceMatches.filter { match ->
-                        it.selectedSourceId == match.source.id &&
-                            it.selectedSourceManga?.url == match.manga.url
-                    }
-                    val nextMatches = (selectedMatches + verified.matches)
-                        .distinctBy { match -> "${match.source.id}:${match.manga.url}" }
-                        .sortedByDescending { match -> match.score }
-                    it.copy(
-                        sourceMatches = nextMatches,
-                        sourceMatchChapterCounts = it.sourceMatchChapterCounts + verified.chapterCounts,
-                        busy = false,
-                        sourcePickerLoading = false,
-                        sourcePickerMessage = if (nextMatches.isEmpty()) {
-                            editedTitle?.let { title ->
-                                "No readable matches found for \"$title\". Edit the search title or tap a source below to try it directly."
-                            } ?: "No readable matches found automatically. Edit the search title or tap a source below to try it directly."
-                        } else {
-                            editedTitle?.let { title -> "Found ${nextMatches.size} readable sources for \"$title\"" }
-                                ?: "Found ${nextMatches.size} readable sources"
-                        },
-                        message = null,
-                    )
-                }
+                _state.update { it.withSourcePickerSearchCompleted(verified, editedTitle) }
             } catch (error: Throwable) {
                 if (error is CancellationException) return@launch
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
-                _state.update {
-                    it.copy(
-                        busy = false,
-                        sourcePickerLoading = false,
-                        sourcePickerMessage = sourcePickerErrorMessage("source search", error),
-                        message = null,
-                    )
-                }
+                _state.update { it.withSourcePickerFailure("source search", error) }
             } finally {
                 if (sourcePickerRequestId == requestId) {
                     sourcePickerJob = null
@@ -2022,16 +1863,7 @@ class MainViewModel(
     }
 
     private fun sourcePickerSources(): List<SourceDescriptor> {
-        val snapshot = _state.value
-        val selectedSourceId = snapshot.selectedSourceId
-        return snapshot.installedSources
-            .distinctBy { "${it.packageName}:${it.id}" }
-            .sortedWith(
-                compareBy<SourceDescriptor> { if (it.id == selectedSourceId) 0 else 1 }
-                    .thenBy { it.languageSortPriority(snapshot.sourceLanguages) }
-                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
-                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.lang },
-            )
+        return _state.value.sourcePickerSources()
     }
 
     private fun publishSourcePickerUpdate(requestId: Long, mediaId: Int, update: SourcePickerSearchUpdate) {
@@ -2048,28 +1880,17 @@ class MainViewModel(
             if (!isActiveSourcePickerRequest(requestId, mediaId)) {
                 it
             } else {
-                val nextMatches = (it.sourceMatches + match)
-                    .distinctBy { result -> "${result.source.id}:${result.manga.url}" }
-                    .sortedByDescending { result -> result.score }
-                it.copy(
-                    sourceMatches = nextMatches,
-                    sourceMatchChapterCounts = it.sourceMatchChapterCounts + (match.sourceMatchKey() to chapterCount),
-                    sourcePickerMessage = "Found ${nextMatches.size} readable sources",
-                    message = null,
-                )
+                it.withSourcePickerMatchPublished(match, chapterCount)
             }
         }
     }
 
     private fun publishSourcePickerDiagnostic(requestId: Long, mediaId: Int, source: SourceDescriptor, detail: String) {
-        val diagnostic = "${source.name}: $detail"
         _state.update {
             if (!isActiveSourcePickerRequest(requestId, mediaId)) {
                 it
-            } else if (diagnostic in it.sourcePickerDiagnostics) {
-                it
             } else {
-                it.copy(sourcePickerDiagnostics = it.sourcePickerDiagnostics + diagnostic)
+                it.withSourcePickerDiagnostic(source, detail)
             }
         }
     }
@@ -2078,40 +1899,18 @@ class MainViewModel(
         val media = _state.value.selectedMedia ?: return
         val requestId = beginSourcePickerJob()
         sourcePickerJob = viewModelScope.launch {
-            _state.update {
-                it.copy(
-                    sourcePickerLoading = true,
-                    sourcePickerMessage = "Opening ${match.manga.title} from ${match.source.name}...",
-                    message = null,
-                )
-            }
+            _state.update { it.withSourcePickerMatchOpening(match) }
             try {
                 val resolved = sourceDataSource.resolveMangaDetails(match)
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 sourceDataSource.saveSourceBinding(resolved)
-                _state.update {
-                    it.copy(
-                        selectedSourceId = resolved.source.id,
-                        selectedSourceManga = resolved.manga,
-                        sourcePickerOpen = false,
-                        sourcePickerLoading = false,
-                        sourcePickerMessage = null,
-                        message = "Source selected for ${resolved.manga.title}",
-                    )
-                }
+                _state.update { it.withSourcePickerSourceSelected(resolved, addToMatches = false) }
                 loadChapters(resolved.source, resolved.manga)
             } catch (error: Throwable) {
                 if (error is CancellationException) return@launch
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 Log.w(TAG, "Source binding failed for ${match.source.name}/${match.manga.title}", error)
-                _state.update {
-                    it.copy(
-                        busy = false,
-                        sourcePickerLoading = false,
-                        sourcePickerMessage = sourcePickerErrorMessage(match.source.name, error),
-                        message = null,
-                    )
-                }
+                _state.update { it.withSourcePickerFailure(match.source.name, error) }
             } finally {
                 if (sourcePickerRequestId == requestId) {
                     sourcePickerJob = null
@@ -2121,38 +1920,17 @@ class MainViewModel(
     }
 
     fun loadChaptersForCurrentMatch() {
-        val state = _state.value
-        val selectedSourceId = state.selectedSourceId
-        val selectedManga = state.selectedSourceManga
-        val match = state.sourceMatches.firstOrNull { result ->
-            result.source.id == selectedSourceId &&
-                selectedManga != null &&
-                result.manga.sourceId == selectedManga.sourceId &&
-                result.manga.url == selectedManga.url
-        } ?: state.sourceMatches.firstOrNull { result ->
-            selectedManga != null &&
-                result.manga.sourceId == selectedManga.sourceId &&
-                result.manga.url == selectedManga.url
-        } ?: state.sourceMatches.firstOrNull { it.source.id == selectedSourceId }
-        val manga = match?.manga ?: selectedManga?.takeIf { manga ->
-            selectedSourceId == null || manga.sourceId == selectedSourceId
-        }
-        val source = match?.source
-            ?: manga?.let { selected ->
-                state.installedSources.firstOrNull { it.id == selected.sourceId }
-                    ?: state.allInstalledSources.firstOrNull { it.id == selected.sourceId }
-            }
-            ?: state.selectedSource
-        if (source == null || manga == null) {
-            _state.update { it.copy(message = "Find and choose a source match first") }
+        val selection = _state.value.selectedSourceChapterSelection()
+        if (selection == null) {
+            _state.update { it.withSourceChapterSelectionMissing() }
             return
         }
-        loadChapters(source, manga)
+        loadChapters(selection.source, selection.manga)
     }
 
     private fun loadChapters(source: SourceDescriptor, manga: com.tankobun.core.model.SourceManga) {
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
+            _state.update { it.withSourceChaptersLoading() }
             runCatching {
                 val now = System.currentTimeMillis()
                 sourceDataSource.loadChapters(
@@ -2163,18 +1941,7 @@ class MainViewModel(
                 )
             }.onSuccess { (detailedManga, chapters, chapterProgress) ->
                 Log.i(TAG, "Chapter load ${source.name}/${detailedManga.title}: chapters=${chapters.size}")
-                _state.update {
-                    it.copy(
-                        selectedSourceManga = detailedManga,
-                        sourceChapters = chapters,
-                        chapterProgress = chapterProgress,
-                        selectingDownloadChapters = false,
-                        selectedDownloadChapterUrls = emptySet(),
-                        busy = false,
-                        sourceMatchChapterCounts = it.sourceMatchChapterCounts + (sourceMatchKey(source.id, detailedManga.url) to chapters.size),
-                        message = if (chapters.isEmpty()) "No chapters found" else null,
-                    )
-                }
+                _state.update { it.withSourceChaptersLoaded(source, detailedManga, chapters, chapterProgress) }
                 if (_state.value.keepNextTenDownloads) {
                     val result = ensureNextTenDownloads()
                     if (result.changed > 0) {
@@ -2183,7 +1950,7 @@ class MainViewModel(
                 }
             }.onFailure { error ->
                 Log.w(TAG, "Chapter load failed for ${source.name}/${manga.title}", error)
-                _state.update { it.copy(busy = false, message = error.message ?: "Chapter load failed") }
+                _state.update { it.withSourceChaptersLoadFailed(error) }
             }
         }
     }
