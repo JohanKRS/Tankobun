@@ -12,7 +12,7 @@ class InstalledExtensionScannerTest {
         )
         assertEquals(
             "all",
-            extensionLanguageFromPackage("eu.kanade.tachiyomi.extension.all.mangadex"),
+            extensionLanguageFromPackage("eu.kanade.tachiyomi.extension.all.fixture"),
         )
     }
 }

@@ -10,15 +10,15 @@ import org.junit.Test
 class TachiyomiSourceHostTest {
     @Test
     fun expandsManifestRelativeSourceClassNames() {
-        val packageName = "eu.kanade.tachiyomi.extension.all.mangadex"
+        val packageName = "eu.kanade.tachiyomi.extension.all.fixture"
 
         assertEquals(
-            "eu.kanade.tachiyomi.extension.all.mangadex.MangaDexFactory",
-            ".MangaDexFactory".toFullyQualifiedSourceClassName(packageName),
+            "eu.kanade.tachiyomi.extension.all.fixture.FixtureFactory",
+            ".FixtureFactory".toFullyQualifiedSourceClassName(packageName),
         )
         assertEquals(
-            "eu.kanade.tachiyomi.extension.all.mangadex.MangaDexFactory",
-            "MangaDexFactory".toFullyQualifiedSourceClassName(packageName),
+            "eu.kanade.tachiyomi.extension.all.fixture.FixtureFactory",
+            "FixtureFactory".toFullyQualifiedSourceClassName(packageName),
         )
         assertEquals(
             "other.package.Factory",
