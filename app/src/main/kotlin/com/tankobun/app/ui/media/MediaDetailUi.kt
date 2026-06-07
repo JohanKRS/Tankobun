@@ -285,7 +285,7 @@ internal fun MangaDetailScreen(
         label = "Manga detail backdrop blur",
     )
     val coverZoomScrimAlpha by animateFloatAsState(
-        targetValue = if (coverZoomOpen) QuickDrawerScrimAlpha else 0f,
+        targetValue = if (coverZoomOpen) CoverZoomScrimAlpha else 0f,
         animationSpec = tween(durationMillis = QuickDrawerSnapMillis),
         label = "Cover zoom scrim",
     )
@@ -346,7 +346,8 @@ internal fun MangaDetailScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     top = MediaDetailTopOverlayPadding,
-                    bottom = MediaDetailContentPadding + 12.dp,
+                    bottom = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() +
+                        MediaDetailBottomDockClearance,
                 ),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
@@ -520,6 +521,8 @@ internal fun mediaDetailActionColor(): Color = MaterialTheme.colorScheme.seconda
 
 private val MediaDetailContentPadding = 16.dp
 private val MediaDetailTopOverlayPadding = 92.dp
+private val MediaDetailBottomDockClearance = 112.dp
+private const val CoverZoomScrimAlpha = 0.34f
 
 @Composable
 internal fun DetailSectionTitle(text: String, modifier: Modifier = Modifier) {
@@ -572,220 +575,6 @@ internal fun DetailIconBadge(icon: ImageVector, modifier: Modifier = Modifier) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-internal fun ChapterActionsBar(
-    readingActionChapter: SourceChapter?,
-    hasProgress: Boolean,
-    hasChapters: Boolean,
-    onOpenChapter: (SourceChapter) -> Unit,
-    onLoadChapters: () -> Unit,
-    onOpenDownloadActions: () -> Unit,
-) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val tight = maxWidth < 380.dp
-        val actionHeight = LocalTankobunStyle.current.sizes.iconAction
-        val startReadingButton: @Composable (Modifier) -> Unit = { modifier ->
-            if (readingActionChapter != null) {
-                if (tight) {
-                    TankobunIconActionButton(
-                        icon = Icons.Default.PlayArrow,
-                        contentDescription = if (hasProgress) "Resume reading" else "Start reading",
-                        onClick = { onOpenChapter(readingActionChapter) },
-                        modifier = modifier,
-                        filled = true,
-                    )
-                } else {
-                    TankobunActionButton(
-                        label = if (hasProgress) "Resume" else "Start",
-                        icon = Icons.Default.PlayArrow,
-                        onClick = { onOpenChapter(readingActionChapter) },
-                        modifier = modifier,
-                    )
-                }
-            }
-        }
-        val refreshButton: @Composable (Modifier) -> Unit = { modifier ->
-            TankobunIconActionButton(
-                icon = Icons.Default.Refresh,
-                contentDescription = if (hasChapters) "Refresh chapters" else "Load chapters",
-                onClick = onLoadChapters,
-                modifier = modifier,
-            )
-        }
-        val downloadButton: @Composable (Modifier) -> Unit = { modifier ->
-            if (tight) {
-                TankobunIconActionButton(
-                    icon = Icons.Default.Download,
-                    contentDescription = "Download chapters",
-                    onClick = onOpenDownloadActions,
-                    enabled = hasChapters,
-                    modifier = modifier,
-                )
-            } else {
-                TankobunActionButton(
-                    label = "Download",
-                    icon = Icons.Default.Download,
-                    onClick = onOpenDownloadActions,
-                    enabled = hasChapters,
-                    filled = false,
-                    modifier = modifier,
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (readingActionChapter != null) {
-                startReadingButton(
-                    if (tight) Modifier.width(actionHeight) else Modifier.widthIn(min = 122.dp),
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            refreshButton(Modifier)
-            downloadButton(if (tight) Modifier.width(actionHeight) else Modifier.widthIn(min = 116.dp))
-        }
-    }
-}
-
-@Composable
-internal fun ChapterManualDownloadBar(
-    selectedCount: Int,
-    onDownloadSelected: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.70f),
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                "$selectedCount selected",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            TextButton(onClick = onCancel) {
-                Text("Cancel")
-            }
-            Button(
-                onClick = onDownloadSelected,
-                enabled = selectedCount > 0,
-                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
-            ) {
-                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Download")
-            }
-        }
-    }
-}
-
-@Composable
-internal fun ChapterDownloadActionsDialog(
-    keepNextTenDownloads: Boolean,
-    onDismiss: () -> Unit,
-    onDownloadAll: () -> Unit,
-    onDownloadUnread: () -> Unit,
-    onDownloadNextTen: () -> Unit,
-    onKeepNextTenChange: (Boolean) -> Unit,
-    onSelectManually: () -> Unit,
-) {
-    TankobunDialog(onDismiss = onDismiss, maxHeight = 640.dp) {
-        TankobunDialogHeader(title = "Download Chapters", onDismiss = onDismiss)
-        ChapterDownloadActionRow(
-            title = "All chapters",
-            subtitle = "Queue every chapter from this source.",
-            onClick = onDownloadAll,
-        )
-        ChapterDownloadActionRow(
-            title = "Unread only",
-            subtitle = "Skip chapters already marked as read.",
-            onClick = onDownloadUnread,
-        )
-        ChapterDownloadActionRow(
-            title = "Next 10",
-            subtitle = "Queue the next unread chapters from your current progress.",
-            onClick = onDownloadNextTen,
-        )
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 1.dp,
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onKeepNextTenChange(!keepNextTenDownloads) }
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("Always keep next 10", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Text(
-                        "Automatically queue the next unread batch as you move through chapters.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = keepNextTenDownloads,
-                    onCheckedChange = onKeepNextTenChange,
-                )
-            }
-        }
-        ChapterDownloadActionRow(
-            title = "Select manually",
-            subtitle = "Choose chapters directly from the list.",
-            onClick = onSelectManually,
-        )
-    }
-}
-
-@Composable
-internal fun ChapterDownloadActionRow(
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
-        color = Color.Transparent,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
-                .clickable(onClick = onClick)
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
 @Composable
 internal fun MangaHeroSection(
     media: AnilistMedia,
@@ -807,7 +596,10 @@ internal fun MangaHeroSection(
             (coverHeight * 0.62f).coerceIn(180.dp, 250.dp)
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 18.dp)) {
+        Column(
+            modifier = Modifier.padding(top = if (compact) 0.dp else 32.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 18.dp),
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 28.dp),
@@ -824,17 +616,32 @@ internal fun MangaHeroSection(
                         .height(coverHeight),
                     verticalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp)) {
+                    if (compact) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AutoResizingMangaTitle(
+                                title = media.title.userPreferred,
+                                compact = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(titleHeight),
+                            )
+                            MangaHeroMetaLine(media = media, compact = true)
+                        }
+                    } else {
                         AutoResizingMangaTitle(
                             title = media.title.userPreferred,
-                            compact = compact,
+                            compact = false,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(titleHeight),
                         )
-                        MangaHeroMetaLine(media)
                     }
-                    MangaStatRow(media = media, compact = compact)
+                    Column(verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 10.dp)) {
+                        if (!compact) {
+                            MangaHeroMetaLine(media = media, compact = false)
+                        }
+                        MangaStatRow(media = media, compact = compact)
+                    }
                 }
             }
             MangaInfoRow(media = media, compact = compact, onAuthorClick = onAuthorClick)
@@ -880,12 +687,12 @@ internal fun AutoResizingMangaTitle(
     BoxWithConstraints(modifier = modifier) {
         val density = LocalDensity.current
         val textMeasurer = rememberTextMeasurer()
-        val maxFontSize = if (compact) 82f else 92f
+        val maxFontSize = if (compact) 82f else 104f
         val minFontSize = if (compact) 16f else 22f
         val maxLines = if (compact) 5 else 6
         val maxWidthPx = with(density) { maxWidth.toPx() }
         val maxHeightPx = with(density) { maxHeight.toPx() }
-        val verticalClipGuardPx = with(density) { if (compact) 0.dp.toPx() else 3.dp.toPx() }
+        val verticalClipGuardPx = with(density) { if (compact) 0.dp.toPx() else 7.dp.toPx() }
         val layout = remember(title, compact, maxWidth, maxHeight, density.fontScale) {
             buildMangaTitleLayout(
                 title = title,
@@ -923,16 +730,6 @@ private fun bebasNeueStatTextStyle(compact: Boolean): TextStyle =
         fontWeight = FontWeight.Normal,
         letterSpacing = 0.sp,
         lineHeight = if (compact) 32.sp else 44.sp,
-    )
-
-@Composable
-private fun bebasNeueChapterTitleStyle(): TextStyle =
-    MaterialTheme.typography.titleMedium.copy(
-        fontFamily = TankobunDisplayFontFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 22.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.sp,
     )
 
 @Composable
@@ -1116,13 +913,17 @@ private fun measuredTitleHeight(
     ).size.height
 
 @Composable
-internal fun MangaHeroMetaLine(media: AnilistMedia) {
+internal fun MangaHeroMetaLine(media: AnilistMedia, compact: Boolean) {
     Text(
         listOfNotNull(
             media.mediaTypeLabel(),
             media.status.statusLabel(),
         ).joinToString("  /  ").uppercase(Locale.getDefault()),
-        style = MaterialTheme.typography.labelMedium,
+        style = if (compact) {
+            MaterialTheme.typography.labelMedium
+        } else {
+            MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp, lineHeight = 16.sp)
+        },
         color = mediaDetailAccentColor(),
         fontWeight = FontWeight.Bold,
         maxLines = 1,
@@ -1806,377 +1607,9 @@ internal fun LoadMoreRecommendationsTile(
 }
 
 @Composable
-internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewModel) {
-    val selectedManga = state.selectedSourceManga
-    val selectedSource = state.selectedSource
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        DetailSectionTitle("Source")
-        if (selectedManga == null) {
-            SourceActionCard(
-                title = "No source selected.",
-                subtitle = if (state.allInstalledSources.isEmpty()) {
-                    "Install source extensions in Settings."
-                } else {
-                    "Choose a source to browse and read."
-                },
-                onFindSource = viewModel::openSourcePicker,
-            )
-        } else {
-            SelectedSourceCard(
-                source = selectedSource,
-                sourceName = selectedSource?.let { "${it.name} (${it.lang})" } ?: "Selected source",
-                chapterLine = if (state.sourceChapters.isEmpty()) {
-                    "No chapters loaded"
-                } else {
-                    "${state.sourceChapters.size} chapters"
-                },
-                onChange = viewModel::openSourcePicker,
-            )
-        }
-    }
-}
-
-@Composable
-internal fun SourceActionCard(
-    title: String,
-    subtitle: String,
-    onFindSource: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
-        color = mediaDetailPanelColor(),
-        contentColor = mediaDetailForegroundColor(),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 13.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DetailIconBadge(icon = Icons.Default.Link)
-            SourceActionText(title = title, subtitle = subtitle, modifier = Modifier.weight(1f))
-            TankobunIconActionButton(
-                icon = Icons.Default.Search,
-                contentDescription = "Find source",
-                onClick = onFindSource,
-            )
-        }
-    }
-}
-
-@Composable
-internal fun SourceActionText(title: String, subtitle: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        Text(
-            subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-internal fun SelectedSourceCard(
-    source: SourceDescriptor?,
-    sourceName: String,
-    chapterLine: String,
-    onChange: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
-        color = mediaDetailPanelColor(),
-        contentColor = mediaDetailForegroundColor(),
-    ) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val compact = maxWidth < 430.dp
-            val iconSize = if (compact) 48.dp else 52.dp
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = if (compact) 12.dp else 14.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                PlainSourceIcon(
-                    source = source,
-                    fallbackName = sourceName,
-                    modifier = Modifier.size(iconSize),
-                )
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(1.dp),
-                ) {
-                    Text(
-                        sourceName,
-                        style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        chapterLine,
-                        style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                TankobunIconActionButton(
-                    icon = Icons.Default.SwapHoriz,
-                    contentDescription = "Change source",
-                    onClick = onChange,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun PlainSourceIcon(
-    source: SourceDescriptor?,
-    fallbackName: String,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    val sourceIcon = remember(source?.packageName) {
-        source?.packageName?.let { packageName ->
-            runCatching {
-                context.packageManager.getApplicationIcon(packageName).toSourceImageBitmap()
-            }.getOrNull()
-        }
-    }
-    Box(
-        modifier = modifier.clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (sourceIcon != null) {
-            Image(
-                bitmap = sourceIcon,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-        } else {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
-                color = mediaDetailAccentColor().copy(alpha = 0.16f),
-                contentColor = mediaDetailAccentColor(),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        extensionInitials(fallbackName),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun Drawable.toSourceImageBitmap(): ImageBitmap {
-    val drawable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && this is AdaptiveIconDrawable) {
-        foreground ?: this
-    } else {
-        this
-    }
-    val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 192
-    val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 192
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    drawable.setBounds(0, 0, canvas.width, canvas.height)
-    drawable.draw(canvas)
-    val visibleBounds = bitmap.visibleAlphaBounds()
-    val trimmed = if (visibleBounds != null && visibleBounds.width() > 0 && visibleBounds.height() > 0) {
-        Bitmap.createBitmap(bitmap, visibleBounds.left, visibleBounds.top, visibleBounds.width(), visibleBounds.height())
-    } else {
-        bitmap
-    }
-    return trimmed.asImageBitmap()
-}
-
-private fun Bitmap.visibleAlphaBounds(alphaThreshold: Int = 8): Rect? {
-    val pixels = IntArray(width * height)
-    getPixels(pixels, 0, width, 0, 0, width, height)
-    var left = width
-    var top = height
-    var right = -1
-    var bottom = -1
-    for (y in 0 until height) {
-        val rowOffset = y * width
-        for (x in 0 until width) {
-            val alpha = pixels[rowOffset + x] ushr 24
-            if (alpha > alphaThreshold) {
-                if (x < left) left = x
-                if (x > right) right = x
-                if (y < top) top = y
-                if (y > bottom) bottom = y
-            }
-        }
-    }
-    return if (right >= left && bottom >= top) {
-        Rect(left, top, right + 1, bottom + 1)
-    } else {
-        null
-    }
-}
-
-@Composable
-internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
-    val matches = state.sourceMatches.filter { match ->
-        state.sourceMatchChapterCounts[sourceMatchKey(match.source.id, match.manga.url)] != null
-    }
-    val availableSources = remember(state.installedSources, state.selectedSourceId) {
-        state.installedSources
-            .distinctBy { it.sourceSettingsKey() }
-            .sortedWith(
-                compareBy<SourceDescriptor> { if (it.id == state.selectedSourceId) 0 else 1 }
-                    .thenBy { sourceLanguageSortPriority(it.lang.normalizedSourceLanguage()) }
-                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
-                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.lang },
-            )
-    }
-    val matchSourceKeys = remember(matches) {
-        matches.mapTo(mutableSetOf()) { it.source.sourceSettingsKey() }
-    }
-    val diagnostics = state.sourcePickerDiagnostics
-    var searchTitleEditorOpen by remember(media.id) { mutableStateOf(false) }
-    val showSearchTitleEditor = searchTitleEditorOpen ||
-        (matches.isEmpty() && availableSources.isNotEmpty() && !state.sourcePickerLoading)
-
-    Dialog(
-        onDismissRequest = viewModel::closeSourcePicker,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        TankobunDialogSurface(maxWidth = 720.dp, fillMaxHeightFraction = 0.86f, scrollable = false) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Find source", style = MaterialTheme.typography.headlineSmall)
-                        Text(
-                            "${media.title.userPreferred} / ${availableSources.size} enabled sources",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    TextButton(onClick = viewModel::closeSourcePicker) {
-                        Text("Close")
-                    }
-                }
-
-                if (state.sourcePickerLoading) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                }
-
-                state.sourcePickerMessage?.let { pickerMessage ->
-                    TankobunMessageBanner(pickerMessage)
-                }
-
-                AnimatedVisibility(showSearchTitleEditor) {
-                    SourcePickerSearchTitleEditor(
-                        title = state.sourcePickerSearchTitle,
-                        enabled = availableSources.isNotEmpty(),
-                        onTitleChange = viewModel::updateSourcePickerSearchTitle,
-                        onSearch = viewModel::findSourceMatchesWithEditedTitle,
-                    )
-                }
-
-                if (matches.isEmpty() && availableSources.isEmpty() && !state.sourcePickerLoading) {
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("No enabled sources.", style = MaterialTheme.typography.titleMedium)
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                "Enable or install sources from Settings.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (matches.isNotEmpty()) {
-                            item {
-                                Text("Readable matches", style = MaterialTheme.typography.titleMedium)
-                            }
-                            items(matches, key = { "match:${it.source.id}:${it.manga.url}" }) { match ->
-                                val count = state.sourceMatchChapterCounts[sourceMatchKey(match.source.id, match.manga.url)] ?: 0
-                                SourceMatchRow(
-                                    match = match,
-                                    chapterCount = count,
-                                    current = state.selectedSourceId == match.source.id &&
-                                        state.selectedSourceManga?.url == match.manga.url,
-                                    mediaCover = media.coverImage,
-                                    onClick = { viewModel.bindSourceMatch(match) },
-                                )
-                            }
-                        }
-                        val fallbackSources = availableSources.filterNot { it.sourceSettingsKey() in matchSourceKeys }
-                        if (fallbackSources.isNotEmpty()) {
-                            item {
-                                Text("Try a specific source", style = MaterialTheme.typography.titleMedium)
-                            }
-                            items(fallbackSources, key = { "source:${it.sourceSettingsKey()}" }) { source ->
-                                SourceCandidateRow(
-                                    source = source,
-                                    current = state.selectedSourceId == source.id,
-                                    onClick = { viewModel.bindSource(source) },
-                                )
-                            }
-                        }
-                        if (diagnostics.isNotEmpty()) {
-                            item {
-                                Text("Skipped sources", style = MaterialTheme.typography.titleMedium)
-                            }
-                            items(diagnostics, key = { "diagnostic:$it" }) { diagnostic ->
-                                SourceDiagnosticRow(diagnostic)
-                            }
-                        }
-                    }
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = { searchTitleEditorOpen = true },
-                        enabled = availableSources.isNotEmpty(),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.Tune, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("Edit search title")
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (state.sourcePickerLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.size(8.dp))
-                        }
-                        Text(
-                            "${matches.size} readable / ${availableSources.size} enabled",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-        }
-    }
-}
-
-@Composable
 internal fun CoverZoomOverlay(media: AnilistMedia, onDismiss: () -> Unit) {
+    val safeInsets = WindowInsets.safeDrawing.asPaddingValues()
+    val layoutDirection = LocalLayoutDirection.current
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -2190,7 +1623,12 @@ internal fun CoverZoomOverlay(media: AnilistMedia, onDismiss: () -> Unit) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 48.dp),
+                .padding(
+                    start = safeInsets.calculateStartPadding(layoutDirection) + 16.dp,
+                    top = safeInsets.calculateTopPadding() + 88.dp,
+                    end = safeInsets.calculateEndPadding(layoutDirection) + 16.dp,
+                    bottom = safeInsets.calculateBottomPadding() + 96.dp,
+                ),
             contentAlignment = Alignment.Center,
         ) {
             val availableWidth = maxWidth
@@ -2222,169 +1660,6 @@ internal fun CoverZoomOverlay(media: AnilistMedia, onDismiss: () -> Unit) {
         }
     }
 }
-
-@Composable
-internal fun SourcePickerSearchTitleEditor(
-    title: String,
-    enabled: Boolean,
-    onTitleChange: (String) -> Unit,
-    onSearch: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    ) {
-        BoxWithConstraints(Modifier.fillMaxWidth().padding(12.dp)) {
-            val compact = maxWidth < 420.dp
-            if (compact) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SourceSearchTitleField(
-                        title = title,
-                        enabled = enabled,
-                        onTitleChange = onTitleChange,
-                        onSearch = onSearch,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Button(
-                        onClick = onSearch,
-                        enabled = enabled && title.trim().length >= 2,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.Search, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("Search")
-                    }
-                }
-            } else {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SourceSearchTitleField(
-                        title = title,
-                        enabled = enabled,
-                        onTitleChange = onTitleChange,
-                        onSearch = onSearch,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Button(
-                        onClick = onSearch,
-                        enabled = enabled && title.trim().length >= 2,
-                    ) {
-                        Icon(Icons.Default.Search, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("Search")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun SourceSearchTitleField(
-    title: String,
-    enabled: Boolean,
-    onTitleChange: (String) -> Unit,
-    onSearch: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    OutlinedTextField(
-        value = title,
-        onValueChange = onTitleChange,
-        modifier = modifier,
-        enabled = enabled,
-        singleLine = true,
-        label = { Text("Search title") },
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { if (enabled && title.trim().length >= 2) onSearch() }),
-    )
-}
-
-@Composable
-internal fun SourceDiagnosticRow(message: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    ) {
-        Text(
-            message,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-            style = MaterialTheme.typography.bodySmall,
-        )
-    }
-}
-
-@Composable
-internal fun SourceMatchRow(
-    match: SourceSearchResult,
-    chapterCount: Int,
-    current: Boolean,
-    mediaCover: String?,
-    onClick: () -> Unit,
-) {
-    ElevatedCard(onClick = onClick, shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
-        ListItem(
-            headlineContent = { Text(match.manga.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            supportingContent = {
-                Text(
-                    "${match.source.name} (${match.source.lang}) / $chapterCount chapters / ${(match.score * 100).toInt()}% match",
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            },
-            leadingContent = {
-                CoverImage(
-                    url = match.manga.thumbnailUrl ?: mediaCover,
-                    title = match.manga.title,
-                    modifier = Modifier.size(width = 48.dp, height = 68.dp),
-                )
-            },
-            trailingContent = {
-                if (current) {
-                    Text("Current", color = MaterialTheme.colorScheme.secondary)
-                }
-            },
-        )
-    }
-}
-
-@Composable
-internal fun SourceCandidateRow(
-    source: SourceDescriptor,
-    current: Boolean,
-    onClick: () -> Unit,
-) {
-    ElevatedCard(onClick = onClick, shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
-        ListItem(
-            headlineContent = { Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            supportingContent = {
-                Text(
-                    sourceMetadata(source),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            },
-            leadingContent = {
-                ExtensionIcon(
-                    packageName = source.packageName,
-                    name = source.name,
-                    iconUrl = null,
-                    modifier = Modifier.size(42.dp),
-                )
-            },
-            trailingContent = {
-                Text(if (current) "Selected" else "Try", color = MaterialTheme.colorScheme.secondary)
-            },
-        )
-    }
-}
-internal fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
-    "$sourceId:$mangaUrl"
 
 internal fun trackingStatuses(): List<MediaStatus> = listOf(
     MediaStatus.CURRENT,
@@ -2443,283 +1718,3 @@ internal fun CoverImage(
     }
 }
 
-internal fun TankobunUiState.primaryReadingActionChapter(): SourceChapter? =
-    latestProgress?.let { progress ->
-        val exactChapter = sourceChapters.firstOrNull { it.url == progress.chapterUrl }
-        if (exactChapter != null) exactChapter else {
-            sourceChapters.chapterNearProgress(progress)
-        }
-    } ?: sourceChapters.firstInReadingOrder()
-
-internal fun TankobunUiState.nextReaderChapter(): SourceChapter? =
-    sourceChapters.nextInReadingOrderAfter(activeChapter ?: return null)
-
-internal fun List<SourceChapter>.chapterNearProgress(progress: ReadingProgress): SourceChapter? {
-    val chapterNumber = progress.chapterNumber
-    if (chapterNumber > 0f) {
-        val nextChapter = if (progress.completed) {
-            filter { it.chapterNumber > chapterNumber }.minByOrNull { it.chapterNumber }
-        } else {
-            filter { it.chapterNumber >= chapterNumber }.minByOrNull { it.chapterNumber }
-        }
-        if (nextChapter != null) return nextChapter
-        return minByOrNull { abs((it.chapterNumber.takeIf { number -> number > 0f } ?: chapterNumber) - chapterNumber) }
-    }
-    return firstInReadingOrder()
-}
-
-internal fun List<SourceChapter>.firstInReadingOrder(): SourceChapter? =
-    filter { it.chapterNumber > 0f }
-        .minByOrNull { it.chapterNumber }
-        ?: lastOrNull()
-
-internal fun SourceChapter.isReadBy(progressByChapter: Map<String, ReadingProgress>): Boolean =
-    progressByChapter[url]?.completed == true
-
-internal fun TankobunUiState.downloadForChapter(chapter: SourceChapter): DownloadJob? {
-    val mediaId = selectedMedia?.id ?: return null
-    return downloads
-        .filter { it.mediaId == mediaId && it.sourceId == chapter.sourceId && it.chapterUrl == chapter.url }
-        .maxByOrNull { it.updatedAtEpochMillis }
-}
-
-@Composable
-internal fun ChapterRow(
-    chapter: SourceChapter,
-    viewModel: MainViewModel,
-    read: Boolean,
-    download: DownloadJob?,
-    selectingForDownload: Boolean,
-    selectedForDownload: Boolean,
-    onToggleDownloadSelection: () -> Unit,
-) {
-    key(chapter.url, download?.state, download?.completedPages, download?.pageCount, selectingForDownload, selectedForDownload) {
-        val chapterShape = RoundedCornerShape(8.dp)
-        val latestRead by rememberUpdatedState(read)
-        var swipeActionRead by remember(chapter.url) { mutableStateOf(read) }
-        var dragOffset by remember(chapter.url) { mutableFloatStateOf(0f) }
-        var dragging by remember(chapter.url) { mutableStateOf(false) }
-        val swipeActionLabel = if (swipeActionRead) "Mark as\nunread" else "Mark as\nread"
-        val swipeActionIcon = if (swipeActionRead) Icons.Default.Replay else Icons.Default.Check
-        val swipeActionColor = LocalTankobunStyle.current.colors.accent
-        val density = LocalDensity.current
-        val maxRevealPx = with(density) { 132.dp.toPx() }
-        val hardRevealPx = with(density) { 164.dp.toPx() }
-        val actionThresholdPx = with(density) { 76.dp.toPx() }
-        fun resistedSwipeOffset(proposedOffset: Float): Float {
-            val distance = abs(proposedOffset)
-            if (distance <= maxRevealPx) return proposedOffset
-            val direction = if (proposedOffset < 0f) -1f else 1f
-            val extra = ((distance - maxRevealPx) * 0.22f).coerceAtMost(hardRevealPx - maxRevealPx)
-            return direction * (maxRevealPx + extra)
-        }
-        val draggableState = rememberDraggableState { delta ->
-            dragOffset = resistedSwipeOffset(dragOffset + delta)
-        }
-        val animatedDragOffset by animateFloatAsState(
-            targetValue = dragOffset,
-            animationSpec = if (dragging) {
-                tween(durationMillis = 0)
-            } else {
-                spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                )
-            },
-            label = "chapterSwipeOffset",
-        )
-        LaunchedEffect(read, dragging, dragOffset) {
-            if (!dragging && dragOffset == 0f) {
-                swipeActionRead = read
-            }
-        }
-        @Composable
-        fun ChapterCard() {
-            ElevatedCard(
-                shape = chapterShape,
-                onClick = {
-                    if (selectingForDownload) {
-                        onToggleDownloadSelection()
-                    } else {
-                        viewModel.openChapter(chapter)
-                    }
-                },
-            ) {
-                ListItem(
-                    leadingContent = if (selectingForDownload) {
-                        {
-                            Checkbox(
-                                checked = selectedForDownload,
-                                onCheckedChange = { onToggleDownloadSelection() },
-                            )
-                        }
-                    } else {
-                        null
-                    },
-                    headlineContent = {
-                        Text(
-                            chapter.name,
-                            style = bebasNeueChapterTitleStyle(),
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (read) 0.66f else 1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    trailingContent = {
-                        ChapterDownloadIndicator(
-                            download = download,
-                            onDownload = { viewModel.enqueueDownload(chapter) },
-                            onResume = { download?.let { viewModel.resumeDownload(it.id) } },
-                            onRetry = { download?.let { viewModel.retryDownload(it.id) } },
-                        )
-                    },
-                )
-            }
-        }
-        if (selectingForDownload) {
-            ChapterCard()
-        } else {
-            val actionAlignment = if (animatedDragOffset < 0f) Alignment.CenterEnd else Alignment.CenterStart
-            val actionAlpha = (abs(animatedDragOffset) / with(density) { 72.dp.toPx() }).coerceIn(0f, 1f)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(chapterShape)
-                    .draggable(
-                        state = draggableState,
-                        orientation = Orientation.Horizontal,
-                        onDragStarted = {
-                            swipeActionRead = latestRead
-                            dragging = true
-                        },
-                        onDragStopped = {
-                            val shouldToggle = abs(dragOffset) >= actionThresholdPx
-                            val targetRead = !swipeActionRead
-                            dragging = false
-                            dragOffset = 0f
-                            if (shouldToggle) {
-                                viewModel.setChapterRead(chapter, read = targetRead)
-                            }
-                        },
-                    ),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(swipeActionColor.copy(alpha = 0.18f))
-                        .padding(horizontal = 18.dp),
-                ) {
-                    ChapterSwipeAction(
-                        label = swipeActionLabel,
-                        icon = swipeActionIcon,
-                        color = swipeActionColor,
-                        modifier = Modifier
-                            .align(actionAlignment)
-                            .graphicsLayer { alpha = actionAlpha },
-                    )
-                }
-                Box(
-                    modifier = Modifier.graphicsLayer {
-                        translationX = animatedDragOffset
-                    },
-                ) {
-                    ChapterCard()
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun ChapterSwipeAction(
-    label: String,
-    icon: ImageVector,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(22.dp),
-        )
-        Text(
-            label,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = color,
-        )
-    }
-}
-
-@Composable
-internal fun ChapterDownloadIndicator(
-    download: DownloadJob?,
-    onDownload: () -> Unit,
-    onResume: () -> Unit,
-    onRetry: () -> Unit,
-) {
-    when {
-        download == null -> IconButton(onClick = onDownload) {
-            Icon(Icons.Default.Download, contentDescription = "Download")
-        }
-
-        download.state == DownloadState.COMPLETE -> Surface(
-            modifier = Modifier.size(40.dp),
-            shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-            contentColor = MaterialTheme.colorScheme.primary,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = "Downloaded",
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
-
-        download.state == DownloadState.QUEUED || download.state == DownloadState.RUNNING -> {
-            val progress = remember(download.completedPages, download.pageCount) {
-                if (download.pageCount > 0) {
-                    (download.completedPages.toFloat() / download.pageCount).coerceIn(0f, 1f)
-                } else {
-                    null
-                }
-            }
-            Box(
-                modifier = Modifier.size(40.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (progress == null) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
-                    )
-                } else {
-                    CircularProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
-                    )
-                }
-            }
-        }
-
-        download.state == DownloadState.PAUSED -> IconButton(onClick = onResume) {
-            Icon(Icons.Default.PlayArrow, contentDescription = "Resume download")
-        }
-
-        download.state == DownloadState.FAILED -> IconButton(onClick = onRetry) {
-            Icon(Icons.Default.Replay, contentDescription = "Retry download")
-        }
-    }
-}
