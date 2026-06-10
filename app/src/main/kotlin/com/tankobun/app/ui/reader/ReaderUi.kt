@@ -283,7 +283,10 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
             nextSegment = state.readerNextSegment,
         )
     }
-    val currentWebtoonStartIndex = state.readerPreviousSegment?.pages?.size ?: 0
+    val previousFallbackChapter = previousChapter.takeIf { state.readerPreviousSegment == null }
+    val hasPreviousChapterFallback = previousFallbackChapter != null
+    val webtoonPageItemOffset = if (hasPreviousChapterFallback) 1 else 0
+    val currentWebtoonStartIndex = webtoonPageItemOffset + (state.readerPreviousSegment?.pages?.size ?: 0)
     val canGoBack = state.currentPageIndex > 0 || previousChapter != null
     val canGoForward = state.currentPageIndex < lastPageIndex || nextChapter != null
     var scrubberValue by remember(chapter.url, pageCount) {
@@ -349,7 +352,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                         }
                         if (anchorIndex >= 0) {
                             suppressWebtoonPositionUpdates = true
-                            webtoonListState.scrollToItem(anchorIndex, anchor.scrollOffset)
+                            webtoonListState.scrollToItem(webtoonPageItemOffset + anchorIndex, anchor.scrollOffset)
                             withFrameNanos { }
                         }
                     }
@@ -396,7 +399,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     LaunchedEffect(chapter.url, state.readerMode, webtoonPageItems) {
         if (state.readerMode == ReaderMode.WEBTOON) {
             snapshotFlow {
-                webtoonPageItems.getOrNull(webtoonListState.firstVisibleItemIndex)
+                webtoonPageItems.getOrNull(webtoonListState.firstVisibleItemIndex - webtoonPageItemOffset)
                     ?.let { it to webtoonListState.firstVisibleItemScrollOffset }
             }
                 .distinctUntilChanged()
@@ -426,7 +429,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     (viewportHeight * WEBTOON_READER_POSITION_ANCHOR_FRACTION).roundToInt()
                 layoutInfo.visibleItemsInfo
                     .mapNotNull { itemInfo ->
-                        val item = webtoonPageItems.getOrNull(itemInfo.index)
+                        val item = webtoonPageItems.getOrNull(itemInfo.index - webtoonPageItemOffset)
                             ?.takeIf { it.chapter.url == chapter.url }
                             ?: return@mapNotNull null
                         val itemStart = itemInfo.offset
@@ -551,6 +554,17 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(pageGap),
             ) {
+                previousFallbackChapter?.let { fallbackChapter ->
+                    item(key = "previous:${fallbackChapter.url}") {
+                        WebtoonPreviousChapterHeader(
+                            previousChapter = fallbackChapter,
+                            onOpenPreviousChapter = {
+                                resetZoom()
+                                viewModel.openPreviousChapter()
+                            },
+                        )
+                    }
+                }
                 itemsIndexed(
                     webtoonPageItems,
                     key = { _, item -> "${item.chapter.url}:${item.page.index}:${item.page.imageUrl}" },
@@ -566,7 +580,13 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 }
                 if (nextChapter != null && state.readerNextSegment == null) {
                     item(key = "next:${nextChapter.url}") {
-                        WebtoonNextChapterFooter(nextChapter = nextChapter)
+                        WebtoonNextChapterFooter(
+                            nextChapter = nextChapter,
+                            onOpenNextChapter = {
+                                resetZoom()
+                                viewModel.openNextChapter()
+                            },
+                        )
                     }
                 }
             }
@@ -1161,7 +1181,45 @@ internal fun ReaderImagePlaceholder(
 }
 
 @Composable
-internal fun WebtoonNextChapterFooter(nextChapter: SourceChapter) {
+internal fun WebtoonPreviousChapterHeader(
+    previousChapter: SourceChapter,
+    onOpenPreviousChapter: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 112.dp)
+            .padding(vertical = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            previousChapter.name,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.72f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        TextButton(onClick = onOpenPreviousChapter) {
+            Icon(
+                Icons.Default.PlayArrow,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.88f),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "Open previous chapter",
+                color = Color.White.copy(alpha = 0.88f),
+            )
+        }
+    }
+}
+
+@Composable
+internal fun WebtoonNextChapterFooter(
+    nextChapter: SourceChapter,
+    onOpenNextChapter: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1182,6 +1240,18 @@ internal fun WebtoonNextChapterFooter(nextChapter: SourceChapter) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        TextButton(onClick = onOpenNextChapter) {
+            Icon(
+                Icons.Default.PlayArrow,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.88f),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "Open now",
+                color = Color.White.copy(alpha = 0.88f),
+            )
+        }
     }
 }
 

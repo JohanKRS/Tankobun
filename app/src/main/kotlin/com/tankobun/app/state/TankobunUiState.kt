@@ -101,6 +101,7 @@ data class TankobunUiState(
     val sourcePickerSearchTitle: String = "",
     val selectedSourceManga: SourceManga? = null,
     val sourceChapters: List<SourceChapter> = emptyList(),
+    val chapterListStartsAtFirst: Boolean = true,
     val latestProgress: ReadingProgress? = null,
     val chapterProgress: Map<String, ReadingProgress> = emptyMap(),
     val recentReadingProgress: List<RecentReadingProgress> = emptyList(),

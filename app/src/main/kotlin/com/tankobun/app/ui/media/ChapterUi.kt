@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -80,8 +81,10 @@ internal fun ChapterActionsBar(
     readingActionChapter: SourceChapter?,
     hasProgress: Boolean,
     hasChapters: Boolean,
+    chapterListStartsAtFirst: Boolean,
     onOpenChapter: (SourceChapter) -> Unit,
     onLoadChapters: () -> Unit,
+    onToggleChapterListOrder: () -> Unit,
     onOpenDownloadActions: () -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -114,6 +117,32 @@ internal fun ChapterActionsBar(
                 onClick = onLoadChapters,
                 modifier = modifier,
             )
+        }
+        val orderButtonLabel = if (chapterListStartsAtFirst) "First" else "Last"
+        val orderButtonDescription = if (chapterListStartsAtFirst) {
+            "Show latest chapter first"
+        } else {
+            "Show first chapter first"
+        }
+        val orderButton: @Composable (Modifier) -> Unit = { modifier ->
+            if (tight) {
+                TankobunIconActionButton(
+                    icon = Icons.Default.SwapVert,
+                    contentDescription = orderButtonDescription,
+                    onClick = onToggleChapterListOrder,
+                    enabled = hasChapters,
+                    modifier = modifier,
+                )
+            } else {
+                TankobunActionButton(
+                    label = orderButtonLabel,
+                    icon = Icons.Default.SwapVert,
+                    onClick = onToggleChapterListOrder,
+                    enabled = hasChapters,
+                    filled = false,
+                    modifier = modifier,
+                )
+            }
         }
         val downloadButton: @Composable (Modifier) -> Unit = { modifier ->
             if (tight) {
@@ -148,6 +177,7 @@ internal fun ChapterActionsBar(
             }
             Spacer(Modifier.weight(1f))
             refreshButton(Modifier)
+            orderButton(if (tight) Modifier.width(actionHeight) else Modifier.widthIn(min = 96.dp))
             downloadButton(if (tight) Modifier.width(actionHeight) else Modifier.widthIn(min = 116.dp))
         }
     }

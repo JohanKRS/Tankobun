@@ -407,8 +407,10 @@ internal fun MangaDetailScreen(
                                         readingActionChapter = state.primaryReadingActionChapter(),
                                         hasProgress = state.latestProgress != null,
                                         hasChapters = state.sourceChapters.isNotEmpty(),
+                                        chapterListStartsAtFirst = state.chapterListStartsAtFirst,
                                         onOpenChapter = viewModel::openChapter,
                                         onLoadChapters = viewModel::loadChaptersForCurrentMatch,
+                                        onToggleChapterListOrder = viewModel::toggleChapterListOrder,
                                         onOpenDownloadActions = { downloadActionsOpen = true },
                                     )
                                     if (state.selectingDownloadChapters) {
@@ -458,7 +460,12 @@ internal fun MangaDetailScreen(
                         }
                     }
                 } else {
-                    items(state.sourceChapters, key = { "${it.sourceId}:${it.url}" }) { chapter ->
+                    val visibleChapters = if (state.chapterListStartsAtFirst) {
+                        state.sourceChapters
+                    } else {
+                        state.sourceChapters.asReversed()
+                    }
+                    items(visibleChapters, key = { "${it.sourceId}:${it.url}" }) { chapter ->
                         Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
                             ChapterRow(
                                 chapter = chapter,

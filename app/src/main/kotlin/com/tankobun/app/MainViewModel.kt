@@ -174,6 +174,7 @@ class MainViewModel(
             readerTutorialVisible = !container.settingsStore.readerTutorialCompleted(),
             readerMode = container.settingsStore.readerMode(),
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
+            chapterListStartsAtFirst = container.settingsStore.chapterListStartsAtFirst(),
             keepNextTenDownloads = container.settingsStore.keepNextTenDownloads(),
             anilistAutoSaveTrackingChanges = container.settingsStore.anilistAutoSaveTrackingChanges(),
             anilistAutoSyncReaderProgress = container.settingsStore.anilistAutoSyncReaderProgress(),
@@ -1235,6 +1236,12 @@ class MainViewModel(
         _state.update { it.copy(readerPageGapLevel = normalized) }
     }
 
+    fun toggleChapterListOrder() {
+        val nextValue = !_state.value.chapterListStartsAtFirst
+        container.settingsStore.saveChapterListStartsAtFirst(nextValue)
+        _state.update { it.copy(chapterListStartsAtFirst = nextValue) }
+    }
+
     fun setAnilistAutoSaveTrackingChanges(enabled: Boolean) {
         container.settingsStore.saveAnilistAutoSaveTrackingChanges(enabled)
         _state.update { it.copy(anilistAutoSaveTrackingChanges = enabled) }
@@ -2181,6 +2188,16 @@ class MainViewModel(
                 pageScrollOffset = pageScrollOffset,
                 direction = ReaderSegmentDirection.NEXT,
             )
+            else -> openWebtoonAdjacentChapter(chapterUrl)
+        }
+    }
+
+    private fun openWebtoonAdjacentChapter(chapterUrl: String) {
+        val snapshot = _state.value
+        val activeChapter = snapshot.activeChapter ?: return
+        when (chapterUrl) {
+            snapshot.sourceChapters.previousInReadingOrderBefore(activeChapter)?.url -> openPreviousChapter()
+            snapshot.sourceChapters.nextInReadingOrderAfter(activeChapter)?.url -> openNextChapter()
         }
     }
 

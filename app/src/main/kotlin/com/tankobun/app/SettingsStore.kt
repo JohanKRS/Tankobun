@@ -132,6 +132,13 @@ class SettingsStore(context: Context) {
         preferences.edit().putInt(KEY_READER_PAGE_GAP_LEVEL, level.coerceIn(0, 3)).apply()
     }
 
+    fun chapterListStartsAtFirst(): Boolean =
+        preferences.getBoolean(KEY_CHAPTER_LIST_STARTS_AT_FIRST, true)
+
+    fun saveChapterListStartsAtFirst(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_CHAPTER_LIST_STARTS_AT_FIRST, enabled).apply()
+    }
+
     fun keepNextTenDownloads(): Boolean =
         preferences.getBoolean(KEY_KEEP_NEXT_TEN_DOWNLOADS, false)
 
@@ -318,6 +325,7 @@ class SettingsStore(context: Context) {
         const val KEY_BROWSE_SHOW_WHOLE_COVERS = "browse.show.whole.covers"
         const val KEY_READER_MODE = "reader.mode"
         const val KEY_READER_PAGE_GAP_LEVEL = "reader.page.gap.level"
+        const val KEY_CHAPTER_LIST_STARTS_AT_FIRST = "chapters.list.starts.at.first"
         const val KEY_KEEP_NEXT_TEN_DOWNLOADS = "downloads.keep.next.ten"
         const val KEY_ANILIST_AUTO_SAVE_TRACKING_CHANGES = "anilist.auto.save.tracking.changes"
         const val KEY_ANILIST_AUTO_SYNC_READER_PROGRESS = "anilist.auto.sync.reader.progress"
