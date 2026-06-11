@@ -20,7 +20,8 @@ enum class AppLanguage(
 ) {
     SYSTEM("system", null),
     ENGLISH("en", "en"),
-    PORTUGUESE_BRAZIL("pt-BR", "pt-BR");
+    PORTUGUESE_BRAZIL("pt-BR", "pt-BR"),
+    SPANISH("es", "es");
 
     companion object {
         fun fromStorageValue(value: String?): AppLanguage =

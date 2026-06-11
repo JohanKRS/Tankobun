@@ -124,6 +124,7 @@
     <string name="settings_language_system_default">System default</string>
     <string name="settings_language_english">English</string>
     <string name="settings_language_portuguese_brazil">Portuguese (Brazil)</string>
+    <string name="settings_language_spanish">Spanish</string>
     <string name="settings_language_applied">Interface language updates immediately. Source content and AniList titles still follow their own settings.</string>
     <string name="settings_redirect_uri">Redirect URI: %1$s</string>
     <string name="settings_library_cache">Library cache: %1$s</string>

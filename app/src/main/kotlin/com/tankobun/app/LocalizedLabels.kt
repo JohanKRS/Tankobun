@@ -15,6 +15,7 @@ internal fun AppLanguage.labelRes(): Int =
         AppLanguage.SYSTEM -> R.string.settings_language_system_default
         AppLanguage.ENGLISH -> R.string.settings_language_english
         AppLanguage.PORTUGUESE_BRAZIL -> R.string.settings_language_portuguese_brazil
+        AppLanguage.SPANISH -> R.string.settings_language_spanish
     }
 
 @Composable
