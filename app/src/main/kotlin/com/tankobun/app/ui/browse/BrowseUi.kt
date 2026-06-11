@@ -14,6 +14,7 @@ import android.view.View
 import android.view.WindowInsets as AndroidWindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -235,7 +236,10 @@ internal enum class BrowsePicker {
 internal data class BrowseOption(
     val label: String,
     val value: String?,
-)
+    @StringRes val labelRes: Int? = null,
+) {
+    constructor(@StringRes labelRes: Int, value: String?) : this("", value, labelRes)
+}
 
 internal const val BROWSE_SORT_SEARCH_MATCH_UI = "SEARCH_MATCH"
 internal const val WEBTOON_RESTORE_MAX_ATTEMPTS = 18
@@ -263,38 +267,38 @@ internal val BrowseGenres = listOf(
 )
 
 internal val BrowseFormatOptions = listOf(
-    BrowseOption("Any", null),
-    BrowseOption("Manga", "MANGA"),
-    BrowseOption("Novel", "NOVEL"),
-    BrowseOption("One Shot", "ONE_SHOT"),
+    BrowseOption(R.string.common_any, null),
+    BrowseOption(R.string.media_type_manga, "MANGA"),
+    BrowseOption(R.string.media_type_novel, "NOVEL"),
+    BrowseOption(R.string.media_type_one_shot, "ONE_SHOT"),
 )
 
 internal val BrowseStatusOptions = listOf(
-    BrowseOption("Any", null),
-    BrowseOption("Releasing", "RELEASING"),
-    BrowseOption("Finished", "FINISHED"),
-    BrowseOption("Not Yet Released", "NOT_YET_RELEASED"),
-    BrowseOption("Cancelled", "CANCELLED"),
-    BrowseOption("Hiatus", "HIATUS"),
+    BrowseOption(R.string.common_any, null),
+    BrowseOption(R.string.publishing_releasing, "RELEASING"),
+    BrowseOption(R.string.publishing_finished, "FINISHED"),
+    BrowseOption(R.string.publishing_not_yet_released, "NOT_YET_RELEASED"),
+    BrowseOption(R.string.publishing_cancelled, "CANCELLED"),
+    BrowseOption(R.string.publishing_hiatus, "HIATUS"),
 )
 
 internal val BrowseCountryOptions = listOf(
-    BrowseOption("Any", null),
-    BrowseOption("Japan", "JP"),
-    BrowseOption("South Korea", "KR"),
-    BrowseOption("China", "CN"),
-    BrowseOption("Taiwan", "TW"),
+    BrowseOption(R.string.common_any, null),
+    BrowseOption(R.string.country_japan, "JP"),
+    BrowseOption(R.string.country_south_korea, "KR"),
+    BrowseOption(R.string.country_china, "CN"),
+    BrowseOption(R.string.country_taiwan, "TW"),
 )
 
 internal val BrowseSortOptions = listOf(
-    BrowseOption("Search Match", "SEARCH_MATCH"),
-    BrowseOption("Trending", "TRENDING_DESC"),
-    BrowseOption("Popularity", "POPULARITY_DESC"),
-    BrowseOption("Favorites", "FAVOURITES_DESC"),
-    BrowseOption("Average Score", "SCORE_DESC"),
-    BrowseOption("Recently Updated", "UPDATED_AT_DESC"),
-    BrowseOption("Newest", "START_DATE_DESC"),
-    BrowseOption("Title", "TITLE_ROMAJI"),
+    BrowseOption(R.string.browse_sort_search_match, "SEARCH_MATCH"),
+    BrowseOption(R.string.browse_sort_trending, "TRENDING_DESC"),
+    BrowseOption(R.string.browse_sort_popularity, "POPULARITY_DESC"),
+    BrowseOption(R.string.browse_sort_favorites, "FAVOURITES_DESC"),
+    BrowseOption(R.string.browse_sort_average_score, "SCORE_DESC"),
+    BrowseOption(R.string.browse_sort_recently_updated, "UPDATED_AT_DESC"),
+    BrowseOption(R.string.browse_sort_newest, "START_DATE_DESC"),
+    BrowseOption(R.string.browse_sort_title, "TITLE_ROMAJI"),
 )
 
 @Composable
@@ -374,13 +378,13 @@ internal fun BrowseScreen(
             )
         }
 
-        picker?.let { activePicker ->
+                picker?.let { activePicker ->
             BrowseOptionDialog(
                 title = when (activePicker) {
-                    BrowsePicker.FORMAT -> "Format"
-                    BrowsePicker.STATUS -> "Publishing Status"
-                    BrowsePicker.COUNTRY -> "Country Of Origin"
-                    BrowsePicker.YEAR -> "Year"
+                    BrowsePicker.FORMAT -> tankobunString(R.string.common_format)
+                    BrowsePicker.STATUS -> tankobunString(R.string.browse_publishing_status)
+                    BrowsePicker.COUNTRY -> tankobunString(R.string.browse_country_of_origin)
+                    BrowsePicker.YEAR -> tankobunString(R.string.common_year)
                 },
                 options = when (activePicker) {
                     BrowsePicker.FORMAT -> BrowseFormatOptions
@@ -434,49 +438,49 @@ internal fun BrowseFilterBar(
         TankobunSearchField(
             value = state.searchQuery,
             onValueChange = viewModel::setSearchQuery,
-            placeholder = "Search AniList manga",
+            placeholder = tankobunString(R.string.browse_search_placeholder),
             onSearch = viewModel::searchAniList,
             showSearchAction = false,
         )
         TankobunFilterRow {
             BrowseFilterPill(
-                label = "Genres",
-                value = if (state.browseGenres.isEmpty()) "Any" else state.browseGenres.size.toString(),
+                label = tankobunString(R.string.common_genres),
+                value = if (state.browseGenres.isEmpty()) tankobunString(R.string.common_any) else state.browseGenres.size.toString(),
                 selected = state.browseGenres.isNotEmpty(),
                 onClick = onOpenGenres,
             )
             BrowseFilterPill(
-                label = "Tags",
-                value = if (state.browseTags.isEmpty()) "Any" else state.browseTags.size.toString(),
+                label = tankobunString(R.string.common_tags),
+                value = if (state.browseTags.isEmpty()) tankobunString(R.string.common_any) else state.browseTags.size.toString(),
                 selected = state.browseTags.isNotEmpty(),
                 onClick = onOpenTags,
             )
             BrowseFilterPill(
-                label = "Format",
+                label = tankobunString(R.string.common_format),
                 value = BrowseFormatOptions.labelFor(state.browseFormat),
                 selected = state.browseFormat != null,
                 onClick = { onOpenPicker(BrowsePicker.FORMAT) },
             )
             BrowseFilterPill(
-                label = "Status",
+                label = tankobunString(R.string.common_status),
                 value = BrowseStatusOptions.labelFor(state.browsePublishingStatus),
                 selected = state.browsePublishingStatus != null,
                 onClick = { onOpenPicker(BrowsePicker.STATUS) },
             )
             BrowseFilterPill(
-                label = "Country",
+                label = tankobunString(R.string.common_country),
                 value = BrowseCountryOptions.labelFor(state.browseCountryOfOrigin),
                 selected = state.browseCountryOfOrigin != null,
                 onClick = { onOpenPicker(BrowsePicker.COUNTRY) },
             )
             BrowseFilterPill(
-                label = "Year",
-                value = state.browseYear?.toString() ?: "Any",
+                label = tankobunString(R.string.common_year),
+                value = state.browseYear?.toString() ?: tankobunString(R.string.common_any),
                 selected = state.browseYear != null,
                 onClick = { onOpenPicker(BrowsePicker.YEAR) },
             )
             BrowseIconFilterPill(
-                contentDescription = "Browse options",
+                contentDescription = tankobunString(R.string.browse_options),
                 onClick = onOpenAdvanced,
             )
             if (state.browseFiltersOrSortActive()) {
@@ -550,7 +554,7 @@ internal fun BrowseLanding(
         }
         item {
             BrowseMangaShelf(
-                title = "TRENDING NOW",
+                title = tankobunString(R.string.browse_trending_now),
                 media = state.browseTrending,
                 trackedStatuses = trackedStatuses,
                 onViewAll = { viewModel.viewAllBrowseSection("TRENDING_DESC") },
@@ -559,7 +563,7 @@ internal fun BrowseLanding(
         }
         item {
             BrowseMangaShelf(
-                title = "ALL TIME POPULAR",
+                title = tankobunString(R.string.browse_all_time_popular),
                 media = state.browsePopular,
                 trackedStatuses = trackedStatuses,
                 onViewAll = { viewModel.viewAllBrowseSection("POPULARITY_DESC") },
@@ -568,7 +572,7 @@ internal fun BrowseLanding(
         }
         item {
             BrowseMangaShelf(
-                title = "POPULAR MANHWA",
+                title = tankobunString(R.string.browse_popular_manhwa),
                 media = state.browsePopularManhwa,
                 trackedStatuses = trackedStatuses,
                 onViewAll = viewModel::viewAllPopularManhwa,
@@ -577,7 +581,7 @@ internal fun BrowseLanding(
         }
         item {
             BrowseMangaShelf(
-                title = "TOP 100 MANGA",
+                title = tankobunString(R.string.browse_top_100_manga),
                 media = state.browseTopManga,
                 trackedStatuses = trackedStatuses,
                 onViewAll = { viewModel.viewAllBrowseSection("SCORE_DESC") },
@@ -603,12 +607,12 @@ internal fun BrowseMangaShelf(
         TankobunSectionHeader(
             title = title,
             modifier = Modifier.padding(horizontal = BrowseLandingContentPadding),
-            actionLabel = "View All",
+            actionLabel = tankobunString(R.string.browse_view_all),
             onAction = onViewAll,
         )
         if (media.isEmpty()) {
             Text(
-                "Cached discovery will appear here after AniList responds.",
+                tankobunString(R.string.browse_cached_discovery_empty),
                 modifier = Modifier.padding(horizontal = BrowseLandingContentPadding),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -685,9 +689,9 @@ internal fun BrowseResults(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     when {
-                        state.browseStaffName != null -> "Author Results"
-                        state.searchQuery.isBlank() -> "Browse Manga"
-                        else -> "Search Results"
+                        state.browseStaffName != null -> tankobunString(R.string.browse_author_results)
+                        state.searchQuery.isBlank() -> tankobunString(R.string.browse_manga)
+                        else -> tankobunString(R.string.browse_search_results)
                     },
                     style = LocalTankobunStyle.current.typography.sectionLabel,
                     color = LocalTankobunStyle.current.colors.accent,
@@ -719,9 +723,9 @@ internal fun BrowseResults(
         isLoadingMore = state.browseResultsLoadingMore,
         onNearEnd = if (state.browseResultsHasMore) viewModel::loadMoreBrowseResults else null,
         emptyMessage = if (state.busy) {
-            "Searching AniList..."
+            tankobunString(R.string.browse_searching_anilist)
         } else {
-            "No AniList manga found for these filters."
+            tankobunString(R.string.browse_no_results)
         },
     )
 }
@@ -734,7 +738,7 @@ internal fun BrowseGenreDialog(
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         TankobunDialogSurface(fillMaxHeightFraction = 0.78f, scrollable = false) {
-            TankobunDialogHeader(title = "Genres", onDismiss = onDismiss)
+            TankobunDialogHeader(title = tankobunString(R.string.common_genres), onDismiss = onDismiss)
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -746,7 +750,7 @@ internal fun BrowseGenreDialog(
                         selected = genre in state.browseGenres,
                         onClick = { viewModel.setBrowseGenre(genre, genre !in state.browseGenres) },
                         label = {
-                            Text(genre, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(browseGenreLabel(genre), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         },
                     )
                     }
@@ -758,11 +762,11 @@ internal fun BrowseGenreDialog(
                         state.browseGenres.forEach { viewModel.setBrowseGenre(it, false) }
                     },
                 ) {
-                    Text("Clear")
+                    Text(tankobunString(R.string.common_clear))
                 }
                 Spacer(Modifier.weight(1f))
                 TankobunActionButton(
-                    label = "Apply",
+                    label = tankobunString(R.string.common_apply),
                     onClick = {
                         onDismiss()
                         viewModel.searchAniList()
@@ -784,11 +788,11 @@ internal fun BrowseTagDialog(
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         TankobunDialogSurface(fillMaxHeightFraction = 0.82f, scrollable = false) {
-            TankobunDialogHeader(title = "Tags", onDismiss = onDismiss)
+            TankobunDialogHeader(title = tankobunString(R.string.common_tags), onDismiss = onDismiss)
             TankobunSearchField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = "Find a tag",
+                placeholder = tankobunString(R.string.browse_find_tag),
                 showSearchAction = false,
             )
             if (state.browseAvailableTags.isEmpty()) {
@@ -797,11 +801,11 @@ internal fun BrowseTagDialog(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
-                        "Tags will appear here after AniList responds.",
+                        tankobunString(R.string.browse_tags_empty),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     TankobunActionButton(
-                        label = "Refresh tags",
+                        label = tankobunString(R.string.browse_refresh_tags),
                         onClick = { viewModel.loadBrowseTags(force = true) },
                         filled = false,
                     )
@@ -835,11 +839,11 @@ internal fun BrowseTagDialog(
                         state.browseTags.forEach { viewModel.setBrowseTag(it, false) }
                     },
                 ) {
-                    Text("Clear")
+                    Text(tankobunString(R.string.common_clear))
                 }
                 Spacer(Modifier.weight(1f))
                 TankobunActionButton(
-                    label = "Apply",
+                    label = tankobunString(R.string.common_apply),
                     onClick = {
                         onDismiss()
                         viewModel.searchAniList()
@@ -874,7 +878,7 @@ internal fun BrowseOptionDialog(
             )
             {
                 ListItem(
-                    headlineContent = { Text(option.label) },
+                    headlineContent = { Text(option.labelText()) },
                 )
             }
         }
@@ -891,38 +895,38 @@ internal fun LibraryOptionsDialog(
     onDismiss: () -> Unit,
 ) {
     TankobunDialog(onDismiss = onDismiss, maxHeight = 680.dp) {
-        TankobunDialogHeader(title = "Library Options", onDismiss = onDismiss)
-        Text("Sort", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        TankobunDialogHeader(title = tankobunString(R.string.browse_library_options), onDismiss = onDismiss)
+        Text(tankobunString(R.string.browse_sort), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         FlowRowCompat {
             LibrarySortOptions.forEach { option ->
                 TankobunChip(
                     selected = sort == option.value,
                     onClick = { onSortChange(option.value) },
-                    label = { Text(option.label) },
+                    label = { Text(option.labelText()) },
                 )
             }
         }
-        Text("View", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(tankobunString(R.string.common_view), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         MediaViewModeRow(
             selected = state.libraryViewMode,
             onSelect = viewModel::setLibraryViewMode,
         )
-        Text("Covers per row", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(tankobunString(R.string.settings_covers_per_row), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         CoverColumnsRow(
             selected = state.libraryCoverColumns,
             onSelect = viewModel::setLibraryCoverColumns,
         )
-        Text("Cover framing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(tankobunString(R.string.settings_cover_framing), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         CoverFramingRow(
             showWholeCover = state.libraryShowWholeCovers,
             onShowWholeCoverChange = viewModel::setLibraryShowWholeCovers,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onReset) {
-                Text("Clear filters")
+                Text(tankobunString(R.string.common_clear_filters))
             }
             Spacer(Modifier.weight(1f))
-            TankobunActionButton(label = "Apply", onClick = onDismiss)
+            TankobunActionButton(label = tankobunString(R.string.common_apply), onClick = onDismiss)
         }
     }
 }
@@ -934,39 +938,39 @@ internal fun BrowseAdvancedDialog(
     onDismiss: () -> Unit,
 ) {
     TankobunDialog(onDismiss = onDismiss, maxHeight = 680.dp) {
-        TankobunDialogHeader(title = "Browse Options", onDismiss = onDismiss)
-        Text("Sort", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        TankobunDialogHeader(title = tankobunString(R.string.browse_browse_options), onDismiss = onDismiss)
+        Text(tankobunString(R.string.browse_sort), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         FlowRowCompat {
             BrowseSortOptions.forEach { option ->
                 TankobunChip(
                     selected = state.browseSort == option.value,
                     onClick = { option.value?.let(viewModel::setBrowseSort) },
-                    label = { Text(option.label) },
+                    label = { Text(option.labelText()) },
                 )
             }
         }
-        Text("View", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(tankobunString(R.string.common_view), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         MediaViewModeRow(
             selected = state.browseViewMode,
             onSelect = viewModel::setBrowseViewMode,
         )
-        Text("Covers per row", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(tankobunString(R.string.settings_covers_per_row), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         CoverColumnsRow(
             selected = state.browseCoverColumns,
             onSelect = viewModel::setBrowseCoverColumns,
         )
-        Text("Cover framing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(tankobunString(R.string.settings_cover_framing), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         CoverFramingRow(
             showWholeCover = state.browseShowWholeCovers,
             onShowWholeCoverChange = viewModel::setBrowseShowWholeCovers,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = viewModel::resetBrowseFilters) {
-                Text("Clear filters")
+                Text(tankobunString(R.string.common_clear_filters))
             }
             Spacer(Modifier.weight(1f))
             TankobunActionButton(
-                label = "Apply",
+                label = tankobunString(R.string.common_apply),
                 onClick = {
                     onDismiss()
                     viewModel.searchAniList()
@@ -1006,18 +1010,23 @@ internal fun CoverFramingRow(
         TankobunChip(
             selected = !showWholeCover,
             onClick = { onShowWholeCoverChange(false) },
-            label = { Text("Fill frame") },
+            label = { Text(tankobunString(R.string.cover_framing_fill)) },
         )
         TankobunChip(
             selected = showWholeCover,
             onClick = { onShowWholeCoverChange(true) },
-            label = { Text("Show whole cover") },
+            label = { Text(tankobunString(R.string.cover_framing_whole)) },
         )
     }
 }
 
+@Composable
+internal fun BrowseOption.labelText(): String =
+    labelRes?.let { tankobunString(it) } ?: label
+
+@Composable
 internal fun List<BrowseOption>.labelFor(value: String?): String =
-    firstOrNull { it.value == value }?.label ?: "Any"
+    firstOrNull { it.value == value }?.labelText() ?: tankobunString(R.string.common_any)
 
 internal fun List<AnilistMediaTag>.visibleTags(query: String): List<AnilistMediaTag> {
     val normalizedQuery = query.trim().lowercase()
@@ -1034,7 +1043,7 @@ internal fun List<AnilistMediaTag>.visibleTags(query: String): List<AnilistMedia
 
 internal fun browseYearOptions(): List<BrowseOption> {
     val currentYear = java.time.Year.now().value
-    return listOf(BrowseOption("Any", null)) +
+    return listOf(BrowseOption(R.string.common_any, null)) +
         (currentYear downTo 1970).map { BrowseOption(it.toString(), it.toString()) }
 }
 
@@ -1051,19 +1060,33 @@ internal fun TankobunUiState.browseFiltersOrSortActive(): Boolean =
         browseStaffName != null ||
         browseSort != BROWSE_SORT_SEARCH_MATCH_UI
 
+@Composable
 internal fun browseSummary(state: TankobunUiState): String {
-    val parts = buildList {
-        state.searchQuery.trim().takeIf { it.isNotBlank() }?.let { add("Search \"$it\"") }
-        state.browseStaffName?.let { add("Author: $it") }
-        if (state.browseGenres.isNotEmpty()) add(state.browseGenres.sorted().joinToString(", "))
-        if (state.browseTags.isNotEmpty()) add(state.browseTags.sorted().joinToString(", "))
-        state.browseFormat?.let { add(BrowseFormatOptions.labelFor(it)) }
-        state.browsePublishingStatus?.let { add(BrowseStatusOptions.labelFor(it)) }
-        state.browseCountryOfOrigin?.let { add(BrowseCountryOptions.labelFor(it)) }
-        state.browseYear?.let { add(it.toString()) }
-        BrowseSortOptions.labelFor(state.browseSort).takeIf { it != "Search Match" }?.let { add("Sort: $it") }
+    val parts = mutableListOf<String>()
+    state.searchQuery.trim().takeIf { it.isNotBlank() }?.let {
+        parts += tankobunString(R.string.browse_summary_search, it)
     }
-    return parts.ifEmpty { listOf("AniList manga database") }.joinToString(" / ")
+    state.browseStaffName?.let {
+        parts += tankobunString(R.string.browse_summary_author, it)
+    }
+    if (state.browseGenres.isNotEmpty()) {
+        val genreLabels = mutableListOf<String>()
+        state.browseGenres.sorted().forEach { genre ->
+            genreLabels += browseGenreLabel(genre)
+        }
+        parts += genreLabels.joinToString(", ")
+    }
+    if (state.browseTags.isNotEmpty()) parts += state.browseTags.sorted().joinToString(", ")
+    state.browseFormat?.let { parts += BrowseFormatOptions.labelFor(it) }
+    state.browsePublishingStatus?.let { parts += BrowseStatusOptions.labelFor(it) }
+    state.browseCountryOfOrigin?.let { parts += BrowseCountryOptions.labelFor(it) }
+    state.browseYear?.let { parts += it.toString() }
+    val defaultSortLabel = tankobunString(R.string.browse_sort_search_match)
+    val selectedSortLabel = BrowseSortOptions.labelFor(state.browseSort)
+    if (selectedSortLabel != defaultSortLabel) {
+        parts += tankobunString(R.string.browse_summary_sort, selectedSortLabel)
+    }
+    return parts.ifEmpty { listOf(tankobunString(R.string.browse_summary_default)) }.joinToString(" / ")
 }
 
 @Composable
@@ -1076,37 +1099,80 @@ internal fun String?.statusColor(): Color = when (this) {
     else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
-internal fun String?.statusLabel(): String = when (this) {
-    "RELEASING" -> "Releasing"
-    "FINISHED" -> "Finished"
-    "HIATUS" -> "Hiatus"
-    "NOT_YET_RELEASED" -> "Not yet released"
-    "CANCELLED" -> "Cancelled"
-    else -> "Status unknown"
+@StringRes
+internal fun String?.publishingStatusLabelRes(): Int = when (this) {
+    "RELEASING" -> R.string.publishing_releasing
+    "FINISHED" -> R.string.publishing_finished
+    "HIATUS" -> R.string.publishing_hiatus
+    "NOT_YET_RELEASED" -> R.string.publishing_not_yet_released
+    "CANCELLED" -> R.string.publishing_cancelled
+    else -> R.string.publishing_unknown
 }
 
+@Composable
+internal fun String?.statusLabel(): String =
+    tankobunString(publishingStatusLabelRes())
+
+@StringRes
+internal fun String?.mediaFormatLabelRes(): Int = when (this) {
+    "MANGA" -> R.string.media_type_manga
+    "NOVEL" -> R.string.media_type_novel
+    "ONE_SHOT" -> R.string.media_type_one_shot
+    else -> R.string.media_type_manga
+}
+
+@Composable
 internal fun AnilistMedia.mediaTypeLabel(): String = when (countryOfOrigin?.uppercase(Locale.getDefault())) {
-    "KR" -> "Manhwa"
-    "CN", "TW", "HK" -> "Manhua"
-    else -> format.mediaFormatLabel()
+    "KR" -> tankobunString(R.string.media_type_manhwa)
+    "CN", "TW", "HK" -> tankobunString(R.string.media_type_manhua)
+    else -> tankobunString(format.mediaFormatLabelRes())
 }
 
-internal fun String?.mediaFormatLabel(): String = when (this) {
-    "MANGA" -> "Manga"
-    "NOVEL" -> "Novel"
-    "ONE_SHOT" -> "One Shot"
-    else -> "Manga"
+@Composable
+internal fun String?.mediaFormatLabel(): String =
+    tankobunString(mediaFormatLabelRes())
+
+@Composable
+internal fun AnilistMedia.publishingYearLabel(): String {
+    val startYear = startDateYear
+    val endYear = endDateYear
+    return when {
+        startYear != null && endYear != null && startYear != endYear -> "$startYear - $endYear"
+        startYear != null && status == "RELEASING" -> tankobunString(R.string.media_year_since, startYear)
+        startYear != null -> startYear.toString()
+        else -> tankobunString(R.string.media_date_unknown)
+    }
 }
 
-internal fun AnilistMedia.publishingYearLabel(): String = when {
-    startDateYear != null && endDateYear != null && startDateYear != endDateYear -> "$startDateYear - $endDateYear"
-    startDateYear != null && status == "RELEASING" -> "Since $startDateYear"
-    startDateYear != null -> startDateYear.toString()
-    else -> "Date unknown"
-}
-
+@Composable
 internal fun List<String>.authorLabel(): String =
-    take(3).joinToString(", ").ifBlank { "Unknown" }
+    take(3).joinToString(", ").ifBlank { tankobunString(R.string.media_unknown_author) }
+
+@Composable
+internal fun browseGenreLabel(genre: String): String {
+    val labelRes = when (genre) {
+        "Action" -> R.string.browse_genre_action
+        "Adventure" -> R.string.browse_genre_adventure
+        "Comedy" -> R.string.browse_genre_comedy
+        "Drama" -> R.string.browse_genre_drama
+        "Ecchi" -> R.string.browse_genre_ecchi
+        "Fantasy" -> R.string.browse_genre_fantasy
+        "Horror" -> R.string.browse_genre_horror
+        "Mahou Shoujo" -> R.string.browse_genre_mahou_shoujo
+        "Mecha" -> R.string.browse_genre_mecha
+        "Music" -> R.string.browse_genre_music
+        "Mystery" -> R.string.browse_genre_mystery
+        "Psychological" -> R.string.browse_genre_psychological
+        "Romance" -> R.string.browse_genre_romance
+        "Sci-Fi" -> R.string.browse_genre_sci_fi
+        "Slice of Life" -> R.string.browse_genre_slice_of_life
+        "Sports" -> R.string.browse_genre_sports
+        "Supernatural" -> R.string.browse_genre_supernatural
+        "Thriller" -> R.string.browse_genre_thriller
+        else -> null
+    }
+    return labelRes?.let { tankobunString(it) } ?: genre
+}
 
 internal fun Int.formatCompact(): String =
     when {

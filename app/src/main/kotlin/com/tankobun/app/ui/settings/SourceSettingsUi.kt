@@ -453,11 +453,11 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                 if (page == 0) {
                     if (state.allInstalledSources.isEmpty()) {
                         item(key = "installed-empty") {
-                            TankobunEmptyState(title = "No installed Tachiyomi-compatible source extensions found.")
+                            TankobunEmptyState(title = tankobunString(R.string.sources_empty_installed))
                         }
                     } else if (sourceGroups.isEmpty()) {
                         item(key = "installed-filter-empty") {
-                            TankobunEmptyState(title = "No installed sources match this search and language filter.")
+                            TankobunEmptyState(title = tankobunString(R.string.sources_empty_installed_filter))
                         }
                     } else {
                         items(sourceGroups, key = { it.first }) { (language, sources) ->
@@ -486,12 +486,12 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                     }
                     if (repositoryEntries.isEmpty()) {
                         item(key = "repository-empty") {
-                            TankobunEmptyState(title = "Load a repository index to browse installable extensions.")
+                            TankobunEmptyState(title = tankobunString(R.string.sources_empty_repository))
                         }
                     } else {
                         if (visibleRepositoryEntries.isEmpty()) {
                             item(key = "repository-filter-empty") {
-                                TankobunEmptyState(title = "No repository extensions match this search and language filter.")
+                                TankobunEmptyState(title = tankobunString(R.string.sources_empty_repository_filter))
                             }
                         }
                         items(visibleRepositoryEntries, key = { "${it.packageName}:${it.versionCode}" }) { extension ->
@@ -582,14 +582,14 @@ internal fun SourceSettingsHeader(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Source extensions",
+                    tankobunString(R.string.sources_header),
                     style = LocalTankobunStyle.current.typography.sectionLabel,
                     color = LocalTankobunStyle.current.colors.accent,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "$activeInstalledCount active / $visibleInstalledCount installed",
+                    tankobunString(R.string.sources_active_installed_count, activeInstalledCount, visibleInstalledCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -600,7 +600,11 @@ internal fun SourceSettingsHeader(
         TankobunSearchField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = if (selectedTab == 0) "Search installed sources" else "Search extensions",
+            placeholder = if (selectedTab == 0) {
+                tankobunString(R.string.sources_search_installed)
+            } else {
+                tankobunString(R.string.sources_search_extensions)
+            },
             showSearchAction = false,
         )
     }
@@ -619,7 +623,10 @@ internal fun SourceSettingsTabRow(
         containerColor = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.primary,
     ) {
-        listOf("Installed" to installedCount, "Repository" to repositoryCount).forEachIndexed { index, (label, count) ->
+        listOf(
+            tankobunString(R.string.sources_tab_installed) to installedCount,
+            tankobunString(R.string.sources_tab_repository) to repositoryCount,
+        ).forEachIndexed { index, (label, count) ->
             Tab(
                 selected = selectedTab == index,
                 onClick = { onSelectTab(index) },
@@ -652,7 +659,7 @@ internal fun SourceRepositoryControls(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Extension repository",
+            tankobunString(R.string.sources_repository),
             style = LocalTankobunStyle.current.typography.sectionLabel,
             color = LocalTankobunStyle.current.colors.accent,
         )
@@ -661,7 +668,7 @@ internal fun SourceRepositoryControls(
             onValueChange = onRepositoryUrlChange,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("Repository index URL") },
+            label = { Text(tankobunString(R.string.sources_repository_index_url)) },
             shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
             trailingIcon = {
                 Button(
@@ -674,13 +681,13 @@ internal fun SourceRepositoryControls(
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Load", maxLines = 1)
+                    Text(tankobunString(R.string.common_load), maxLines = 1)
                 }
             },
         )
         if (repositoryCount > 0) {
             Text(
-                "$repositoryCount extensions shown",
+                tankobunString(R.string.sources_extensions_shown, repositoryCount),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -724,16 +731,16 @@ internal fun SourceLanguageGroupSection(
                         color = LocalTankobunStyle.current.colors.accent,
                     )
                     Text(
-                        "$activeCount of ${sources.size} active",
+                        tankobunString(R.string.sources_active_of_count, activeCount, sources.size),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 TextButton(onClick = { onGroupEnabledChange(sources, true) }) {
-                    Text("All on")
+                    Text(tankobunString(R.string.sources_all_on))
                 }
                 TextButton(onClick = { onGroupEnabledChange(sources, false) }) {
-                    Text("All off")
+                    Text(tankobunString(R.string.sources_all_off))
                 }
             }
             sources.forEach { source ->
@@ -793,14 +800,14 @@ internal fun SourceSettingsRow(
         if (extension != null && updateAvailable) {
             SourceSettingsIconActionButton(
                 icon = Icons.Default.Download,
-                contentDescription = "Update $displayName",
+                contentDescription = tankobunString(R.string.sources_update_cd, displayName),
                 enabled = !installing,
                 onClick = { onInstall(extension) },
             )
         }
         SourceSettingsIconActionButton(
             icon = Icons.Default.Delete,
-            contentDescription = "Uninstall $displayName",
+            contentDescription = tankobunString(R.string.sources_uninstall_cd, displayName),
             onClick = { onUninstall(source.packageName) },
         )
         Switch(
@@ -856,7 +863,7 @@ internal fun ExtensionRepositoryRow(
     val installed = installedSources.isNotEmpty()
     val updateAvailable = installedVersionCode?.let { extension.versionCode > it } == true
     val showInstallAction = !installed || updateAvailable
-    val actionLabel = if (updateAvailable) "Update" else "Install"
+    val actionLabel = if (updateAvailable) tankobunString(R.string.common_update) else tankobunString(R.string.common_install)
     TankobunPanel(
         modifier = Modifier.fillMaxWidth(),
         color = LocalTankobunStyle.current.colors.panel,
@@ -881,8 +888,12 @@ internal fun ExtensionRepositoryRow(
                         listOfNotNull(
                             sourceLanguageDisplay(extension.lang.normalizedSourceLanguage()),
                             "v${extension.versionName}",
-                            if (extension.isNsfw) "NSFW" else null,
-                            if (installed) "${installedSources.size} source${if (installedSources.size == 1) "" else "s"} installed" else null,
+                            if (extension.isNsfw) tankobunString(R.string.sources_nsfw) else null,
+                            if (installed) {
+                                tankobunString(R.string.sources_installed_sources_count, installedSources.size)
+                            } else {
+                                null
+                            },
                         ).joinToString(" / "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -924,7 +935,7 @@ internal fun ExtensionRepositoryRow(
                 if (installed) {
                     SourceSettingsIconActionButton(
                         icon = Icons.Default.Delete,
-                        contentDescription = "Uninstall $displayName",
+                        contentDescription = tankobunString(R.string.sources_uninstall_cd, displayName),
                         onClick = onUninstall,
                     )
                 }
@@ -978,10 +989,11 @@ internal fun ExtensionIndexEntry.matchesSourceSettingsQuery(query: String): Bool
 internal fun String.matchesSourceSettingsQuery(query: String): Boolean =
     lowercase().contains(query)
 
+@Composable
 internal fun sourceMetadata(source: SourceDescriptor): String =
     listOfNotNull(
         source.versionName?.let { "v$it" },
-        if (source.isNsfw) "NSFW" else null,
+        if (source.isNsfw) tankobunString(R.string.sources_nsfw) else null,
     ).joinToString(" / ")
 
 @Composable
@@ -1148,16 +1160,17 @@ internal fun sourceLanguageSortPriority(language: String): Int =
         else -> 2
     }
 
+@Composable
 internal fun cacheAgeLabel(syncedAtEpochMillis: Long): String {
     val ageMillis = (System.currentTimeMillis() - syncedAtEpochMillis).coerceAtLeast(0L)
     val minutes = ageMillis / 60_000L
     val hours = minutes / 60L
     val days = hours / 24L
     return when {
-        minutes < 1 -> "just now"
-        hours < 1 -> "${minutes}m ago"
-        days < 1 -> "${hours}h ago"
-        else -> "${days}d ago"
+        minutes < 1 -> tankobunString(R.string.cache_just_now)
+        hours < 1 -> tankobunString(R.string.cache_minutes_ago, minutes)
+        days < 1 -> tankobunString(R.string.cache_hours_ago, hours)
+        else -> tankobunString(R.string.cache_days_ago, days)
     }
 }
 
@@ -1225,9 +1238,75 @@ internal fun sourceLanguageLabel(language: String): String =
         else -> language.uppercase()
     }
 
+private fun sourceLanguageLabelRes(language: String): Int? =
+    when (language.normalizedSourceLanguage()) {
+        "all" -> R.string.language_all
+        "af" -> R.string.language_af
+        "ar" -> R.string.language_ar
+        "az" -> R.string.language_az
+        "be" -> R.string.language_be
+        "bg" -> R.string.language_bg
+        "bn" -> R.string.language_bn
+        "ca" -> R.string.language_ca
+        "cs" -> R.string.language_cs
+        "da" -> R.string.language_da
+        "de" -> R.string.language_de
+        "el" -> R.string.language_el
+        "en" -> R.string.language_en
+        "eo" -> R.string.language_eo
+        "pt" -> R.string.language_pt
+        "pt-br" -> R.string.language_pt_br
+        "es" -> R.string.language_es
+        "eu" -> R.string.language_eu
+        "fa" -> R.string.language_fa
+        "fi" -> R.string.language_fi
+        "fr" -> R.string.language_fr
+        "ga" -> R.string.language_ga
+        "gl" -> R.string.language_gl
+        "he" -> R.string.language_he
+        "hi" -> R.string.language_hi
+        "hr" -> R.string.language_hr
+        "hu" -> R.string.language_hu
+        "id" -> R.string.language_id
+        "it" -> R.string.language_it
+        "ja" -> R.string.language_ja
+        "ka" -> R.string.language_ka
+        "kk" -> R.string.language_kk
+        "ko" -> R.string.language_ko
+        "la" -> R.string.language_la
+        "lt" -> R.string.language_lt
+        "ms" -> R.string.language_ms
+        "mn" -> R.string.language_mn
+        "my" -> R.string.language_my
+        "ne" -> R.string.language_ne
+        "nl" -> R.string.language_nl
+        "no" -> R.string.language_no
+        "pl" -> R.string.language_pl
+        "ro" -> R.string.language_ro
+        "ru" -> R.string.language_ru
+        "sr" -> R.string.language_sr
+        "sv" -> R.string.language_sv
+        "ta" -> R.string.language_ta
+        "te" -> R.string.language_te
+        "th" -> R.string.language_th
+        "tr" -> R.string.language_tr
+        "uk" -> R.string.language_uk
+        "ur" -> R.string.language_ur
+        "vi" -> R.string.language_vi
+        "zh" -> R.string.language_zh
+        "zh-hans" -> R.string.language_zh_hans
+        "zh-hant" -> R.string.language_zh_hant
+        else -> null
+    }
+
+@Composable
+private fun sourceLanguageLocalizedLabel(language: String): String =
+    sourceLanguageLabelRes(language)?.let { tankobunString(it) } ?: language.uppercase()
+
+@Composable
 internal fun sourceLanguageDisplay(language: String): String =
-    sourceLanguageFlag(language)?.let { flag -> "$flag ${sourceLanguageLabel(language)}" }
-        ?: sourceLanguageLabel(language)
+    sourceLanguageFlag(language)?.let { flag -> "$flag ${sourceLanguageLocalizedLabel(language)}" }
+        ?: sourceLanguageLocalizedLabel(language)
 
 internal fun sourceLanguageFlag(language: String): String? {
     val normalized = language.normalizedSourceLanguage()

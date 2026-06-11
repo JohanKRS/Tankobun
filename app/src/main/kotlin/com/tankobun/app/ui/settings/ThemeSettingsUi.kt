@@ -234,7 +234,7 @@ internal fun ThemePicker(
     val choices = tankobunThemeChoices()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_theme_section), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
                 choices.firstOrNull { it.mode == selected }?.name ?: "Neon Koi",
                 style = MaterialTheme.typography.labelLarge,
@@ -288,9 +288,9 @@ internal fun ThemeChoiceCard(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
     val typeLabel = when (choice.dark) {
-        true -> "Dark"
-        false -> "Light"
-        null -> "Auto"
+        true -> tankobunString(R.string.common_dark)
+        false -> tankobunString(R.string.common_light)
+        null -> tankobunString(R.string.common_auto)
     }
     Surface(
         modifier = Modifier
@@ -341,7 +341,7 @@ internal fun ThemeChoiceCard(
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(typeLabel, style = MaterialTheme.typography.labelSmall, color = secondaryTextColor)
                     if (selected) {
-                        Text("Selected", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Text(tankobunString(R.string.common_selected), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
                 }
             }

@@ -140,6 +140,11 @@ internal class SourceDataSource(
         sources: List<SourceDescriptor>,
         now: Long,
         titleOverride: String? = null,
+        diagnosticSearchTimedOut: String = "search timed out",
+        diagnosticNoSearchResults: String = "no search results",
+        diagnosticNoConfidentTitleMatch: String = "no confident title match",
+        diagnosticNoReadableChapters: String = "no readable chapters",
+        diagnosticDetail: (Throwable) -> String = ::sourcePickerDiagnosticDetail,
         onUpdate: suspend (SourcePickerSearchUpdate) -> Unit = {},
     ): VerifiedSourceMatches = supervisorScope {
         val semaphore = Semaphore(SOURCE_SEARCH_CONCURRENCY)
@@ -157,15 +162,15 @@ internal class SourceDataSource(
                                 .take(SOURCE_CANDIDATES_TO_VERIFY)
                             when {
                                 searchResults == null -> {
-                                    onUpdate(SourcePickerSearchUpdate.Diagnostic(source, "search timed out"))
+                                    onUpdate(SourcePickerSearchUpdate.Diagnostic(source, diagnosticSearchTimedOut))
                                     null
                                 }
                                 searchResults.isEmpty() -> {
-                                    onUpdate(SourcePickerSearchUpdate.Diagnostic(source, "no search results"))
+                                    onUpdate(SourcePickerSearchUpdate.Diagnostic(source, diagnosticNoSearchResults))
                                     null
                                 }
                                 candidates.isEmpty() -> {
-                                    onUpdate(SourcePickerSearchUpdate.Diagnostic(source, "no confident title match"))
+                                    onUpdate(SourcePickerSearchUpdate.Diagnostic(source, diagnosticNoConfidentTitleMatch))
                                     null
                                 }
                                 else -> {
@@ -173,7 +178,7 @@ internal class SourceDataSource(
                                         firstReadableMatch(source, candidates, now)
                                     }
                                     if (readable == null) {
-                                        onUpdate(SourcePickerSearchUpdate.Diagnostic(source, "no readable chapters"))
+                                        onUpdate(SourcePickerSearchUpdate.Diagnostic(source, diagnosticNoReadableChapters))
                                     } else {
                                         onUpdate(SourcePickerSearchUpdate.Match(readable.match, readable.chapterCount))
                                     }
@@ -183,7 +188,7 @@ internal class SourceDataSource(
                         } catch (error: Throwable) {
                             if (error is CancellationException) throw error
                             Log.w(TAG, "Source verification failed for ${source.name}", error)
-                            onUpdate(SourcePickerSearchUpdate.Diagnostic(source, sourcePickerDiagnosticDetail(error)))
+                            onUpdate(SourcePickerSearchUpdate.Diagnostic(source, diagnosticDetail(error)))
                             null
                         }
                     }

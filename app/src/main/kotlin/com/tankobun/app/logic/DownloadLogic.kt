@@ -17,16 +17,6 @@ internal data class BulkDownloadResult(
         get() = queued + resumed + retried
 }
 
-internal fun bulkDownloadMessage(label: String, result: BulkDownloadResult): String {
-    if (result.changed == 0) return "No new $label to download"
-    val parts = buildList {
-        if (result.queued > 0) add("queued ${result.queued}")
-        if (result.resumed > 0) add("resumed ${result.resumed}")
-        if (result.retried > 0) add("retrying ${result.retried}")
-    }
-    return "${parts.joinToString(" / ")} $label"
-}
-
 internal fun buildDownloadStorageSummary(
     downloads: List<DownloadJob>,
     pages: List<DownloadPageEntity>,

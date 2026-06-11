@@ -712,7 +712,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                         IconButton(onClick = viewModel::closeReader) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Close reader",
+                                contentDescription = tankobunString(R.string.reader_close),
                                 tint = Color.White,
                             )
                         }
@@ -728,7 +728,12 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
-                                "${if (state.readerMode == ReaderMode.WEBTOON) "Webtoon" else "Paged"} / Page ${displayedPageIndex + 1} of $pageCount",
+                                tankobunString(
+                                    R.string.reader_progress_format,
+                                    state.readerMode.readerModeLabel(),
+                                    displayedPageIndex + 1,
+                                    pageCount,
+                                ),
                                 color = Color.White.copy(alpha = 0.74f),
                                 style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,
@@ -761,9 +766,9 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 Icon(
                                     Icons.Default.SkipPrevious,
                                     contentDescription = if (state.currentPageIndex <= 0 && previousChapter != null) {
-                                        "Previous chapter"
+                                        tankobunString(R.string.reader_previous_chapter)
                                     } else {
-                                        "Previous page"
+                                        tankobunString(R.string.reader_previous_page)
                                     },
                                     tint = Color.White.copy(alpha = if (canGoBack) 1f else 0.34f),
                                 )
@@ -778,12 +783,12 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Text(
-                                        "Page ${displayedPageIndex + 1}",
+                                        tankobunString(R.string.reader_page_number, displayedPageIndex + 1),
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelLarge,
                                     )
                                     Text(
-                                        "$pageCount pages",
+                                        tankobunQuantityString(R.plurals.page_count, pageCount, pageCount),
                                         color = Color.White.copy(alpha = 0.68f),
                                         style = MaterialTheme.typography.labelMedium,
                                     )
@@ -825,9 +830,9 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 Icon(
                                     Icons.Default.SkipNext,
                                     contentDescription = if (state.currentPageIndex >= lastPageIndex && nextChapter != null) {
-                                        "Next chapter"
+                                        tankobunString(R.string.reader_next_chapter)
                                     } else {
-                                        "Next page"
+                                        tankobunString(R.string.reader_next_page)
                                     },
                                     tint = Color.White.copy(alpha = if (canGoForward) 1f else 0.34f),
                                 )
@@ -851,7 +856,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                         resetZoom()
                                         viewModel.setReaderMode(ReaderMode.PAGED)
                                     },
-                                    label = { Text("Paged") },
+                                    label = { Text(ReaderMode.PAGED.readerModeLabel()) },
                                 )
                                 TankobunChip(
                                     selected = state.readerMode == ReaderMode.WEBTOON,
@@ -859,7 +864,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                         resetZoom()
                                         viewModel.setReaderMode(ReaderMode.WEBTOON)
                                     },
-                                    label = { Text("Webtoon") },
+                                    label = { Text(ReaderMode.WEBTOON.readerModeLabel()) },
                                 )
                                 TankobunChip(
                                     selected = state.readerPageGapLevel > 0,
@@ -869,11 +874,11 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 TankobunChip(
                                     selected = readerScale > 1.05f,
                                     onClick = { resetZoom() },
-                                    label = { Text("Reset zoom") },
+                                    label = { Text(tankobunString(R.string.reader_reset_zoom)) },
                                 )
                             }
                             Text(
-                                "zoom: $zoomPercent%",
+                                tankobunString(R.string.common_zoom_percent, zoomPercent),
                                 color = Color.White.copy(alpha = 0.78f),
                                 style = MaterialTheme.typography.labelLarge,
                                 maxLines = 1,
@@ -918,18 +923,18 @@ internal fun ReaderTutorialOverlay(readerMode: ReaderMode, onDismiss: () -> Unit
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ReaderTapZoneHint(
-                label = "Previous",
-                detail = "tap or swipe",
+                label = tankobunString(R.string.common_previous),
+                detail = tankobunString(R.string.reader_tutorial_previous),
                 modifier = Modifier.weight(1f),
             )
             ReaderTapZoneHint(
-                label = "Controls",
-                detail = "tap center",
+                label = tankobunString(R.string.common_options),
+                detail = tankobunString(R.string.reader_tutorial_controls),
                 modifier = Modifier.weight(1.15f),
             )
             ReaderTapZoneHint(
-                label = "Next",
-                detail = "tap or swipe",
+                label = tankobunString(R.string.common_next),
+                detail = tankobunString(R.string.reader_tutorial_previous),
                 modifier = Modifier.weight(1f),
             )
         }
@@ -947,17 +952,17 @@ internal fun ReaderTutorialOverlay(readerMode: ReaderMode, onDismiss: () -> Unit
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    "Reader basics",
+                    tankobunString(R.string.reader_basics),
                     color = Color.White,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ReaderModeBadge(label = "Paged", selected = readerMode == ReaderMode.PAGED)
-                    ReaderModeBadge(label = "Webtoon", selected = readerMode == ReaderMode.WEBTOON)
+                    ReaderModeBadge(label = ReaderMode.PAGED.readerModeLabel(), selected = readerMode == ReaderMode.PAGED)
+                    ReaderModeBadge(label = ReaderMode.WEBTOON.readerModeLabel(), selected = readerMode == ReaderMode.WEBTOON)
                 }
                 Text(
-                    "Paged mode turns pages with side taps or horizontal swipes. Webtoon mode scrolls vertically for long-strip chapters. Center tap toggles controls; pinch or double-tap to zoom.",
+                    tankobunString(R.string.reader_tutorial_body),
                     color = Color.White.copy(alpha = 0.78f),
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -965,7 +970,7 @@ internal fun ReaderTutorialOverlay(readerMode: ReaderMode, onDismiss: () -> Unit
                     onClick = onDismiss,
                     modifier = Modifier.align(Alignment.End),
                 ) {
-                    Text("Got it")
+                    Text(tankobunString(R.string.reader_got_it))
                 }
             }
         }
@@ -1033,7 +1038,7 @@ internal fun ReaderLoadingScreen(
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Close reader",
+                contentDescription = tankobunString(R.string.reader_close),
                 tint = Color.White,
             )
         }
@@ -1047,7 +1052,7 @@ internal fun ReaderLoadingScreen(
             if (error == null) {
                 CircularProgressIndicator(color = Color.White.copy(alpha = 0.86f))
                 Text(
-                    "Loading ${chapter.name}",
+                    tankobunString(R.string.reader_loading_chapter, chapter.name),
                     color = Color.White.copy(alpha = 0.72f),
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
@@ -1073,7 +1078,7 @@ internal fun ReaderLoadingScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     OutlinedButton(onClick = onClose) {
-                        Text("Close reader")
+                        Text(tankobunString(R.string.reader_close))
                     }
                     Button(onClick = onRetry) {
                         Icon(
@@ -1081,7 +1086,7 @@ internal fun ReaderLoadingScreen(
                             contentDescription = null,
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text("Try again")
+                        Text(tankobunString(R.string.common_try_again))
                     }
                 }
             }
@@ -1132,7 +1137,7 @@ internal fun ReaderPageImage(
         error = {
             ReaderImagePlaceholder(
                 modifier = loadingModifier,
-                label = "Page failed to load",
+                label = tankobunString(R.string.reader_page_failed),
                 onRetry = { retryAttempt += 1 },
             )
         },
@@ -1171,7 +1176,7 @@ internal fun ReaderImagePlaceholder(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "Retry",
+                        tankobunString(R.string.common_retry),
                         color = Color.White.copy(alpha = 0.88f),
                     )
                 }
@@ -1208,7 +1213,7 @@ internal fun WebtoonPreviousChapterHeader(
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                "Open previous chapter",
+                tankobunString(R.string.reader_open_previous_chapter),
                 color = Color.White.copy(alpha = 0.88f),
             )
         }
@@ -1234,7 +1239,7 @@ internal fun WebtoonNextChapterFooter(
             color = Color.White.copy(alpha = 0.86f),
         )
         Text(
-            "Loading ${nextChapter.name}",
+            tankobunString(R.string.reader_loading_chapter, nextChapter.name),
             style = MaterialTheme.typography.bodySmall,
             color = Color.White.copy(alpha = 0.72f),
             maxLines = 1,
@@ -1248,7 +1253,7 @@ internal fun WebtoonNextChapterFooter(
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                "Open now",
+                tankobunString(R.string.reader_open_now),
                 color = Color.White.copy(alpha = 0.88f),
             )
         }
@@ -1294,11 +1299,12 @@ internal data class ReaderPanBounds(
             (maxY > 0.5f && abs(pan.y) > abs(pan.x))
 }
 
+@Composable
 internal fun readerGapLabel(level: Int): String = when (level) {
-    1 -> "Small gaps"
-    2 -> "Medium gaps"
-    3 -> "Large gaps"
-    else -> "No gaps"
+    1 -> tankobunString(R.string.reader_small_gaps)
+    2 -> tankobunString(R.string.reader_medium_gaps)
+    3 -> tankobunString(R.string.reader_large_gaps)
+    else -> tankobunString(R.string.reader_no_gaps)
 }
 
 internal fun ReaderPage.readerPageAspectRatio(): Float? {

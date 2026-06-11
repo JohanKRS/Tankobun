@@ -232,8 +232,8 @@ internal fun DownloadsSettingsScreen(
 ) {
     var pendingDelete by remember { mutableStateOf<PendingDownloadDelete?>(null) }
     SettingsDetailPanel(
-        title = "Downloads",
-        subtitle = "Review local chapter storage and remove downloaded manga.",
+        title = tankobunString(R.string.common_downloads),
+        subtitle = tankobunString(R.string.settings_downloads_subtitle),
         modifier = modifier,
     ) {
         val summary = state.downloadStorageSummary
@@ -250,9 +250,13 @@ internal fun DownloadsSettingsScreen(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Local storage", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(tankobunString(R.string.downloads_local_storage), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text(
-                        "${summary.items.size} source groups / ${summary.items.sumOf { it.chapterCount }} chapters",
+                        tankobunString(
+                            R.string.downloads_storage_summary,
+                            summary.items.size,
+                            summary.items.sumOf { it.chapterCount },
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -266,11 +270,12 @@ internal fun DownloadsSettingsScreen(
         }
 
         if (summary.items.isEmpty()) {
-            Text("No downloaded chapters yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tankobunString(R.string.downloads_no_downloaded_chapters), color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
+            val allDownloadsLabel = tankobunString(R.string.downloads_all_downloads)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    "By manga and source",
+                    tankobunString(R.string.downloads_by_manga_source),
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -279,7 +284,7 @@ internal fun DownloadsSettingsScreen(
                     onClick = {
                         pendingDelete = PendingDownloadDelete(
                             mediaId = null,
-                            title = "All downloads",
+                            title = allDownloadsLabel,
                             detail = summary.totalBytes.formatFileSize(),
                         )
                     },
@@ -287,12 +292,13 @@ internal fun DownloadsSettingsScreen(
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Delete all")
+                    Text(tankobunString(R.string.downloads_delete_all))
                 }
             }
             summary.items.forEach { item ->
                 val title = state.downloadedMediaTitle(item.mediaId)
                 val sourceLabel = state.downloadedSourceLabel(item.sourceId)
+                val detail = "${item.bytes.formatFileSize()} / ${item.downloadStorageDetailLine()}"
                 DownloadStorageRow(
                     title = title,
                     sourceLabel = sourceLabel,
@@ -303,7 +309,7 @@ internal fun DownloadsSettingsScreen(
                             sourceId = item.sourceId,
                             title = title,
                             sourceLabel = sourceLabel,
-                            detail = "${item.bytes.formatFileSize()} / ${item.downloadStorageDetailLine()}",
+                            detail = detail,
                         )
                     },
                 )
@@ -343,7 +349,7 @@ internal fun DeleteDownloadsDialog(
     onConfirm: () -> Unit,
 ) {
     TankobunDialog(onDismiss = onDismiss, maxWidth = 520.dp, maxHeight = 520.dp) {
-        TankobunDialogHeader(title = "Delete downloads?", onDismiss = onDismiss)
+        TankobunDialogHeader(title = tankobunString(R.string.downloads_delete_title), onDismiss = onDismiss)
         Text(
             buildList {
                 add(target.title)
@@ -356,10 +362,10 @@ internal fun DeleteDownloadsDialog(
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(tankobunString(R.string.common_cancel))
             }
             TankobunActionButton(
-                label = "Delete",
+                label = tankobunString(R.string.common_delete),
                 icon = Icons.Default.Delete,
                 onClick = onConfirm,
             )
@@ -415,7 +421,10 @@ internal fun DownloadStorageRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete downloads for $title from $sourceLabel")
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = tankobunString(R.string.downloads_delete_cd, title, sourceLabel),
+                )
             }
         }
     }
@@ -471,9 +480,9 @@ internal fun CutoutLayoutToggle(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Ignore camera cutout", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(tankobunString(R.string.settings_ignore_camera_cutout), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(
-                    "Let content use the full display width as if this tablet had no notch.",
+                    tankobunString(R.string.settings_ignore_camera_cutout_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -529,14 +538,17 @@ internal fun SettingsToggleRow(
     }
 }
 
+@Composable
 internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
     when (this) {
-        SettingsRoute.MAIN -> "Settings"
+        SettingsRoute.MAIN -> tankobunString(R.string.common_settings)
         SettingsRoute.APPEARANCE -> buildList {
             add(tankobunThemeChoices().firstOrNull { it.mode == state.themeMode }?.name ?: "Neon Koi")
-            add("${state.dockAlignment.settingsLabel()} dock")
+            add(tankobunString(R.string.dock_summary, state.dockAlignment.settingsLabel()))
         }.joinToString(" / ")
-        SettingsRoute.LANGUAGES -> "${state.sourceLanguages.count { it != UNIVERSAL_SOURCE_LANGUAGE }} source languages"
+        SettingsRoute.LANGUAGES -> state.sourceLanguages.count { it != UNIVERSAL_SOURCE_LANGUAGE }.let { count ->
+            tankobunQuantityString(R.plurals.source_language_count, count, count)
+        }
         SettingsRoute.LIBRARY -> state.libraryViewMode.mediaViewSettingsSummary(
             columns = state.libraryCoverColumns,
             showWholeCovers = state.libraryShowWholeCovers,
@@ -546,24 +558,40 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
             showWholeCovers = state.browseShowWholeCovers,
         )
         SettingsRoute.READER -> buildList {
-            add(if (state.readerMode == ReaderMode.WEBTOON) "Webtoon" else "Paged")
+            add(state.readerMode.readerModeLabel())
             add(readerGapLabel(state.readerPageGapLevel))
         }.joinToString(" / ")
         SettingsRoute.DOWNLOADS -> state.downloadStorageSummary.totalBytes.formatFileSize()
         SettingsRoute.ANILIST -> buildList {
             add(
-                state.viewerName?.let { "Signed in as $it" }
-                    ?: if (state.clientConfigured) "Ready to connect" else "Client setup needed",
+                state.viewerName?.let { tankobunString(R.string.settings_signed_in_as, it) }
+                    ?: if (state.clientConfigured) {
+                        tankobunString(R.string.settings_anilist_ready)
+                    } else {
+                        tankobunString(R.string.settings_anilist_client_setup_needed)
+                    },
             )
             add(state.anilistTitleLanguage.settingsLabel())
             add(state.anilistScoreFormat.settingsLabel())
-            if (state.anilistAutoSaveTrackingChanges) add("Auto-save edits")
-            if (state.anilistAutoSyncReaderProgress) add("Auto progress")
+            if (state.anilistAutoSaveTrackingChanges) add(tankobunString(R.string.settings_auto_save_tracking_edits))
+            if (state.anilistAutoSyncReaderProgress) add(tankobunString(R.string.settings_update_progress_from_reading))
         }.joinToString(" / ")
-        SettingsRoute.CUSTOM_LISTS -> "${state.anilistCustomLists.size} list${if (state.anilistCustomLists.size == 1) "" else "s"}"
-        SettingsRoute.BACKUPS -> "${state.libraryItems.count { it.media.idMal != null }} / ${state.libraryItems.size} MAL matched"
-        SettingsRoute.ABOUT -> "Tutorial and notices"
-        SettingsRoute.SOURCES -> "${state.installedSources.size} active / ${state.visibleInstalledSourceCount()} installed"
+        SettingsRoute.CUSTOM_LISTS -> tankobunQuantityString(
+            R.plurals.list_count,
+            state.anilistCustomLists.size,
+            state.anilistCustomLists.size,
+        )
+        SettingsRoute.BACKUPS -> tankobunString(
+            R.string.backup_mal_matched_summary,
+            state.libraryItems.count { it.media.idMal != null },
+            state.libraryItems.size,
+        )
+        SettingsRoute.ABOUT -> tankobunString(R.string.about_summary)
+        SettingsRoute.SOURCES -> tankobunString(
+            R.string.sources_active_installed_count,
+            state.installedSources.size,
+            state.visibleInstalledSourceCount(),
+        )
     }
 
 private fun TankobunUiState.visibleInstalledSourceCount(): Int =
@@ -572,19 +600,12 @@ private fun TankobunUiState.visibleInstalledSourceCount(): Int =
         language in sourceLanguages || language == UNIVERSAL_SOURCE_LANGUAGE
     }
 
-internal fun BackupSchedule.label(): String =
-    when (this) {
-        BackupSchedule.OFF -> "Off"
-        BackupSchedule.DAILY -> "Daily"
-        BackupSchedule.WEEKLY -> "Weekly"
-        BackupSchedule.MONTHLY -> "Monthly"
-    }
-
+@Composable
 internal fun backupCoverageLabel(totalItems: Int, malMatchedItems: Int, missingMalItems: Int): String =
     when {
-        totalItems == 0 -> "No cached AniList manga yet. Sync before exporting."
-        missingMalItems == 0 -> "$totalItems manga ready for MAL-ID based import."
-        else -> "$malMatchedItems manga have MAL IDs; $missingMalItems included without a MAL match."
+        totalItems == 0 -> tankobunString(R.string.backup_no_cached_manga)
+        missingMalItems == 0 -> tankobunString(R.string.backup_ready_for_mal, totalItems)
+        else -> tankobunString(R.string.backup_missing_mal, malMatchedItems, missingMalItems)
     }
 
 internal fun suggestedAniListBackupFileName(viewerName: String?): String {
@@ -596,32 +617,35 @@ internal fun suggestedAniListBackupFileName(viewerName: String?): String {
     return "tankobun_anilist_backup_${userPart}_${System.currentTimeMillis()}.xml"
 }
 
+@Composable
 internal fun TankobunUiState.downloadedMediaTitle(mediaId: Int): String =
     libraryItems.firstOrNull { it.media.id == mediaId }?.media?.title?.userPreferred
         ?: library.firstOrNull { it.id == mediaId }?.title?.userPreferred
         ?: selectedMedia?.takeIf { it.id == mediaId }?.title?.userPreferred
-        ?: "Manga $mediaId"
+        ?: tankobunString(R.string.sources_manga_fallback, mediaId)
 
+@Composable
 internal fun TankobunUiState.downloadedSourceLabel(sourceId: Long): String {
     val source = installedSources.firstOrNull { it.id == sourceId }
         ?: allInstalledSources.firstOrNull { it.id == sourceId }
         ?: selectedSource?.takeIf { it.id == sourceId }
     return source?.let {
         "${it.name.extensionDisplayName()} / ${sourceLanguageDisplay(it.lang)}"
-    } ?: "Source $sourceId"
+    } ?: tankobunString(R.string.sources_source_fallback, sourceId)
 }
 
+@Composable
 internal fun DownloadStorageItem.downloadStorageDetailLine(): String =
     buildList {
-        add("$chapterCount ${if (chapterCount == 1) "chapter" else "chapters"}")
+        add(tankobunQuantityString(R.plurals.chapter_count, chapterCount, chapterCount))
         if (completedChapterCount > 0) {
-            add("$completedChapterCount complete")
+            add(tankobunString(R.string.downloads_storage_detail_complete, completedChapterCount))
         }
         if (activeChapterCount > 0) {
-            add("$activeChapterCount active")
+            add(tankobunString(R.string.downloads_storage_detail_active, activeChapterCount))
         }
         if (pageCount > 0) {
-            add("$pageCount pages")
+            add(tankobunQuantityString(R.plurals.page_count, pageCount, pageCount))
         }
     }.joinToString(" / ")
 
@@ -637,21 +661,22 @@ internal fun Long.formatFileSize(): String {
     return "%.1f %s".format(Locale.US, value, units[unitIndex])
 }
 
-internal fun MediaViewMode.mediaViewLabel(): String =
-    when (supportedMediaViewMode()) {
-        MediaViewMode.COVER_GRID -> "Cover only"
-        MediaViewMode.COVER_WITH_INFO -> "Cover + info"
-        MediaViewMode.LIST -> "List"
-        MediaViewMode.MASONRY,
-        MediaViewMode.JUSTIFIED -> "Cover only"
-    }
-
+@Composable
 internal fun MediaViewMode.mediaViewSettingsSummary(columns: Int, showWholeCovers: Boolean): String {
     val supportedMode = supportedMediaViewMode()
     return if (supportedMode == MediaViewMode.LIST) {
         mediaViewLabel()
     } else {
-        val framing = if (showWholeCovers) "whole covers" else "filled covers"
-        "${mediaViewLabel()} / ${columns.supportedCoverColumns()} per row / $framing"
+        val framing = if (showWholeCovers) {
+            tankobunString(R.string.cover_framing_whole_summary)
+        } else {
+            tankobunString(R.string.cover_framing_filled_summary)
+        }
+        tankobunString(
+            R.string.media_view_summary,
+            mediaViewLabel(),
+            columns.supportedCoverColumns(),
+            framing,
+        )
     }
 }

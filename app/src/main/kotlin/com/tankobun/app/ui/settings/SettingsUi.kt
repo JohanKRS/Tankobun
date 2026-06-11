@@ -311,12 +311,12 @@ internal fun SettingsIndexPane(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                "Settings",
+                tankobunString(R.string.common_settings),
                 style = LocalTankobunStyle.current.typography.sectionLabel,
                 color = LocalTankobunStyle.current.colors.accent,
             )
             Text(
-                "Tune Tankobun for how you read, browse, and sync.",
+                tankobunString(R.string.settings_index_intro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -332,7 +332,7 @@ internal fun SettingsIndexPane(
             }
         }
         Text(
-            "Unofficial app. Source extensions and content providers are third parties.",
+            tankobunString(R.string.settings_unofficial_notice),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -436,28 +436,28 @@ internal fun SettingsDetailContent(
     when (route) {
         SettingsRoute.MAIN,
         SettingsRoute.APPEARANCE -> SettingsDetailPanel(
-            title = "Appearance",
-            subtitle = "Choose a theme and layout behavior for your reading setup.",
+            title = tankobunString(R.string.settings_appearance),
+            subtitle = tankobunString(R.string.settings_appearance_subtitle),
             modifier = modifier,
         ) {
             ThemePicker(
                 selected = state.themeMode,
                 onSelect = viewModel::setThemeMode,
             )
-            Text("Dock position", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_dock_position), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             DockAlignmentRow(
                 selected = state.dockAlignment,
                 onSelect = viewModel::setDockAlignment,
             )
-            Text("System UI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_system_ui), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             SettingsToggleRow(
-                title = "Show Android status bar",
-                subtitle = "Keep the phone status bar visible in the app. The reader still hides it.",
+                title = tankobunString(R.string.settings_show_android_status_bar),
+                subtitle = tankobunString(R.string.settings_show_android_status_bar_desc),
                 checked = state.showAppStatusBar,
                 onCheckedChange = viewModel::setShowAppStatusBar,
             )
             if (deviceHasDisplayCutout) {
-                Text("Layout", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(tankobunString(R.string.settings_layout), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 CutoutLayoutToggle(
                     ignoreDisplayCutout = state.ignoreDisplayCutout,
                     onIgnoreDisplayCutoutChange = viewModel::setIgnoreDisplayCutout,
@@ -466,60 +466,60 @@ internal fun SettingsDetailContent(
         }
         SettingsRoute.LANGUAGES -> LanguagesSettingsScreen(state, viewModel, modifier)
         SettingsRoute.LIBRARY -> SettingsDetailPanel(
-            title = "Library",
-            subtitle = "Pick the default layout for your swipeable AniList lists.",
+            title = tankobunString(R.string.common_library),
+            subtitle = tankobunString(R.string.settings_library_subtitle),
             modifier = modifier,
         ) {
-            Text("Library view", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_library_view), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             MediaViewModeRow(selected = state.libraryViewMode, onSelect = viewModel::setLibraryViewMode)
-            Text("Covers per row", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_covers_per_row), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             CoverColumnsRow(
                 selected = state.libraryCoverColumns,
                 onSelect = viewModel::setLibraryCoverColumns,
             )
-            Text("Cover framing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_cover_framing), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             CoverFramingRow(
                 showWholeCover = state.libraryShowWholeCovers,
                 onShowWholeCoverChange = viewModel::setLibraryShowWholeCovers,
             )
         }
         SettingsRoute.BROWSE -> SettingsDetailPanel(
-            title = "Browse",
-            subtitle = "Pick the default layout for AniList search and discovery.",
+            title = tankobunString(R.string.common_browse),
+            subtitle = tankobunString(R.string.settings_browse_subtitle),
             modifier = modifier,
         ) {
-            Text("Browse view", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_browse_view), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             MediaViewModeRow(selected = state.browseViewMode, onSelect = viewModel::setBrowseViewMode)
-            Text("Covers per row", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_covers_per_row), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             CoverColumnsRow(
                 selected = state.browseCoverColumns,
                 onSelect = viewModel::setBrowseCoverColumns,
             )
-            Text("Cover framing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_cover_framing), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             CoverFramingRow(
                 showWholeCover = state.browseShowWholeCovers,
                 onShowWholeCoverChange = viewModel::setBrowseShowWholeCovers,
             )
         }
         SettingsRoute.READER -> SettingsDetailPanel(
-            title = "Reader",
-            subtitle = "Adjust paging, scrolling, and spacing.",
+            title = tankobunString(R.string.common_reader),
+            subtitle = tankobunString(R.string.settings_reader_subtitle),
             modifier = modifier,
         ) {
-            Text("Reading mode", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_reading_mode), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             FlowRowCompat {
                 TankobunChip(
                     selected = state.readerMode == ReaderMode.PAGED,
                     onClick = { viewModel.setReaderMode(ReaderMode.PAGED) },
-                    label = { Text("Paged") },
+                    label = { Text(tankobunString(R.string.reader_paged)) },
                 )
                 TankobunChip(
                     selected = state.readerMode == ReaderMode.WEBTOON,
                     onClick = { viewModel.setReaderMode(ReaderMode.WEBTOON) },
-                    label = { Text("Webtoon") },
+                    label = { Text(tankobunString(R.string.reader_webtoon)) },
                 )
             }
-            Text("Page gaps", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_page_gaps), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             FlowRowCompat {
                 (0..3).forEach { level ->
                     TankobunChip(
@@ -533,10 +533,10 @@ internal fun SettingsDetailContent(
         SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(state, viewModel, modifier)
         SettingsRoute.ANILIST -> SettingsDetailPanel(
             title = "AniList",
-            subtitle = "Manage sync and account connection.",
+            subtitle = tankobunString(R.string.settings_anilist_subtitle),
             modifier = modifier,
         ) {
-            Text("Connection", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_connection), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             TankobunPanel(
                 modifier = Modifier.fillMaxWidth(),
                 color = LocalTankobunStyle.current.colors.panel,
@@ -544,22 +544,22 @@ internal fun SettingsDetailContent(
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        state.viewerName?.let { "Signed in as $it" } ?: if (state.clientConfigured) {
-                            "AniList is ready to connect."
+                        state.viewerName?.let { tankobunString(R.string.settings_signed_in_as, it) } ?: if (state.clientConfigured) {
+                            tankobunString(R.string.settings_anilist_ready)
                         } else {
-                            "AniList client setup needed."
+                            tankobunString(R.string.settings_anilist_client_setup_needed)
                         },
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        "Redirect URI: ${BuildConfig.ANILIST_REDIRECT_URI}",
+                        tankobunString(R.string.settings_redirect_uri, BuildConfig.ANILIST_REDIRECT_URI),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     state.librarySyncedAtEpochMillis.takeIf { it > 0 }?.let {
                         Text(
-                            "Library cache: ${cacheAgeLabel(it)}",
+                            tankobunString(R.string.settings_library_cache, cacheAgeLabel(it)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -568,11 +568,11 @@ internal fun SettingsDetailContent(
             }
             if (state.loggedIn) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TankobunActionButton(label = "Sync AniList", onClick = viewModel::refreshLibrary)
-                    TankobunActionButton(label = "Sign out", onClick = viewModel::signOut, filled = false)
+                    TankobunActionButton(label = tankobunString(R.string.common_sync_anilist), onClick = viewModel::refreshLibrary)
+                    TankobunActionButton(label = tankobunString(R.string.common_sign_out), onClick = viewModel::signOut, filled = false)
                 }
             }
-            Text("AniList preferences", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_anilist_preferences), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             TankobunPanel(
                 modifier = Modifier.fillMaxWidth(),
                 color = LocalTankobunStyle.current.colors.panel,
@@ -580,12 +580,12 @@ internal fun SettingsDetailContent(
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "These update your AniList account and will also apply on AniList's website.",
+                        tankobunString(R.string.settings_anilist_preferences_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Title language", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(tankobunString(R.string.settings_title_language), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         FlowRowCompat {
                             AnilistTitleLanguage.entries.forEach { language ->
                                 TankobunChip(
@@ -598,7 +598,7 @@ internal fun SettingsDetailContent(
                         }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Rating format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(tankobunString(R.string.settings_rating_format), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         FlowRowCompat {
                             AnilistScoreFormat.entries.forEach { format ->
                                 TankobunChip(
@@ -612,30 +612,30 @@ internal fun SettingsDetailContent(
                     }
                     if (!state.loggedIn) {
                         Text(
-                            "Connect AniList before changing account preferences.",
+                            tankobunString(R.string.settings_connect_anilist_before_account_preferences),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
             }
-            Text("Sync behavior", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tankobunString(R.string.settings_sync_behavior), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             SettingsToggleRow(
-                title = "Auto-save tracking edits",
-                subtitle = "Status, score, progress, notes, privacy, and custom lists save after a short pause.",
+                title = tankobunString(R.string.settings_auto_save_tracking_edits),
+                subtitle = tankobunString(R.string.settings_auto_save_tracking_edits_desc),
                 checked = state.anilistAutoSaveTrackingChanges,
                 onCheckedChange = viewModel::setAnilistAutoSaveTrackingChanges,
                 enabled = state.loggedIn,
             )
             SettingsToggleRow(
-                title = "Update progress from reading",
-                subtitle = "Completed chapters move AniList progress to that chapter number.",
+                title = tankobunString(R.string.settings_update_progress_from_reading),
+                subtitle = tankobunString(R.string.settings_update_progress_from_reading_desc),
                 checked = state.anilistAutoSyncReaderProgress,
                 onCheckedChange = viewModel::setAnilistAutoSyncReaderProgress,
             )
             SettingsToggleRow(
-                title = "Include manual read marks",
-                subtitle = "Mark-as-read actions can also move AniList progress forward.",
+                title = tankobunString(R.string.settings_include_manual_read_marks),
+                subtitle = tankobunString(R.string.settings_include_manual_read_marks_desc),
                 checked = state.anilistSyncManualReadProgress,
                 onCheckedChange = viewModel::setAnilistSyncManualReadProgress,
                 enabled = state.anilistAutoSyncReaderProgress,
@@ -668,18 +668,18 @@ internal fun CustomListsSettingsScreen(
     }
 
     SettingsDetailPanel(
-        title = "Custom Lists",
-        subtitle = "Create, rename, and delete AniList manga custom lists. Manga stay in their normal AniList status lists.",
+        title = tankobunString(R.string.settings_custom_lists),
+        subtitle = tankobunString(R.string.settings_custom_lists_subtitle),
         modifier = modifier,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             TankobunActionButton(
-                label = "New list",
+                label = tankobunString(R.string.settings_new_list),
                 enabled = state.loggedIn && !state.busy,
                 onClick = { creatingList = true },
             )
             TankobunActionButton(
-                label = "Sync AniList",
+                label = tankobunString(R.string.common_sync_anilist),
                 icon = Icons.Default.Refresh,
                 enabled = state.loggedIn && !state.busy,
                 onClick = viewModel::refreshLibrary,
@@ -688,11 +688,11 @@ internal fun CustomListsSettingsScreen(
         }
 
         if (!state.loggedIn) {
-            TankobunMessageBanner("Connect AniList before managing custom lists.")
+            TankobunMessageBanner(tankobunString(R.string.settings_connect_anilist_before_custom_lists))
         }
 
         if (state.anilistCustomLists.isEmpty()) {
-            TankobunEmptyState(title = "No custom lists yet.")
+            TankobunEmptyState(title = tankobunString(R.string.settings_no_custom_lists))
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.anilistCustomLists.forEach { listName ->
@@ -710,8 +710,8 @@ internal fun CustomListsSettingsScreen(
 
     if (creatingList) {
         CustomListNameDialog(
-            title = "New Custom List",
-            confirmLabel = "Create",
+            title = tankobunString(R.string.settings_new_custom_list),
+            confirmLabel = tankobunString(R.string.common_create),
             initialName = "",
             onConfirm = { name ->
                 viewModel.createAnilistCustomList(name)
@@ -723,8 +723,8 @@ internal fun CustomListsSettingsScreen(
 
     renamingList?.let { listName ->
         CustomListNameDialog(
-            title = "Rename Custom List",
-            confirmLabel = "Rename",
+            title = tankobunString(R.string.settings_rename_custom_list),
+            confirmLabel = tankobunString(R.string.common_rename),
             initialName = listName,
             onConfirm = { name ->
                 viewModel.renameAnilistCustomList(listName, name)
@@ -774,17 +774,17 @@ internal fun CustomListSettingsRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "$count manga",
+                    tankobunQuantityString(R.plurals.manga_count, count, count),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             TextButton(enabled = enabled, onClick = onRename) {
-                Text("Rename")
+                Text(tankobunString(R.string.common_rename))
             }
             TankobunIconActionButton(
                 icon = Icons.Default.Delete,
-                contentDescription = "Delete custom list $name",
+                contentDescription = tankobunString(R.string.settings_delete_custom_list_cd, name),
                 enabled = enabled,
                 onClick = onDelete,
             )
@@ -808,12 +808,12 @@ internal fun CustomListNameDialog(
             onValueChange = { name = it },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("List name") },
+            label = { Text(tankobunString(R.string.settings_list_name)) },
             shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(tankobunString(R.string.common_cancel))
             }
             Spacer(Modifier.weight(1f))
             TankobunActionButton(
@@ -833,18 +833,18 @@ internal fun DeleteCustomListDialog(
     onDismiss: () -> Unit,
 ) {
     TankobunDialog(onDismiss = onDismiss) {
-        TankobunDialogHeader(title = "Delete Custom List", onDismiss = onDismiss)
+        TankobunDialogHeader(title = tankobunString(R.string.settings_delete_custom_list), onDismiss = onDismiss)
         Text(
-            "Delete \"$name\" and remove it from $count manga? The manga will stay in their normal AniList status lists.",
+            tankobunString(R.string.settings_delete_custom_list_message, name, tankobunQuantityString(R.plurals.manga_count, count, count)),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(tankobunString(R.string.common_cancel))
             }
             Spacer(Modifier.weight(1f))
-            TankobunActionButton(label = "Delete", icon = Icons.Default.Delete, onClick = onConfirm)
+            TankobunActionButton(label = tankobunString(R.string.common_delete), icon = Icons.Default.Delete, onClick = onConfirm)
         }
     }
 }
@@ -865,11 +865,11 @@ internal fun LanguagesSettingsScreen(
             .sortedWith(compareBy<String> { sourceLanguageSortPriority(it) }.thenBy { sourceLanguageLabel(it) })
     }
     SettingsDetailPanel(
-        title = "Languages",
-        subtitle = "Choose app language behavior and which source languages Tankobun should show by default.",
+        title = tankobunString(R.string.settings_languages),
+        subtitle = tankobunString(R.string.settings_languages_subtitle),
         modifier = modifier,
     ) {
-        Text("App language", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(tankobunString(R.string.settings_app_language), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         TankobunPanel(
             modifier = Modifier.fillMaxWidth(),
             color = LocalTankobunStyle.current.colors.panel,
@@ -877,33 +877,23 @@ internal fun LanguagesSettingsScreen(
         ) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 FlowRowCompat {
-                    TankobunChip(
-                        selected = true,
-                        onClick = {},
-                        label = { Text("System default") },
-                    )
-                    TankobunChip(
-                        selected = false,
-                        onClick = {},
-                        enabled = false,
-                        label = { Text("English") },
-                    )
-                    TankobunChip(
-                        selected = false,
-                        onClick = {},
-                        enabled = false,
-                        label = { Text("Portuguese") },
-                    )
+                    AppLanguage.entries.forEach { language ->
+                        TankobunChip(
+                            selected = state.appLanguage == language,
+                            onClick = { viewModel.setAppLanguage(language) },
+                            label = { Text(language.settingsLabel()) },
+                        )
+                    }
                 }
                 Text(
-                    "Interface translations are a placeholder for now; Tankobun will keep following your system language.",
+                    tankobunString(R.string.settings_language_applied),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
 
-        Text("Source languages", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(tankobunString(R.string.settings_source_languages), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         TankobunPanel(
             modifier = Modifier.fillMaxWidth(),
             color = LocalTankobunStyle.current.colors.panel,
@@ -911,7 +901,7 @@ internal fun LanguagesSettingsScreen(
         ) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "Sources and repository entries use these languages by default. Multilingual sources are always available.",
+                    tankobunString(R.string.settings_source_languages_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -928,7 +918,7 @@ internal fun LanguagesSettingsScreen(
                             enabled = !alwaysOn,
                             label = {
                                 Text(
-                                    if (alwaysOn) "${sourceLanguageDisplay(language)} always" else sourceLanguageDisplay(language),
+                                    if (alwaysOn) tankobunString(R.string.settings_source_language_always, sourceLanguageDisplay(language)) else sourceLanguageDisplay(language),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -940,25 +930,6 @@ internal fun LanguagesSettingsScreen(
         }
     }
 }
-
-internal fun AnilistTitleLanguage.settingsLabel(): String =
-    when (this) {
-        AnilistTitleLanguage.ROMAJI -> "Romaji"
-        AnilistTitleLanguage.ENGLISH -> "English"
-        AnilistTitleLanguage.NATIVE -> "Native"
-        AnilistTitleLanguage.ROMAJI_STYLISED -> "Romaji styled"
-        AnilistTitleLanguage.ENGLISH_STYLISED -> "English styled"
-        AnilistTitleLanguage.NATIVE_STYLISED -> "Native styled"
-    }
-
-internal fun AnilistScoreFormat.settingsLabel(): String =
-    when (this) {
-        AnilistScoreFormat.POINT_100 -> "100 point"
-        AnilistScoreFormat.POINT_10_DECIMAL -> "10 decimal"
-        AnilistScoreFormat.POINT_10 -> "10 point"
-        AnilistScoreFormat.POINT_5 -> "5 stars"
-        AnilistScoreFormat.POINT_3 -> "3 smileys"
-    }
 
 @Composable
 internal fun DockAlignmentRow(
@@ -975,10 +946,3 @@ internal fun DockAlignmentRow(
         }
     }
 }
-
-internal fun DockAlignment.settingsLabel(): String =
-    when (this) {
-        DockAlignment.LEFT -> "Left"
-        DockAlignment.CENTER -> "Center"
-        DockAlignment.RIGHT -> "Right"
-    }

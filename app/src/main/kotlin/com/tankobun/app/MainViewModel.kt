@@ -16,7 +16,6 @@ import com.tankobun.app.logic.BROWSE_TRENDING_CACHE_KEY
 import com.tankobun.app.logic.BulkDownloadResult
 import com.tankobun.app.logic.BrowseLandingData
 import com.tankobun.app.logic.browseCacheKey
-import com.tankobun.app.logic.bulkDownloadMessage
 import com.tankobun.app.logic.downloadSourceName
 import com.tankobun.app.logic.filteredScoreInput
 import com.tankobun.app.logic.formatTrackingScore
@@ -34,6 +33,7 @@ import com.tankobun.app.logic.readerSourceForChapter
 import com.tankobun.app.logic.ReaderSegmentDirection
 import com.tankobun.app.logic.selectedSourceChapterSelection
 import com.tankobun.app.logic.sourceSettingsKey
+import com.tankobun.app.logic.sourcePickerDiagnosticDetail
 import com.tankobun.app.logic.sourcePickerSources
 import com.tankobun.app.logic.toAniListScore
 import com.tankobun.app.logic.userMessage
@@ -89,6 +89,8 @@ import com.tankobun.app.state.TankobunUiState
 
 import android.net.Uri
 import android.util.Log
+import androidx.annotation.PluralsRes
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -167,6 +169,7 @@ class MainViewModel(
             disabledSourceKeys = container.settingsStore.disabledSourceKeys(),
             extensionRepositoryUrl = container.settingsStore.extensionRepositoryUrl(),
             themeMode = container.settingsStore.themeMode(),
+            appLanguage = container.settingsStore.appLanguage(),
             ignoreDisplayCutout = container.settingsStore.ignoreDisplayCutout(),
             showAppStatusBar = container.settingsStore.showAppStatusBar(),
             dockAlignment = container.settingsStore.dockAlignment(),
@@ -181,6 +184,15 @@ class MainViewModel(
             anilistSyncManualReadProgress = container.settingsStore.anilistSyncManualReadProgress(),
         ),
     )
+    private fun localizedContext() =
+        container.application.withAppLanguage(_state.value.appLanguage)
+
+    private fun string(@StringRes id: Int, vararg args: Any): String =
+        localizedContext().getString(id, *args)
+
+    private fun quantityString(@PluralsRes id: Int, quantity: Int, vararg args: Any): String =
+        localizedContext().resources.getQuantityString(id, quantity, *args)
+
     private val browseDataSource = BrowseDataSource(container, cachePolicy) { _state.value.anilistTitleLanguage }
     private val sourceDataSource = SourceDataSource(container, cachePolicy)
     val state: StateFlow<TankobunUiState> = _state
@@ -222,7 +234,7 @@ class MainViewModel(
     fun handleOAuthRedirect(uri: String) {
         val token = AnilistOAuth.parseRedirect(uri) ?: return
         container.tokenStore.saveAccessToken(token.accessToken)
-        _state.update { it.copy(loggedIn = true, message = "AniList connected") }
+        _state.update { it.copy(loggedIn = true, message = string(R.string.msg_anilist_connected)) }
         refreshLibrary()
     }
 
@@ -244,7 +256,7 @@ class MainViewModel(
                 libraryItems = emptyList(),
                 librarySyncedAtEpochMillis = 0L,
                 recentReadingProgress = emptyList(),
-                message = "Signed out",
+                message = string(R.string.msg_signed_out),
             )
         }
     }
@@ -309,6 +321,11 @@ class MainViewModel(
     fun setThemeMode(mode: TankobunThemeMode) {
         container.settingsStore.saveThemeMode(mode)
         _state.update { it.copy(themeMode = mode) }
+    }
+
+    fun setAppLanguage(language: AppLanguage) {
+        container.settingsStore.saveAppLanguage(language)
+        _state.update { it.copy(appLanguage = language) }
     }
 
     fun setIgnoreDisplayCutout(enabled: Boolean) {
@@ -421,7 +438,7 @@ class MainViewModel(
         val repositoryUrl = _state.value.extensionRepositoryUrl.trim()
         if (repositoryUrl.isBlank()) {
             if (!silent) {
-                _state.update { it.copy(message = "Paste an extension repository index URL first") }
+                _state.update { it.copy(message = string(R.string.msg_paste_repository_first)) }
             }
             return
         }
@@ -436,14 +453,14 @@ class MainViewModel(
                     it.copy(
                         availableExtensions = extensions,
                         busy = if (silent) it.busy else false,
-                        message = if (silent) it.message else "Loaded ${extensions.size} extensions",
+                        message = if (silent) it.message else string(R.string.msg_loaded_extensions, extensions.size),
                     )
                 }
             }.onFailure { error ->
                 _state.update {
                     it.copy(
                         busy = if (silent) it.busy else false,
-                        message = if (silent) it.message else error.message ?: "Extension index failed",
+                        message = if (silent) it.message else error.message ?: string(R.string.msg_extension_index_failed),
                     )
                 }
             }
@@ -465,7 +482,7 @@ class MainViewModel(
                 it.copy(
                     installingExtensionPackageName = entry.packageName,
                     extensionInstallRequest = null,
-                    message = "Downloading ${entry.name}",
+                    message = string(R.string.msg_downloading_extension, entry.name),
                 )
             }
             runCatching {
@@ -481,7 +498,7 @@ class MainViewModel(
                             expectedVersionCode = entry.versionCode,
                             expectedVersionName = entry.versionName,
                         ),
-                        message = "Ready to install ${entry.name}",
+                        message = string(R.string.msg_ready_to_install_extension, entry.name),
                     )
                 }
             }.onFailure { error ->
@@ -489,7 +506,7 @@ class MainViewModel(
                 _state.update {
                     it.copy(
                         installingExtensionPackageName = null,
-                        message = error.message ?: "Extension download failed",
+                        message = error.message ?: string(R.string.msg_extension_download_failed),
                     )
                 }
             }
@@ -498,7 +515,7 @@ class MainViewModel(
 
     fun requireExtensionInstallPermission() {
         _state.update {
-            it.copy(message = "Allow Tankobun to install extensions, then tap Install again")
+            it.copy(message = string(R.string.msg_allow_extension_install))
         }
     }
 
@@ -530,9 +547,9 @@ class MainViewModel(
             refreshInstalledSources()
             val version = installedVersion
             val message = when {
-                version == null -> "Installer returned before ${request.name} was installed"
-                version.versionCode >= request.expectedVersionCode -> "Updated ${request.name} to v${version.versionName}"
-                else -> "${request.name} is still v${version.versionName}; Android did not finish the update"
+                version == null -> string(R.string.msg_installer_returned_before_install, request.name)
+                version.versionCode >= request.expectedVersionCode -> string(R.string.msg_updated_extension, request.name, version.versionName)
+                else -> string(R.string.msg_extension_still_old, request.name, version.versionName)
             }
             _state.update { it.copy(message = message) }
             Log.i(
@@ -575,7 +592,7 @@ class MainViewModel(
     fun refreshLibrary() {
         val token = container.tokenStore.accessToken()
         if (token == null) {
-            _state.update { it.copy(message = "Connect AniList to sync your library") }
+            _state.update { it.copy(message = string(R.string.msg_connect_anilist_sync_library)) }
             return
         }
 
@@ -596,7 +613,7 @@ class MainViewModel(
                         libraryItems = items,
                         librarySyncedAtEpochMillis = synced.syncedAtEpochMillis,
                         busy = false,
-                        message = "Library synced",
+                        message = string(R.string.msg_library_synced),
                     )
                 }
                 loadRecentReadingProgress()
@@ -605,7 +622,7 @@ class MainViewModel(
             }.onFailure { error ->
                 Log.e(TAG, "AniList library sync failed", error)
                 _state.update {
-                    it.copy(busy = false, message = error.userMessage("Library sync failed"))
+                    it.copy(busy = false, message = error.userMessage(localizedContext(), string(R.string.msg_library_sync_failed)))
                 }
             }
         }
@@ -615,7 +632,7 @@ class MainViewModel(
         val snapshot = _state.value
         val items = snapshot.libraryItems
         if (items.isEmpty()) {
-            _state.update { it.copy(message = "Sync AniList before creating a backup") }
+            _state.update { it.copy(message = string(R.string.msg_sync_before_backup)) }
             return
         }
 
@@ -632,12 +649,15 @@ class MainViewModel(
                 _state.update {
                     it.copy(
                         busy = false,
-                        message = "AniList backup saved (${items.size} manga)",
+                        message = string(
+                            R.string.msg_backup_saved,
+                            quantityString(R.plurals.manga_count, items.size, items.size),
+                        ),
                     )
                 }
             }.onFailure { error ->
                 Log.e(TAG, "AniList backup failed", error)
-                _state.update { it.copy(busy = false, message = error.userMessage("Backup failed")) }
+                _state.update { it.copy(busy = false, message = error.userMessage(localizedContext(), string(R.string.msg_backup_failed))) }
             }
         }
     }
@@ -645,7 +665,7 @@ class MainViewModel(
     fun restoreAniListBackup(uri: Uri) {
         val token = container.tokenStore.accessToken()
         if (token == null) {
-            _state.update { it.copy(message = "Connect AniList before restoring a backup") }
+            _state.update { it.copy(message = string(R.string.msg_connect_before_restore)) }
             return
         }
 
@@ -666,14 +686,19 @@ class MainViewModel(
                         anilistCustomLists = result.customLists,
                         busy = false,
                         message = buildList {
-                            add("Restored ${result.restored} manga")
-                            if (result.skipped > 0) add("${result.skipped} skipped")
+                            add(
+                                string(
+                                    R.string.msg_restored_manga,
+                                    quantityString(R.plurals.manga_count, result.restored, result.restored),
+                                ),
+                            )
+                            if (result.skipped > 0) add(string(R.string.msg_restore_skipped, result.skipped))
                         }.joinToString(" / "),
                     )
                 }
             }.onFailure { error ->
                 Log.e(TAG, "AniList backup restore failed", error)
-                _state.update { it.copy(busy = false, message = error.userMessage("Restore failed")) }
+                _state.update { it.copy(busy = false, message = error.userMessage(localizedContext(), string(R.string.msg_restore_failed))) }
             }
         }
     }
@@ -682,13 +707,13 @@ class MainViewModel(
         if (!backupDataSource.persistBackupFolderPermission(uri)) {
             Log.w(TAG, "Could not persist backup folder permission")
             _state.update {
-                it.copy(message = "Could not keep access to that folder. Choose another writable folder.")
+                it.copy(message = string(R.string.msg_backup_folder_permission_failed))
             }
             return
         }
         val uriString = uri.toString()
         container.settingsStore.saveBackupFolderUri(uriString)
-        _state.update { it.copy(backupFolderUri = uriString, message = "Backup folder selected") }
+        _state.update { it.copy(backupFolderUri = uriString, message = string(R.string.msg_backup_folder_selected)) }
         ScheduledBackupWork.update(container.application, _state.value.backupSchedule)
         if (_state.value.backupSchedule != BackupSchedule.OFF) {
             runScheduledAniListBackupIfDue(force = true, reportResult = true)
@@ -704,7 +729,7 @@ class MainViewModel(
 
     fun runScheduledAniListBackupNow() {
         if (_state.value.backupFolderUri == null) {
-            _state.update { it.copy(message = "Choose a backup folder first") }
+            _state.update { it.copy(message = string(R.string.msg_choose_backup_folder_first)) }
             return
         }
         runScheduledAniListBackupIfDue(
@@ -725,13 +750,13 @@ class MainViewModel(
         val folderUri = snapshot.backupFolderUri?.let(Uri::parse)
         if (folderUri == null) {
             if (reportResult) {
-                _state.update { it.copy(message = "Choose a backup folder first") }
+                _state.update { it.copy(message = string(R.string.msg_choose_backup_folder_first)) }
             }
             return
         }
         if (snapshot.libraryItems.isEmpty()) {
             if (reportResult) {
-                _state.update { it.copy(message = "Sync AniList before creating a backup") }
+                _state.update { it.copy(message = string(R.string.msg_sync_before_backup)) }
             }
             return
         }
@@ -739,7 +764,7 @@ class MainViewModel(
         if (!force && !schedule.isDue(lastRunAt = snapshot.lastScheduledBackupAtEpochMillis, now = now)) return
         if (scheduledBackupJob?.isActive == true) {
             if (reportResult) {
-                _state.update { it.copy(message = "Backup is already running") }
+                _state.update { it.copy(message = string(R.string.msg_backup_already_running)) }
             }
             return
         }
@@ -756,7 +781,14 @@ class MainViewModel(
                     it.copy(
                         lastScheduledBackupAtEpochMillis = now,
                         busy = if (reportResult) false else it.busy,
-                        message = if (reportResult) "Scheduled backup saved ($count manga)" else it.message,
+                        message = if (reportResult) {
+                            string(
+                                R.string.msg_scheduled_backup_saved,
+                                quantityString(R.plurals.manga_count, count, count),
+                            )
+                        } else {
+                            it.message
+                        },
                     )
                 }
             }.onFailure { error ->
@@ -764,7 +796,11 @@ class MainViewModel(
                 _state.update {
                     it.copy(
                         busy = if (reportResult) false else it.busy,
-                        message = if (reportResult) error.userMessage("Scheduled backup failed") else it.message,
+                        message = if (reportResult) {
+                            error.userMessage(localizedContext(), string(R.string.msg_scheduled_backup_failed))
+                        } else {
+                            it.message
+                        },
                     )
                 }
             }
@@ -1058,7 +1094,11 @@ class MainViewModel(
                 _state.update {
                     it.copy(
                         busy = false,
-                        message = if (hasCachedLanding) it.message else error.userMessage("Browse failed"),
+                        message = if (hasCachedLanding) {
+                            it.message
+                        } else {
+                            error.userMessage(localizedContext(), string(R.string.msg_browse_failed))
+                        },
                     )
                 }
             }
@@ -1137,7 +1177,7 @@ class MainViewModel(
                         it.copy(
                             busy = false,
                             browseResultsLoadingMore = false,
-                            message = error.userMessage("Search failed"),
+                            message = error.userMessage(localizedContext(), string(R.string.msg_search_failed)),
                         )
                     }
                 }
@@ -1191,7 +1231,7 @@ class MainViewModel(
                     _state.update {
                         it.copy(
                             browseResultsLoadingMore = false,
-                            message = error.userMessage("Could not load more manga"),
+                            message = error.userMessage(localizedContext(), string(R.string.msg_could_not_load_more_manga)),
                         )
                     }
                 }
@@ -1263,7 +1303,7 @@ class MainViewModel(
         if (_state.value.anilistTitleLanguage == language) return
         val token = container.tokenStore.accessToken()
         if (token == null) {
-            _state.update { it.copy(message = "Connect AniList before changing account preferences") }
+            _state.update { it.copy(message = string(R.string.msg_connect_before_account_preferences)) }
             return
         }
         viewModelScope.launch {
@@ -1277,7 +1317,7 @@ class MainViewModel(
                         anilistScoreFormat = viewer.scoreFormat,
                         anilistCustomLists = viewer.mangaCustomLists,
                         busy = false,
-                        message = "AniList title language saved",
+                        message = string(R.string.msg_title_language_saved),
                     )
                 }
             }.onFailure { error ->
@@ -1285,7 +1325,7 @@ class MainViewModel(
                 _state.update {
                     it.copy(
                         busy = false,
-                        message = error.userMessage("Could not update AniList title language"),
+                        message = error.userMessage(localizedContext(), string(R.string.msg_title_language_update_failed)),
                     )
                 }
             }
@@ -1296,7 +1336,7 @@ class MainViewModel(
         if (_state.value.anilistScoreFormat == format) return
         val token = container.tokenStore.accessToken()
         if (token == null) {
-            _state.update { it.copy(message = "Connect AniList before changing account preferences") }
+            _state.update { it.copy(message = string(R.string.msg_connect_before_account_preferences)) }
             return
         }
         viewModelScope.launch {
@@ -1312,7 +1352,7 @@ class MainViewModel(
                         anilistCustomLists = viewer.mangaCustomLists,
                         trackingScore = it.selectedListEntry?.score.formatTrackingScore(viewer.scoreFormat),
                         busy = false,
-                        message = "AniList rating format saved",
+                        message = string(R.string.msg_rating_format_saved),
                     )
                 }
                 refreshLibrary()
@@ -1321,7 +1361,7 @@ class MainViewModel(
                 _state.update {
                     it.copy(
                         busy = false,
-                        message = error.userMessage("Could not update AniList rating format"),
+                        message = error.userMessage(localizedContext(), string(R.string.msg_rating_format_update_failed)),
                     )
                 }
             }
@@ -1333,12 +1373,12 @@ class MainViewModel(
         if (normalizedName.isBlank()) return
         val token = container.tokenStore.accessToken()
         if (token == null) {
-            _state.update { it.copy(message = "Connect AniList before managing custom lists") }
+            _state.update { it.copy(message = string(R.string.msg_connect_before_custom_lists)) }
             return
         }
         val currentLists = _state.value.anilistCustomLists.normalizedCustomLists()
         if (currentLists.any { it.equals(normalizedName, ignoreCase = true) }) {
-            _state.update { it.copy(message = "Custom list already exists") }
+            _state.update { it.copy(message = string(R.string.msg_custom_list_exists)) }
             return
         }
         val nextLists = (currentLists + normalizedName).normalizedCustomLists()
@@ -1351,12 +1391,17 @@ class MainViewModel(
                     it.copy(
                         anilistCustomLists = savedLists,
                         busy = false,
-                        message = "Custom list created",
+                        message = string(R.string.msg_custom_list_created),
                     )
                 }
             }.onFailure { error ->
                 Log.e(TAG, "AniList custom list create failed", error)
-                _state.update { it.copy(busy = false, message = error.userMessage("Custom list create failed")) }
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_custom_list_create_failed)),
+                    )
+                }
             }
         }
     }
@@ -1368,13 +1413,13 @@ class MainViewModel(
         if (normalizedOldName.equals(normalizedNewName, ignoreCase = true)) return
         val token = container.tokenStore.accessToken()
         if (token == null) {
-            _state.update { it.copy(message = "Connect AniList before managing custom lists") }
+            _state.update { it.copy(message = string(R.string.msg_connect_before_custom_lists)) }
             return
         }
         val snapshot = _state.value
         val currentLists = snapshot.anilistCustomLists.normalizedCustomLists()
         if (currentLists.any { it.equals(normalizedNewName, ignoreCase = true) && !it.equals(normalizedOldName, ignoreCase = true) }) {
-            _state.update { it.copy(message = "A custom list with that name already exists") }
+            _state.update { it.copy(message = string(R.string.msg_custom_list_name_exists)) }
             return
         }
         val nextLists = currentLists
@@ -1398,11 +1443,17 @@ class MainViewModel(
                         updatedEntries = result.updatedEntries,
                         oldName = normalizedOldName,
                         newName = normalizedNewName,
+                        successMessage = string(R.string.msg_custom_list_renamed),
                     )
                 }
             }.onFailure { error ->
                 Log.e(TAG, "AniList custom list rename failed", error)
-                _state.update { it.copy(busy = false, message = error.userMessage("Custom list rename failed")) }
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_custom_list_rename_failed)),
+                    )
+                }
             }
         }
     }
@@ -1412,7 +1463,7 @@ class MainViewModel(
         if (normalizedName.isBlank()) return
         val token = container.tokenStore.accessToken()
         if (token == null) {
-            _state.update { it.copy(message = "Connect AniList before managing custom lists") }
+            _state.update { it.copy(message = string(R.string.msg_connect_before_custom_lists)) }
             return
         }
         val snapshot = _state.value
@@ -1436,11 +1487,17 @@ class MainViewModel(
                         customLists = result.customLists,
                         updatedEntries = result.updatedEntries,
                         name = normalizedName,
+                        successMessage = string(R.string.msg_custom_list_deleted),
                     )
                 }
             }.onFailure { error ->
                 Log.e(TAG, "AniList custom list delete failed", error)
-                _state.update { it.copy(busy = false, message = error.userMessage("Custom list delete failed")) }
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_custom_list_delete_failed)),
+                    )
+                }
             }
         }
     }
@@ -1523,7 +1580,7 @@ class MainViewModel(
             }.onFailure { error ->
                 Log.e(TAG, "AniList custom list save failed for ${media.id}", error)
                 _state.update {
-                    it.copy(message = error.userMessage("Custom list save failed"))
+                    it.copy(message = error.userMessage(localizedContext(), string(R.string.msg_custom_list_save_failed)))
                 }
             }
         }
@@ -1548,7 +1605,7 @@ class MainViewModel(
         val token = container.tokenStore.accessToken()
         if (token == null) {
             if (!autoSave) {
-                _state.update { it.copy(message = "Connect AniList to track this manga") }
+                _state.update { it.copy(message = string(R.string.msg_connect_anilist_track_manga)) }
             }
             return
         }
@@ -1604,6 +1661,7 @@ class MainViewModel(
                         entry = result.entry,
                         knownCustomLists = result.knownCustomLists,
                         autoSave = autoSave,
+                        successMessage = string(R.string.msg_tracking_saved),
                     )
                 }
             }.onFailure { error ->
@@ -1613,7 +1671,12 @@ class MainViewModel(
                         mediaId = media.id,
                         autoSave = autoSave,
                         message = error.userMessage(
-                            if (autoSave) "Tracking auto-save failed. Tap save to retry" else "Tracking save failed",
+                            localizedContext(),
+                            if (autoSave) {
+                                string(R.string.msg_tracking_auto_save_failed)
+                            } else {
+                                string(R.string.msg_tracking_save_failed)
+                            },
                         ),
                     )
                 }
@@ -1706,7 +1769,7 @@ class MainViewModel(
                     if (it.selectedMedia?.id == mediaId) {
                         it.copy(
                             recommendationsLoading = false,
-                            message = error.userMessage("Recommendations failed"),
+                            message = error.userMessage(localizedContext(), string(R.string.msg_recommendations_failed)),
                         )
                     } else {
                         it
@@ -1743,7 +1806,7 @@ class MainViewModel(
         val sources = sourcePickerSources()
         _state.update { it.withSourcePickerOpened(media) }
         if (sources.isEmpty()) {
-            _state.update { it.withSourcePickerNoSources() }
+            _state.update { it.withSourcePickerNoSources(localizedContext()) }
             return
         }
         if (!_state.value.sourcePickerLoading) {
@@ -1763,7 +1826,7 @@ class MainViewModel(
     fun findSourceMatchesWithEditedTitle() {
         val title = _state.value.sourcePickerSearchTitle.trim()
         if (title.length < 2) {
-            _state.update { it.withSourcePickerEditedTitleTooShort() }
+            _state.update { it.withSourcePickerEditedTitleTooShort(localizedContext()) }
             return
         }
         findSourceMatches(forceRefresh = true, titleOverride = title)
@@ -1791,7 +1854,7 @@ class MainViewModel(
     fun bindSelectedSource() {
         val media = _state.value.selectedMedia ?: return
         val source = _state.value.selectedSource ?: run {
-            _state.update { it.withSourcePickerNoSources() }
+            _state.update { it.withSourcePickerNoSources(localizedContext()) }
             return
         }
         bindSource(source)
@@ -1801,19 +1864,19 @@ class MainViewModel(
         val media = _state.value.selectedMedia ?: return
         val requestId = beginSourcePickerJob()
         sourcePickerJob = viewModelScope.launch {
-            _state.update { it.withSourcePickerSourceSearchStarted(source) }
+            _state.update { it.withSourcePickerSourceSearchStarted(localizedContext(), source) }
             try {
                 val now = System.currentTimeMillis()
                 val match = sourceDataSource.readableSourceMatch(media, source, now)
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 sourceDataSource.saveSourceBinding(match)
-                _state.update { it.withSourcePickerSourceSelected(match, addToMatches = true) }
+                _state.update { it.withSourcePickerSourceSelected(localizedContext(), match, addToMatches = true) }
                 loadChapters(match.source, match.manga)
             } catch (error: Throwable) {
                 if (error is CancellationException) return@launch
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 Log.w(TAG, "Selected source binding failed for ${source.name}", error)
-                _state.update { it.withSourcePickerFailure(source.name, error) }
+                _state.update { it.withSourcePickerFailure(localizedContext(), source.name, error) }
             } finally {
                 if (sourcePickerRequestId == requestId) {
                     sourcePickerJob = null
@@ -1826,13 +1889,13 @@ class MainViewModel(
         val media = _state.value.selectedMedia ?: return
         val sources = sourcePickerSources()
         if (sources.isEmpty()) {
-            _state.update { it.withSourcePickerNoSources() }
+            _state.update { it.withSourcePickerNoSources(localizedContext()) }
             return
         }
         val editedTitle = titleOverride?.trim()?.takeIf { it.length >= 2 }
         val requestId = beginSourcePickerJob()
         sourcePickerJob = viewModelScope.launch {
-            _state.update { it.withSourcePickerSearchStarted(editedTitle) }
+            _state.update { it.withSourcePickerSearchStarted(localizedContext(), editedTitle) }
             try {
                 val now = System.currentTimeMillis()
                 val verified = if (editedTitle == null) {
@@ -1842,6 +1905,11 @@ class MainViewModel(
                             media = media,
                             sources = sources,
                             now = now,
+                            diagnosticSearchTimedOut = string(R.string.source_picker_search_timed_out),
+                            diagnosticNoSearchResults = string(R.string.source_picker_no_search_results),
+                            diagnosticNoConfidentTitleMatch = string(R.string.source_picker_no_confident_match),
+                            diagnosticNoReadableChapters = string(R.string.source_picker_no_readable_chapters),
+                            diagnosticDetail = { error -> sourcePickerDiagnosticDetail(localizedContext(), error) },
                             onUpdate = { update -> publishSourcePickerUpdate(requestId, media.id, update) },
                         ).also { verified ->
                             sourceDataSource.cacheVerifiedMatches(media.id, verified.matches)
@@ -1852,15 +1920,20 @@ class MainViewModel(
                         sources = sources,
                         now = now,
                         titleOverride = editedTitle,
+                        diagnosticSearchTimedOut = string(R.string.source_picker_search_timed_out),
+                        diagnosticNoSearchResults = string(R.string.source_picker_no_search_results),
+                        diagnosticNoConfidentTitleMatch = string(R.string.source_picker_no_confident_match),
+                        diagnosticNoReadableChapters = string(R.string.source_picker_no_readable_chapters),
+                        diagnosticDetail = { error -> sourcePickerDiagnosticDetail(localizedContext(), error) },
                         onUpdate = { update -> publishSourcePickerUpdate(requestId, media.id, update) },
                     )
                 }
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
-                _state.update { it.withSourcePickerSearchCompleted(verified, editedTitle) }
+                _state.update { it.withSourcePickerSearchCompleted(localizedContext(), verified, editedTitle) }
             } catch (error: Throwable) {
                 if (error is CancellationException) return@launch
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
-                _state.update { it.withSourcePickerFailure("source search", error) }
+                _state.update { it.withSourcePickerFailure(localizedContext(), "source search", error) }
             } finally {
                 if (sourcePickerRequestId == requestId) {
                     sourcePickerJob = null
@@ -1887,7 +1960,7 @@ class MainViewModel(
             if (!isActiveSourcePickerRequest(requestId, mediaId)) {
                 it
             } else {
-                it.withSourcePickerMatchPublished(match, chapterCount)
+                it.withSourcePickerMatchPublished(localizedContext(), match, chapterCount)
             }
         }
     }
@@ -1906,18 +1979,18 @@ class MainViewModel(
         val media = _state.value.selectedMedia ?: return
         val requestId = beginSourcePickerJob()
         sourcePickerJob = viewModelScope.launch {
-            _state.update { it.withSourcePickerMatchOpening(match) }
+            _state.update { it.withSourcePickerMatchOpening(localizedContext(), match) }
             try {
                 val resolved = sourceDataSource.resolveMangaDetails(match)
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 sourceDataSource.saveSourceBinding(resolved)
-                _state.update { it.withSourcePickerSourceSelected(resolved, addToMatches = false) }
+                _state.update { it.withSourcePickerSourceSelected(localizedContext(), resolved, addToMatches = false) }
                 loadChapters(resolved.source, resolved.manga)
             } catch (error: Throwable) {
                 if (error is CancellationException) return@launch
                 if (!isActiveSourcePickerRequest(requestId, media.id)) return@launch
                 Log.w(TAG, "Source binding failed for ${match.source.name}/${match.manga.title}", error)
-                _state.update { it.withSourcePickerFailure(match.source.name, error) }
+                _state.update { it.withSourcePickerFailure(localizedContext(), match.source.name, error) }
             } finally {
                 if (sourcePickerRequestId == requestId) {
                     sourcePickerJob = null
@@ -1929,7 +2002,7 @@ class MainViewModel(
     fun loadChaptersForCurrentMatch() {
         val selection = _state.value.selectedSourceChapterSelection()
         if (selection == null) {
-            _state.update { it.withSourceChapterSelectionMissing() }
+            _state.update { it.withSourceChapterSelectionMissing(localizedContext()) }
             return
         }
         loadChapters(selection.source, selection.manga)
@@ -1948,16 +2021,16 @@ class MainViewModel(
                 )
             }.onSuccess { (detailedManga, chapters, chapterProgress) ->
                 Log.i(TAG, "Chapter load ${source.name}/${detailedManga.title}: chapters=${chapters.size}")
-                _state.update { it.withSourceChaptersLoaded(source, detailedManga, chapters, chapterProgress) }
+                _state.update { it.withSourceChaptersLoaded(localizedContext(), source, detailedManga, chapters, chapterProgress) }
                 if (_state.value.keepNextTenDownloads) {
                     val result = ensureNextTenDownloads()
                     if (result.changed > 0) {
-                        _state.update { it.copy(message = "Queued ${result.changed} next chapters for download") }
+                        _state.update { it.copy(message = string(R.string.msg_queued_next_chapters, result.changed)) }
                     }
                 }
             }.onFailure { error ->
                 Log.w(TAG, "Chapter load failed for ${source.name}/${manga.title}", error)
-                _state.update { it.withSourceChaptersLoadFailed(error) }
+                _state.update { it.withSourceChaptersLoadFailed(localizedContext(), error) }
             }
         }
     }
@@ -1980,16 +2053,16 @@ class MainViewModel(
             }.onSuccess { pages ->
                 if (pages.isEmpty() && source == null) {
                     val readerError = ReaderLoadError(
-                        title = "Source not installed",
-                        message = "This chapter belongs to a source that is not installed anymore. Install the source again or choose another one.",
+                        title = string(R.string.msg_source_not_installed_title),
+                        message = string(R.string.msg_source_not_installed_reader),
                     )
                     _state.update { it.withReaderLoadError(chapter, readerError) }
                     return@onSuccess
                 }
                 if (pages.isEmpty()) {
                     val readerError = ReaderLoadError(
-                        title = "No pages found",
-                        message = "The source opened this chapter, but it did not return any pages. The chapter may have been removed, or the source may need an update.",
+                        title = string(R.string.msg_no_pages_found_title),
+                        message = string(R.string.msg_no_pages_found_reader),
                     )
                     _state.update { it.withReaderLoadError(chapter, readerError) }
                     return@onSuccess
@@ -2032,7 +2105,7 @@ class MainViewModel(
                 loadAdjacentReaderSegments(media.id, chapter)
             }.onFailure { error ->
                 Log.w(TAG, "Page load failed for ${source?.name ?: "cached source"}/${chapter.name}", error)
-                val readerError = readerLoadErrorFor(container.application, error, source)
+                val readerError = readerLoadErrorFor(localizedContext(), error, source)
                 _state.update { it.withReaderLoadError(chapter, readerError) }
             }
         }
@@ -2109,7 +2182,7 @@ class MainViewModel(
         loadCachedSourceState(item.media.id)
         val chapter = item.chapter
         if (chapter == null) {
-            _state.update { it.copy(message = "Chapter cache is missing for ${item.media.title.userPreferred}") }
+            _state.update { it.copy(message = string(R.string.msg_chapter_cache_missing, item.media.title.userPreferred)) }
         } else {
             openChapter(chapter)
         }
@@ -2408,7 +2481,11 @@ class MainViewModel(
                         } else {
                             it.trackingProgress
                         },
-                        message = if (read) "Marked ${chapter.name} as read" else "Marked ${chapter.name} as unread",
+                        message = if (read) {
+                            string(R.string.msg_marked_read, chapter.name)
+                        } else {
+                            string(R.string.msg_marked_unread, chapter.name)
+                        },
                     )
                 } else {
                     it
@@ -2426,16 +2503,16 @@ class MainViewModel(
             val media = _state.value.selectedMedia ?: return@launch
             val result = enqueueChapterDownloads(media.id, listOf(chapter))
             val message = when {
-                result.queued > 0 -> "Queued ${chapter.name}"
-                result.resumed > 0 -> "Resumed ${chapter.name}"
-                result.retried > 0 -> "Retrying ${chapter.name}"
+                result.queued > 0 -> string(R.string.msg_queued_chapter, chapter.name)
+                result.resumed > 0 -> string(R.string.msg_resumed_chapter, chapter.name)
+                result.retried > 0 -> string(R.string.msg_retrying_chapter, chapter.name)
                 else -> {
                     val existing = downloadDataSource.latestForChapter(media.id, chapter.url)
                     when (existing?.state) {
-                        DownloadState.COMPLETE -> "${chapter.name} is already downloaded"
+                        DownloadState.COMPLETE -> string(R.string.msg_chapter_already_downloaded, chapter.name)
                         DownloadState.QUEUED,
-                        DownloadState.RUNNING -> "${chapter.name} is already queued"
-                        else -> "${chapter.name} is already in downloads"
+                        DownloadState.RUNNING -> string(R.string.msg_chapter_already_queued, chapter.name)
+                        else -> string(R.string.msg_chapter_already_in_downloads, chapter.name)
                     }
                 }
             }
@@ -2445,18 +2522,18 @@ class MainViewModel(
 
     fun downloadAllChapters() {
         val chapters = _state.value.sourceChapters
-        enqueueVisibleChapterDownloads(chapters, "all chapters")
+        enqueueVisibleChapterDownloads(chapters, R.string.download_label_all_chapters)
     }
 
     fun downloadUnreadChapters() {
         val snapshot = _state.value
         val chapters = snapshot.sourceChapters.filterNot { snapshot.chapterProgress[it.url]?.completed == true }
-        enqueueVisibleChapterDownloads(chapters, "unread chapters")
+        enqueueVisibleChapterDownloads(chapters, R.string.download_label_unread_chapters)
     }
 
     fun downloadNextTenChapters() {
         val chapters = nextTenDownloadCandidates(_state.value)
-        enqueueVisibleChapterDownloads(chapters, "next 10 chapters")
+        enqueueVisibleChapterDownloads(chapters, R.string.download_label_next_10_chapters)
     }
 
     fun setKeepNextTenDownloads(enabled: Boolean) {
@@ -2468,9 +2545,9 @@ class MainViewModel(
                 _state.update {
                     it.copy(
                         message = if (result.changed > 0) {
-                            "Keeping next 10 ready: queued ${result.changed}"
+                            string(R.string.msg_keep_next_10_ready, result.changed)
                         } else {
-                            "Next 10 are already ready"
+                            string(R.string.msg_next_10_ready)
                         },
                     )
                 }
@@ -2512,7 +2589,7 @@ class MainViewModel(
     fun downloadSelectedChapters() {
         val snapshot = _state.value
         val chapters = snapshot.sourceChapters.filter { it.url in snapshot.selectedDownloadChapterUrls }
-        enqueueVisibleChapterDownloads(chapters, "selected chapters") {
+        enqueueVisibleChapterDownloads(chapters, R.string.download_label_selected_chapters) {
             it.copy(
                 selectingDownloadChapters = false,
                 selectedDownloadChapterUrls = emptySet(),
@@ -2522,14 +2599,15 @@ class MainViewModel(
 
     private fun enqueueVisibleChapterDownloads(
         chapters: List<SourceChapter>,
-        label: String,
+        @StringRes labelRes: Int,
         stateAfterMessage: (TankobunUiState) -> TankobunUiState = { it },
     ) {
         viewModelScope.launch {
             val media = _state.value.selectedMedia ?: return@launch
             val distinctChapters = chapters.distinctBy { "${it.sourceId}:${it.url}" }
+            val label = string(labelRes)
             if (distinctChapters.isEmpty()) {
-                _state.update { stateAfterMessage(it).copy(message = "No $label to download") }
+                _state.update { stateAfterMessage(it).copy(message = string(R.string.msg_no_label_to_download, label)) }
                 return@launch
             }
             val result = enqueueChapterDownloads(media.id, distinctChapters)
@@ -2545,6 +2623,16 @@ class MainViewModel(
         val snapshot = _state.value
         val media = snapshot.selectedMedia ?: return BulkDownloadResult()
         return enqueueChapterDownloads(media.id, nextTenDownloadCandidates(snapshot), retryFailed = false)
+    }
+
+    private fun bulkDownloadMessage(label: String, result: BulkDownloadResult): String {
+        if (result.changed == 0) return string(R.string.msg_no_new_downloads, label)
+        val parts = buildList {
+            if (result.queued > 0) add(string(R.string.msg_bulk_queued, result.queued))
+            if (result.resumed > 0) add(string(R.string.msg_bulk_resumed, result.resumed))
+            if (result.retried > 0) add(string(R.string.msg_bulk_retrying, result.retried))
+        }.joinToString(" / ")
+        return string(R.string.msg_bulk_download_result, parts, label)
     }
 
     private suspend fun enqueueChapterDownloads(
@@ -2563,21 +2651,21 @@ class MainViewModel(
     fun pauseDownload(jobId: String) {
         viewModelScope.launch {
             downloadDataSource.pause(jobId)
-            _state.update { it.copy(message = "Paused download") }
+            _state.update { it.copy(message = string(R.string.msg_paused_download)) }
         }
     }
 
     fun resumeDownload(jobId: String) {
         viewModelScope.launch {
             downloadDataSource.resume(jobId)
-            _state.update { it.copy(message = "Resumed download") }
+            _state.update { it.copy(message = string(R.string.msg_resumed_download)) }
         }
     }
 
     fun retryDownload(jobId: String) {
         viewModelScope.launch {
             downloadDataSource.retry(jobId)
-            _state.update { it.copy(message = "Retrying download") }
+            _state.update { it.copy(message = string(R.string.msg_retrying_download)) }
         }
     }
 
@@ -2585,27 +2673,27 @@ class MainViewModel(
         viewModelScope.launch {
             downloadDataSource.remove(jobId)
             refreshDownloadState()
-            _state.update { it.copy(message = "Removed download") }
+            _state.update { it.copy(message = string(R.string.msg_removed_download)) }
         }
     }
 
     fun removeDownloadsForMedia(mediaId: Int) {
         viewModelScope.launch {
-            val title = _state.value.mediaTitle(mediaId)
+            val title = _state.value.mediaTitle(mediaId, string(R.string.sources_manga_fallback, mediaId))
             downloadDataSource.removeMedia(mediaId)
             refreshDownloadState()
-            _state.update { it.copy(message = "Removed downloads for $title") }
+            _state.update { it.copy(message = string(R.string.msg_removed_downloads_for, title)) }
         }
     }
 
     fun removeDownloadsForMediaSource(mediaId: Int, sourceId: Long) {
         viewModelScope.launch {
             val snapshot = _state.value
-            val title = snapshot.mediaTitle(mediaId)
-            val sourceName = snapshot.downloadSourceName(sourceId)
+            val title = snapshot.mediaTitle(mediaId, string(R.string.sources_manga_fallback, mediaId))
+            val sourceName = snapshot.downloadSourceName(sourceId, string(R.string.sources_source_fallback, sourceId))
             downloadDataSource.removeMediaSource(mediaId, sourceId)
             refreshDownloadState()
-            _state.update { it.copy(message = "Removed $sourceName downloads for $title") }
+            _state.update { it.copy(message = string(R.string.msg_removed_source_downloads_for, sourceName, title)) }
         }
     }
 
@@ -2613,7 +2701,7 @@ class MainViewModel(
         viewModelScope.launch {
             downloadDataSource.removeAll()
             refreshDownloadState()
-            _state.update { it.copy(message = "Removed all downloads") }
+            _state.update { it.copy(message = string(R.string.msg_removed_all_downloads)) }
         }
     }
 
@@ -2622,7 +2710,7 @@ class MainViewModel(
         viewModelScope.launch {
             failed.forEach { downloadDataSource.retry(it.id) }
             if (failed.isNotEmpty()) {
-                _state.update { it.copy(message = "Retrying ${failed.size} failed downloads") }
+                _state.update { it.copy(message = string(R.string.msg_retrying_failed_downloads, failed.size)) }
             }
         }
     }
@@ -2632,7 +2720,7 @@ class MainViewModel(
         viewModelScope.launch {
             active.forEach { downloadDataSource.pause(it.id) }
             if (active.isNotEmpty()) {
-                _state.update { it.copy(message = "Paused ${active.size} downloads") }
+                _state.update { it.copy(message = string(R.string.msg_paused_downloads, active.size)) }
             }
         }
     }
@@ -2642,7 +2730,7 @@ class MainViewModel(
         viewModelScope.launch {
             paused.forEach { downloadDataSource.resume(it.id) }
             if (paused.isNotEmpty()) {
-                _state.update { it.copy(message = "Resumed ${paused.size} downloads") }
+                _state.update { it.copy(message = string(R.string.msg_resumed_downloads, paused.size)) }
             }
         }
     }

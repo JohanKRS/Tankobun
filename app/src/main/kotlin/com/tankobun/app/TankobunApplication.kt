@@ -2,6 +2,8 @@ package com.tankobun.app
 
 import android.app.Application
 import android.net.Uri
+import androidx.annotation.PluralsRes
+import androidx.annotation.StringRes
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import com.tankobun.core.anilist.AnilistGraphQlClient
@@ -70,6 +72,12 @@ class AppContainer(application: Application) {
 
     val tokenStore = SecureTokenStore(application)
     val settingsStore = SettingsStore(application)
+
+    fun string(@StringRes id: Int, vararg args: Any): String =
+        application.getAppString(settingsStore.appLanguage(), id, *args)
+
+    fun quantityString(@PluralsRes id: Int, quantity: Int, vararg args: Any): String =
+        application.getAppQuantityString(settingsStore.appLanguage(), id, quantity, *args)
 
     val anilistRepository = AnilistRepository(
         AnilistGraphQlClient(

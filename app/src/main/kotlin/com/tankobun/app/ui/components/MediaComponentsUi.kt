@@ -244,14 +244,14 @@ internal fun MediaViewModeRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         listOf(
-            MediaViewMode.COVER_GRID to "Cover only",
-            MediaViewMode.COVER_WITH_INFO to "Cover + info",
-            MediaViewMode.LIST to "List",
-        ).forEach { (mode, label) ->
+            MediaViewMode.COVER_GRID,
+            MediaViewMode.COVER_WITH_INFO,
+            MediaViewMode.LIST,
+        ).forEach { mode ->
             TankobunChip(
                 selected = selectedMode == mode,
                 onClick = { onSelect(mode) },
-                label = { Text(label) },
+                label = { Text(mode.mediaViewLabel()) },
             )
         }
     }
@@ -269,7 +269,7 @@ internal fun MediaCollection(
     trackedStatuses: Map<Int, MediaStatus> = emptyMap(),
     header: (@Composable () -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp),
-    emptyMessage: String = "No manga here yet.",
+    emptyMessage: String? = null,
     isLoadingMore: Boolean = false,
     onNearEnd: (() -> Unit)? = null,
     nearEndThreshold: Int = 8,
@@ -333,7 +333,7 @@ internal fun MediaCollection(
                 }
             }
             item(key = "media-empty") {
-                TankobunEmptyState(title = emptyMessage)
+                TankobunEmptyState(title = emptyMessage ?: tankobunString(R.string.empty_no_manga_here))
             }
         }
         return
@@ -629,7 +629,7 @@ internal fun MediaRow(media: AnilistMedia, trackedStatus: MediaStatus? = null, o
                     )
                     media.chapters?.let { chapters ->
                         Text(
-                            "$chapters chapters",
+                            tankobunQuantityString(R.plurals.chapter_count, chapters, chapters),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -728,21 +728,11 @@ internal fun TrackedMediaStatusBadge(
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = icon,
-                contentDescription = "Tracked: ${status.trackedBadgeLabel()}",
+                contentDescription = tankobunString(R.string.media_tracked_status_cd, status.trackedBadgeLabel()),
                 modifier = Modifier.size(14.dp),
             )
         }
     }
-}
-
-internal fun MediaStatus.trackedBadgeLabel(): String = when (this) {
-    MediaStatus.CURRENT -> "Reading"
-    MediaStatus.PLANNING -> "Planning"
-    MediaStatus.COMPLETED -> "Completed"
-    MediaStatus.PAUSED -> "Paused"
-    MediaStatus.DROPPED -> "Dropped"
-    MediaStatus.REPEATING -> "Rereading"
-    MediaStatus.UNKNOWN -> "Tracked"
 }
 
 internal fun List<LibraryItem>.trackedMediaStatuses(): Map<Int, MediaStatus> =

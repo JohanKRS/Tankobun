@@ -278,20 +278,21 @@ internal val SettingsDetailRoutes = listOf(
     SettingsRoute.ABOUT,
 )
 
+@Composable
 internal fun SettingsRoute.settingsTitle(): String =
     when (this) {
-        SettingsRoute.MAIN -> "Settings"
-        SettingsRoute.APPEARANCE -> "Appearance"
-        SettingsRoute.LANGUAGES -> "Languages"
-        SettingsRoute.LIBRARY -> "Library"
-        SettingsRoute.BROWSE -> "Browse"
-        SettingsRoute.READER -> "Reader"
-        SettingsRoute.DOWNLOADS -> "Downloads"
+        SettingsRoute.MAIN -> tankobunString(R.string.common_settings)
+        SettingsRoute.APPEARANCE -> tankobunString(R.string.settings_appearance)
+        SettingsRoute.LANGUAGES -> tankobunString(R.string.settings_languages)
+        SettingsRoute.LIBRARY -> tankobunString(R.string.common_library)
+        SettingsRoute.BROWSE -> tankobunString(R.string.common_browse)
+        SettingsRoute.READER -> tankobunString(R.string.common_reader)
+        SettingsRoute.DOWNLOADS -> tankobunString(R.string.common_downloads)
         SettingsRoute.ANILIST -> "AniList"
-        SettingsRoute.CUSTOM_LISTS -> "Custom Lists"
-        SettingsRoute.BACKUPS -> "Backups"
-        SettingsRoute.ABOUT -> "About"
-        SettingsRoute.SOURCES -> "Sources"
+        SettingsRoute.CUSTOM_LISTS -> tankobunString(R.string.settings_custom_lists)
+        SettingsRoute.BACKUPS -> tankobunString(R.string.settings_backups)
+        SettingsRoute.ABOUT -> tankobunString(R.string.common_about)
+        SettingsRoute.SOURCES -> tankobunString(R.string.settings_sources)
     }
 
 internal enum class QuickDrawerMode {
@@ -361,18 +362,34 @@ internal const val LIBRARY_SORT_PROGRESS = "PROGRESS"
 internal const val LIBRARY_SORT_SCORE = "SCORE"
 
 internal val LibrarySortOptions = listOf(
-    BrowseOption("List Order", LIBRARY_SORT_LIST_ORDER),
-    BrowseOption("Title", LIBRARY_SORT_TITLE),
-    BrowseOption("Recently Updated", LIBRARY_SORT_UPDATED),
-    BrowseOption("Progress", LIBRARY_SORT_PROGRESS),
-    BrowseOption("Score", LIBRARY_SORT_SCORE),
+    BrowseOption(R.string.library_sort_list_order, LIBRARY_SORT_LIST_ORDER),
+    BrowseOption(R.string.browse_sort_title, LIBRARY_SORT_TITLE),
+    BrowseOption(R.string.library_sort_recently_updated, LIBRARY_SORT_UPDATED),
+    BrowseOption(R.string.common_progress, LIBRARY_SORT_PROGRESS),
+    BrowseOption(R.string.common_score, LIBRARY_SORT_SCORE),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TankobunAppRoot(viewModel: MainViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    TankobunLocalizedContent(state.appLanguage) {
+        TankobunAppRootContent(
+            state = state,
+            viewModel = viewModel,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TankobunAppRootContent(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+) {
     val context = LocalContext.current
+    val readerBackToast = tankobunString(R.string.toast_back_exit_reader)
+    val appBackToast = tankobunString(R.string.toast_back_exit)
     var selectedTab by remember { mutableIntStateOf(0) }
     var settingsRoute by remember { mutableStateOf(SettingsRoute.MAIN) }
     var quickDrawerMode by remember { mutableStateOf(QuickDrawerMode.CLOSED) }
@@ -447,7 +464,7 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
             viewModel.closeReader()
         } else {
             lastReaderBackPressAt = now
-            Toast.makeText(context, "Press back again to exit reader", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, readerBackToast, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -475,7 +492,7 @@ internal fun TankobunAppRoot(viewModel: MainViewModel) {
                     (context as? Activity)?.finish()
                 } else {
                     lastHomeBackPressAt = now
-                    Toast.makeText(context, "Press back again to exit", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, appBackToast, Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -750,7 +767,7 @@ internal fun TankobunScaffold(
             topBar = {
                 TankobunTopBar(
                     title = selectedMedia?.title?.userPreferred
-                        ?: if (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN) settingsRoute.settingsTitle() else "Tankobun",
+                        ?: if (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN) settingsRoute.settingsTitle() else tankobunString(R.string.app_name),
                     hazeState = chromeHazeState,
                     showBack = canNavigateBack,
                     ignoreDisplayCutout = ignoreDisplayCutout,
@@ -1075,7 +1092,7 @@ internal fun TankobunTopBar(
                     IconButton(onClick = onBack, modifier = Modifier.size(if (compact) 36.dp else 48.dp)) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = tankobunString(R.string.common_back),
                             modifier = Modifier.size(iconSize),
                         )
                     }
@@ -1255,10 +1272,10 @@ internal fun TankobunBottomNavigationBar(
 ) {
     val styleColors = LocalTankobunStyle.current.colors
     val items = listOf(
-        Triple("Library", Icons.AutoMirrored.Filled.LibraryBooks, 0),
-        Triple("Browse", Icons.Default.Explore, 1),
-        Triple("Downloads", Icons.Default.Download, 2),
-        Triple("Settings", Icons.Default.Settings, 3),
+        Triple(tankobunString(R.string.nav_library), Icons.AutoMirrored.Filled.LibraryBooks, 0),
+        Triple(tankobunString(R.string.nav_browse), Icons.Default.Explore, 1),
+        Triple(tankobunString(R.string.nav_downloads), Icons.Default.Download, 2),
+        Triple(tankobunString(R.string.nav_settings), Icons.Default.Settings, 3),
     )
     val selectedIndex = selectedTab.coerceIn(0, items.lastIndex)
     val itemSize = 44.dp
@@ -1379,7 +1396,7 @@ internal fun TankobunBottomNavigationBar(
                 ) {
                     AnimatedHamburgerCloseIcon(
                         close = quickActionsOpen,
-                        contentDescription = if (quickActionsOpen) "Close quick actions" else "Open quick actions",
+                        contentDescription = if (quickActionsOpen) tankobunString(R.string.common_close) else tankobunString(R.string.common_options),
                         iconColor = quickActionIconColor,
                         modifier = Modifier.size(26.dp),
                     )
@@ -1528,42 +1545,42 @@ internal fun QuickDrawer(
                                 IconButton(onClick = onTogglePin) {
                                     Icon(
                                         imageVector = if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                                        contentDescription = if (pinned) "Unpin quick actions" else "Pin quick actions",
+                                        contentDescription = if (pinned) tankobunString(R.string.common_close) else tankobunString(R.string.common_options),
                                         tint = if (pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                             }
                         }
 
-                        QuickDrawerSection(title = "AniList Tracking") {
+                        QuickDrawerSection(title = tankobunString(R.string.detail_track_manga)) {
                             if (selectedMedia != null) {
                                 AniListTrackingSection(state, viewModel, selectedMedia)
                             } else {
                                 Text(
-                                    "Open a manga to track it here.",
+                                    tankobunString(R.string.quick_open_manga_tracking),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
 
-                        QuickDrawerSection(title = "Continue Reading") {
+                        QuickDrawerSection(title = tankobunString(R.string.chapter_resume_reading)) {
                             if (state.recentReadingProgress.isNotEmpty()) {
                                 state.recentReadingProgress.forEach { item ->
                                     RecentReadingAction(item = item, onClick = { onOpenRecentProgress(item) })
                                 }
                             } else {
                                 Text(
-                                    "Start reading any manga to create resume points.",
+                                    tankobunString(R.string.quick_start_reading_resume),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
 
-                        QuickDrawerSection(title = "Downloads") {
+                        QuickDrawerSection(title = tankobunString(R.string.common_downloads)) {
                             if (state.downloads.isEmpty()) {
-                                Text("No downloads queued.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(tankobunString(R.string.downloads_no_queued), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             } else {
                                 state.downloads.take(4).forEach { job ->
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1571,7 +1588,7 @@ internal fun QuickDrawer(
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(job.chapterName, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             Text(
-                                                job.state.name.lowercase(),
+                                                job.state.statusLabel(),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -1611,8 +1628,10 @@ internal fun RecentReadingAction(item: RecentReadingProgress, onClick: () -> Uni
         )
         Text(
             listOf(
-                item.chapter?.name ?: item.progress.chapterNumber.takeIf { it > 0 }?.let { "Chapter $it" } ?: "Saved chapter",
-                "Page ${item.progress.pageIndex + 1}/${item.progress.totalPages}",
+                item.chapter?.name
+                    ?: item.progress.chapterNumber.takeIf { it > 0 }?.let { tankobunString(R.string.reader_chapter_number, it.toString()) }
+                    ?: tankobunString(R.string.reader_saved_chapter),
+                tankobunString(R.string.reader_page_fraction, item.progress.pageIndex + 1, item.progress.totalPages),
             ).joinToString(" / "),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1620,7 +1639,7 @@ internal fun RecentReadingAction(item: RecentReadingProgress, onClick: () -> Uni
             overflow = TextOverflow.Ellipsis,
         )
         TankobunActionButton(
-            label = if (item.chapter == null) "Open manga" else "Resume",
+            label = if (item.chapter == null) tankobunString(R.string.reader_open_manga) else tankobunString(R.string.chapter_resume),
             icon = Icons.AutoMirrored.Filled.MenuBook,
             onClick = onClick,
             modifier = Modifier.fillMaxWidth(),

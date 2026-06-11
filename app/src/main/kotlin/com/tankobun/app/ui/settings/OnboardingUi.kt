@@ -1,5 +1,6 @@
 package com.tankobun.app.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,59 +44,61 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.tankobun.app.LocalTankobunStyle
+import com.tankobun.app.R
+import com.tankobun.app.tankobunString
 import com.tankobun.app.ui.components.TankobunActionButton
 
 private data class OnboardingPage(
     val icon: ImageVector,
-    val title: String,
-    val body: String,
-    val points: List<String>,
+    @StringRes val titleRes: Int,
+    @StringRes val bodyRes: Int,
+    val pointRes: List<Int>,
 )
 
 private val TankobunOnboardingPages = listOf(
     OnboardingPage(
         icon = Icons.AutoMirrored.Filled.LibraryBooks,
-        title = "Build your manga shelf",
-        body = "Tankobun keeps your AniList library, browsing, reading progress, and downloads in one place.",
-        points = listOf(
-            "Connect AniList when you want your lists and progress synced.",
-            "Browse also works for discovering manga before you sign in.",
+        titleRes = R.string.onboarding_page_shelf_title,
+        bodyRes = R.string.onboarding_page_shelf_body,
+        pointRes = listOf(
+            R.string.onboarding_page_shelf_bullet_1,
+            R.string.onboarding_page_shelf_bullet_2,
         ),
     ),
     OnboardingPage(
         icon = Icons.Default.Download,
-        title = "Add source extensions",
-        body = "Sources are installed by you and stay outside the app until you enable them.",
-        points = listOf(
-            "Use Settings > Sources to install or manage extension languages.",
-            "Keep only the sources you actually want active.",
+        titleRes = R.string.onboarding_page_extensions_title,
+        bodyRes = R.string.onboarding_page_extensions_body,
+        pointRes = listOf(
+            R.string.onboarding_page_extensions_bullet_1,
+            R.string.onboarding_page_extensions_bullet_2,
         ),
     ),
     OnboardingPage(
         icon = Icons.Default.Search,
-        title = "Pick a readable source",
-        body = "Open a manga, tap Source, and Tankobun checks enabled sources for readable matches.",
-        points = listOf(
-            "Choose Change anytime if a source is slow or missing chapters.",
-            "Some sources need direct URLs or may fail without blocking the rest.",
+        titleRes = R.string.onboarding_page_source_match_title,
+        bodyRes = R.string.onboarding_page_source_match_body,
+        pointRes = listOf(
+            R.string.onboarding_page_source_match_bullet_1,
+            R.string.onboarding_page_source_match_bullet_2,
         ),
     ),
     OnboardingPage(
         icon = Icons.AutoMirrored.Filled.MenuBook,
-        title = "Read your way",
-        body = "Use paged or webtoon reading, resume from the chapter list, and let progress update as you finish chapters.",
-        points = listOf(
-            "Reader settings control spacing and reading mode.",
-            "Downloads can queue all, unread, next 10, or hand-picked chapters.",
+        titleRes = R.string.onboarding_page_read_title,
+        bodyRes = R.string.onboarding_page_read_body,
+        pointRes = listOf(
+            R.string.onboarding_page_read_bullet_1,
+            R.string.onboarding_page_read_bullet_2,
         ),
     ),
     OnboardingPage(
         icon = Icons.Default.Settings,
-        title = "Make it yours",
-        body = "Themes, backups, source filters, downloads, and AniList behavior all live in Settings.",
-        points = listOf(
-            "Replay this tutorial from Settings > About.",
-            "Export backups when you want a portable AniList/MAL-friendly file.",
+        titleRes = R.string.onboarding_page_customize_title,
+        bodyRes = R.string.onboarding_page_customize_body,
+        pointRes = listOf(
+            R.string.onboarding_page_customize_bullet_1,
+            R.string.onboarding_page_customize_bullet_2,
         ),
     ),
 )
@@ -135,15 +138,15 @@ internal fun OnboardingDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("Welcome to Tankobun", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(tankobunString(R.string.onboarding_welcome), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            "Step ${pageIndex + 1} of ${TankobunOnboardingPages.size}",
+                            tankobunString(R.string.onboarding_step_count, pageIndex + 1, TankobunOnboardingPages.size),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close tutorial")
+                        Icon(Icons.Default.Close, contentDescription = tankobunString(R.string.onboarding_close_tutorial))
                     }
                 }
 
@@ -162,13 +165,13 @@ internal fun OnboardingDialog(
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        page.title,
+                        tankobunString(page.titleRes),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
                     )
                     Text(
-                        page.body,
+                        tankobunString(page.bodyRes),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -176,7 +179,7 @@ internal fun OnboardingDialog(
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    page.points.forEach { point ->
+                    page.pointRes.forEach { pointRes ->
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                             Box(
                                 modifier = Modifier
@@ -185,7 +188,7 @@ internal fun OnboardingDialog(
                                     .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(999.dp)),
                             )
                             Text(
-                                point,
+                                tankobunString(pointRes),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -221,14 +224,14 @@ internal fun OnboardingDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text(if (isLastPage) "Close" else "Skip")
+                        Text(if (isLastPage) tankobunString(R.string.common_close) else tankobunString(R.string.onboarding_skip))
                     }
                     Spacer(Modifier.weight(1f))
                     if (pageIndex > 0) {
-                        TankobunActionButton(label = "Back", onClick = { pageIndex -= 1 }, filled = false)
+                        TankobunActionButton(label = tankobunString(R.string.common_back), onClick = { pageIndex -= 1 }, filled = false)
                     }
                     TankobunActionButton(
-                        label = if (isLastPage) "Start" else "Next",
+                        label = if (isLastPage) tankobunString(R.string.common_start) else tankobunString(R.string.common_next),
                         onClick = {
                             if (isLastPage) {
                                 onDismiss()

@@ -253,12 +253,12 @@ internal fun DownloadsScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 TankobunSectionHeader(
-                    title = "Downloads",
+                    title = tankobunString(R.string.common_downloads),
                     trailing = state.downloadSummaryLabel(),
                     modifier = Modifier.weight(1f),
                 )
                 TankobunActionButton(
-                    label = "Storage manager",
+                    label = tankobunString(R.string.downloads_storage_manager),
                     icon = Icons.Default.Settings,
                     onClick = onOpenStorageManager,
                     modifier = Modifier.widthIn(max = 190.dp),
@@ -270,7 +270,7 @@ internal fun DownloadsScreen(
             FlowRowCompat {
                 if (hasActiveDownloads) {
                     TankobunActionButton(
-                        label = "Pause active",
+                        label = tankobunString(R.string.downloads_pause_active),
                         icon = Icons.Default.Pause,
                         onClick = viewModel::pauseActiveDownloads,
                         filled = false,
@@ -278,14 +278,14 @@ internal fun DownloadsScreen(
                 }
                 if (hasPausedDownloads) {
                     TankobunActionButton(
-                        label = "Resume paused",
+                        label = tankobunString(R.string.downloads_resume_paused),
                         icon = Icons.Default.PlayArrow,
                         onClick = viewModel::resumePausedDownloads,
                     )
                 }
                 if (hasFailedDownloads) {
                     TankobunActionButton(
-                        label = "Retry failed",
+                        label = tankobunString(R.string.downloads_retry_failed),
                         icon = Icons.Default.Replay,
                         onClick = viewModel::retryFailedDownloads,
                     )
@@ -294,7 +294,7 @@ internal fun DownloadsScreen(
         }
         if (state.downloads.isEmpty()) {
             item {
-                TankobunEmptyState(title = "No downloads yet.")
+                TankobunEmptyState(title = tankobunString(R.string.downloads_empty))
             }
         } else {
             items(state.downloads, key = { it.id }) { job ->
@@ -342,21 +342,21 @@ internal fun DownloadJobRow(
                         when (job.state) {
                             DownloadState.QUEUED,
                             DownloadState.RUNNING -> IconButton(onClick = onPause) {
-                                Icon(Icons.Default.Pause, contentDescription = "Pause download")
+                                Icon(Icons.Default.Pause, contentDescription = tankobunString(R.string.downloads_pause_download))
                             }
 
                             DownloadState.PAUSED -> IconButton(onClick = onResume) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = "Resume download")
+                                Icon(Icons.Default.PlayArrow, contentDescription = tankobunString(R.string.downloads_resume_download))
                             }
 
                             DownloadState.FAILED -> IconButton(onClick = onRetry) {
-                                Icon(Icons.Default.Replay, contentDescription = "Retry download")
+                                Icon(Icons.Default.Replay, contentDescription = tankobunString(R.string.downloads_retry_download))
                             }
 
                             DownloadState.COMPLETE -> Unit
                         }
                         IconButton(onClick = onRemove) {
-                            Icon(Icons.Default.Delete, contentDescription = "Remove download")
+                            Icon(Icons.Default.Delete, contentDescription = tankobunString(R.string.downloads_remove_download))
                         }
                     }
                 },
@@ -365,36 +365,34 @@ internal fun DownloadJobRow(
     }
 }
 
+@Composable
 internal fun DownloadJob.downloadStatusLine(): String {
-    val status = when (state) {
-        DownloadState.QUEUED -> "Queued"
-        DownloadState.RUNNING -> "Downloading"
-        DownloadState.PAUSED -> "Paused"
-        DownloadState.COMPLETE -> "Complete"
-        DownloadState.FAILED -> "Failed"
-    }
+    val status = state.statusLabel()
     val progress = when {
-        pageCount > 0 -> " / $completedPages of $pageCount pages"
-        completedPages > 0 -> " / $completedPages pages"
+        pageCount > 0 -> " / ${tankobunString(R.string.downloads_pages_progress, completedPages, pageCount)}"
+        completedPages > 0 -> " / ${tankobunQuantityString(R.plurals.page_count, completedPages, completedPages)}"
         else -> ""
     }
-    val retries = retryCount.takeIf { it > 0 }?.let { " / $it retries" }.orEmpty()
+    val retries = retryCount.takeIf { it > 0 }
+        ?.let { " / ${tankobunString(R.string.downloads_retries, it)}" }
+        .orEmpty()
     return "$status$progress$retries"
 }
 
+@Composable
 internal fun TankobunUiState.downloadSummaryLabel(): String {
-    if (downloads.isEmpty()) return "0 jobs"
+    if (downloads.isEmpty()) return tankobunString(R.string.downloads_zero_jobs)
     val running = downloads.count { it.state == DownloadState.RUNNING }
     val queued = downloads.count { it.state == DownloadState.QUEUED }
     val complete = downloads.count { it.state == DownloadState.COMPLETE }
     val failed = downloads.count { it.state == DownloadState.FAILED }
     val paused = downloads.count { it.state == DownloadState.PAUSED }
     return listOfNotNull(
-        running.takeIf { it > 0 }?.let { "$it running" },
-        queued.takeIf { it > 0 }?.let { "$it queued" },
-        paused.takeIf { it > 0 }?.let { "$it paused" },
-        failed.takeIf { it > 0 }?.let { "$it failed" },
-        complete.takeIf { it > 0 }?.let { "$it complete" },
+        running.takeIf { it > 0 }?.let { tankobunString(R.string.downloads_running_count, it) },
+        queued.takeIf { it > 0 }?.let { tankobunString(R.string.downloads_queued_count, it) },
+        paused.takeIf { it > 0 }?.let { tankobunString(R.string.downloads_paused_count, it) },
+        failed.takeIf { it > 0 }?.let { tankobunString(R.string.downloads_failed_count, it) },
+        complete.takeIf { it > 0 }?.let { tankobunString(R.string.downloads_complete_count, it) },
     ).joinToString(" / ")
 }
 

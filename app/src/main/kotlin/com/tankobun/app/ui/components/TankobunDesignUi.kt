@@ -62,7 +62,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.tankobun.app.LocalTankobunStyle
+import com.tankobun.app.R
 import com.tankobun.app.TankobunDisplayFontFamily
+import com.tankobun.app.tankobunString
 import java.util.Locale
 
 /*
@@ -312,12 +314,12 @@ internal fun TankobunSearchField(
             Row {
                 if (value.isNotBlank()) {
                     IconButton(onClick = { onValueChange("") }) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear search")
+                        Icon(Icons.Default.Close, contentDescription = tankobunString(R.string.common_clear))
                     }
                 }
                 if (showSearchAction) {
                     IconButton(onClick = onSearch) {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
+                        Icon(Icons.Default.Search, contentDescription = tankobunString(R.string.common_search))
                     }
                 }
             }
@@ -406,7 +408,7 @@ internal fun TankobunClearFiltersChip(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CompositionLocalProvider(LocalTextStyle provides MaterialTheme.typography.labelMedium) {
-                Text("Clear filters")
+                Text(tankobunString(R.string.common_clear_filters))
             }
         }
     }
@@ -522,7 +524,7 @@ internal fun TankobunDialogHeader(title: String, onDismiss: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
         )
         IconButton(onClick = onDismiss) {
-            Icon(Icons.Default.Close, contentDescription = "Close")
+            Icon(Icons.Default.Close, contentDescription = tankobunString(R.string.common_close))
         }
     }
 }

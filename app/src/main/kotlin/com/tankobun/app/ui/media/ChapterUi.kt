@@ -63,7 +63,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.MainViewModel
+import com.tankobun.app.R
 import com.tankobun.app.TankobunDisplayFontFamily
+import com.tankobun.app.tankobunString
 import com.tankobun.app.logic.nextInReadingOrderAfter
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.app.ui.components.TankobunActionButton
@@ -95,14 +97,18 @@ internal fun ChapterActionsBar(
                 if (tight) {
                     TankobunIconActionButton(
                         icon = Icons.Default.PlayArrow,
-                        contentDescription = if (hasProgress) "Resume reading" else "Start reading",
+                        contentDescription = if (hasProgress) {
+                            tankobunString(R.string.chapter_resume_reading)
+                        } else {
+                            tankobunString(R.string.chapter_start_reading)
+                        },
                         onClick = { onOpenChapter(readingActionChapter) },
                         modifier = modifier,
                         filled = true,
                     )
                 } else {
                     TankobunActionButton(
-                        label = if (hasProgress) "Resume" else "Start",
+                        label = if (hasProgress) tankobunString(R.string.chapter_resume) else tankobunString(R.string.common_start),
                         icon = Icons.Default.PlayArrow,
                         onClick = { onOpenChapter(readingActionChapter) },
                         modifier = modifier,
@@ -113,16 +119,24 @@ internal fun ChapterActionsBar(
         val refreshButton: @Composable (Modifier) -> Unit = { modifier ->
             TankobunIconActionButton(
                 icon = Icons.Default.Refresh,
-                contentDescription = if (hasChapters) "Refresh chapters" else "Load chapters",
+                contentDescription = if (hasChapters) {
+                    tankobunString(R.string.chapter_refresh_chapters)
+                } else {
+                    tankobunString(R.string.chapter_load_chapters)
+                },
                 onClick = onLoadChapters,
                 modifier = modifier,
             )
         }
-        val orderButtonLabel = if (chapterListStartsAtFirst) "First" else "Last"
-        val orderButtonDescription = if (chapterListStartsAtFirst) {
-            "Show latest chapter first"
+        val orderButtonLabel = if (chapterListStartsAtFirst) {
+            tankobunString(R.string.chapter_first)
         } else {
-            "Show first chapter first"
+            tankobunString(R.string.chapter_last)
+        }
+        val orderButtonDescription = if (chapterListStartsAtFirst) {
+            tankobunString(R.string.chapter_show_latest_first)
+        } else {
+            tankobunString(R.string.chapter_show_first_first)
         }
         val orderButton: @Composable (Modifier) -> Unit = { modifier ->
             if (tight) {
@@ -148,14 +162,14 @@ internal fun ChapterActionsBar(
             if (tight) {
                 TankobunIconActionButton(
                     icon = Icons.Default.Download,
-                    contentDescription = "Download chapters",
+                    contentDescription = tankobunString(R.string.chapter_download_chapters),
                     onClick = onOpenDownloadActions,
                     enabled = hasChapters,
                     modifier = modifier,
                 )
             } else {
                 TankobunActionButton(
-                    label = "Download",
+                    label = tankobunString(R.string.common_download),
                     icon = Icons.Default.Download,
                     onClick = onOpenDownloadActions,
                     enabled = hasChapters,
@@ -201,13 +215,13 @@ internal fun ChapterManualDownloadBar(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                "$selectedCount selected",
+                tankobunString(R.string.chapter_selected_count, selectedCount),
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
             )
             TextButton(onClick = onCancel) {
-                Text("Cancel")
+                Text(tankobunString(R.string.common_cancel))
             }
             Button(
                 onClick = onDownloadSelected,
@@ -216,7 +230,7 @@ internal fun ChapterManualDownloadBar(
             ) {
                 Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Download")
+                Text(tankobunString(R.string.common_download))
             }
         }
     }
@@ -233,20 +247,20 @@ internal fun ChapterDownloadActionsDialog(
     onSelectManually: () -> Unit,
 ) {
     TankobunDialog(onDismiss = onDismiss, maxHeight = 640.dp) {
-        TankobunDialogHeader(title = "Download Chapters", onDismiss = onDismiss)
+        TankobunDialogHeader(title = tankobunString(R.string.chapter_download_dialog_title), onDismiss = onDismiss)
         ChapterDownloadActionRow(
-            title = "All chapters",
-            subtitle = "Queue every chapter from this source.",
+            title = tankobunString(R.string.chapter_all_chapters),
+            subtitle = tankobunString(R.string.chapter_all_chapters_desc),
             onClick = onDownloadAll,
         )
         ChapterDownloadActionRow(
-            title = "Unread only",
-            subtitle = "Skip chapters already marked as read.",
+            title = tankobunString(R.string.chapter_unread_only),
+            subtitle = tankobunString(R.string.chapter_unread_only_desc),
             onClick = onDownloadUnread,
         )
         ChapterDownloadActionRow(
-            title = "Next 10",
-            subtitle = "Queue the next unread chapters from your current progress.",
+            title = tankobunString(R.string.chapter_next_10),
+            subtitle = tankobunString(R.string.chapter_next_10_desc),
             onClick = onDownloadNextTen,
         )
         Surface(
@@ -264,9 +278,9 @@ internal fun ChapterDownloadActionsDialog(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("Always keep next 10", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(tankobunString(R.string.chapter_keep_next_10), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text(
-                        "Automatically queue the next unread batch as you move through chapters.",
+                        tankobunString(R.string.chapter_keep_next_10_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -278,8 +292,8 @@ internal fun ChapterDownloadActionsDialog(
             }
         }
         ChapterDownloadActionRow(
-            title = "Select manually",
-            subtitle = "Choose chapters directly from the list.",
+            title = tankobunString(R.string.chapter_select_manually),
+            subtitle = tankobunString(R.string.chapter_select_manually_desc),
             onClick = onSelectManually,
         )
     }
@@ -374,7 +388,11 @@ internal fun ChapterRow(
         var swipeActionRead by remember(chapter.url) { mutableStateOf(read) }
         var dragOffset by remember(chapter.url) { mutableFloatStateOf(0f) }
         var dragging by remember(chapter.url) { mutableStateOf(false) }
-        val swipeActionLabel = if (swipeActionRead) "Mark as\nunread" else "Mark as\nread"
+        val swipeActionLabel = if (swipeActionRead) {
+            tankobunString(R.string.chapter_mark_unread)
+        } else {
+            tankobunString(R.string.chapter_mark_read)
+        }
         val swipeActionIcon = if (swipeActionRead) Icons.Default.Replay else Icons.Default.Check
         val swipeActionColor = LocalTankobunStyle.current.colors.accent
         val density = LocalDensity.current
@@ -550,7 +568,7 @@ internal fun ChapterDownloadIndicator(
 ) {
     when {
         download == null -> IconButton(onClick = onDownload) {
-            Icon(Icons.Default.Download, contentDescription = "Download")
+            Icon(Icons.Default.Download, contentDescription = tankobunString(R.string.common_download))
         }
 
         download.state == DownloadState.COMPLETE -> Surface(
@@ -562,7 +580,7 @@ internal fun ChapterDownloadIndicator(
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     Icons.Default.Check,
-                    contentDescription = "Downloaded",
+                    contentDescription = tankobunString(R.string.common_downloaded),
                     modifier = Modifier.size(20.dp),
                 )
             }
@@ -600,11 +618,11 @@ internal fun ChapterDownloadIndicator(
         }
 
         download.state == DownloadState.PAUSED -> IconButton(onClick = onResume) {
-            Icon(Icons.Default.PlayArrow, contentDescription = "Resume download")
+            Icon(Icons.Default.PlayArrow, contentDescription = tankobunString(R.string.downloads_resume_download))
         }
 
         download.state == DownloadState.FAILED -> IconButton(onClick = onRetry) {
-            Icon(Icons.Default.Replay, contentDescription = "Retry download")
+            Icon(Icons.Default.Replay, contentDescription = tankobunString(R.string.downloads_retry_download))
         }
     }
 }

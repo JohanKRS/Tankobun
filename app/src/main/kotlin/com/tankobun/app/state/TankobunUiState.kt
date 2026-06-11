@@ -4,6 +4,7 @@ import com.tankobun.app.BackupSchedule
 import com.tankobun.app.DEFAULT_MEDIA_COVER_COLUMNS
 import com.tankobun.app.DockAlignment
 import com.tankobun.app.MediaViewMode
+import com.tankobun.app.AppLanguage
 import com.tankobun.app.TankobunThemeMode
 import com.tankobun.app.defaultSourceLanguages
 import com.tankobun.app.logic.BROWSE_SORT_SEARCH_MATCH
@@ -28,6 +29,7 @@ data class TankobunUiState(
     val loggedIn: Boolean = false,
     val clientConfigured: Boolean = false,
     val themeMode: TankobunThemeMode = TankobunThemeMode.SYSTEM,
+    val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val ignoreDisplayCutout: Boolean = false,
     val showAppStatusBar: Boolean = true,
     val dockAlignment: DockAlignment = DockAlignment.CENTER,
@@ -136,16 +138,16 @@ data class TankobunUiState(
 
 private fun List<LibraryItem>.toLibrarySections(): List<LibrarySection> {
     val statusSections = listOf(
-        MediaStatus.CURRENT to "Reading",
-        MediaStatus.PLANNING to "Plan to Read",
-        MediaStatus.COMPLETED to "Completed",
-        MediaStatus.PAUSED to "Paused",
-        MediaStatus.DROPPED to "Dropped",
-        MediaStatus.REPEATING to "Rereading",
-        MediaStatus.UNKNOWN to "Other",
-    ).mapNotNull { (status, title) ->
+        MediaStatus.CURRENT,
+        MediaStatus.PLANNING,
+        MediaStatus.COMPLETED,
+        MediaStatus.PAUSED,
+        MediaStatus.DROPPED,
+        MediaStatus.REPEATING,
+        MediaStatus.UNKNOWN,
+    ).mapNotNull { status ->
         val items = filter { it.entry.status == status }
-        if (items.isEmpty()) null else LibrarySection(status.name, title, items)
+        if (items.isEmpty()) null else LibrarySection(status.name, status.name, items, status)
     }
 
     val customSections = flatMap { item ->

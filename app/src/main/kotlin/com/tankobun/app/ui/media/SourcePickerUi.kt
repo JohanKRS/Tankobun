@@ -61,6 +61,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.MainViewModel
+import com.tankobun.app.R
+import com.tankobun.app.tankobunQuantityString
+import com.tankobun.app.tankobunString
 import com.tankobun.app.logic.sourceMatchKey
 import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.state.TankobunUiState
@@ -70,6 +73,7 @@ import com.tankobun.app.ui.components.TankobunMessageBanner
 import com.tankobun.app.ui.settings.ExtensionIcon
 import com.tankobun.app.ui.settings.extensionInitials
 import com.tankobun.app.ui.settings.normalizedSourceLanguage
+import com.tankobun.app.ui.settings.sourceLanguageDisplay
 import com.tankobun.app.ui.settings.sourceLanguageSortPriority
 import com.tankobun.app.ui.settings.sourceMetadata
 import com.tankobun.core.model.AnilistMedia
@@ -82,25 +86,26 @@ internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewMod
     val selectedSource = state.selectedSource
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        DetailSectionTitle("Source")
+        DetailSectionTitle(tankobunString(R.string.common_source))
         if (selectedManga == null) {
             SourceActionCard(
-                title = "No source selected.",
+                title = tankobunString(R.string.source_none_selected),
                 subtitle = if (state.allInstalledSources.isEmpty()) {
-                    "Install source extensions in Settings."
+                    tankobunString(R.string.source_install_in_settings)
                 } else {
-                    "Choose a source to browse and read."
+                    tankobunString(R.string.source_choose_to_read)
                 },
                 onFindSource = viewModel::openSourcePicker,
             )
         } else {
             SelectedSourceCard(
                 source = selectedSource,
-                sourceName = selectedSource?.let { "${it.name} (${it.lang})" } ?: "Selected source",
+                sourceName = selectedSource?.let { "${it.name} (${sourceLanguageDisplay(it.lang)})" }
+                    ?: tankobunString(R.string.source_selected_source),
                 chapterLine = if (state.sourceChapters.isEmpty()) {
-                    "No chapters loaded"
+                    tankobunString(R.string.source_no_chapters_loaded)
                 } else {
-                    "${state.sourceChapters.size} chapters"
+                    tankobunQuantityString(R.plurals.chapter_count, state.sourceChapters.size, state.sourceChapters.size)
                 },
                 onChange = viewModel::openSourcePicker,
             )
@@ -131,7 +136,7 @@ internal fun SourceActionCard(
             SourceActionText(title = title, subtitle = subtitle, modifier = Modifier.weight(1f))
             TankobunIconActionButton(
                 icon = Icons.Default.Search,
-                contentDescription = "Find source",
+                contentDescription = tankobunString(R.string.source_find_source),
                 onClick = onFindSource,
             )
         }
@@ -199,7 +204,7 @@ internal fun SelectedSourceCard(
                 }
                 TankobunIconActionButton(
                     icon = Icons.Default.SwapHoriz,
-                    contentDescription = "Change source",
+                    contentDescription = tankobunString(R.string.source_change_source),
                     onClick = onChange,
                 )
             }
@@ -328,9 +333,9 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
         TankobunDialogSurface(maxWidth = 720.dp, fillMaxHeightFraction = 0.86f, scrollable = false) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Find source", style = MaterialTheme.typography.headlineSmall)
+                    Text(tankobunString(R.string.source_find_source), style = MaterialTheme.typography.headlineSmall)
                     Text(
-                        "${media.title.userPreferred} / ${availableSources.size} enabled sources",
+                        tankobunString(R.string.source_enabled_count, media.title.userPreferred, availableSources.size),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -338,7 +343,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                     )
                 }
                 TextButton(onClick = viewModel::closeSourcePicker) {
-                    Text("Close")
+                    Text(tankobunString(R.string.common_close))
                 }
             }
 
@@ -362,10 +367,10 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
             if (matches.isEmpty() && availableSources.isEmpty() && !state.sourcePickerLoading) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("No enabled sources.", style = MaterialTheme.typography.titleMedium)
+                        Text(tankobunString(R.string.source_no_enabled), style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Enable or install sources from Settings.",
+                            tankobunString(R.string.source_enable_or_install),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -377,7 +382,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                 ) {
                     if (matches.isNotEmpty()) {
                         item {
-                            Text("Readable matches", style = MaterialTheme.typography.titleMedium)
+                            Text(tankobunString(R.string.source_readable_matches), style = MaterialTheme.typography.titleMedium)
                         }
                         items(matches, key = { "match:${it.source.id}:${it.manga.url}" }) { match ->
                             val count = state.sourceMatchChapterCounts[sourceMatchKey(match.source.id, match.manga.url)] ?: 0
@@ -394,7 +399,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                     val fallbackSources = availableSources.filterNot { it.sourceSettingsKey() in matchSourceKeys }
                     if (fallbackSources.isNotEmpty()) {
                         item {
-                            Text("Try a specific source", style = MaterialTheme.typography.titleMedium)
+                            Text(tankobunString(R.string.source_try_specific), style = MaterialTheme.typography.titleMedium)
                         }
                         items(fallbackSources, key = { "source:${it.sourceSettingsKey()}" }) { source ->
                             SourceCandidateRow(
@@ -406,7 +411,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                     }
                     if (diagnostics.isNotEmpty()) {
                         item {
-                            Text("Skipped sources", style = MaterialTheme.typography.titleMedium)
+                            Text(tankobunString(R.string.source_skipped_sources), style = MaterialTheme.typography.titleMedium)
                         }
                         items(diagnostics, key = { "diagnostic:$it" }) { diagnostic ->
                             SourceDiagnosticRow(diagnostic)
@@ -423,7 +428,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                 ) {
                     Icon(Icons.Default.Tune, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
-                    Text("Edit search title")
+                    Text(tankobunString(R.string.source_edit_search_title))
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -435,7 +440,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                         Spacer(Modifier.size(8.dp))
                     }
                     Text(
-                        "${matches.size} readable / ${availableSources.size} enabled",
+                        tankobunString(R.string.source_readable_enabled_count, matches.size, availableSources.size),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -477,7 +482,7 @@ internal fun SourcePickerSearchTitleEditor(
                     ) {
                         Icon(Icons.Default.Search, contentDescription = null)
                         Spacer(Modifier.size(8.dp))
-                        Text("Search")
+                        Text(tankobunString(R.string.common_search))
                     }
                 }
             } else {
@@ -498,7 +503,7 @@ internal fun SourcePickerSearchTitleEditor(
                     ) {
                         Icon(Icons.Default.Search, contentDescription = null)
                         Spacer(Modifier.size(8.dp))
-                        Text("Search")
+                        Text(tankobunString(R.string.common_search))
                     }
                 }
             }
@@ -520,7 +525,7 @@ internal fun SourceSearchTitleField(
         modifier = modifier,
         enabled = enabled,
         singleLine = true,
-        label = { Text("Search title") },
+        label = { Text(tankobunString(R.string.source_search_title)) },
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { if (enabled && title.trim().length >= 2) onSearch() }),
     )
@@ -554,8 +559,15 @@ internal fun SourceMatchRow(
         ListItem(
             headlineContent = { Text(match.manga.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = {
+                val chapterCountLabel = tankobunQuantityString(R.plurals.chapter_count, chapterCount, chapterCount)
                 Text(
-                    "${match.source.name} (${match.source.lang}) / $chapterCount chapters / ${(match.score * 100).toInt()}% match",
+                    tankobunString(
+                        R.string.source_match_detail,
+                        match.source.name,
+                        sourceLanguageDisplay(match.source.lang),
+                        chapterCountLabel,
+                        (match.score * 100).toInt(),
+                    ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -569,7 +581,7 @@ internal fun SourceMatchRow(
             },
             trailingContent = {
                 if (current) {
-                    Text("Current", color = MaterialTheme.colorScheme.secondary)
+                    Text(tankobunString(R.string.common_current), color = MaterialTheme.colorScheme.secondary)
                 }
             },
         )
@@ -601,7 +613,10 @@ internal fun SourceCandidateRow(
                 )
             },
             trailingContent = {
-                Text(if (current) "Selected" else "Try", color = MaterialTheme.colorScheme.secondary)
+                Text(
+                    if (current) tankobunString(R.string.common_selected) else tankobunString(R.string.common_try),
+                    color = MaterialTheme.colorScheme.secondary,
+                )
             },
         )
     }

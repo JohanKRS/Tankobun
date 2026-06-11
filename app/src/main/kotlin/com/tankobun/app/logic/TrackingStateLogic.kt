@@ -62,6 +62,7 @@ internal fun TankobunUiState.withRenamedAniListCustomList(
     updatedEntries: Map<Int, AnilistListEntry>,
     oldName: String,
     newName: String,
+    successMessage: String,
 ): TankobunUiState =
     withUpdatedAniListCustomListEntries(
         customLists = customLists,
@@ -72,13 +73,14 @@ internal fun TankobunUiState.withRenamedAniListCustomList(
         transformSelectedLists = { lists ->
             lists.renamedCustomList(oldName, newName).toSet()
         },
-        message = "Custom list renamed",
+        message = successMessage,
     )
 
 internal fun TankobunUiState.withDeletedAniListCustomList(
     customLists: List<String>,
     updatedEntries: Map<Int, AnilistListEntry>,
     name: String,
+    successMessage: String,
 ): TankobunUiState =
     withUpdatedAniListCustomListEntries(
         customLists = customLists,
@@ -89,7 +91,7 @@ internal fun TankobunUiState.withDeletedAniListCustomList(
         transformSelectedLists = { lists ->
             lists.withoutCustomList(name).toSet()
         },
-        message = "Custom list deleted",
+        message = successMessage,
     )
 
 internal fun TankobunUiState.withTrackingCustomListSaveResult(
@@ -138,6 +140,7 @@ internal fun TankobunUiState.withTrackingSaveResult(
     entry: AnilistListEntry,
     knownCustomLists: List<String>,
     autoSave: Boolean,
+    successMessage: String,
 ): TankobunUiState {
     val selected = selectedMedia?.id == media.id
     val preserveEditedForm = selected && trackingDirty
@@ -157,7 +160,7 @@ internal fun TankobunUiState.withTrackingSaveResult(
         trackingSaveInProgress = if (selected) false else trackingSaveInProgress,
         trackingSaveFailed = if (selected) false else trackingSaveFailed,
         busy = if (autoSave) busy else false,
-        message = if (autoSave) message else "AniList tracking saved",
+        message = if (autoSave) message else successMessage,
     )
 }
 

@@ -255,11 +255,11 @@ internal fun BackupsSettingsScreen(
     }
 
     SettingsDetailPanel(
-        title = "Backups",
-        subtitle = "Save and restore your AniList manga list as MyAnimeList-compatible XML.",
+        title = tankobunString(R.string.settings_backups),
+        subtitle = tankobunString(R.string.settings_backups_subtitle),
         modifier = modifier,
     ) {
-        Text("AniList manga backup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(tankobunString(R.string.backup_anilist_manga), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         TankobunPanel(
             modifier = Modifier.fillMaxWidth(),
             color = LocalTankobunStyle.current.colors.panel,
@@ -277,7 +277,7 @@ internal fun BackupsSettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("MyAnimeList XML", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(tankobunString(R.string.backup_mal_xml), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Text(
                             backupCoverageLabel(totalItems, malMatchedItems, missingMalItems),
                             style = MaterialTheme.typography.bodySmall,
@@ -285,7 +285,7 @@ internal fun BackupsSettingsScreen(
                         )
                         state.librarySyncedAtEpochMillis.takeIf { it > 0 }?.let {
                             Text(
-                                "Library cache: ${cacheAgeLabel(it)}",
+                                tankobunString(R.string.settings_library_cache, cacheAgeLabel(it)),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -293,12 +293,12 @@ internal fun BackupsSettingsScreen(
                     }
                     AssistChip(
                         onClick = {},
-                        label = { Text("$malMatchedItems / $totalItems matched") },
+                        label = { Text(tankobunString(R.string.backup_matched_count, malMatchedItems, totalItems)) },
                         enabled = false,
                     )
                 }
                 Text(
-                    "You can restore this backup from AniList's web import page or directly in Tankobun.",
+                    tankobunString(R.string.backup_restore_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -307,20 +307,20 @@ internal fun BackupsSettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     TankobunActionButton(
-                        label = "Sync first",
+                        label = tankobunString(R.string.backup_sync_first),
                         onClick = viewModel::refreshLibrary,
                         enabled = state.loggedIn,
                         filled = false,
                     )
                     TankobunActionButton(
-                        label = "Save backup",
+                        label = tankobunString(R.string.backup_save),
                         onClick = {
                             backupLauncher.launch(suggestedAniListBackupFileName(state.viewerName))
                         },
                         enabled = totalItems > 0,
                     )
                     TankobunActionButton(
-                        label = "Restore",
+                        label = tankobunString(R.string.backup_restore),
                         onClick = {
                             restoreLauncher.launch(arrayOf("text/xml", "application/xml", "*/*"))
                         },
@@ -330,7 +330,7 @@ internal fun BackupsSettingsScreen(
                 }
             }
         }
-        Text("Scheduled backups", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(tankobunString(R.string.backup_scheduled), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         TankobunPanel(
             modifier = Modifier.fillMaxWidth(),
             color = LocalTankobunStyle.current.colors.panel,
@@ -343,12 +343,12 @@ internal fun BackupsSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    "Choose a folder and Tankobun will keep dated XML backups there.",
+                    tankobunString(R.string.backup_scheduled_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 state.backupFolderUri?.let {
-                    ScheduledBackupFolderSummary(folderLabel = backupFolderLabel ?: "Selected folder")
+                    ScheduledBackupFolderSummary(folderLabel = backupFolderLabel ?: tankobunString(R.string.backup_selected_folder))
                 }
                 BackupSchedulePicker(
                     selected = state.backupSchedule,
@@ -360,19 +360,27 @@ internal fun BackupsSettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TankobunActionButton(
-                        label = if (state.backupFolderUri == null) "Choose folder" else "Change folder",
+                        label = if (state.backupFolderUri == null) {
+                            tankobunString(R.string.backup_choose_folder)
+                        } else {
+                            tankobunString(R.string.backup_change_folder)
+                        },
                         onClick = { folderLauncher.launch(null) },
                         filled = false,
                     )
                     TankobunActionButton(
-                        label = "Run now",
+                        label = tankobunString(R.string.backup_run_now),
                         onClick = viewModel::runScheduledAniListBackupNow,
                         enabled = state.backupFolderUri != null && totalItems > 0,
                     )
                 }
                 val lastRun = state.lastScheduledBackupAtEpochMillis
                 Text(
-                    if (lastRun > 0L) "Last backup: ${cacheAgeLabel(lastRun)}" else "No scheduled backup saved yet.",
+                    if (lastRun > 0L) {
+                        tankobunString(R.string.backup_last_backup, cacheAgeLabel(lastRun))
+                    } else {
+                        tankobunString(R.string.backup_no_scheduled)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -392,7 +400,7 @@ private fun ScheduledBackupFolderSummary(folderLabel: String) {
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Text(
-            "Selected folder",
+            tankobunString(R.string.backup_selected_folder),
             style = MaterialTheme.typography.labelMedium,
             color = LocalTankobunStyle.current.colors.accent,
             fontWeight = FontWeight.Bold,
@@ -405,7 +413,7 @@ private fun ScheduledBackupFolderSummary(folderLabel: String) {
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            "Run now writes an XML backup to this folder immediately.",
+            tankobunString(R.string.backup_run_now_desc),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

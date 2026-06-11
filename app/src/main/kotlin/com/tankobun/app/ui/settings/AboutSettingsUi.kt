@@ -231,8 +231,8 @@ internal fun AboutSettingsScreen(
 ) {
     val uriHandler = LocalUriHandler.current
     SettingsDetailPanel(
-        title = "About",
-        subtitle = "A little context about what Tankobun is and is not.",
+        title = tankobunString(R.string.common_about),
+        subtitle = tankobunString(R.string.settings_about_subtitle),
         modifier = modifier,
     ) {
         TankobunPanel(
@@ -248,35 +248,35 @@ internal fun AboutSettingsScreen(
             ) {
                 Text("Tankobun", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
-                    "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    tankobunString(R.string.about_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 TankobunActionButton(
-                    label = "GitHub repository",
+                    label = tankobunString(R.string.about_github),
                     icon = Icons.Default.Link,
                     onClick = { uriHandler.openUri(TankobunGithubUrl) },
                     modifier = Modifier.fillMaxWidth(),
                     filled = false,
                 )
                 TankobunActionButton(
-                    label = "Replay tutorial",
+                    label = tankobunString(R.string.about_replay_tutorial),
                     icon = Icons.Default.Replay,
                     onClick = onReplayOnboarding,
                     modifier = Modifier.fillMaxWidth(),
                     filled = false,
                 )
                 Text(
-                    "Tankobun is an unofficial manga reader and is not affiliated with AniList.",
+                    tankobunString(R.string.about_unofficial),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Text(
-                    "AniList data is accessed through the user-authorized AniList API. Tankobun does not host, upload, or provide manga or chapter content.",
+                    tankobunString(R.string.about_anilist_data),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "Sources and extensions are third-party. Tankobun only works with compatible extension formats and local user configuration.",
+                    tankobunString(R.string.about_sources),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

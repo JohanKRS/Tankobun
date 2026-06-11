@@ -333,10 +333,10 @@ internal fun LibraryScreen(
     picker?.let { activePicker ->
         BrowseOptionDialog(
             title = when (activePicker) {
-                LibraryPicker.FORMAT -> "Format"
-                LibraryPicker.STATUS -> "Publishing Status"
-                LibraryPicker.COUNTRY -> "Country Of Origin"
-                LibraryPicker.YEAR -> "Year"
+                LibraryPicker.FORMAT -> tankobunString(R.string.common_format)
+                LibraryPicker.STATUS -> tankobunString(R.string.browse_publishing_status)
+                LibraryPicker.COUNTRY -> tankobunString(R.string.browse_country_of_origin)
+                LibraryPicker.YEAR -> tankobunString(R.string.common_year)
             },
             options = when (activePicker) {
                 LibraryPicker.FORMAT -> formatOptions
@@ -434,48 +434,48 @@ internal fun LibraryFilterBar(
         TankobunSearchField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = "Search your library",
+            placeholder = tankobunString(R.string.library_search_placeholder),
             showSearchAction = false,
         )
         TankobunFilterRow {
             BrowseFilterPill(
-                label = "Genres",
-                value = if (genres.isEmpty()) "Any" else genres.size.toString(),
+                label = tankobunString(R.string.common_genres),
+                value = if (genres.isEmpty()) tankobunString(R.string.common_any) else genres.size.toString(),
                 selected = genres.isNotEmpty(),
                 onClick = onOpenGenres,
             )
             BrowseFilterPill(
-                label = "Tags",
-                value = if (tags.isEmpty()) "Any" else tags.size.toString(),
+                label = tankobunString(R.string.common_tags),
+                value = if (tags.isEmpty()) tankobunString(R.string.common_any) else tags.size.toString(),
                 selected = tags.isNotEmpty(),
                 onClick = onOpenTags,
             )
             BrowseFilterPill(
-                label = "Format",
+                label = tankobunString(R.string.common_format),
                 value = formatOptions.labelFor(format),
                 selected = format != null,
                 onClick = { onOpenPicker(LibraryPicker.FORMAT) },
             )
             BrowseFilterPill(
-                label = "Status",
+                label = tankobunString(R.string.common_status),
                 value = statusOptions.labelFor(publishingStatus),
                 selected = publishingStatus != null,
                 onClick = { onOpenPicker(LibraryPicker.STATUS) },
             )
             BrowseFilterPill(
-                label = "Country",
+                label = tankobunString(R.string.common_country),
                 value = countryOptions.labelFor(countryOfOrigin),
                 selected = countryOfOrigin != null,
                 onClick = { onOpenPicker(LibraryPicker.COUNTRY) },
             )
             BrowseFilterPill(
-                label = "Year",
+                label = tankobunString(R.string.common_year),
                 value = yearOptions.labelFor(year),
                 selected = year != null,
                 onClick = { onOpenPicker(LibraryPicker.YEAR) },
             )
             BrowseIconFilterPill(
-                contentDescription = "Library options",
+                contentDescription = tankobunString(R.string.library_options),
                 onClick = onOpenOptions,
             )
             if (filtersOrSortActive) {
@@ -503,7 +503,11 @@ internal fun LibraryConnectPrompt(
             Icon(Icons.Default.Link, contentDescription = null)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    if (clientConfigured) "Connect AniList" else "AniList setup needed",
+                    if (clientConfigured) {
+                        tankobunString(R.string.library_connect_anilist)
+                    } else {
+                        tankobunString(R.string.library_anilist_setup_needed)
+                    },
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -511,16 +515,16 @@ internal fun LibraryConnectPrompt(
                 )
                 Text(
                     if (clientConfigured) {
-                        "Sign in to show your lists here."
+                        tankobunString(R.string.library_sign_in_desc)
                     } else {
-                        "Add AniList credentials in settings before connecting."
+                        tankobunString(R.string.library_credentials_desc)
                     },
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            TankobunActionButton(label = "Connect", enabled = clientConfigured, onClick = onConnect)
+            TankobunActionButton(label = tankobunString(R.string.common_connect), enabled = clientConfigured, onClick = onConnect)
         }
     }
 }
@@ -559,7 +563,7 @@ internal fun LibraryPager(
                 header()
             }
             item(key = "library-empty") {
-                TankobunEmptyState(title = "No manga in your AniList library yet.")
+                TankobunEmptyState(title = tankobunString(R.string.library_empty))
             }
         }
         return
@@ -764,9 +768,9 @@ internal fun LibraryPager(
                     null
                 },
                 emptyMessage = if (filtersActive) {
-                    "No titles match these library filters."
+                    tankobunString(R.string.library_filter_empty)
                 } else {
-                    "No manga in this AniList list yet."
+                    tankobunString(R.string.library_list_empty)
                 },
             )
         }
@@ -814,7 +818,7 @@ internal fun LibraryPager(
                                 val tabTextColor = LocalContentColor.current
                                 Text(
                                     buildAnnotatedString {
-                                        append(section.title)
+                                        append(section.status?.let { tankobunString(it.sectionTitleRes()) } ?: section.title)
                                         append(" ")
                                         pushStyle(SpanStyle(color = tabTextColor.copy(alpha = 0.74f)))
                                         append(count.toString())
@@ -850,7 +854,7 @@ internal fun LibraryGenreDialog(
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         TankobunDialogSurface(fillMaxHeightFraction = 0.78f, scrollable = false) {
-            TankobunDialogHeader(title = "Genres", onDismiss = onDismiss)
+            TankobunDialogHeader(title = tankobunString(R.string.common_genres), onDismiss = onDismiss)
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -862,7 +866,7 @@ internal fun LibraryGenreDialog(
                             selected = genre in selectedGenres,
                             onClick = { onGenreSelected(genre, genre !in selectedGenres) },
                             label = {
-                                Text(genre, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(browseGenreLabel(genre), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             },
                         )
                     }
@@ -870,10 +874,10 @@ internal fun LibraryGenreDialog(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onClear) {
-                    Text("Clear")
+                    Text(tankobunString(R.string.common_clear))
                 }
                 Spacer(Modifier.weight(1f))
-                TankobunActionButton(label = "Apply", onClick = onDismiss)
+                TankobunActionButton(label = tankobunString(R.string.common_apply), onClick = onDismiss)
             }
         }
     }
@@ -892,11 +896,11 @@ internal fun LibraryTagDialog(
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         TankobunDialogSurface(fillMaxHeightFraction = 0.82f, scrollable = false) {
-            TankobunDialogHeader(title = "Tags", onDismiss = onDismiss)
+            TankobunDialogHeader(title = tankobunString(R.string.common_tags), onDismiss = onDismiss)
             TankobunSearchField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = "Find a tag",
+                placeholder = tankobunString(R.string.browse_find_tag),
                 showSearchAction = false,
             )
             if (availableTags.isEmpty()) {
@@ -905,7 +909,7 @@ internal fun LibraryTagDialog(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
-                        "Tags will appear here after the next AniList library sync.",
+                        tankobunString(R.string.library_tags_after_sync),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -934,10 +938,10 @@ internal fun LibraryTagDialog(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onClear) {
-                    Text("Clear")
+                    Text(tankobunString(R.string.common_clear))
                 }
                 Spacer(Modifier.weight(1f))
-                TankobunActionButton(label = "Apply", onClick = onDismiss)
+                TankobunActionButton(label = tankobunString(R.string.common_apply), onClick = onDismiss)
             }
         }
     }
@@ -963,20 +967,20 @@ internal fun libraryTagOptions(
 }
 
 internal fun libraryFormatOptions(sections: List<LibrarySection>): List<BrowseOption> =
-    listOf(BrowseOption("Any", null)) +
+    listOf(BrowseOption(R.string.common_any, null)) +
         sections.flatMap { section -> section.items }
             .mapNotNull { it.media.format }
             .distinct()
             .sorted()
-            .map { BrowseOption(it.mediaFormatLabel(), it) }
+            .map { BrowseOption(it.mediaFormatLabelRes(), it) }
 
 internal fun libraryStatusOptions(sections: List<LibrarySection>): List<BrowseOption> =
-    listOf(BrowseOption("Any", null)) +
+    listOf(BrowseOption(R.string.common_any, null)) +
         sections.flatMap { section -> section.items }
             .mapNotNull { it.media.status }
             .distinct()
             .sorted()
-            .map { BrowseOption(it.statusLabel(), it) }
+            .map { BrowseOption(it.publishingStatusLabelRes(), it) }
 
 internal fun libraryCountryOptions(sections: List<LibrarySection>): List<BrowseOption> {
     val countriesInLibrary = sections
@@ -990,7 +994,7 @@ internal fun libraryCountryOptions(sections: List<LibrarySection>): List<BrowseO
 }
 
 internal fun libraryYearOptions(sections: List<LibrarySection>): List<BrowseOption> =
-    listOf(BrowseOption("Any", null)) +
+    listOf(BrowseOption(R.string.common_any, null)) +
         sections.flatMap { section -> section.items }
             .mapNotNull { it.media.startDateYear }
             .distinct()
@@ -1041,6 +1045,6 @@ internal fun AnilistMedia.librarySearchText(): String =
         title.native?.let(::add)
         genres.forEach(::add)
         tags.forEach(::add)
-        countryOfOrigin?.let { add(BrowseCountryOptions.labelFor(it)) }
+        countryOfOrigin?.let(::add)
         synonyms.forEach(::add)
     }.joinToString(" ").lowercase()

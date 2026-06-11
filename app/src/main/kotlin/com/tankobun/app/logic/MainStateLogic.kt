@@ -36,17 +36,17 @@ internal fun TankobunUiState.withAniListTitleLanguage(language: AnilistTitleLang
         },
     )
 
-internal fun TankobunUiState.mediaTitle(mediaId: Int): String =
+internal fun TankobunUiState.mediaTitle(mediaId: Int, fallback: String = "Manga $mediaId"): String =
     libraryItems.firstOrNull { it.media.id == mediaId }?.media?.title?.userPreferred
         ?: library.firstOrNull { it.id == mediaId }?.title?.userPreferred
         ?: selectedMedia?.takeIf { it.id == mediaId }?.title?.userPreferred
-        ?: "Manga $mediaId"
+        ?: fallback
 
-internal fun TankobunUiState.downloadSourceName(sourceId: Long): String =
+internal fun TankobunUiState.downloadSourceName(sourceId: Long, fallback: String = "Source $sourceId"): String =
     installedSources.firstOrNull { it.id == sourceId }?.name
         ?: allInstalledSources.firstOrNull { it.id == sourceId }?.name
         ?: selectedSource?.takeIf { it.id == sourceId }?.name
-        ?: "Source $sourceId"
+        ?: fallback
 
 internal fun TankobunUiState.withSelectedMedia(
     media: AnilistMedia,

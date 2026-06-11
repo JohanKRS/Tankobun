@@ -5,6 +5,7 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.SourceChapter
+import com.tankobun.core.model.MediaStatus
 
 data class ExtensionInstallRequest(
     val packageName: String,
@@ -23,6 +24,7 @@ data class LibrarySection(
     val key: String,
     val title: String,
     val items: List<LibraryItem>,
+    val status: MediaStatus? = null,
 )
 
 data class RecentReadingProgress(

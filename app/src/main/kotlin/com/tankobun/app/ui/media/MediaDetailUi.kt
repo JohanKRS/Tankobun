@@ -394,12 +394,12 @@ internal fun MangaDetailScreen(
                     Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
                         var downloadActionsOpen by remember { mutableStateOf(false) }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            DetailSectionTitle("Chapters")
+                            DetailSectionTitle(tankobunString(R.string.common_chapters))
                             if (state.selectedSourceManga == null) {
                                 DetailPlaceholderCard(
                                     icon = Icons.AutoMirrored.Filled.MenuBook,
-                                    title = "No chapters loaded yet.",
-                                    subtitle = "Select a source to view chapters.",
+                                    title = tankobunString(R.string.detail_chapters_empty_title),
+                                    subtitle = tankobunString(R.string.detail_chapters_empty_select_source),
                                 )
                             } else {
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -454,8 +454,8 @@ internal fun MangaDetailScreen(
                         Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
                             DetailPlaceholderCard(
                                 icon = Icons.AutoMirrored.Filled.MenuBook,
-                                title = "No chapters loaded yet.",
-                                subtitle = "Load chapters from the selected source.",
+                                title = tankobunString(R.string.detail_chapters_empty_title),
+                                subtitle = tankobunString(R.string.detail_chapters_empty_load),
                             )
                         }
                     }
@@ -941,9 +941,9 @@ internal fun MangaHeroMetaLine(media: AnilistMedia, compact: Boolean) {
 @Composable
 internal fun MangaStatRow(media: AnilistMedia, compact: Boolean) {
     val stats = listOf(
-        (if (compact) "CH." else "Chapters") to (media.chapters?.toString() ?: "--"),
-        (if (compact) "VOL." else "Volumes") to (media.volumes?.toString() ?: "--"),
-        (if (compact) "Score" else "Score") to (media.averageScore?.let { "$it%" } ?: "--"),
+        (if (compact) tankobunString(R.string.detail_chapter_stat_short) else tankobunString(R.string.detail_chapter_stat)) to (media.chapters?.toString() ?: "--"),
+        (if (compact) tankobunString(R.string.detail_volume_stat_short) else tankobunString(R.string.detail_volume_stat)) to (media.volumes?.toString() ?: "--"),
+        tankobunString(R.string.common_score) to (media.averageScore?.let { "$it%" } ?: "--"),
     )
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -995,12 +995,16 @@ internal fun MangaInfoRow(media: AnilistMedia, compact: Boolean, onAuthorClick: 
     val infoItems = listOfNotNull(
         MangaInfoItem(
             icon = Icons.Default.Person,
-            label = "Author",
+            label = tankobunString(R.string.detail_author),
             value = media.staff.authorLabel(),
             onClick = authorName?.let { { onAuthorClick(it) } },
         ),
-        MangaInfoItem(Icons.Default.CalendarMonth, if (compact) "Years" else "Published", media.publishingYearLabel(compact)),
-        media.popularity?.let { MangaInfoItem(Icons.Default.Groups, "Readers", it.formatCompact()) },
+        MangaInfoItem(
+            Icons.Default.CalendarMonth,
+            if (compact) tankobunString(R.string.detail_years) else tankobunString(R.string.detail_published),
+            media.publishingYearLabel(compact),
+        ),
+        media.popularity?.let { MangaInfoItem(Icons.Default.Groups, tankobunString(R.string.detail_readers), it.formatCompact()) },
     )
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1088,7 +1092,7 @@ internal fun MangaDescriptionAndTags(
                 )
                 if (descriptionOverflow || descriptionExpanded) {
                     Text(
-                        if (descriptionExpanded) "Show less" else "Read more",
+                        if (descriptionExpanded) tankobunString(R.string.detail_show_less) else tankobunString(R.string.detail_read_more),
                         modifier = Modifier.clickable { descriptionExpanded = !descriptionExpanded },
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontSize = if (compact) 13.sp else 14.sp,
@@ -1126,12 +1130,13 @@ internal fun String?.plainMediaDescription(): String =
         ?.trim()
         .orEmpty()
 
-internal fun AnilistMedia.publishingYearLabel(compact: Boolean): String =
-    when {
+@Composable
+internal fun AnilistMedia.publishingYearLabel(compact: Boolean): String {
+    val startYear = startDateYear
+    val endYear = endDateYear
+    return when {
         !compact -> publishingYearLabel()
-        startDateYear != null && endDateYear != null && startDateYear != endDateYear -> {
-            val startYear = startDateYear ?: return "Unknown"
-            val endYear = endDateYear ?: return "Unknown"
+        startYear != null && endYear != null && startYear != endYear -> {
             val compactEnd = if (startYear / 100 == endYear / 100) {
                 (endYear % 100).toString().padStart(2, '0')
             } else {
@@ -1139,10 +1144,11 @@ internal fun AnilistMedia.publishingYearLabel(compact: Boolean): String =
             }
             "$startYear-$compactEnd"
         }
-        startDateYear != null && status == "RELEASING" -> "Since $startDateYear"
-        startDateYear != null -> startDateYear.toString()
-        else -> "Unknown"
+        startYear != null && status == "RELEASING" -> tankobunString(R.string.media_year_since, startYear)
+        startYear != null -> startYear.toString()
+        else -> tankobunString(R.string.common_unknown)
     }
+}
 
 @Composable
 internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
@@ -1165,7 +1171,7 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
                 onValueChange = viewModel::setTrackingProgress,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("Progress") },
+                label = { Text(tankobunString(R.string.common_progress)) },
                 suffix = { Text("/ ${media.chapters ?: "?"}") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
@@ -1183,22 +1189,22 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
             modifier = Modifier.fillMaxWidth(),
             minLines = 2,
             maxLines = 4,
-            label = { Text("Notes") },
+            label = { Text(tankobunString(R.string.common_notes)) },
         )
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Private", style = MaterialTheme.typography.bodyMedium)
+            Text(tankobunString(R.string.common_private), style = MaterialTheme.typography.bodyMedium)
             Switch(checked = state.trackingPrivate, onCheckedChange = viewModel::setTrackingPrivate)
             Spacer(Modifier.weight(1f))
             val canSaveTracking = state.loggedIn &&
                 !state.trackingSaveInProgress &&
                 (state.selectedListEntry == null || state.trackingDirty || state.trackingSaveFailed)
             val actionLabel = when {
-                state.trackingSaveInProgress -> "Saving..."
-                state.trackingSaveFailed -> "Retry save"
-                state.selectedListEntry == null -> "Track manga"
-                state.trackingDirty -> "Save AniList"
-                else -> "Saved"
+                state.trackingSaveInProgress -> tankobunString(R.string.detail_saving)
+                state.trackingSaveFailed -> tankobunString(R.string.common_retry_save)
+                state.selectedListEntry == null -> tankobunString(R.string.detail_track_manga)
+                state.trackingDirty -> tankobunString(R.string.detail_save_anilist)
+                else -> tankobunString(R.string.common_saved)
             }
             val actionIcon = when {
                 state.trackingSaveInProgress || state.trackingSaveFailed -> Icons.Default.Refresh
@@ -1223,7 +1229,7 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
         }
         if (!state.loggedIn) {
             Text(
-                "Connect AniList to track, rate, and organize this manga.",
+                tankobunString(R.string.detail_connect_anilist_tracking),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1301,7 +1307,7 @@ internal fun AniListCustomListSelector(
         .sortedWith(String.CASE_INSENSITIVE_ORDER)
         .takeIf { it.isNotEmpty() }
         ?.joinToString(", ")
-        ?: "Custom lists"
+        ?: tankobunString(R.string.detail_custom_lists)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
@@ -1325,7 +1331,7 @@ internal fun AniListCustomListSelector(
                 ) {
                     if (availableLists.isEmpty()) {
                         Text(
-                            "No custom lists yet.",
+                            tankobunString(R.string.detail_no_custom_lists),
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1368,7 +1374,7 @@ internal fun AniListCustomListSelector(
                             onValueChange = { newListName = it },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
-                            label = { Text("New list") },
+                            label = { Text(tankobunString(R.string.detail_new_list)) },
                         )
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Spacer(Modifier.weight(1f))
@@ -1379,7 +1385,7 @@ internal fun AniListCustomListSelector(
                                 },
                                 enabled = newListName.isNotBlank(),
                             ) {
-                                Text("Add")
+                                Text(tankobunString(R.string.common_add))
                             }
                         }
                     }
@@ -1421,7 +1427,7 @@ internal fun AniListScoreInput(
 internal fun StarScoreInput(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
     val selected = value.toDoubleOrNull()?.roundToInt() ?: 0
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("Score", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(tankobunString(R.string.common_score), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             (1..5).forEach { star ->
                 IconButton(
@@ -1430,7 +1436,7 @@ internal fun StarScoreInput(value: String, onValueChange: (String) -> Unit, modi
                 ) {
                     Icon(
                         if (star <= selected) Icons.Default.Star else Icons.Default.StarBorder,
-                        contentDescription = "$star star score",
+                        contentDescription = tankobunString(R.string.detail_star_score_cd, star),
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
@@ -1453,13 +1459,8 @@ internal fun MoodScoreInput(value: String, onValueChange: (String) -> Unit, modi
     }
 }
 
-internal fun AnilistScoreFormat.scoreLabel(): String = when (this) {
-    AnilistScoreFormat.POINT_100 -> "Score"
-    AnilistScoreFormat.POINT_10_DECIMAL -> "Score"
-    AnilistScoreFormat.POINT_10 -> "Score"
-    AnilistScoreFormat.POINT_5 -> "Score"
-    AnilistScoreFormat.POINT_3 -> "Score"
-}
+@Composable
+internal fun AnilistScoreFormat.scoreLabel(): String = tankobunString(R.string.common_score)
 
 internal fun AnilistScoreFormat.scoreSuffix(): String = when (this) {
     AnilistScoreFormat.POINT_100 -> "/ 100"
@@ -1486,9 +1487,9 @@ internal fun RecommendationsSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            DetailSectionTitle("Recommendations")
+            DetailSectionTitle(tankobunString(R.string.detail_recommendations))
             Text(
-                "${recommendations.size} shown",
+                tankobunString(R.string.detail_shown_count, recommendations.size),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -1599,11 +1600,11 @@ internal fun LoadMoreRecommendationsTile(
         ) {
             if (loading) {
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                Text("Loading", style = MaterialTheme.typography.labelMedium)
+                Text(tankobunString(R.string.common_loading), style = MaterialTheme.typography.labelMedium)
             } else {
                 Icon(Icons.Default.Refresh, contentDescription = null)
                 Text(
-                    "Load more",
+                    tankobunString(R.string.detail_load_more),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -1676,16 +1677,6 @@ internal fun trackingStatuses(): List<MediaStatus> = listOf(
     MediaStatus.DROPPED,
     MediaStatus.REPEATING,
 )
-
-internal fun MediaStatus.displayName(): String = when (this) {
-    MediaStatus.CURRENT -> "Reading"
-    MediaStatus.PLANNING -> "Plan"
-    MediaStatus.COMPLETED -> "Completed"
-    MediaStatus.PAUSED -> "Paused"
-    MediaStatus.DROPPED -> "Dropped"
-    MediaStatus.REPEATING -> "Rereading"
-    MediaStatus.UNKNOWN -> "Unknown"
-}
 
 @Composable
 internal fun CoverImage(

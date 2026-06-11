@@ -231,6 +231,13 @@ class SettingsStore(context: Context) {
             ?.plus(UNIVERSAL_SOURCE_LANGUAGE)
             ?: defaultSourceLanguages()
 
+    fun appLanguage(): AppLanguage =
+        AppLanguage.fromStorageValue(preferences.getString(KEY_APP_LANGUAGE, null))
+
+    fun saveAppLanguage(language: AppLanguage) {
+        preferences.edit().putString(KEY_APP_LANGUAGE, language.storageValue).apply()
+    }
+
     fun saveSourceLanguages(languages: Set<String>) {
         preferences.edit()
             .putStringSet(KEY_SOURCE_LANGUAGES, languages.map { it.trim().lowercase().replace('_', '-') }.toSet())
@@ -335,6 +342,7 @@ class SettingsStore(context: Context) {
         const val KEY_BACKUP_LAST_RUN_AT = "backup.last.run.at"
         const val KEY_ANILIST_TAGS = "anilist.tags"
         const val KEY_ANILIST_TAGS_CACHED_AT = "anilist.tags.cached.at"
+        const val KEY_APP_LANGUAGE = "app.language"
         const val KEY_SOURCE_LANGUAGES = "source.languages"
         const val KEY_DISABLED_SOURCE_KEYS = "source.disabled.keys"
         const val KEY_VIEWER_NAME = "anilist.viewer.name"
