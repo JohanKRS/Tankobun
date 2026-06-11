@@ -408,6 +408,12 @@ internal fun BackupsSettingsScreen(
                 state.backupFolderUri?.let {
                     ScheduledBackupFolderSummary(folderLabel = backupFolderLabel ?: tankobunString(R.string.backup_selected_folder))
                 }
+                Text(tankobunString(R.string.backup_scheduled_content), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                BackupContentPicker(
+                    selected = state.backupContent,
+                    onSelect = viewModel::setBackupContent,
+                )
+                Text(tankobunString(R.string.backup_scheduled_frequency), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 BackupSchedulePicker(
                     selected = state.backupSchedule,
                     onSelect = viewModel::setBackupSchedule,
@@ -587,6 +593,38 @@ private fun ScheduledBackupFolderSummary(folderLabel: String) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@Composable
+internal fun BackupContentPicker(
+    selected: BackupContent,
+    onSelect: (BackupContent) -> Unit,
+) {
+    val contents = listOf(
+        BackupContent.BOTH,
+        BackupContent.LIBRARY,
+        BackupContent.SETTINGS,
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        contents.chunked(2).forEach { rowContents ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                rowContents.forEach { content ->
+                    TankobunChip(
+                        selected = selected == content,
+                        onClick = { onSelect(content) },
+                        label = { Text(content.label()) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (rowContents.size == 1) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+        }
     }
 }
 

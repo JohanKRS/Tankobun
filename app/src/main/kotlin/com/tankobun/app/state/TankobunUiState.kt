@@ -1,6 +1,7 @@
 package com.tankobun.app.state
 
 import com.tankobun.app.BackupSchedule
+import com.tankobun.app.BackupContent
 import com.tankobun.app.DEFAULT_MEDIA_COVER_COLUMNS
 import com.tankobun.app.DockAlignment
 import com.tankobun.app.MediaViewMode
@@ -49,6 +50,7 @@ data class TankobunUiState(
     val librarySyncedAtEpochMillis: Long = 0L,
     val backupFolderUri: String? = null,
     val backupSchedule: BackupSchedule = BackupSchedule.OFF,
+    val backupContent: BackupContent = BackupContent.BOTH,
     val lastScheduledBackupAtEpochMillis: Long = 0L,
     val libraryViewMode: MediaViewMode = MediaViewMode.COVER_GRID,
     val libraryCoverColumns: Int = DEFAULT_MEDIA_COVER_COLUMNS,

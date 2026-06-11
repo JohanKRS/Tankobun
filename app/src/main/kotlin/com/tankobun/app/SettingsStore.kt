@@ -192,6 +192,15 @@ class SettingsStore(context: Context) {
         preferences.edit().putString(KEY_BACKUP_SCHEDULE, schedule.name).apply()
     }
 
+    fun backupContent(): BackupContent =
+        preferences.getString(KEY_BACKUP_CONTENT, null)
+            ?.let { stored -> runCatching { BackupContent.valueOf(stored) }.getOrNull() }
+            ?: BackupContent.BOTH
+
+    fun saveBackupContent(content: BackupContent) {
+        preferences.edit().putString(KEY_BACKUP_CONTENT, content.name).apply()
+    }
+
     fun lastScheduledBackupAtEpochMillis(): Long =
         preferences.getLong(KEY_BACKUP_LAST_RUN_AT, 0L)
 
@@ -407,6 +416,7 @@ class SettingsStore(context: Context) {
         const val KEY_SHOW_NSFW_CONTENT = "profile.show.nsfw.content"
         const val KEY_BACKUP_FOLDER_URI = "backup.folder.uri"
         const val KEY_BACKUP_SCHEDULE = "backup.schedule"
+        const val KEY_BACKUP_CONTENT = "backup.content"
         const val KEY_BACKUP_LAST_RUN_AT = "backup.last.run.at"
         const val KEY_ANILIST_TAGS = "anilist.tags"
         const val KEY_ANILIST_TAGS_CACHED_AT = "anilist.tags.cached.at"
@@ -486,6 +496,18 @@ enum class BackupSchedule {
     WEEKLY,
     MONTHLY,
 }
+
+enum class BackupContent {
+    LIBRARY,
+    SETTINGS,
+    BOTH,
+}
+
+fun BackupContent.includesLibrary(): Boolean =
+    this == BackupContent.LIBRARY || this == BackupContent.BOTH
+
+fun BackupContent.includesSettings(): Boolean =
+    this == BackupContent.SETTINGS || this == BackupContent.BOTH
 
 fun MediaViewMode.supportedMediaViewMode(): MediaViewMode =
     when (this) {

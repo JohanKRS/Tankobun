@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.tankobun.app.backup.AppSettingsBackupDataSource
 import com.tankobun.app.backup.buildMyAnimeListBackupXml
 import com.tankobun.app.backup.createDocumentInTree
 import com.tankobun.app.state.LibraryItem
@@ -29,36 +30,37 @@ class ScheduledBackupWorker(
             val container = app.container
             val settings = container.settingsStore
             val schedule = settings.backupSchedule()
+            val content = settings.backupContent()
             val folderUri = settings.backupFolderUri()?.let(Uri::parse)
             if (schedule == BackupSchedule.OFF || folderUri == null) {
                 Result.success()
             } else {
-                val items = backupLibraryItems(container)
-                if (items.isEmpty()) {
+                val libraryWritten = if (content.includesLibrary()) {
+                    val items = backupLibraryItems(container)
+                    if (items.isEmpty()) {
+                        false
+                    } else {
+                        writeScheduledLibraryBackup(container, folderUri, items)
+                        true
+                    }
+                } else {
+                    false
+                }
+                val settingsWritten = if (content.includesSettings()) {
+                    AppSettingsBackupDataSource(container).writeScheduledBackupFromCurrentSettings(folderUri)
+                    true
+                } else {
+                    false
+                }
+                if (!libraryWritten && !settingsWritten) {
                     Result.success()
                 } else {
-                    val fileUri = createDocumentInTree(
-                        contentResolver = applicationContext.contentResolver,
-                        treeUri = folderUri,
-                        mimeType = "text/xml",
-                        displayName = scheduledBackupFileName(settings.viewerName()),
-                    )
-                    val xml = buildMyAnimeListBackupXml(
-                        items = items,
-                        viewerName = settings.viewerName(),
-                        scoreFormat = settings.anilistScoreFormat(),
-                    )
-                    val output = applicationContext.contentResolver.openOutputStream(fileUri)
-                        ?: error("Could not open backup file")
-                    OutputStreamWriter(output, Charsets.UTF_8).use { writer ->
-                        writer.write(xml)
-                    }
                     settings.saveLastScheduledBackupAtEpochMillis(System.currentTimeMillis())
                     Result.success()
                 }
             }
         }.getOrElse { error ->
-            android.util.Log.w("ScheduledBackupWorker", "Scheduled AniList backup failed", error)
+            android.util.Log.w("ScheduledBackupWorker", "Scheduled backup failed", error)
             Result.retry()
         }
     }
@@ -113,6 +115,29 @@ private suspend fun backupLibraryItems(container: AppContainer): List<LibraryIte
         }
         .distinctBy { it.media.id }
         .sortedBy { it.media.title.userPreferred.lowercase(Locale.ROOT) }
+}
+
+private fun writeScheduledLibraryBackup(
+    container: AppContainer,
+    folderUri: Uri,
+    items: List<LibraryItem>,
+) {
+    val fileUri = createDocumentInTree(
+        contentResolver = container.application.contentResolver,
+        treeUri = folderUri,
+        mimeType = "text/xml",
+        displayName = scheduledBackupFileName(container.settingsStore.viewerName()),
+    )
+    val xml = buildMyAnimeListBackupXml(
+        items = items,
+        viewerName = container.settingsStore.viewerName(),
+        scoreFormat = container.settingsStore.anilistScoreFormat(),
+    )
+    val output = container.application.contentResolver.openOutputStream(fileUri)
+        ?: error("Could not open backup file")
+    OutputStreamWriter(output, Charsets.UTF_8).use { writer ->
+        writer.write(xml)
+    }
 }
 
 private fun scheduledBackupFileName(viewerName: String?): String {

@@ -78,6 +78,19 @@ internal fun BackupSchedule.label(): String =
     tankobunString(labelRes())
 
 @StringRes
+internal fun BackupContent.labelRes(): Int =
+    when (this) {
+        BackupContent.LIBRARY -> R.string.backup_content_library
+        BackupContent.SETTINGS -> R.string.backup_content_settings
+        BackupContent.BOTH -> R.string.backup_content_both
+    }
+
+@Composable
+@ReadOnlyComposable
+internal fun BackupContent.label(): String =
+    tankobunString(labelRes())
+
+@StringRes
 internal fun AnilistTitleLanguage.labelRes(): Int =
     when (this) {
         AnilistTitleLanguage.ROMAJI -> R.string.anilist_title_romaji

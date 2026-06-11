@@ -3,12 +3,14 @@ package com.tankobun.app.backup
 import android.net.Uri
 import com.tankobun.app.AppContainer
 import com.tankobun.app.AppLanguage
+import com.tankobun.app.BackupContent
 import com.tankobun.app.BackupSchedule
 import com.tankobun.app.DockAlignment
 import com.tankobun.app.MediaViewMode
 import com.tankobun.app.TankobunThemeMode
 import com.tankobun.app.defaultSourceLanguages
 import com.tankobun.app.logic.sourceSettingsKey
+import com.tankobun.app.logic.visibleSources
 import com.tankobun.app.state.BackupMissingSource
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.core.extensions.ExtensionIndexEntry
@@ -35,6 +37,27 @@ internal class AppSettingsBackupDataSource(
             output.write(payload.toByteArray(Charsets.UTF_8))
         }
         snapshot.allInstalledSources.map { it.packageName }.distinct().size
+    }
+
+    suspend fun writeScheduledBackup(folderUri: Uri, snapshot: TankobunUiState): Int = withContext(Dispatchers.IO) {
+        val fileUri = createDocumentInTree(
+            contentResolver = container.application.contentResolver,
+            treeUri = folderUri,
+            mimeType = "application/json",
+            displayName = suggestedScheduledAppSettingsBackupFileName(),
+        )
+        saveBackup(uri = fileUri, snapshot = snapshot)
+    }
+
+    suspend fun writeScheduledBackupFromCurrentSettings(folderUri: Uri): Int = withContext(Dispatchers.IO) {
+        val fileUri = createDocumentInTree(
+            contentResolver = container.application.contentResolver,
+            treeUri = folderUri,
+            mimeType = "application/json",
+            displayName = suggestedScheduledAppSettingsBackupFileName(),
+        )
+        val snapshot = currentSettingsSnapshot()
+        saveBackup(uri = fileUri, snapshot = snapshot)
     }
 
     suspend fun restoreBackup(uri: Uri): AppSettingsBackupRestoreResult = withContext(Dispatchers.IO) {
@@ -87,6 +110,7 @@ internal class AppSettingsBackupDataSource(
             .put("anilistSyncManualReadProgress", snapshot.anilistSyncManualReadProgress)
             .put("anilistCustomLists", snapshot.anilistCustomLists.toJsonArray())
             .put("backupSchedule", snapshot.backupSchedule.name)
+            .put("backupContent", snapshot.backupContent.name)
 
     private fun sourcesJson(snapshot: TankobunUiState): JSONObject =
         JSONObject()
@@ -163,6 +187,55 @@ internal class AppSettingsBackupDataSource(
         settings.optBooleanOrNull("anilistSyncManualReadProgress")?.let(store::saveAnilistSyncManualReadProgress)
         settings.optJSONArray("anilistCustomLists")?.stringValues()?.let(store::saveAnilistCustomLists)
         settings.enumOrNull<BackupSchedule>("backupSchedule")?.let(store::saveBackupSchedule)
+        settings.enumOrNull<BackupContent>("backupContent")?.let(store::saveBackupContent)
+    }
+
+    private fun currentSettingsSnapshot(): TankobunUiState {
+        val store = container.settingsStore
+        val allSources = container.extensionScanner.installedExtensions().flatMap { descriptor ->
+            runCatching {
+                container.sourceHost.loadSources(descriptor.packageName).map { source ->
+                    descriptor.copy(
+                        id = source.id,
+                        name = source.name,
+                        lang = source.lang,
+                    )
+                }
+            }.getOrDefault(emptyList()).ifEmpty { listOf(descriptor) }
+        }.visibleSources()
+        return TankobunUiState(
+            loggedIn = container.tokenStore.accessToken() != null,
+            themeMode = store.themeMode(),
+            appLanguage = store.appLanguage(),
+            ignoreDisplayCutout = store.ignoreDisplayCutout(),
+            showAppStatusBar = store.showAppStatusBar(),
+            dockAlignment = store.dockAlignment(),
+            libraryViewMode = store.libraryViewMode(),
+            libraryCoverColumns = store.libraryCoverColumns(),
+            libraryShowWholeCovers = store.libraryShowWholeCovers(),
+            browseViewMode = store.browseViewMode(),
+            browseCoverColumns = store.browseCoverColumns(),
+            browseShowWholeCovers = store.browseShowWholeCovers(),
+            readerMode = store.readerMode(),
+            readerPageGapLevel = store.readerPageGapLevel(),
+            chapterListStartsAtFirst = store.chapterListStartsAtFirst(),
+            keepNextTenDownloads = store.keepNextTenDownloads(),
+            showNsfwContent = store.showNsfwContent(),
+            anilistScoreFormat = store.anilistScoreFormat(),
+            anilistTitleLanguage = store.anilistTitleLanguage(),
+            anilistAutoSaveTrackingChanges = store.anilistAutoSaveTrackingChanges(),
+            anilistAutoSyncReaderProgress = store.anilistAutoSyncReaderProgress(),
+            anilistSyncManualReadProgress = store.anilistSyncManualReadProgress(),
+            anilistCustomLists = store.anilistCustomLists(),
+            backupFolderUri = store.backupFolderUri(),
+            backupSchedule = store.backupSchedule(),
+            backupContent = store.backupContent(),
+            extensionRepositoryUrl = store.extensionRepositoryUrl(),
+            sourceLanguages = store.sourceLanguages(),
+            disabledSourceKeys = store.disabledSourceKeys(),
+            allInstalledSources = allSources,
+            installedSources = allSources,
+        )
     }
 
     private fun restoreSourcePreferences(sources: JSONObject) {
@@ -210,6 +283,9 @@ internal class AppSettingsBackupDataSource(
         const val JSON_INDENT = 2
     }
 }
+
+private fun suggestedScheduledAppSettingsBackupFileName(): String =
+    "tankobun_settings_${System.currentTimeMillis()}.json"
 
 private fun Iterable<Any>.toJsonArray(): JSONArray =
     JSONArray().also { array -> forEach { array.put(it) } }

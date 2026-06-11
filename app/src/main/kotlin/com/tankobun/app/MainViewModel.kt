@@ -132,6 +132,11 @@ private data class ReaderPagePosition(
     val pageScrollOffset: Int,
 )
 
+private data class ScheduledBackupRunResult(
+    val libraryItems: Int? = null,
+    val sourcePackages: Int? = null,
+)
+
 
 class MainViewModel(
     private val container: AppContainer,
@@ -164,6 +169,7 @@ class MainViewModel(
             librarySyncedAtEpochMillis = container.settingsStore.librarySyncedAtEpochMillis(),
             backupFolderUri = container.settingsStore.backupFolderUri(),
             backupSchedule = container.settingsStore.backupSchedule(),
+            backupContent = container.settingsStore.backupContent(),
             lastScheduledBackupAtEpochMillis = container.settingsStore.lastScheduledBackupAtEpochMillis(),
             libraryViewMode = container.settingsStore.libraryViewMode(),
             libraryCoverColumns = container.settingsStore.libraryCoverColumns(),
@@ -826,6 +832,7 @@ class MainViewModel(
                 anilistSyncManualReadProgress = store.anilistSyncManualReadProgress(),
                 anilistCustomLists = store.anilistCustomLists(),
                 backupSchedule = store.backupSchedule(),
+                backupContent = store.backupContent(),
                 extensionRepositoryUrl = store.extensionRepositoryUrl(),
                 sourceLanguages = sourceLanguages,
                 disabledSourceKeys = disabledSourceKeys,
@@ -881,6 +888,12 @@ class MainViewModel(
         runScheduledAniListBackupIfDue(force = true, reportResult = schedule != BackupSchedule.OFF)
     }
 
+    fun setBackupContent(content: BackupContent) {
+        container.settingsStore.saveBackupContent(content)
+        _state.update { it.copy(backupContent = content) }
+        runScheduledAniListBackupIfDue(force = true, reportResult = _state.value.backupSchedule != BackupSchedule.OFF)
+    }
+
     fun runScheduledAniListBackupNow() {
         if (_state.value.backupFolderUri == null) {
             _state.update { it.copy(message = string(R.string.msg_choose_backup_folder_first)) }
@@ -900,6 +913,7 @@ class MainViewModel(
     ) {
         val snapshot = _state.value
         val schedule = snapshot.backupSchedule
+        val content = snapshot.backupContent
         if (schedule == BackupSchedule.OFF && requireSchedule) return
         val folderUri = snapshot.backupFolderUri?.let(Uri::parse)
         if (folderUri == null) {
@@ -908,7 +922,7 @@ class MainViewModel(
             }
             return
         }
-        if (snapshot.libraryItems.isEmpty()) {
+        if (content == BackupContent.LIBRARY && snapshot.libraryItems.isEmpty()) {
             if (reportResult) {
                 _state.update { it.copy(message = string(R.string.msg_sync_before_backup)) }
             }
@@ -928,25 +942,35 @@ class MainViewModel(
                 _state.update { it.copy(busy = true, message = null) }
             }
             runCatching {
-                backupDataSource.writeScheduledBackup(folderUri = folderUri, snapshot = snapshot)
-            }.onSuccess { count ->
+                ScheduledBackupRunResult(
+                    libraryItems = if (content.includesLibrary()) {
+                        snapshot.libraryItems
+                            .takeIf { it.isNotEmpty() }
+                            ?.let { backupDataSource.writeScheduledBackup(folderUri = folderUri, snapshot = snapshot) }
+                    } else {
+                        null
+                    },
+                    sourcePackages = if (content.includesSettings()) {
+                        appSettingsBackupDataSource.writeScheduledBackup(folderUri = folderUri, snapshot = snapshot)
+                    } else {
+                        null
+                    },
+                )
+            }.onSuccess { result ->
                 container.settingsStore.saveLastScheduledBackupAtEpochMillis(now)
                 _state.update {
                     it.copy(
                         lastScheduledBackupAtEpochMillis = now,
                         busy = if (reportResult) false else it.busy,
                         message = if (reportResult) {
-                            string(
-                                R.string.msg_scheduled_backup_saved,
-                                quantityString(R.plurals.manga_count, count, count),
-                            )
+                            scheduledBackupSavedMessage(result)
                         } else {
                             it.message
                         },
                     )
                 }
             }.onFailure { error ->
-                Log.e(TAG, "Scheduled AniList backup failed", error)
+                Log.e(TAG, "Scheduled backup failed", error)
                 _state.update {
                     it.copy(
                         busy = if (reportResult) false else it.busy,
@@ -1485,6 +1509,19 @@ class MainViewModel(
                 },
             )
         }
+    }
+
+    private fun scheduledBackupSavedMessage(result: ScheduledBackupRunResult): String {
+        val libraryPart = result.libraryItems?.let { count ->
+            string(R.string.backup_content_library_with_count, quantityString(R.plurals.manga_count, count, count))
+        }
+        val settingsPart = result.sourcePackages?.let { count ->
+            string(R.string.backup_content_settings_with_count, count)
+        }
+        return string(
+            R.string.msg_scheduled_backup_saved,
+            listOfNotNull(libraryPart, settingsPart).joinToString(" / "),
+        )
     }
 
     fun setAnilistTitleLanguage(language: AnilistTitleLanguage) {

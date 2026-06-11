@@ -18,12 +18,14 @@ import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -610,23 +612,32 @@ internal fun BrowseMangaShelf(
             actionLabel = tankobunString(R.string.browse_view_all),
             onAction = onViewAll,
         )
-        if (media.isEmpty()) {
-            Text(
-                tankobunString(R.string.browse_cached_discovery_empty),
-                modifier = Modifier.padding(horizontal = BrowseLandingContentPadding),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = BrowseLandingContentPadding),
-                horizontalArrangement = Arrangement.spacedBy(28.dp),
-            ) {
-                items(media, key = { it.id }) { item ->
-                    BrowseShelfTile(
-                        media = item,
-                        trackedStatus = trackedStatuses[item.id],
-                        onClick = { onSelectMedia(item) },
-                    )
+        AnimatedContent(
+            targetState = media,
+            transitionSpec = {
+                fadeIn(animationSpec = tween(durationMillis = 220)) togetherWith
+                    fadeOut(animationSpec = tween(durationMillis = 160))
+            },
+            label = "BrowseShelfRefresh",
+        ) { shelfMedia ->
+            if (shelfMedia.isEmpty()) {
+                Text(
+                    tankobunString(R.string.browse_cached_discovery_empty),
+                    modifier = Modifier.padding(horizontal = BrowseLandingContentPadding),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = BrowseLandingContentPadding),
+                    horizontalArrangement = Arrangement.spacedBy(28.dp),
+                ) {
+                    items(shelfMedia, key = { it.id }) { item ->
+                        BrowseShelfTile(
+                            media = item,
+                            trackedStatus = trackedStatuses[item.id],
+                            onClick = { onSelectMedia(item) },
+                        )
+                    }
                 }
             }
         }

@@ -493,6 +493,13 @@
     <string name="backup_schedule_daily">Diário</string>
     <string name="backup_schedule_weekly">Semanal</string>
     <string name="backup_schedule_monthly">Mensal</string>
+    <string name="backup_scheduled_content">Conteúdo</string>
+    <string name="backup_scheduled_frequency">Frequência</string>
+    <string name="backup_content_library">Biblioteca</string>
+    <string name="backup_content_settings">Configurações</string>
+    <string name="backup_content_both">Biblioteca + configurações</string>
+    <string name="backup_content_library_with_count">Biblioteca: %1$s</string>
+    <string name="backup_content_settings_with_count">Configurações: %1$d pacotes de sources</string>
     <string name="backup_no_cached_manga">Ainda não há mangás do AniList em cache. Sincronize antes de exportar.</string>
     <string name="backup_ready_for_mal">%1$d mangás prontos para importação baseada em ID do MAL.</string>
     <string name="backup_missing_mal">%1$d mangás têm IDs do MAL; %2$d incluídos sem correspondência no MAL.</string>
