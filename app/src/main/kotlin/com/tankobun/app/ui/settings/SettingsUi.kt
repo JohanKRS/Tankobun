@@ -439,8 +439,9 @@ internal fun SettingsDetailContent(
 ) {
     val deviceHasDisplayCutout = hasDisplayCutout()
     when (route) {
-        SettingsRoute.MAIN -> ProfileSettingsScreen(state, viewModel, modifier)
-        SettingsRoute.PROFILE -> ProfileSettingsScreen(state, viewModel, modifier)
+        SettingsRoute.MAIN,
+        SettingsRoute.PROFILE,
+        SettingsRoute.ANILIST -> ProfileSettingsScreen(state, viewModel, modifier)
         SettingsRoute.APPEARANCE -> SettingsDetailPanel(
             title = tankobunString(R.string.settings_appearance),
             subtitle = tankobunString(R.string.settings_appearance_subtitle),
@@ -537,116 +538,6 @@ internal fun SettingsDetailContent(
             }
         }
         SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(state, viewModel, modifier)
-        SettingsRoute.ANILIST -> SettingsDetailPanel(
-            title = "AniList",
-            subtitle = tankobunString(R.string.settings_anilist_subtitle),
-            modifier = modifier,
-        ) {
-            Text(tankobunString(R.string.settings_connection), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            TankobunPanel(
-                modifier = Modifier.fillMaxWidth(),
-                color = LocalTankobunStyle.current.colors.panel,
-                contentColor = LocalTankobunStyle.current.colors.panelContent,
-            ) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        state.viewerName?.let { tankobunString(R.string.settings_signed_in_as, it) } ?: if (state.clientConfigured) {
-                            tankobunString(R.string.settings_anilist_ready)
-                        } else {
-                            tankobunString(R.string.settings_anilist_client_setup_needed)
-                        },
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        tankobunString(R.string.settings_redirect_uri, BuildConfig.ANILIST_REDIRECT_URI),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    state.librarySyncedAtEpochMillis.takeIf { it > 0 }?.let {
-                        Text(
-                            tankobunString(R.string.settings_library_cache, cacheAgeLabel(it)),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            if (state.loggedIn) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TankobunActionButton(label = tankobunString(R.string.common_sync_anilist), onClick = viewModel::refreshLibrary)
-                    TankobunActionButton(label = tankobunString(R.string.common_sign_out), onClick = viewModel::signOut, filled = false)
-                }
-            }
-            Text(tankobunString(R.string.settings_anilist_preferences), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            TankobunPanel(
-                modifier = Modifier.fillMaxWidth(),
-                color = LocalTankobunStyle.current.colors.panel,
-                contentColor = LocalTankobunStyle.current.colors.panelContent,
-            ) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        tankobunString(R.string.settings_anilist_preferences_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(tankobunString(R.string.settings_title_language), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        FlowRowCompat {
-                            AnilistTitleLanguage.entries.forEach { language ->
-                                TankobunChip(
-                                    selected = state.anilistTitleLanguage == language,
-                                    onClick = { viewModel.setAnilistTitleLanguage(language) },
-                                    enabled = state.loggedIn && !state.busy,
-                                    label = { Text(language.settingsLabel()) },
-                                )
-                            }
-                        }
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(tankobunString(R.string.settings_rating_format), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        FlowRowCompat {
-                            AnilistScoreFormat.entries.forEach { format ->
-                                TankobunChip(
-                                    selected = state.anilistScoreFormat == format,
-                                    onClick = { viewModel.setAnilistScoreFormat(format) },
-                                    enabled = state.loggedIn && !state.busy,
-                                    label = { Text(format.settingsLabel()) },
-                                )
-                            }
-                        }
-                    }
-                    if (!state.loggedIn) {
-                        Text(
-                            tankobunString(R.string.settings_connect_anilist_before_account_preferences),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            Text(tankobunString(R.string.settings_sync_behavior), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            SettingsToggleRow(
-                title = tankobunString(R.string.settings_auto_save_tracking_edits),
-                subtitle = tankobunString(R.string.settings_auto_save_tracking_edits_desc),
-                checked = state.anilistAutoSaveTrackingChanges,
-                onCheckedChange = viewModel::setAnilistAutoSaveTrackingChanges,
-                enabled = state.loggedIn,
-            )
-            SettingsToggleRow(
-                title = tankobunString(R.string.settings_update_progress_from_reading),
-                subtitle = tankobunString(R.string.settings_update_progress_from_reading_desc),
-                checked = state.anilistAutoSyncReaderProgress,
-                onCheckedChange = viewModel::setAnilistAutoSyncReaderProgress,
-            )
-            SettingsToggleRow(
-                title = tankobunString(R.string.settings_include_manual_read_marks),
-                subtitle = tankobunString(R.string.settings_include_manual_read_marks_desc),
-                checked = state.anilistSyncManualReadProgress,
-                onCheckedChange = viewModel::setAnilistSyncManualReadProgress,
-                enabled = state.anilistAutoSyncReaderProgress,
-            )
-        }
         SettingsRoute.CUSTOM_LISTS -> CustomListsSettingsScreen(state, viewModel, modifier)
         SettingsRoute.BACKUPS -> BackupsSettingsScreen(state, viewModel, modifier)
         SettingsRoute.ABOUT -> AboutSettingsScreen(
@@ -663,47 +554,159 @@ internal fun ProfileSettingsScreen(
     viewModel: MainViewModel,
     modifier: Modifier = Modifier,
 ) {
-    val stats = remember(state.anilistMangaStats, state.libraryItems) {
-        state.anilistMangaStats ?: state.localMangaStats()
-    }
-
     SettingsDetailPanel(
         title = tankobunString(R.string.settings_profile),
         subtitle = tankobunString(R.string.settings_profile_subtitle),
         modifier = modifier,
     ) {
-        ProfileHeaderCard(state = state)
+        if (state.loggedIn) {
+            val stats = remember(state.anilistMangaStats, state.libraryItems) {
+                state.anilistMangaStats ?: state.localMangaStats()
+            }
+            ProfileHeaderCard(state = state)
+            ProfileStatsSections(stats = stats)
+        }
+        Text(tankobunString(R.string.settings_connection), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        TankobunPanel(
+            modifier = Modifier.fillMaxWidth(),
+            color = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
+        ) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    state.viewerName?.let { tankobunString(R.string.settings_signed_in_as, it) } ?: if (state.clientConfigured) {
+                        tankobunString(R.string.settings_anilist_ready)
+                    } else {
+                        tankobunString(R.string.settings_anilist_client_setup_needed)
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    tankobunString(R.string.settings_redirect_uri, BuildConfig.ANILIST_REDIRECT_URI),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                state.librarySyncedAtEpochMillis.takeIf { it > 0 }?.let {
+                    Text(
+                        tankobunString(R.string.settings_library_cache, cacheAgeLabel(it)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        if (state.loggedIn) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TankobunActionButton(label = tankobunString(R.string.common_sync_anilist), onClick = viewModel::refreshLibrary)
+                TankobunActionButton(label = tankobunString(R.string.common_sign_out), onClick = viewModel::signOut, filled = false)
+            }
+        }
+        Text(tankobunString(R.string.settings_anilist_preferences), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        TankobunPanel(
+            modifier = Modifier.fillMaxWidth(),
+            color = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
+        ) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    tankobunString(R.string.settings_anilist_preferences_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(tankobunString(R.string.settings_title_language), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    FlowRowCompat {
+                        AnilistTitleLanguage.entries.forEach { language ->
+                            TankobunChip(
+                                selected = state.anilistTitleLanguage == language,
+                                onClick = { viewModel.setAnilistTitleLanguage(language) },
+                                enabled = state.loggedIn && !state.busy,
+                                label = { Text(language.settingsLabel()) },
+                            )
+                        }
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(tankobunString(R.string.settings_rating_format), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    FlowRowCompat {
+                        AnilistScoreFormat.entries.forEach { format ->
+                            TankobunChip(
+                                selected = state.anilistScoreFormat == format,
+                                onClick = { viewModel.setAnilistScoreFormat(format) },
+                                enabled = state.loggedIn && !state.busy,
+                                label = { Text(format.settingsLabel()) },
+                            )
+                        }
+                    }
+                }
+                if (!state.loggedIn) {
+                    Text(
+                        tankobunString(R.string.settings_connect_anilist_before_account_preferences),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
         SettingsToggleRow(
             title = tankobunString(R.string.settings_show_nsfw_content),
             subtitle = tankobunString(R.string.settings_show_nsfw_content_desc),
             checked = state.showNsfwContent,
             onCheckedChange = viewModel::setShowNsfwContent,
         )
-        Text(
-            tankobunString(R.string.profile_reading_stats),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+        Text(tankobunString(R.string.settings_sync_behavior), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        SettingsToggleRow(
+            title = tankobunString(R.string.settings_auto_save_tracking_edits),
+            subtitle = tankobunString(R.string.settings_auto_save_tracking_edits_desc),
+            checked = state.anilistAutoSaveTrackingChanges,
+            onCheckedChange = viewModel::setAnilistAutoSaveTrackingChanges,
+            enabled = state.loggedIn,
         )
-        ProfileStatsGrid(stats = stats)
-        ProfileBreakdownSection(
-            title = tankobunString(R.string.profile_top_genres),
-            items = stats.genres,
+        SettingsToggleRow(
+            title = tankobunString(R.string.settings_update_progress_from_reading),
+            subtitle = tankobunString(R.string.settings_update_progress_from_reading_desc),
+            checked = state.anilistAutoSyncReaderProgress,
+            onCheckedChange = viewModel::setAnilistAutoSyncReaderProgress,
         )
-        ProfileBreakdownSection(
-            title = tankobunString(R.string.profile_top_tags),
-            items = stats.tags,
-        )
-        ProfileBreakdownSection(
-            title = tankobunString(R.string.profile_formats),
-            items = stats.formats,
-            nameLabel = { name -> tankobunString(name.mediaFormatLabelRes()) },
-        )
-        ProfileBreakdownSection(
-            title = tankobunString(R.string.profile_statuses),
-            items = stats.statuses,
-            nameLabel = { name -> profileStatusLabel(name) },
+        SettingsToggleRow(
+            title = tankobunString(R.string.settings_include_manual_read_marks),
+            subtitle = tankobunString(R.string.settings_include_manual_read_marks_desc),
+            checked = state.anilistSyncManualReadProgress,
+            onCheckedChange = viewModel::setAnilistSyncManualReadProgress,
+            enabled = state.anilistAutoSyncReaderProgress,
         )
     }
+}
+
+@Composable
+private fun ProfileStatsSections(
+    stats: AnilistMangaStats,
+) {
+    Text(
+        tankobunString(R.string.profile_reading_stats),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+    )
+    ProfileStatsGrid(stats = stats)
+    ProfileBreakdownSection(
+        title = tankobunString(R.string.profile_top_genres),
+        items = stats.genres,
+    )
+    ProfileBreakdownSection(
+        title = tankobunString(R.string.profile_top_tags),
+        items = stats.tags,
+    )
+    ProfileBreakdownSection(
+        title = tankobunString(R.string.profile_formats),
+        items = stats.formats,
+        nameLabel = { name -> tankobunString(name.mediaFormatLabelRes()) },
+    )
+    ProfileBreakdownSection(
+        title = tankobunString(R.string.profile_statuses),
+        items = stats.statuses,
+        nameLabel = { name -> profileStatusLabel(name) },
+    )
 }
 
 @Composable

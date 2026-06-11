@@ -483,7 +483,7 @@ internal fun BrowseFilterBar(
                 contentDescription = tankobunString(R.string.browse_options),
                 onClick = onOpenAdvanced,
             )
-            if (state.browseFiltersOrSortActive()) {
+            if (state.hasBrowseQueryOrFilters() || state.browseSearched) {
                 TankobunClearFiltersChip(onClick = viewModel::resetBrowseFilters)
             }
         }

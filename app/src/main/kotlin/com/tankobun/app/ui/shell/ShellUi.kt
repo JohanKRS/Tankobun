@@ -272,7 +272,6 @@ internal val SettingsDetailRoutes = listOf(
     SettingsRoute.READER,
     SettingsRoute.SOURCES,
     SettingsRoute.DOWNLOADS,
-    SettingsRoute.ANILIST,
     SettingsRoute.CUSTOM_LISTS,
     SettingsRoute.BACKUPS,
     SettingsRoute.ABOUT,
