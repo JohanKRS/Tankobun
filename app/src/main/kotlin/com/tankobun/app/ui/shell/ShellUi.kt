@@ -397,6 +397,9 @@ private fun TankobunAppRootContent(
     val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
     val selectedMedia = state.selectedMedia
     val readerOpen = state.activeChapter != null
+    val browseCanNavigateBack = selectedTab == 1 &&
+        selectedMedia == null &&
+        (state.hasBrowseQueryOrFilters() || state.browseSearched)
     val appStatusBarVisible = state.showAppStatusBar && !readerOpen
     val useDarkStatusBarIcons = state.themeMode.useDarkStatusBarIcons(isSystemInDarkTheme())
     val currentRoute = TankobunRoute(
@@ -471,6 +474,10 @@ private fun TankobunAppRootContent(
             quickDrawerMode = QuickDrawerMode.CLOSED
             return
         }
+        if (browseCanNavigateBack && viewModel.navigateBrowseBack()) {
+            resetBackPressWindows()
+            return
+        }
         if (popRoute()) return
         when {
             selectedMedia != null -> {
@@ -530,7 +537,9 @@ private fun TankobunAppRootContent(
                 viewModel = viewModel,
                 selectedTab = selectedTab,
                 onSelectTab = ::navigateToRootTab,
-                canNavigateBack = selectedMedia != null || (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN),
+                canNavigateBack = selectedMedia != null ||
+                    browseCanNavigateBack ||
+                    (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN),
                 onNavigateBack = { handleAppBack() },
                 onSelectMedia = { media -> navigateTo(TankobunRoute(tab = selectedTab, media = media)) },
                 selectedMedia = selectedMedia,

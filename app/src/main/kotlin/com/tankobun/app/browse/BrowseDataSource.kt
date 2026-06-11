@@ -37,18 +37,44 @@ internal class BrowseDataSource(
         return results
     }
 
+    suspend fun browseCacheFresh(cacheKey: String, ttlMillis: Long): Boolean {
+        val now = System.currentTimeMillis()
+        val cachedRows = container.database.searchResultDao().cachedSearchRows(cacheKey)
+        return cachedRows.isNotEmpty() &&
+            cachedRows.all { now - it.fetchedAtEpochMillis <= ttlMillis }
+    }
+
+    suspend fun refreshAnilistBrowseMedia(
+        cacheKey: String,
+        fetch: suspend () -> List<AnilistMedia>,
+    ): List<AnilistMedia> {
+        val now = System.currentTimeMillis()
+        val results = fetch().map { it.withTitleLanguage(titleLanguage()) }
+        cacheBrowseMedia(cacheKey, results, now)
+        return results
+    }
+
     suspend fun cachedAnilistBrowseMediaPage(
         cacheKey: String,
+        ttlMillis: Long = cachePolicy.anilistSearchTtlMillis,
+        forceRefresh: Boolean = false,
         fetch: suspend () -> AnilistMediaPage,
     ): AnilistMediaPage {
         val now = System.currentTimeMillis()
         val cachedRows = container.database.searchResultDao().cachedSearchRows(cacheKey)
         val cachedIsFresh = cachedRows.isNotEmpty() &&
-            cachedRows.all { now - it.fetchedAtEpochMillis <= cachePolicy.anilistSearchTtlMillis }
-        if (cachedIsFresh) {
+            cachedRows.all { now - it.fetchedAtEpochMillis <= ttlMillis }
+        if (!forceRefresh && cachedIsFresh) {
             return cachedBrowsePageFromMedia(cachedBrowseMedia(cacheKey))
         }
-        val page = fetch()
+        val page = runCatching {
+            fetch()
+        }.getOrElse { error ->
+            if (cachedRows.isNotEmpty()) {
+                return cachedBrowsePageFromMedia(cachedBrowseMedia(cacheKey))
+            }
+            throw error
+        }
         cacheBrowseMedia(cacheKey, page.media)
         return page
     }

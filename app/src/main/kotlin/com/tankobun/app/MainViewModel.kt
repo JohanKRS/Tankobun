@@ -137,6 +137,31 @@ private data class ScheduledBackupRunResult(
     val sourcePackages: Int? = null,
 )
 
+private data class BrowseCriteria(
+    val searchQuery: String = "",
+    val genres: Set<String> = emptySet(),
+    val tags: Set<String> = emptySet(),
+    val format: String? = null,
+    val publishingStatus: String? = null,
+    val countryOfOrigin: String? = null,
+    val year: Int? = null,
+    val staffName: String? = null,
+    val sort: String = BROWSE_SORT_SEARCH_MATCH,
+) {
+    val hasQueryOrFilters: Boolean
+        get() = searchQuery.trim().isNotBlank() ||
+            genres.isNotEmpty() ||
+            tags.isNotEmpty() ||
+            format != null ||
+            publishingStatus != null ||
+            countryOfOrigin != null ||
+            year != null ||
+            staffName != null ||
+            sort != BROWSE_SORT_SEARCH_MATCH
+}
+
+private const val BROWSE_TRENDING_SORT = "TRENDING_DESC"
+private const val BROWSE_BACK_STACK_LIMIT = 24
 
 class MainViewModel(
     private val container: AppContainer,
@@ -152,9 +177,12 @@ class MainViewModel(
     private var trackingAutoSaveJob: Job? = null
     private var pendingAniListSyncJob: Job? = null
     private var scheduledBackupJob: Job? = null
+    private var browseLandingJob: Job? = null
     private var readerAdjacentLoadJob: Job? = null
     private var sourcePickerJob: Job? = null
     private var sourcePickerRequestId: Long = 0L
+    private var browseBackStack: List<BrowseCriteria> = emptyList()
+    private var committedBrowseCriteria: BrowseCriteria = BrowseCriteria()
     private var lastReaderProgressSavedAtEpochMillis: Long = 0L
     private var latestReaderPosition: ReaderPagePosition? = null
     private val readerPageCacheJobs = ConcurrentHashMap<String, Job>()
@@ -1121,6 +1149,8 @@ class MainViewModel(
     }
 
     fun resetBrowseFilters() {
+        browseBackStack = emptyList()
+        committedBrowseCriteria = BrowseCriteria()
         _state.update {
             it.copy(
                 searchQuery = "",
@@ -1141,6 +1171,46 @@ class MainViewModel(
             )
         }
         loadBrowseLanding()
+    }
+
+    fun navigateBrowseBack(): Boolean {
+        val currentCriteria = _state.value.toBrowseCriteria()
+        if (currentCriteria != committedBrowseCriteria) {
+            restoreBrowseCriteria(committedBrowseCriteria)
+            return true
+        }
+
+        val previousCriteria = browseBackStack.lastOrNull()
+        if (previousCriteria != null) {
+            browseBackStack = browseBackStack.dropLast(1)
+            restoreBrowseCriteria(previousCriteria)
+            return true
+        }
+
+        if (currentCriteria.hasQueryOrFilters || _state.value.browseSearched) {
+            restoreBrowseCriteria(BrowseCriteria())
+            return true
+        }
+
+        return false
+    }
+
+    private fun recordBrowseCriteria(criteria: BrowseCriteria) {
+        if (criteria == committedBrowseCriteria) return
+        browseBackStack = (browseBackStack + committedBrowseCriteria)
+            .distinctConsecutive()
+            .takeLast(BROWSE_BACK_STACK_LIMIT)
+        committedBrowseCriteria = criteria
+    }
+
+    private fun restoreBrowseCriteria(criteria: BrowseCriteria) {
+        committedBrowseCriteria = criteria
+        _state.update { it.withBrowseCriteria(criteria) }
+        if (criteria.hasQueryOrFilters) {
+            searchAniList(recordHistory = false)
+        } else {
+            loadBrowseLanding()
+        }
     }
 
     fun viewAllBrowseSection(sort: String) {
@@ -1236,9 +1306,8 @@ class MainViewModel(
     }
 
     fun loadBrowseLanding(force: Boolean = false) {
-        if (!force && _state.value.browseLandingLoaded) return
-        viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
+        if (!force && browseLandingJob?.isActive == true) return
+        browseLandingJob = viewModelScope.launch {
             val snapshot = _state.value
             val includeAdult = snapshot.showNsfwContent
             val trendingKey = snapshot.browseLandingCacheKey(BROWSE_TRENDING_CACHE_KEY)
@@ -1252,6 +1321,12 @@ class MainViewModel(
                 topManga = browseDataSource.cachedBrowseMedia(topMangaKey).take(BROWSE_LANDING_SECTION_SIZE),
             )
             val hasCachedLanding = cachedLanding.hasContent()
+            val hasVisibleLanding = BrowseLandingData(
+                trending = snapshot.browseTrending,
+                popular = snapshot.browsePopular,
+                popularManhwa = snapshot.browsePopularManhwa,
+                topManga = snapshot.browseTopManga,
+            ).hasContent()
             if (hasCachedLanding) {
                 _state.update {
                     it.copy(
@@ -1263,42 +1338,69 @@ class MainViewModel(
                         busy = false,
                     )
                 }
+            } else if (!hasVisibleLanding) {
+                _state.update { it.copy(busy = true, message = null) }
+            }
+
+            val trendingFresh = !force && browseDataSource.browseCacheFresh(trendingKey, cachePolicy.browseLandingTtlMillis)
+            val popularFresh = !force && browseDataSource.browseCacheFresh(popularKey, cachePolicy.anilistSearchTtlMillis)
+            val manhwaFresh = !force && browseDataSource.browseCacheFresh(manhwaKey, cachePolicy.anilistSearchTtlMillis)
+            val topMangaFresh = !force && browseDataSource.browseCacheFresh(topMangaKey, cachePolicy.anilistSearchTtlMillis)
+            if (trendingFresh && popularFresh && manhwaFresh && topMangaFresh) {
+                _state.update { it.copy(browseLandingLoaded = true, busy = false) }
+                return@launch
             }
             runCatching {
                 val accessToken = container.tokenStore.accessToken()
-                val trending = browseDataSource.cachedAnilistBrowseMedia(trendingKey) {
-                    container.anilistRepository.browseManga(
-                        sort = "TRENDING_DESC",
-                        perPage = BROWSE_LANDING_SECTION_SIZE,
-                        accessToken = accessToken,
-                        includeAdult = includeAdult,
-                    )
+                val trending = if (trendingFresh && cachedLanding.trending.isNotEmpty()) {
+                    cachedLanding.trending
+                } else {
+                    browseDataSource.refreshAnilistBrowseMedia(trendingKey) {
+                        container.anilistRepository.browseManga(
+                            sort = BROWSE_TRENDING_SORT,
+                            perPage = BROWSE_LANDING_SECTION_SIZE,
+                            accessToken = accessToken,
+                            includeAdult = includeAdult,
+                        )
+                    }
                 }
-                val popular = browseDataSource.cachedAnilistBrowseMedia(popularKey) {
-                    container.anilistRepository.browseManga(
-                        sort = "POPULARITY_DESC",
-                        perPage = BROWSE_LANDING_SECTION_SIZE,
-                        accessToken = accessToken,
-                        includeAdult = includeAdult,
-                    )
+                val popular = if (popularFresh && cachedLanding.popular.isNotEmpty()) {
+                    cachedLanding.popular
+                } else {
+                    browseDataSource.refreshAnilistBrowseMedia(popularKey) {
+                        container.anilistRepository.browseManga(
+                            sort = "POPULARITY_DESC",
+                            perPage = BROWSE_LANDING_SECTION_SIZE,
+                            accessToken = accessToken,
+                            includeAdult = includeAdult,
+                        )
+                    }
                 }
-                val popularManhwa = browseDataSource.cachedAnilistBrowseMedia(manhwaKey) {
-                    container.anilistRepository.browseManga(
-                        countryOfOrigin = "KR",
-                        sort = "POPULARITY_DESC",
-                        perPage = BROWSE_LANDING_SECTION_SIZE,
-                        accessToken = accessToken,
-                        includeAdult = includeAdult,
-                    )
+                val popularManhwa = if (manhwaFresh && cachedLanding.popularManhwa.isNotEmpty()) {
+                    cachedLanding.popularManhwa
+                } else {
+                    browseDataSource.refreshAnilistBrowseMedia(manhwaKey) {
+                        container.anilistRepository.browseManga(
+                            countryOfOrigin = "KR",
+                            sort = "POPULARITY_DESC",
+                            perPage = BROWSE_LANDING_SECTION_SIZE,
+                            accessToken = accessToken,
+                            includeAdult = includeAdult,
+                        )
+                    }
                 }
-                val topManga = browseDataSource.cachedAnilistBrowseMedia(topMangaKey) {
-                    container.anilistRepository.browseManga(
-                        sort = "SCORE_DESC",
-                        perPage = BROWSE_LANDING_SECTION_SIZE,
-                        accessToken = accessToken,
-                        includeAdult = includeAdult,
-                    )
-                }.take(BROWSE_LANDING_SECTION_SIZE)
+                val topManga = if (topMangaFresh && cachedLanding.topManga.isNotEmpty()) {
+                    cachedLanding.topManga
+                } else {
+                    browseDataSource.refreshAnilistBrowseMedia(topMangaKey) {
+                        container.anilistRepository.browseManga(
+                            sort = "SCORE_DESC",
+                            perPage = BROWSE_LANDING_SECTION_SIZE,
+                            accessToken = accessToken,
+                            includeAdult = includeAdult,
+                        )
+                    }.take(BROWSE_LANDING_SECTION_SIZE)
+                }
                 BrowseLandingData(trending, popular, popularManhwa, topManga)
             }.onSuccess { landing ->
                 _state.update {
@@ -1317,6 +1419,8 @@ class MainViewModel(
                     it.copy(
                         busy = false,
                         message = if (hasCachedLanding) {
+                            it.message
+                        } else if (hasVisibleLanding) {
                             it.message
                         } else {
                             error.userMessage(localizedContext(), string(R.string.msg_browse_failed))
@@ -1347,10 +1451,18 @@ class MainViewModel(
         }
     }
 
-    fun searchAniList() {
+    fun searchAniList(
+        forceRefresh: Boolean = false,
+        recordHistory: Boolean = true,
+    ) {
         val snapshot = _state.value
         val query = snapshot.searchQuery.trim()
+        val criteria = snapshot.toBrowseCriteria()
         if (!snapshot.hasBrowseQueryOrFilters()) {
+            if (recordHistory) {
+                browseBackStack = emptyList()
+                committedBrowseCriteria = BrowseCriteria()
+            }
             _state.update {
                 it.copy(
                     searchResults = emptyList(),
@@ -1363,6 +1475,9 @@ class MainViewModel(
             }
             loadBrowseLanding()
             return
+        }
+        if (recordHistory) {
+            recordBrowseCriteria(criteria)
         }
         val cacheKey = snapshot.browseCacheKey()
         viewModelScope.launch {
@@ -1377,7 +1492,16 @@ class MainViewModel(
                 )
             }
             runCatching {
-                browseDataSource.cachedAnilistBrowseMediaPage(cacheKey) {
+                val ttlMillis = if (snapshot.usesTrendingResultsCacheTtl()) {
+                    cachePolicy.browseLandingTtlMillis
+                } else {
+                    cachePolicy.anilistSearchTtlMillis
+                }
+                browseDataSource.cachedAnilistBrowseMediaPage(
+                    cacheKey = cacheKey,
+                    ttlMillis = ttlMillis,
+                    forceRefresh = forceRefresh,
+                ) {
                     browseDataSource.fetchBrowseResultsPage(snapshot, page = 1)
                 }
             }.onSuccess { page ->
@@ -3163,4 +3287,52 @@ class MainViewModel(
         private const val RECENT_READING_LIMIT = 3
         private const val TRACKING_AUTO_SAVE_DELAY_MILLIS = 1_200L
     }
+}
+
+private fun TankobunUiState.usesTrendingResultsCacheTtl(): Boolean =
+    searchQuery.trim().isBlank() &&
+        browseStaffName.isNullOrBlank() &&
+        browseSort == BROWSE_TRENDING_SORT
+
+private fun TankobunUiState.toBrowseCriteria(): BrowseCriteria =
+    BrowseCriteria(
+        searchQuery = searchQuery,
+        genres = browseGenres,
+        tags = browseTags,
+        format = browseFormat,
+        publishingStatus = browsePublishingStatus,
+        countryOfOrigin = browseCountryOfOrigin,
+        year = browseYear,
+        staffName = browseStaffName,
+        sort = browseSort,
+    )
+
+private fun TankobunUiState.withBrowseCriteria(criteria: BrowseCriteria): TankobunUiState =
+    copy(
+        searchQuery = criteria.searchQuery,
+        searchResults = emptyList(),
+        browseSearched = criteria.hasQueryOrFilters,
+        browseResultsPage = 0,
+        browseResultsHasMore = false,
+        browseResultsLoadingMore = false,
+        browseGenres = criteria.genres,
+        browseTags = criteria.tags,
+        browseFormat = criteria.format,
+        browsePublishingStatus = criteria.publishingStatus,
+        browseCountryOfOrigin = criteria.countryOfOrigin,
+        browseYear = criteria.year,
+        browseStaffName = criteria.staffName,
+        browseSort = criteria.sort,
+        message = null,
+    )
+
+private fun List<BrowseCriteria>.distinctConsecutive(): List<BrowseCriteria> {
+    if (isEmpty()) return this
+    val distinct = mutableListOf<BrowseCriteria>()
+    forEach { criteria ->
+        if (distinct.lastOrNull() != criteria) {
+            distinct += criteria
+        }
+    }
+    return distinct
 }
