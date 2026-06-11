@@ -1029,15 +1029,14 @@ internal fun List<BrowseOption>.labelFor(value: String?): String =
     firstOrNull { it.value == value }?.labelText() ?: tankobunString(R.string.common_any)
 
 internal fun List<AnilistMediaTag>.visibleTags(query: String): List<AnilistMediaTag> {
-    val normalizedQuery = query.trim().lowercase()
+    val normalizedQuery = query.trim().lowercase(Locale.ROOT)
     return asSequence()
-        .filter { !it.isAdult }
         .filter { tag ->
             normalizedQuery.isBlank() ||
-                tag.name.lowercase().contains(normalizedQuery) ||
-                tag.category.orEmpty().lowercase().contains(normalizedQuery)
+                tag.name.lowercase(Locale.ROOT).contains(normalizedQuery) ||
+                tag.category.orEmpty().lowercase(Locale.ROOT).contains(normalizedQuery)
         }
-        .sortedWith(compareBy<AnilistMediaTag> { it.category.orEmpty() }.thenBy { it.name })
+        .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
         .toList()
 }
 

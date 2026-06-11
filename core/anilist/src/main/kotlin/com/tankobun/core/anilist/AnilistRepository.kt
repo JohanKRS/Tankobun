@@ -218,7 +218,7 @@ class AnilistRepository(
         val data = graphQlClient.execute(query = AnilistQueries.MediaTags)
         return AnilistJsonMapper.mediaTags(data)
             .distinctBy { it.name.lowercase() }
-            .sortedWith(compareBy<AnilistMediaTag> { it.category.orEmpty() }.thenBy { it.name })
+            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
     }
 
     suspend fun mangaById(mediaId: Int, accessToken: String? = null): AnilistMedia? {
