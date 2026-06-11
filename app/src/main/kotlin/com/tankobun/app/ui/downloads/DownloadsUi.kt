@@ -92,7 +92,6 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Search
@@ -102,7 +101,6 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -236,6 +234,8 @@ internal fun DownloadsScreen(
     val hasActiveDownloads = state.downloads.any { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }
     val hasPausedDownloads = state.downloads.any { it.state == DownloadState.PAUSED }
     val hasFailedDownloads = state.downloads.any { it.state == DownloadState.FAILED }
+    val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
+    val downloadSummary = state.downloadSummaryLabel()
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -247,23 +247,37 @@ internal fun DownloadsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                TankobunSectionHeader(
-                    title = tankobunString(R.string.common_downloads),
-                    trailing = state.downloadSummaryLabel(),
-                    modifier = Modifier.weight(1f),
-                )
-                TankobunActionButton(
-                    label = tankobunString(R.string.downloads_storage_manager),
-                    icon = Icons.Default.Settings,
-                    onClick = onOpenStorageManager,
-                    modifier = Modifier.widthIn(max = 190.dp),
-                    filled = false,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TankobunSectionHeader(
+                        title = tankobunString(R.string.common_downloads),
+                        trailing = if (compactLayout) null else downloadSummary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TankobunActionButton(
+                        label = tankobunString(R.string.downloads_storage_manager),
+                        icon = Icons.Default.Settings,
+                        onClick = onOpenStorageManager,
+                        modifier = Modifier.widthIn(max = 190.dp),
+                        filled = false,
+                    )
+                }
+                if (compactLayout) {
+                    Text(
+                        downloadSummary,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = LocalTankobunStyle.current.colors.mutedContent,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         if (hasActiveDownloads || hasPausedDownloads || hasFailedDownloads) item {

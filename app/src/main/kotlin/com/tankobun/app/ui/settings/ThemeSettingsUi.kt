@@ -92,7 +92,6 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Search
@@ -102,7 +101,6 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -242,13 +240,13 @@ internal fun ThemePicker(
             )
         }
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val minCellWidth = 176.dp
-            val rowHeight = 76.dp
+            val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
+            val columnCount = if (compactLayout) 1 else 2
+            val rowHeight = 68.dp
             val rowGap = 10.dp
-            val columnCount = ((maxWidth + rowGap) / (minCellWidth + rowGap)).toInt().coerceAtLeast(1)
             val rowCount = ((choices.size + columnCount - 1) / columnCount).coerceAtLeast(1)
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minCellWidth),
+                columns = GridCells.Fixed(columnCount),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height((rowHeight * rowCount.toFloat()) + (rowGap * (rowCount - 1).coerceAtLeast(0).toFloat())),
@@ -295,7 +293,7 @@ internal fun ThemeChoiceCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(76.dp)
+            .height(68.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -327,13 +325,6 @@ internal fun ThemeChoiceCard(
                         choice.name,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        choice.description,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = secondaryTextColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

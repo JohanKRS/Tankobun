@@ -99,7 +99,6 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Search
@@ -109,7 +108,6 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -298,7 +296,6 @@ internal fun SettingsRoute.settingsTitle(): String =
 internal enum class QuickDrawerMode {
     CLOSED,
     OVERLAY,
-    PINNED,
 }
 
 private const val BackPressRepeatWindowMillis = 1800L
@@ -318,7 +315,6 @@ private data class TankobunRoute(
 }
 
 internal val QuickDrawerOverlayWidth = 340.dp
-internal val QuickDrawerPinnedWidth = 320.dp
 internal val QuickDrawerHandleSlotWidth = 40.dp
 private val FrostedDockHorizontalMargin = 16.dp
 private val FrostedDockTopMargin = 8.dp
@@ -498,12 +494,6 @@ private fun TankobunAppRootContent(
         }
     }
 
-    LaunchedEffect(compactLayout, quickDrawerMode) {
-        if (compactLayout && quickDrawerMode == QuickDrawerMode.PINNED) {
-            quickDrawerMode = QuickDrawerMode.OVERLAY
-        }
-    }
-
     LaunchedEffect(readerOpen) {
         if (!readerOpen) {
             lastReaderBackPressAt = 0L
@@ -567,13 +557,6 @@ private fun TankobunAppRootContent(
                 showQuickActionsButton = !readerOpen,
                 onOpenQuickDrawer = { quickDrawerMode = QuickDrawerMode.OVERLAY },
                 onCloseQuickDrawer = { quickDrawerMode = QuickDrawerMode.CLOSED },
-                onToggleQuickDrawerPin = {
-                    quickDrawerMode = if (quickDrawerMode == QuickDrawerMode.PINNED) {
-                        QuickDrawerMode.OVERLAY
-                    } else {
-                        QuickDrawerMode.PINNED
-                    }
-                },
             )
             if (!readerOpen && quickDrawerMode != QuickDrawerMode.CLOSED && cutoutEndPadding > 0.dp) {
                 Box(
@@ -676,7 +659,6 @@ internal fun TankobunScaffold(
     showQuickActionsButton: Boolean,
     onOpenQuickDrawer: () -> Unit,
     onCloseQuickDrawer: () -> Unit,
-    onToggleQuickDrawerPin: () -> Unit,
 ) {
     val ignoreDisplayCutout = state.ignoreDisplayCutout
     val cutoutStartPadding = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout)
@@ -756,7 +738,6 @@ internal fun TankobunScaffold(
         when (quickDrawerMode) {
             QuickDrawerMode.CLOSED -> openQuickDrawerFromClosed()
             QuickDrawerMode.OVERLAY -> closeQuickDrawerFromOverlay()
-            QuickDrawerMode.PINNED -> onCloseQuickDrawer()
         }
     }
 
@@ -862,25 +843,6 @@ internal fun TankobunScaffold(
                                 )
                             }
                         }
-                        if (quickDrawerMode == QuickDrawerMode.PINNED) {
-                            val pinnedWidth by animateDpAsState(
-                                targetValue = QuickDrawerPinnedWidth,
-                                animationSpec = tween(durationMillis = 220),
-                                label = "Pinned drawer width",
-                            )
-                            QuickDrawer(
-                                state = state,
-                                viewModel = viewModel,
-                                selectedMedia = selectedMedia,
-                                onOpenRecentProgress = onOpenRecentProgress,
-                                pinned = true,
-                                onClose = onCloseQuickDrawer,
-                                onTogglePin = onToggleQuickDrawerPin,
-                                drawerWidth = pinnedWidth,
-                                endPadding = cutoutEndPadding,
-                                modifier = Modifier.fillMaxHeight(),
-                            )
-                        }
                     }
                 }
                 if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
@@ -901,9 +863,7 @@ internal fun TankobunScaffold(
                         viewModel = viewModel,
                         selectedMedia = selectedMedia,
                         onOpenRecentProgress = onOpenRecentProgress,
-                        pinned = false,
                         onClose = { closeQuickDrawerFromOverlay() },
-                        onTogglePin = onToggleQuickDrawerPin,
                         drawerWidth = QuickDrawerOverlayWidth,
                         endPadding = cutoutEndPadding,
                         showHandle = false,
@@ -1487,20 +1447,17 @@ internal fun QuickDrawer(
     viewModel: MainViewModel,
     selectedMedia: AnilistMedia?,
     onOpenRecentProgress: (RecentReadingProgress) -> Unit,
-    pinned: Boolean,
     onClose: () -> Unit,
-    onTogglePin: () -> Unit,
     drawerWidth: Dp,
     endPadding: Dp,
-    showHandle: Boolean = !pinned,
+    showHandle: Boolean = true,
     handleCenterOffset: Dp = 0.dp,
     onHandleDragOffset: (Float) -> Unit = {},
     onHandleDragEnd: (Float) -> Unit = {},
     handleDragLocally: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val handleSlotWidth = if (pinned || !showHandle) 0.dp else QuickDrawerHandleSlotWidth
-    val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
+    val handleSlotWidth = if (showHandle) QuickDrawerHandleSlotWidth else 0.dp
     val chromeInsets = LocalTankobunChromeInsets.current
     Box(modifier = modifier.width(handleSlotWidth + drawerWidth + endPadding)) {
         Surface(
@@ -1512,7 +1469,7 @@ internal fun QuickDrawer(
             color = LocalTankobunStyle.current.colors.panel,
             contentColor = LocalTankobunStyle.current.colors.panelContent,
             tonalElevation = 0.dp,
-            shadowElevation = if (pinned) 0.dp else 10.dp,
+            shadowElevation = 10.dp,
         ) {
             Box(Modifier.fillMaxSize()) {
                 Box(
@@ -1533,25 +1490,9 @@ internal fun QuickDrawer(
                                 top = 18.dp,
                                 end = 18.dp,
                                 bottom = 18.dp + chromeInsets.bottom,
-                            ),
+                        ),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        if (!compactLayout) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                IconButton(onClick = onTogglePin) {
-                                    Icon(
-                                        imageVector = if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                                        contentDescription = if (pinned) tankobunString(R.string.common_close) else tankobunString(R.string.common_options),
-                                        tint = if (pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        }
-
                         QuickDrawerSection(title = tankobunString(R.string.detail_track_manga)) {
                             if (selectedMedia != null) {
                                 AniListTrackingSection(state, viewModel, selectedMedia)
@@ -1601,7 +1542,7 @@ internal fun QuickDrawer(
                 }
             }
         }
-        if (!pinned && showHandle) {
+        if (showHandle) {
             QuickDrawerHandle(
                 expanded = true,
                 onClick = onClose,

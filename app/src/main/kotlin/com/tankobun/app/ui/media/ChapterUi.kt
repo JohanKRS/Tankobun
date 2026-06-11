@@ -128,35 +128,19 @@ internal fun ChapterActionsBar(
                 modifier = modifier,
             )
         }
-        val orderButtonLabel = if (chapterListStartsAtFirst) {
-            tankobunString(R.string.chapter_first)
-        } else {
-            tankobunString(R.string.chapter_last)
-        }
         val orderButtonDescription = if (chapterListStartsAtFirst) {
             tankobunString(R.string.chapter_show_latest_first)
         } else {
             tankobunString(R.string.chapter_show_first_first)
         }
         val orderButton: @Composable (Modifier) -> Unit = { modifier ->
-            if (tight) {
-                TankobunIconActionButton(
-                    icon = Icons.Default.SwapVert,
-                    contentDescription = orderButtonDescription,
-                    onClick = onToggleChapterListOrder,
-                    enabled = hasChapters,
-                    modifier = modifier,
-                )
-            } else {
-                TankobunActionButton(
-                    label = orderButtonLabel,
-                    icon = Icons.Default.SwapVert,
-                    onClick = onToggleChapterListOrder,
-                    enabled = hasChapters,
-                    filled = false,
-                    modifier = modifier,
-                )
-            }
+            TankobunIconActionButton(
+                icon = Icons.Default.SwapVert,
+                contentDescription = orderButtonDescription,
+                onClick = onToggleChapterListOrder,
+                enabled = hasChapters,
+                modifier = modifier,
+            )
         }
         val downloadButton: @Composable (Modifier) -> Unit = { modifier ->
             if (tight) {
@@ -191,7 +175,7 @@ internal fun ChapterActionsBar(
             }
             Spacer(Modifier.weight(1f))
             refreshButton(Modifier)
-            orderButton(if (tight) Modifier.width(actionHeight) else Modifier.widthIn(min = 96.dp))
+            orderButton(Modifier.width(actionHeight))
             downloadButton(if (tight) Modifier.width(actionHeight) else Modifier.widthIn(min = 116.dp))
         }
     }

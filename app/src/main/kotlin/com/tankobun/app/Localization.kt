@@ -8,10 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import java.util.Locale
 
 enum class AppLanguage(
@@ -49,6 +48,8 @@ fun Context.getAppQuantityString(
 ): String =
     withAppLanguage(language).resources.getQuantityString(id, quantity, *args)
 
+private val LocalTankobunStringContext = staticCompositionLocalOf<Context?> { null }
+
 @Composable
 internal fun TankobunLocalizedContent(
     language: AppLanguage,
@@ -60,7 +61,7 @@ internal fun TankobunLocalizedContent(
         baseContext.withAppLanguage(language)
     }
     CompositionLocalProvider(
-        LocalContext provides localizedContext,
+        LocalTankobunStringContext provides localizedContext,
         LocalConfiguration provides localizedContext.resources.configuration,
     ) {
         content()
@@ -70,14 +71,19 @@ internal fun TankobunLocalizedContent(
 @Composable
 @ReadOnlyComposable
 internal fun tankobunString(@StringRes id: Int): String =
-    stringResource(id)
+    tankobunStringContext().resources.getString(id)
 
 @Composable
 @ReadOnlyComposable
 internal fun tankobunString(@StringRes id: Int, vararg args: Any): String =
-    stringResource(id, *args)
+    tankobunStringContext().resources.getString(id, *args)
 
 @Composable
 @ReadOnlyComposable
 internal fun tankobunQuantityString(@PluralsRes id: Int, quantity: Int, vararg args: Any): String =
-    pluralStringResource(id, quantity, *args)
+    tankobunStringContext().resources.getQuantityString(id, quantity, *args)
+
+@Composable
+@ReadOnlyComposable
+private fun tankobunStringContext(): Context =
+    LocalTankobunStringContext.current ?: LocalContext.current
