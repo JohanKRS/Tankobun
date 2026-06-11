@@ -392,6 +392,19 @@ class SettingsStore(context: Context) {
             .apply()
     }
 
+    fun pendingAnilistOAuthState(): String? =
+        preferences.getString(KEY_ANILIST_OAUTH_STATE, null)
+
+    fun savePendingAnilistOAuthState(state: String?) {
+        preferences.edit().apply {
+            if (state.isNullOrBlank()) {
+                remove(KEY_ANILIST_OAUTH_STATE)
+            } else {
+                putString(KEY_ANILIST_OAUTH_STATE, state)
+            }
+        }.apply()
+    }
+
     fun librarySyncedAtEpochMillis(): Long =
         preferences.getLong(KEY_LIBRARY_SYNCED_AT, 0L)
 
@@ -446,6 +459,7 @@ class SettingsStore(context: Context) {
         const val KEY_ANILIST_SCORE_FORMAT = "anilist.score.format"
         const val KEY_ANILIST_TITLE_LANGUAGE = "anilist.title.language"
         const val KEY_ANILIST_CUSTOM_LISTS = "anilist.custom.lists"
+        const val KEY_ANILIST_OAUTH_STATE = "anilist.oauth.state"
         const val KEY_LIBRARY_SYNCED_AT = "anilist.library.synced.at"
         const val PHONE_TABLET_BREAKPOINT_DP = 600
     }

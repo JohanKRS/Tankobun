@@ -1136,7 +1136,7 @@ internal fun String?.mediaFormatLabelRes(): Int = when (this) {
 }
 
 @Composable
-internal fun AnilistMedia.mediaTypeLabel(): String = when (countryOfOrigin?.uppercase(Locale.getDefault())) {
+internal fun AnilistMedia.mediaTypeLabel(): String = when (countryOfOrigin?.uppercase(Locale.ROOT)) {
     "KR" -> tankobunString(R.string.media_type_manhwa)
     "CN", "TW", "HK" -> tankobunString(R.string.media_type_manhua)
     else -> tankobunString(format.mediaFormatLabelRes())

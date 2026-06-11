@@ -187,6 +187,7 @@ class MainStateLogicTest {
             updatedEntries = mapOf(42 to serverEntry),
             oldName = "Favorites",
             newName = "Best",
+            successMessage = "Custom list renamed",
         )
 
         assertEquals(listOf("Best"), next.anilistCustomLists)
@@ -226,6 +227,7 @@ class MainStateLogicTest {
             entry = serverEntry,
             knownCustomLists = listOf("Server"),
             autoSave = false,
+            successMessage = "AniList tracking saved",
         )
 
         assertEquals(serverEntry, next.selectedListEntry)

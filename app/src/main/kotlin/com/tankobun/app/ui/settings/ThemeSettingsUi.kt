@@ -40,7 +40,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -239,28 +238,26 @@ internal fun ThemePicker(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
-            val columnCount = if (compactLayout) 1 else 2
-            val rowHeight = 68.dp
-            val rowGap = 10.dp
-            val rowCount = ((choices.size + columnCount - 1) / columnCount).coerceAtLeast(1)
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(columnCount),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height((rowHeight * rowCount.toFloat()) + (rowGap * (rowCount - 1).coerceAtLeast(0).toFloat())),
-                verticalArrangement = Arrangement.spacedBy(rowGap),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                userScrollEnabled = false,
-            ) {
-                gridItems(choices, key = { it.mode.name }) { choice ->
-                    ThemeChoiceCard(
-                        choice = choice,
-                        selected = selected == choice.mode,
-                        onClick = { onSelect(choice.mode) },
-                    )
-                }
+        val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
+        val columnCount = if (compactLayout) 1 else 2
+        val rowHeight = 68.dp
+        val rowGap = 10.dp
+        val rowCount = ((choices.size + columnCount - 1) / columnCount).coerceAtLeast(1)
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columnCount),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height((rowHeight * rowCount.toFloat()) + (rowGap * (rowCount - 1).coerceAtLeast(0).toFloat())),
+            verticalArrangement = Arrangement.spacedBy(rowGap),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            userScrollEnabled = false,
+        ) {
+            gridItems(choices, key = { it.mode.name }) { choice ->
+                ThemeChoiceCard(
+                    choice = choice,
+                    selected = selected == choice.mode,
+                    onClick = { onSelect(choice.mode) },
+                )
             }
         }
     }

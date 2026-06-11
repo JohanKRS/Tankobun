@@ -2,6 +2,7 @@ package com.tankobun.app.source
 
 import android.util.Log
 import com.tankobun.app.AppContainer
+import com.tankobun.app.BuildConfig
 import com.tankobun.app.logic.SOURCE_CANDIDATES_TO_VERIFY
 import com.tankobun.app.logic.SourceQueryTimeoutException
 import com.tankobun.app.logic.VerifiedReadableMatch
@@ -269,10 +270,12 @@ internal class SourceDataSource(
         }
 
         val ranked = container.sourceMatcher.rank(media, source, distinctCandidates, now, titleOverrides)
-        Log.i(
-            TAG,
-            "Source search ${source.name}: queries=$searchedQueries/${queries.size}, failed=$failedQueries, candidates=${distinctCandidates.size}, ranked=${ranked.size}",
-        )
+        if (BuildConfig.DEBUG) {
+            Log.i(
+                TAG,
+                "Source search ${source.name}: queries=$searchedQueries/${queries.size}, failed=$failedQueries, candidates=${distinctCandidates.size}, ranked=${ranked.size}",
+            )
+        }
         return ranked.ifEmpty {
             distinctCandidates.take(SOURCE_FALLBACK_CANDIDATES_PER_SOURCE).map { sourceManga ->
                 SourceSearchResult(

@@ -8,23 +8,6 @@ import org.junit.Test
 
 class DownloadLogicTest {
     @Test
-    fun formatsBulkDownloadMessages() {
-        val message = bulkDownloadMessage(
-            label = "selected chapters",
-            result = BulkDownloadResult(queued = 2, resumed = 1, retried = 3),
-        )
-
-        assertEquals("queued 2 / resumed 1 / retrying 3 selected chapters", message)
-    }
-
-    @Test
-    fun formatsNoopBulkDownloadMessages() {
-        val message = bulkDownloadMessage("next 10 chapters", BulkDownloadResult(skipped = 4))
-
-        assertEquals("No new next 10 chapters to download", message)
-    }
-
-    @Test
     fun buildsStorageSummaryFromJobsAndPages() {
         val downloads = listOf(
             downloadJob(

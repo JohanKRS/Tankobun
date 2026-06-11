@@ -618,7 +618,7 @@ internal fun MediaRow(media: AnilistMedia, trackedStatus: MediaStatus? = null, o
             supportingContent = {
                 Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
-                        "${media.mediaTypeLabel()} / ${media.status.statusLabel()}".uppercase(Locale.getDefault()),
+                        "${media.mediaTypeLabel()} / ${media.status.statusLabel()}".uppercase(Locale.ROOT),
                         style = LocalTankobunStyle.current.typography.compactStatus,
                         color = LocalTankobunStyle.current.colors.accent,
                         maxLines = 1,

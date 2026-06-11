@@ -177,6 +177,27 @@ internal fun TankobunUiState.withSourcePickerSearchCompleted(
     )
 }
 
+internal fun TankobunUiState.withSourcePickerSearchCompleted(
+    verified: VerifiedSourceMatches,
+    editedTitle: String?,
+): TankobunUiState {
+    val selectedMatches = sourceMatches.filter { match ->
+        selectedSourceId == match.source.id &&
+            selectedSourceManga?.url == match.manga.url
+    }
+    val nextMatches = (selectedMatches + verified.matches)
+        .distinctSourceMatches()
+        .sortedByDescending { match -> match.score }
+    return copy(
+        sourceMatches = nextMatches,
+        sourceMatchChapterCounts = sourceMatchChapterCounts + verified.chapterCounts,
+        busy = false,
+        sourcePickerLoading = false,
+        sourcePickerMessage = sourcePickerSearchCompletedMessage(nextMatches.size, editedTitle),
+        message = null,
+    )
+}
+
 internal fun TankobunUiState.withSourcePickerMatchPublished(
     context: Context,
     match: SourceSearchResult,
@@ -223,6 +244,26 @@ internal fun TankobunUiState.withSourcePickerSourceSelected(
         sourcePickerLoading = false,
         sourcePickerMessage = null,
         message = context.getString(R.string.source_picker_selected, match.manga.title),
+    )
+}
+
+internal fun TankobunUiState.withSourcePickerSourceSelected(
+    match: SourceSearchResult,
+    addToMatches: Boolean,
+): TankobunUiState {
+    val nextMatches = if (addToMatches) {
+        (listOf(match) + sourceMatches).distinctSourceMatches()
+    } else {
+        sourceMatches
+    }
+    return copy(
+        sourceMatches = nextMatches,
+        selectedSourceId = match.source.id,
+        selectedSourceManga = match.manga,
+        sourcePickerOpen = false,
+        sourcePickerLoading = false,
+        sourcePickerMessage = null,
+        message = "Source selected for ${match.manga.title}",
     )
 }
 
@@ -291,6 +332,23 @@ internal fun TankobunUiState.withSourceChaptersLoaded(
         message = if (chapters.isEmpty()) context.getString(R.string.source_picker_no_chapters) else null,
     )
 
+internal fun TankobunUiState.withSourceChaptersLoaded(
+    source: SourceDescriptor,
+    manga: SourceManga,
+    chapters: List<SourceChapter>,
+    chapterProgress: Map<String, ReadingProgress>,
+): TankobunUiState =
+    copy(
+        selectedSourceManga = manga,
+        sourceChapters = chapters,
+        chapterProgress = chapterProgress,
+        selectingDownloadChapters = false,
+        selectedDownloadChapterUrls = emptySet(),
+        busy = false,
+        sourceMatchChapterCounts = sourceMatchChapterCounts + (sourceMatchKey(source.id, manga.url) to chapters.size),
+        message = if (chapters.isEmpty()) "No chapters found" else null,
+    )
+
 internal fun TankobunUiState.withSourceChaptersLoadFailed(context: Context, error: Throwable): TankobunUiState =
     copy(busy = false, message = error.message ?: context.getString(R.string.source_picker_chapter_load_failed))
 
@@ -311,6 +369,26 @@ internal fun sourcePickerErrorMessage(context: Context, sourceName: String, erro
         detail.contains("No readable manga found", ignoreCase = true) ->
             detail
         else -> context.getString(R.string.source_picker_failed_detail, sourceName, detail)
+    }
+}
+
+internal fun sourcePickerErrorMessage(sourceName: String, error: Throwable): String {
+    val detail = errorDetail(error)
+        ?: error.javaClass.simpleName
+    return when {
+        isMissingSourceCompatibilityClass(error) ->
+            "$sourceName needs a compatibility library that was missing from the app. Update the app and try again."
+        isDirectUrlRequiredError(error) ->
+            "$sourceName needs a direct source URL instead of a title search. Paste a supported URL or choose another source."
+        isUnexpectedSourceResponseError(error) ->
+            "$sourceName returned data the extension could not parse. Try updating that extension or choose another source."
+        detail.contains("syntax error in regexp pattern", ignoreCase = true) ->
+            "$sourceName failed while parsing source data. The extension reported a regexp error; try another source or update that extension."
+        detail.contains("timeout", ignoreCase = true) || detail.contains("timed out", ignoreCase = true) ->
+            "$sourceName took too long to respond. Try again or choose another source."
+        detail.contains("No readable manga found", ignoreCase = true) ->
+            detail
+        else -> "$sourceName failed: $detail"
     }
 }
 
@@ -395,6 +473,19 @@ private fun sourcePickerSearchCompletedMessage(
     } else {
         editedTitle?.let { title -> context.getString(R.string.source_picker_found_for_title, matchCount, title) }
             ?: context.getString(R.string.source_picker_found_readable, matchCount)
+    }
+
+private fun sourcePickerSearchCompletedMessage(
+    matchCount: Int,
+    editedTitle: String?,
+): String =
+    if (matchCount == 0) {
+        editedTitle?.let { title ->
+            "No readable matches found for \"$title\". Edit the search title or tap a source below to try it directly."
+        } ?: "No readable matches found automatically. Edit the search title or tap a source below to try it directly."
+    } else {
+        editedTitle?.let { title -> "Found $matchCount readable sources for \"$title\"" }
+            ?: "Found $matchCount readable sources"
     }
 
 private fun sourceSearchQueryVariants(title: String): List<String> {

@@ -123,6 +123,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.security.SecureRandom
+import java.util.Base64
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
@@ -273,21 +275,37 @@ class MainViewModel(
 
     fun loginUrl(): String? {
         if (BuildConfig.ANILIST_CLIENT_ID.isBlank()) return null
+        val state = newOAuthState()
+        container.settingsStore.savePendingAnilistOAuthState(state)
         return AnilistOAuth.authorizationUrl(
             clientId = BuildConfig.ANILIST_CLIENT_ID,
             redirectUri = BuildConfig.ANILIST_REDIRECT_URI,
+            state = state,
         )
     }
 
     fun handleOAuthRedirect(uri: String) {
         val token = AnilistOAuth.parseRedirect(uri) ?: return
+        val expectedState = container.settingsStore.pendingAnilistOAuthState()
+        if (expectedState.isNullOrBlank() || token.state != expectedState) {
+            Log.w(TAG, "Ignoring AniList OAuth redirect with missing or mismatched state.")
+            return
+        }
+        container.settingsStore.savePendingAnilistOAuthState(null)
         container.tokenStore.saveAccessToken(token.accessToken)
         _state.update { it.copy(loggedIn = true, message = string(R.string.msg_anilist_connected)) }
         refreshLibrary()
     }
 
+    private fun newOAuthState(): String {
+        val bytes = ByteArray(OAUTH_STATE_BYTES)
+        secureRandom.nextBytes(bytes)
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+    }
+
     fun signOut() {
         container.tokenStore.clear()
+        container.settingsStore.savePendingAnilistOAuthState(null)
         container.settingsStore.saveViewerName(null)
         container.settingsStore.saveViewerAvatarUrl(null)
         container.settingsStore.saveViewerBannerImageUrl(null)
@@ -647,10 +665,12 @@ class MainViewModel(
                     message = message,
                 )
             }
-            Log.i(
-                TAG,
-                "Installer returned for ${request.packageName}; installed=${version?.versionCode}, expected=${request.expectedVersionCode}",
-            )
+            if (BuildConfig.DEBUG) {
+                Log.i(
+                    TAG,
+                    "Installer returned for ${request.packageName}; installed=${version?.versionCode}, expected=${request.expectedVersionCode}",
+                )
+            }
         }
     }
 
@@ -2409,7 +2429,9 @@ class MainViewModel(
                     now = now,
                 )
             }.onSuccess { (detailedManga, chapters, chapterProgress) ->
-                Log.i(TAG, "Chapter load ${source.name}/${detailedManga.title}: chapters=${chapters.size}")
+                if (BuildConfig.DEBUG) {
+                    Log.i(TAG, "Chapter load ${source.name}/${detailedManga.title}: chapters=${chapters.size}")
+                }
                 _state.update { it.withSourceChaptersLoaded(localizedContext(), source, detailedManga, chapters, chapterProgress) }
                 if (_state.value.keepNextTenDownloads) {
                     val result = ensureNextTenDownloads()
@@ -2466,7 +2488,9 @@ class MainViewModel(
                     ?: savedProgress?.pageIndex?.coerceIn(0, pages.lastIndex.coerceAtLeast(0))
                     ?: 0
                 val startPageScrollOffset = savedProgress?.pageScrollOffset?.coerceAtLeast(0) ?: 0
-                Log.i(TAG, "Page load ${source?.name ?: "downloaded"}/${chapter.name}: pages=${pages.size}")
+                if (BuildConfig.DEBUG) {
+                    Log.i(TAG, "Page load ${source?.name ?: "downloaded"}/${chapter.name}: pages=${pages.size}")
+                }
                 var readerStillOpen = false
                 _state.update {
                     if (it.activeChapter?.url == chapter.url) {
@@ -3284,8 +3308,10 @@ class MainViewModel(
 
     companion object {
         private const val TAG = "TankobunMain"
+        private const val OAUTH_STATE_BYTES = 24
         private const val RECENT_READING_LIMIT = 3
         private const val TRACKING_AUTO_SAVE_DELAY_MILLIS = 1_200L
+        private val secureRandom = SecureRandom()
     }
 }
 

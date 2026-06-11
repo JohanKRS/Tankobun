@@ -129,7 +129,7 @@ internal fun TankobunSectionHeader(
             Modifier.weight(1f, fill = false)
         }
         Text(
-            text = title.uppercase(Locale.getDefault()),
+            text = title.uppercase(Locale.ROOT),
             modifier = titleModifier,
             style = LocalTankobunStyle.current.typography.sectionLabel,
             color = LocalTankobunStyle.current.colors.accent,
@@ -535,7 +535,7 @@ internal fun TankobunMediaStatusLabel(
     modifier: Modifier = Modifier,
 ) {
     Text(
-        text.uppercase(Locale.getDefault()),
+        text.uppercase(Locale.ROOT),
         modifier = modifier,
         style = LocalTankobunStyle.current.typography.compactStatus,
         color = LocalTankobunStyle.current.colors.accent,

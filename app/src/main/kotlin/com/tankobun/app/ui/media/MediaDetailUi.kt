@@ -760,11 +760,11 @@ private fun buildMangaTitleLayout(
     textMeasurer: androidx.compose.ui.text.TextMeasurer,
 ): MangaTitleLayout {
     val words = title
-        .uppercase(Locale.getDefault())
+        .uppercase(Locale.ROOT)
         .trim()
         .split(Regex("\\s+"))
         .filter { it.isNotBlank() }
-        .ifEmpty { listOf(title.uppercase(Locale.getDefault())) }
+        .ifEmpty { listOf(title.uppercase(Locale.ROOT)) }
     var fontSize = maxFontSize
     while (fontSize >= minFontSize) {
         val style = tankobunMangaTitleTextStyle(fontSize)
@@ -925,7 +925,7 @@ internal fun MangaHeroMetaLine(media: AnilistMedia, compact: Boolean) {
         listOfNotNull(
             media.mediaTypeLabel(),
             media.status.statusLabel(),
-        ).joinToString("  /  ").uppercase(Locale.getDefault()),
+        ).joinToString("  /  ").uppercase(Locale.ROOT),
         style = if (compact) {
             MaterialTheme.typography.labelMedium
         } else {
@@ -962,7 +962,7 @@ internal fun MangaStatRow(media: AnilistMedia, compact: Boolean) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    label.uppercase(Locale.getDefault()),
+                    label.uppercase(Locale.ROOT),
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, lineHeight = 12.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

@@ -1,3 +1,12 @@
 # Copy this file to local.properties for local personal builds.
 # Obtain a client id from https://anilist.co/settings/developer.
 anilistClientId=
+
+# Optional: set these for signed release APK/AAB builds.
+# You can also provide the equivalent environment variables:
+# TANKOBUN_RELEASE_STORE_FILE, TANKOBUN_RELEASE_STORE_PASSWORD,
+# TANKOBUN_RELEASE_KEY_ALIAS, and TANKOBUN_RELEASE_KEY_PASSWORD.
+tankobunReleaseStoreFile=
+tankobunReleaseStorePassword=
+tankobunReleaseKeyAlias=
+tankobunReleaseKeyPassword=

@@ -100,7 +100,8 @@ All extension code, source integrations, service names, trademarks, and third-pa
 anilistClientId=
 ```
 
-4. Build the `app` module.
+4. For signed release builds, also provide your own release keystore values in `local.properties` or the matching `TANKOBUN_RELEASE_*` environment variables shown in `local.properties.example`.
+5. Build the `app` module.
 
 ## Privacy
 

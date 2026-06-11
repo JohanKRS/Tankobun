@@ -12,6 +12,21 @@ val localProperties = Properties().apply {
     }
 }
 
+fun signingValue(propertyName: String, envName: String): String? =
+    localProperties.getProperty(propertyName)?.takeIf { it.isNotBlank() }
+        ?: System.getenv(envName)?.takeIf { it.isNotBlank() }
+
+val releaseStoreFile = signingValue("tankobunReleaseStoreFile", "TANKOBUN_RELEASE_STORE_FILE")
+val releaseStorePassword = signingValue("tankobunReleaseStorePassword", "TANKOBUN_RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = signingValue("tankobunReleaseKeyAlias", "TANKOBUN_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = signingValue("tankobunReleaseKeyPassword", "TANKOBUN_RELEASE_KEY_PASSWORD")
+val hasReleaseSigning = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.tankobun.app"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -20,8 +35,8 @@ android {
         applicationId = "com.tankobun.app"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 9
-        versionName = "0.2.0-beta.6"
+        versionCode = 10
+        versionName = "1.0.0"
 
         val clientId = localProperties.getProperty("anilistClientId", "")
         buildConfigField("String", "ANILIST_CLIENT_ID", "\"$clientId\"")
@@ -39,9 +54,20 @@ android {
         }
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(requireNotNull(releaseStoreFile))
+                storePassword = requireNotNull(releaseStorePassword)
+                keyAlias = requireNotNull(releaseKeyAlias)
+                keyPassword = requireNotNull(releaseKeyPassword)
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

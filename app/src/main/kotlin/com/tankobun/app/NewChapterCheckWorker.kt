@@ -309,7 +309,11 @@ private object NewChapterNotifier {
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .build()
 
-        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+        try {
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+        } catch (error: SecurityException) {
+            Log.w("TankobunChapterCheck", "Could not post new chapter notification", error)
+        }
     }
 
     private fun ensureChannel(context: Context, container: AppContainer) {
