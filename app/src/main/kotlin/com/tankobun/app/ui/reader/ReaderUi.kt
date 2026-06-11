@@ -138,6 +138,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -178,7 +179,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
@@ -283,6 +284,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
             nextSegment = state.readerNextSegment,
         )
     }
+    val webtoonPageAspectRatios = remember(chapter.url) { mutableStateMapOf<String, Float>() }
     val previousFallbackChapter = previousChapter.takeIf { state.readerPreviousSegment == null }
     val hasPreviousChapterFallback = previousFallbackChapter != null
     val webtoonPageItemOffset = if (hasPreviousChapterFallback) 1 else 0
@@ -555,7 +557,10 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 verticalArrangement = Arrangement.spacedBy(pageGap),
             ) {
                 previousFallbackChapter?.let { fallbackChapter ->
-                    item(key = "previous:${fallbackChapter.url}") {
+                    item(
+                        key = "previous:${fallbackChapter.url}",
+                        contentType = "reader-chapter-boundary",
+                    ) {
                         WebtoonPreviousChapterHeader(
                             previousChapter = fallbackChapter,
                             onOpenPreviousChapter = {
@@ -568,18 +573,28 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 itemsIndexed(
                     webtoonPageItems,
                     key = { _, item -> "${item.chapter.url}:${item.page.index}:${item.page.imageUrl}" },
+                    contentType = { _, _ -> "reader-page" },
                 ) { _, item ->
+                    val aspectKey = "${item.chapter.url}:${item.page.index}:${item.page.imageUrl}"
                     ReaderPageImage(
                         model = { retryAttempt -> readerImageRequest(state, item.chapter, item.page, retryAttempt) },
                         contentDescription = item.chapter.name,
                         modifier = Modifier.fillMaxWidth(),
                         contentScale = ContentScale.FillWidth,
-                        placeholderAspectRatio = item.page.readerPageAspectRatio()
+                        stabilizeAspectRatio = true,
+                        placeholderAspectRatio = webtoonPageAspectRatios[aspectKey]
+                            ?: item.page.readerPageAspectRatio()
                             ?: DEFAULT_WEBTOON_READER_PAGE_ASPECT_RATIO,
+                        onImageAspectRatio = { aspectRatio ->
+                            webtoonPageAspectRatios[aspectKey] = aspectRatio
+                        },
                     )
                 }
                 if (nextChapter != null && state.readerNextSegment == null) {
-                    item(key = "next:${nextChapter.url}") {
+                    item(
+                        key = "next:${nextChapter.url}",
+                        contentType = "reader-chapter-boundary",
+                    ) {
                         WebtoonNextChapterFooter(
                             nextChapter = nextChapter,
                             onOpenNextChapter = {
@@ -1102,10 +1117,19 @@ internal fun ReaderPageImage(
     contentScale: ContentScale,
     fillViewportWhileLoading: Boolean = false,
     placeholderAspectRatio: Float? = null,
+    stabilizeAspectRatio: Boolean = false,
     onImageAspectRatio: ((Float) -> Unit)? = null,
 ) {
     var retryAttempt by remember { mutableIntStateOf(0) }
     val imageRequest = model(retryAttempt)
+    var loading by remember(imageRequest) { mutableStateOf(true) }
+    var failed by remember(imageRequest) { mutableStateOf(false) }
+    var loadedAspectRatio by remember(imageRequest) { mutableStateOf<Float?>(null) }
+    val stableAspectRatio = if (stabilizeAspectRatio) {
+        loadedAspectRatio ?: placeholderAspectRatio
+    } else {
+        null
+    }
     val loadingModifier = when {
         fillViewportWhileLoading -> Modifier.fillMaxSize()
         placeholderAspectRatio != null -> Modifier
@@ -1115,33 +1139,60 @@ internal fun ReaderPageImage(
             .fillMaxWidth()
             .heightIn(min = 320.dp)
     }
-    SubcomposeAsyncImage(
-        model = imageRequest,
-        contentDescription = contentDescription,
-        modifier = modifier,
-        contentScale = contentScale,
-        onSuccess = { success ->
-            val image = success.result.image
-            val width = image.width
-            val height = image.height
-            if (width > 0 && height > 0) {
-                onImageAspectRatio?.invoke((width.toFloat() / height.toFloat()).coerceIn(0.2f, 2.5f))
-            }
-        },
-        loading = {
+    val placeholderVisible = loading || failed
+    val fixedFrame = fillViewportWhileLoading || placeholderAspectRatio == null
+    val frameModifier = when {
+        stableAspectRatio != null -> Modifier
+            .fillMaxWidth()
+            .aspectRatio(stableAspectRatio)
+        placeholderVisible -> loadingModifier
+        else -> Modifier
+    }
+    Box(
+        modifier = modifier.then(frameModifier),
+    ) {
+        AsyncImage(
+            model = imageRequest,
+            contentDescription = contentDescription,
+            modifier = if (stableAspectRatio != null || placeholderVisible || fixedFrame) {
+                Modifier.matchParentSize()
+            } else {
+                Modifier.fillMaxWidth()
+            },
+            contentScale = contentScale,
+            onLoading = {
+                loading = true
+                failed = false
+            },
+            onSuccess = { success ->
+                loading = false
+                failed = false
+                val image = success.result.image
+                val width = image.width
+                val height = image.height
+                if (width > 0 && height > 0) {
+                    val aspectRatio = (width.toFloat() / height.toFloat()).coerceIn(0.2f, 2.5f)
+                    loadedAspectRatio = aspectRatio
+                    onImageAspectRatio?.invoke(aspectRatio)
+                }
+            },
+            onError = {
+                loading = false
+                failed = true
+            },
+        )
+        if (placeholderVisible) {
             ReaderImagePlaceholder(
-                modifier = loadingModifier,
-                label = null,
+                modifier = Modifier.matchParentSize(),
+                label = if (failed) tankobunString(R.string.reader_page_failed) else null,
+                onRetry = if (failed) {
+                    { retryAttempt += 1 }
+                } else {
+                    null
+                },
             )
-        },
-        error = {
-            ReaderImagePlaceholder(
-                modifier = loadingModifier,
-                label = tankobunString(R.string.reader_page_failed),
-                onRetry = { retryAttempt += 1 },
-            )
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -1268,8 +1319,8 @@ internal fun readerPageGap(level: Int): Dp = when (level) {
 }
 
 internal const val DEFAULT_WEBTOON_READER_PAGE_ASPECT_RATIO = 0.68f
-internal const val WEBTOON_READER_CACHE_AHEAD_DP = 3600
-internal const val WEBTOON_READER_CACHE_BEHIND_DP = 2400
+internal const val WEBTOON_READER_CACHE_AHEAD_DP = 1800
+internal const val WEBTOON_READER_CACHE_BEHIND_DP = 1000
 internal const val WEBTOON_READER_POSITION_ANCHOR_FRACTION = 0.38f
 internal const val PAGED_READER_SWIPE_DISTANCE_FRACTION = 0.14f
 internal const val PAGED_READER_SWIPE_VELOCITY_THRESHOLD = 760f

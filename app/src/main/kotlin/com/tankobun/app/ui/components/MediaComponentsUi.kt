@@ -412,7 +412,11 @@ internal fun MediaCollection(
                         }
                     }
                 }
-                items(media, key = { it.id }) { item ->
+                items(
+                    items = media,
+                    key = { it.id },
+                    contentType = { "media-row" },
+                ) { item ->
                     MediaRow(
                         media = item,
                         trackedStatus = trackedStatuses[item.id],
@@ -496,7 +500,11 @@ internal fun MediaCollection(
                         headerContent()
                     }
                 }
-                gridItems(media, key = { it.id }) { item ->
+                gridItems(
+                    items = media,
+                    key = { it.id },
+                    contentType = { "media-cover-${supportedViewMode.name}" },
+                ) { item ->
                     MediaCoverTile(
                         media = item,
                         viewMode = supportedViewMode,
@@ -544,13 +552,6 @@ internal fun MediaCoverTile(
     modifier: Modifier = Modifier,
     trackedStatus: MediaStatus? = null,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.975f else 1f,
-        animationSpec = tween(durationMillis = 120),
-        label = "Cover press scale",
-    )
     val supportedViewMode = viewMode.supportedMediaViewMode()
     val coverModifier = Modifier
         .fillMaxWidth()
@@ -560,12 +561,8 @@ internal fun MediaCoverTile(
 
     Column(
         modifier = modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
             .clickable(
-                interactionSource = interactionSource,
+                interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
             ),
@@ -574,12 +571,8 @@ internal fun MediaCoverTile(
         Surface(
             shape = RoundedCornerShape(coverCornerRadius),
             color = if (showWholeCover) Color.Transparent else MaterialTheme.colorScheme.surface,
-            tonalElevation = if (showWholeCover) 0.dp else 1.dp,
-            shadowElevation = when {
-                showWholeCover -> 0.dp
-                pressed -> 1.dp
-                else -> 3.dp
-            },
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
         ) {
             TrackedCoverImage(
                 url = media.coverImage,
@@ -725,9 +718,9 @@ internal fun TrackedMediaStatusBadge(
         contentColor = contentColor,
         border = androidx.compose.foundation.BorderStroke(
             width = 1.dp,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
         ),
-        shadowElevation = 2.dp,
+        shadowElevation = 0.dp,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
