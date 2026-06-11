@@ -157,6 +157,7 @@
     <string name="profile_metric_chapters">Chapters</string>
     <string name="profile_metric_volumes">Volumes</string>
     <string name="profile_metric_mean_score">Mean score</string>
+    <string name="profile_score_summary">Mean score %1$s</string>
     <string name="profile_top_genres">Top genres</string>
     <string name="profile_top_tags">Top tags</string>
     <string name="profile_formats">Formats</string>

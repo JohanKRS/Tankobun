@@ -157,6 +157,7 @@
     <string name="profile_metric_chapters">Capítulos</string>
     <string name="profile_metric_volumes">Volúmenes</string>
     <string name="profile_metric_mean_score">Puntuación media</string>
+    <string name="profile_score_summary">Puntuación media %1$s</string>
     <string name="profile_top_genres">Géneros principales</string>
     <string name="profile_top_tags">Etiquetas principales</string>
     <string name="profile_formats">Formatos</string>

@@ -119,7 +119,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -156,11 +155,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -566,6 +567,7 @@ internal fun ProfileSettingsScreen(
             ProfileHeaderCard(state = state)
             ProfileStatsSections(stats = stats)
         }
+        SettingsGroupDivider(label = "AniList")
         Text(tankobunString(R.string.settings_connection), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         TankobunPanel(
             modifier = Modifier.fillMaxWidth(),
@@ -683,30 +685,57 @@ internal fun ProfileSettingsScreen(
 private fun ProfileStatsSections(
     stats: AnilistMangaStats,
 ) {
-    Text(
-        tankobunString(R.string.profile_reading_stats),
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-    )
-    ProfileStatsGrid(stats = stats)
-    ProfileBreakdownSection(
-        title = tankobunString(R.string.profile_top_genres),
-        items = stats.genres,
-    )
-    ProfileBreakdownSection(
-        title = tankobunString(R.string.profile_top_tags),
-        items = stats.tags,
-    )
-    ProfileBreakdownSection(
-        title = tankobunString(R.string.profile_formats),
-        items = stats.formats,
-        nameLabel = { name -> tankobunString(name.mediaFormatLabelRes()) },
-    )
-    ProfileBreakdownSection(
-        title = tankobunString(R.string.profile_statuses),
-        items = stats.statuses,
-        nameLabel = { name -> profileStatusLabel(name) },
-    )
+    TankobunPanel(
+        modifier = Modifier.fillMaxWidth(),
+        color = LocalTankobunStyle.current.colors.panel,
+        contentColor = LocalTankobunStyle.current.colors.panelContent,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    tankobunString(R.string.profile_reading_stats),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    stats.meanScore?.let { tankobunString(R.string.profile_score_summary, it.profileScoreLabel()) }
+                        ?: tankobunString(R.string.profile_stats_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            ProfileStatsGrid(stats = stats)
+            ProfileBreakdownGrid(stats = stats)
+        }
+    }
+}
+
+@Composable
+private fun SettingsGroupDivider(label: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            label,
+            style = LocalTankobunStyle.current.typography.sectionLabel,
+            color = LocalTankobunStyle.current.colors.accent,
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)),
+        )
+    }
 }
 
 @Composable
@@ -715,6 +744,18 @@ private fun ProfileHeaderCard(state: TankobunUiState) {
     val bannerUrl = state.viewerBannerImageUrl?.takeIf { it.isNotBlank() }
     val avatarUrl = state.viewerAvatarUrl?.takeIf { it.isNotBlank() }
     val profileName = state.viewerName ?: tankobunString(R.string.settings_profile_local_name)
+    val hasBanner = bannerUrl != null
+    val headerTextColor = if (hasBanner) Color.White else MaterialTheme.colorScheme.onSurface
+    val headerSecondaryColor = if (hasBanner) Color.White.copy(alpha = 0.82f) else MaterialTheme.colorScheme.onSurfaceVariant
+    val headerTextShadow = if (hasBanner) {
+        Shadow(
+            color = Color.Black.copy(alpha = 0.72f),
+            offset = Offset(x = 0f, y = 2f),
+            blurRadius = 8f,
+        )
+    } else {
+        null
+    }
     TankobunPanel(
         modifier = Modifier.fillMaxWidth(),
         color = LocalTankobunStyle.current.colors.panel,
@@ -746,8 +787,24 @@ private fun ProfileHeaderCard(state: TankobunUiState) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = if (bannerUrl == null) 0.18f else 0.42f)),
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = if (hasBanner) 0.34f else 0.18f)),
             )
+            if (hasBanner) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(116.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.58f),
+                                ),
+                            ),
+                        ),
+                )
+            }
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -789,7 +846,8 @@ private fun ProfileHeaderCard(state: TankobunUiState) {
                 ) {
                     Text(
                         profileName,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleLarge.copy(shadow = headerTextShadow),
+                        color = headerTextColor,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -800,8 +858,8 @@ private fun ProfileHeaderCard(state: TankobunUiState) {
                         } else {
                             tankobunString(R.string.settings_profile_signed_out)
                         },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall.copy(shadow = headerTextShadow),
+                        color = headerSecondaryColor,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -813,39 +871,82 @@ private fun ProfileHeaderCard(state: TankobunUiState) {
 
 @Composable
 private fun ProfileStatsGrid(stats: AnilistMangaStats) {
-    FlowRowCompat {
-        ProfileMetricCard(
-            label = tankobunString(R.string.profile_metric_manga),
-            value = stats.count.toString(),
-        )
-        ProfileMetricCard(
-            label = tankobunString(R.string.profile_metric_chapters),
-            value = stats.chaptersRead.toString(),
-        )
-        ProfileMetricCard(
-            label = tankobunString(R.string.profile_metric_volumes),
-            value = stats.volumesRead.toString(),
-        )
-        ProfileMetricCard(
-            label = tankobunString(R.string.profile_metric_mean_score),
-            value = stats.meanScore?.profileScoreLabel() ?: tankobunString(R.string.common_unknown),
-        )
+    val metrics = listOf(
+        ProfileMetric(tankobunString(R.string.profile_metric_manga), stats.count.toString(), emphasized = true),
+        ProfileMetric(tankobunString(R.string.profile_metric_chapters), stats.chaptersRead.toString()),
+        ProfileMetric(tankobunString(R.string.profile_metric_volumes), stats.volumesRead.toString()),
+        ProfileMetric(
+            tankobunString(R.string.profile_metric_mean_score),
+            stats.meanScore?.profileScoreLabel() ?: tankobunString(R.string.common_unknown),
+        ),
+    )
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        if (maxWidth >= 560.dp) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                metrics.forEach { metric ->
+                    ProfileMetricCard(
+                        label = metric.label,
+                        value = metric.value,
+                        emphasized = metric.emphasized,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        } else {
+            FlowRowCompat {
+                metrics.forEach { metric ->
+                    ProfileMetricCard(
+                        label = metric.label,
+                        value = metric.value,
+                        emphasized = metric.emphasized,
+                        modifier = Modifier.width(150.dp),
+                    )
+                }
+            }
+        }
     }
 }
+
+private data class ProfileMetric(
+    val label: String,
+    val value: String,
+    val emphasized: Boolean = false,
+)
 
 @Composable
 private fun ProfileMetricCard(
     label: String,
     value: String,
+    emphasized: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
-    TankobunPanel(
-        modifier = Modifier.widthIn(min = 132.dp),
-        color = LocalTankobunStyle.current.colors.panel,
-        contentColor = LocalTankobunStyle.current.colors.panelContent,
+    val shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control)
+    val accent = LocalTankobunStyle.current.colors.accent
+    Box(
+        modifier = modifier
+            .height(76.dp)
+            .clip(shape)
+            .background(
+                brush = Brush.horizontalGradient(
+                    if (emphasized) {
+                        listOf(accent.copy(alpha = 0.28f), accent.copy(alpha = 0.10f))
+                    } else {
+                        listOf(
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+                        )
+                    },
+                ),
+            ),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
                 value,
@@ -866,15 +967,78 @@ private fun ProfileMetricCard(
 }
 
 @Composable
+private fun ProfileBreakdownGrid(stats: AnilistMangaStats) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        if (maxWidth >= 640.dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ProfileBreakdownSection(
+                        title = tankobunString(R.string.profile_top_genres),
+                        items = stats.genres,
+                        modifier = Modifier.weight(1f),
+                    )
+                    ProfileBreakdownSection(
+                        title = tankobunString(R.string.profile_top_tags),
+                        items = stats.tags,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ProfileBreakdownSection(
+                        title = tankobunString(R.string.profile_formats),
+                        items = stats.formats,
+                        modifier = Modifier.weight(1f),
+                        nameLabel = { name -> tankobunString(name.mediaFormatLabelRes()) },
+                    )
+                    ProfileBreakdownSection(
+                        title = tankobunString(R.string.profile_statuses),
+                        items = stats.statuses,
+                        modifier = Modifier.weight(1f),
+                        nameLabel = { name -> profileStatusLabel(name) },
+                    )
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                ProfileBreakdownSection(
+                    title = tankobunString(R.string.profile_top_genres),
+                    items = stats.genres,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                ProfileBreakdownSection(
+                    title = tankobunString(R.string.profile_top_tags),
+                    items = stats.tags,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                ProfileBreakdownSection(
+                    title = tankobunString(R.string.profile_formats),
+                    items = stats.formats,
+                    modifier = Modifier.fillMaxWidth(),
+                    nameLabel = { name -> tankobunString(name.mediaFormatLabelRes()) },
+                )
+                ProfileBreakdownSection(
+                    title = tankobunString(R.string.profile_statuses),
+                    items = stats.statuses,
+                    modifier = Modifier.fillMaxWidth(),
+                    nameLabel = { name -> profileStatusLabel(name) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ProfileBreakdownSection(
     title: String,
     items: List<AnilistStatItem>,
+    modifier: Modifier = Modifier,
     nameLabel: @Composable (String) -> String = { it },
 ) {
-    TankobunPanel(
-        modifier = Modifier.fillMaxWidth(),
-        color = LocalTankobunStyle.current.colors.panel,
-        contentColor = LocalTankobunStyle.current.colors.panelContent,
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -888,7 +1052,7 @@ private fun ProfileBreakdownSection(
             val visibleItems = items
                 .filter { it.count > 0 && it.name.isNotBlank() }
                 .sortedWith(compareByDescending<AnilistStatItem> { it.count }.thenBy { it.name.lowercase(Locale.ROOT) })
-                .take(6)
+                .take(5)
             if (visibleItems.isEmpty()) {
                 Text(
                     tankobunString(R.string.profile_stats_empty),
@@ -899,24 +1063,47 @@ private fun ProfileBreakdownSection(
                 visibleItems.forEach { item ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            nameLabel(item.name),
+                        Box(
+                            modifier = Modifier
+                                .size(width = 3.dp, height = 34.dp)
+                                .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.pill))
+                                .background(LocalTankobunStyle.current.colors.accent.copy(alpha = 0.72f)),
+                        )
+                        Column(
                             modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            tankobunString(R.string.profile_stat_detail, item.count, item.chaptersRead),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                nameLabel(item.name),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                tankobunQuantityString(R.plurals.manga_count, item.count, item.count),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.pill),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ) {
+                            Text(
+                                tankobunQuantityString(R.plurals.chapter_count, item.chaptersRead, item.chaptersRead),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             }
