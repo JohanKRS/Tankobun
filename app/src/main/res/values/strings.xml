@@ -281,7 +281,7 @@
     <string name="browse_popular_manhwa">Popular Manhwa</string>
     <string name="browse_top_100_manga">Top 100 Manga</string>
     <string name="browse_view_all">View All</string>
-    <string name="browse_cached_discovery_empty">Cached discovery will appear here after AniList responds.</string>
+    <string name="browse_cached_discovery_empty">Loading...</string>
     <string name="browse_author_results">Author Results</string>
     <string name="browse_manga">Browse Manga</string>
     <string name="browse_search_results">Search Results</string>
@@ -518,7 +518,7 @@
     <string name="backup_missing_sources_desc">These source APKs were present in the restored backup but are not installed on this device.</string>
     <string name="backup_missing_source_unavailable">Not found in the loaded repository index.</string>
 
-    <string name="about_version">Version %1$s (%2$d)</string>
+    <string name="about_version">Version %1$s</string>
     <string name="about_github">GitHub repository</string>
     <string name="about_anilist_website">AniList website</string>
     <string name="about_replay_tutorial">Replay tutorial</string>

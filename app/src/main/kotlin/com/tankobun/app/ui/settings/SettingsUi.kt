@@ -591,6 +591,7 @@ internal fun ProfileSettingsScreen(
     viewModel: MainViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     SettingsDetailPanel(
         title = tankobunString(R.string.settings_profile),
         subtitle = tankobunString(R.string.settings_profile_subtitle),
@@ -602,6 +603,15 @@ internal fun ProfileSettingsScreen(
             }
             ProfileHeaderCard(state = state)
             ProfileStatsSections(stats = stats)
+        } else {
+            LibraryConnectPrompt(
+                clientConfigured = state.clientConfigured,
+                onConnect = {
+                    viewModel.loginUrl()?.let { url ->
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    }
+                },
+            )
         }
         SettingsGroupDivider(label = "AniList")
         Text(tankobunString(R.string.settings_connection), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

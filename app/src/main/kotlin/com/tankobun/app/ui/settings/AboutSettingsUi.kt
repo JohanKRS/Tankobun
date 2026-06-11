@@ -248,7 +248,7 @@ internal fun AboutSettingsScreen(
             ) {
                 Text("Tankobun", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
-                    tankobunString(R.string.about_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                    tankobunString(R.string.about_version, BuildConfig.VERSION_NAME),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
