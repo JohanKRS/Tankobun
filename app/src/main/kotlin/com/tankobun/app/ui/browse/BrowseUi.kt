@@ -784,7 +784,7 @@ internal fun BrowseTagDialog(
     onDismiss: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val visibleTags = state.browseAvailableTags.visibleTags(query)
+    val visibleTags = state.browseAvailableTags.visibleTags(query, includeAdult = state.showNsfwContent)
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         TankobunDialogSurface(fillMaxHeightFraction = 0.82f, scrollable = false) {
@@ -1028,9 +1028,13 @@ internal fun BrowseOption.labelText(): String =
 internal fun List<BrowseOption>.labelFor(value: String?): String =
     firstOrNull { it.value == value }?.labelText() ?: tankobunString(R.string.common_any)
 
-internal fun List<AnilistMediaTag>.visibleTags(query: String): List<AnilistMediaTag> {
+internal fun List<AnilistMediaTag>.visibleTags(
+    query: String,
+    includeAdult: Boolean,
+): List<AnilistMediaTag> {
     val normalizedQuery = query.trim().lowercase(Locale.ROOT)
     return asSequence()
+        .filter { includeAdult || !it.isAdult }
         .filter { tag ->
             normalizedQuery.isBlank() ||
                 tag.name.lowercase(Locale.ROOT).contains(normalizedQuery) ||

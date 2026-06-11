@@ -64,13 +64,14 @@ internal class BrowseDataSource(
                 page = page,
                 perPage = BROWSE_RESULTS_PAGE_SIZE,
                 accessToken = accessToken,
-            )
+            ).withoutNsfwIfNeeded(snapshot.showNsfwContent)
             !snapshot.hasBrowseFilters() && snapshot.browseSort == BROWSE_SORT_SEARCH_MATCH -> {
                 container.anilistRepository.searchMangaPage(
                     query = query,
                     page = page,
                     perPage = BROWSE_RESULTS_PAGE_SIZE,
                     accessToken = accessToken,
+                    includeAdult = snapshot.showNsfwContent,
                 )
             }
             else -> container.anilistRepository.browseMangaPage(
@@ -85,6 +86,7 @@ internal class BrowseDataSource(
                 page = page,
                 perPage = BROWSE_RESULTS_PAGE_SIZE,
                 accessToken = accessToken,
+                includeAdult = snapshot.showNsfwContent,
             )
         }.withTitleLanguage(snapshot.anilistTitleLanguage)
     }
@@ -113,3 +115,6 @@ internal class BrowseDataSource(
         )
     }
 }
+
+private fun AnilistMediaPage.withoutNsfwIfNeeded(showNsfwContent: Boolean): AnilistMediaPage =
+    if (showNsfwContent) this else copy(media = media.filter { !it.isAdult })

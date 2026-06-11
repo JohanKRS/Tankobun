@@ -79,8 +79,17 @@
     <string name="settings_custom_lists">Listas personalizadas</string>
     <string name="settings_backups">Copias de seguridad</string>
     <string name="settings_sources">Fuentes</string>
+    <string name="settings_profile">Perfil</string>
     <string name="settings_index_intro">Ajusta Tankobun a tu forma de leer, explorar y sincronizar.</string>
     <string name="settings_unofficial_notice">Aplicación no oficial. Las extensiones de fuentes y los proveedores de contenido son de terceros.</string>
+    <string name="settings_profile_subtitle">Gestiona la visualización de la cuenta, estadísticas de lectura y visibilidad de contenido.</string>
+    <string name="settings_profile_local">Perfil local</string>
+    <string name="settings_profile_local_name">Lector de Tankobun</string>
+    <string name="settings_profile_signed_out">Conecta AniList para mostrar tu avatar, banner y estadísticas de la cuenta.</string>
+    <string name="settings_nsfw_visible">NSFW visible</string>
+    <string name="settings_nsfw_hidden">NSFW oculto</string>
+    <string name="settings_show_nsfw_content">Mostrar contenido NSFW</string>
+    <string name="settings_show_nsfw_content_desc">Permite que manga adulto de AniList y etiquetas adultas aparezcan en exploración, búsqueda y filtros.</string>
     <string name="settings_appearance_subtitle">Elige un tema y el comportamiento de diseño para tu forma de leer.</string>
     <string name="settings_library_subtitle">Elige el diseño predeterminado para tus listas deslizables de AniList.</string>
     <string name="settings_browse_subtitle">Elige el diseño predeterminado para la búsqueda y el descubrimiento en AniList.</string>
@@ -142,6 +151,18 @@
     <string name="settings_delete_custom_list_message">¿Eliminar \"%1$s\" y quitarla de %2$s? Los manga permanecerán en sus listas normales de estado de AniList.</string>
     <string name="settings_list_name">Nombre de la lista</string>
     <string name="settings_delete_custom_list_cd">Eliminar lista personalizada %1$s</string>
+    <string name="profile_avatar_cd">Avatar de AniList</string>
+    <string name="profile_reading_stats">Estadísticas de lectura</string>
+    <string name="profile_metric_manga">Manga</string>
+    <string name="profile_metric_chapters">Capítulos</string>
+    <string name="profile_metric_volumes">Volúmenes</string>
+    <string name="profile_metric_mean_score">Puntuación media</string>
+    <string name="profile_top_genres">Géneros principales</string>
+    <string name="profile_top_tags">Etiquetas principales</string>
+    <string name="profile_formats">Formatos</string>
+    <string name="profile_statuses">Estados de lectura</string>
+    <string name="profile_stats_empty">Aún no hay datos.</string>
+    <string name="profile_stat_detail">%1$d manga / %2$d capítulos</string>
 
     <string name="language_all">Multilingüe</string>
     <string name="language_af">Afrikáans</string>

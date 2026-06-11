@@ -542,6 +542,19 @@ internal fun SettingsToggleRow(
 internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
     when (this) {
         SettingsRoute.MAIN -> tankobunString(R.string.common_settings)
+        SettingsRoute.PROFILE -> buildList {
+            add(
+                state.viewerName?.let { tankobunString(R.string.settings_signed_in_as, it) }
+                    ?: tankobunString(R.string.settings_profile_local),
+            )
+            add(
+                if (state.showNsfwContent) {
+                    tankobunString(R.string.settings_nsfw_visible)
+                } else {
+                    tankobunString(R.string.settings_nsfw_hidden)
+                },
+            )
+        }.joinToString(" / ")
         SettingsRoute.APPEARANCE -> buildList {
             add(tankobunThemeChoices().firstOrNull { it.mode == state.themeMode }?.name ?: "Neon Koi")
             add(tankobunString(R.string.dock_summary, state.dockAlignment.settingsLabel()))

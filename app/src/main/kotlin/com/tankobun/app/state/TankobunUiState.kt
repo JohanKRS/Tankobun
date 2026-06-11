@@ -10,6 +10,7 @@ import com.tankobun.app.defaultSourceLanguages
 import com.tankobun.app.logic.BROWSE_SORT_SEARCH_MATCH
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
+import com.tankobun.core.model.AnilistMangaStats
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendation
@@ -36,6 +37,10 @@ data class TankobunUiState(
     val onboardingVisible: Boolean = false,
     val readerTutorialVisible: Boolean = false,
     val viewerName: String? = null,
+    val viewerAvatarUrl: String? = null,
+    val viewerBannerImageUrl: String? = null,
+    val anilistMangaStats: AnilistMangaStats? = null,
+    val showNsfwContent: Boolean = false,
     val anilistScoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
     val anilistTitleLanguage: AnilistTitleLanguage = AnilistTitleLanguage.ROMAJI,
     val anilistCustomLists: List<String> = emptyList(),

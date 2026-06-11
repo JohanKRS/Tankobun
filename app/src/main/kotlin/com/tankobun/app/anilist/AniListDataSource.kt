@@ -97,6 +97,9 @@ internal class AniListDataSource(
 
     fun saveViewerSettings(viewer: AnilistViewer) {
         container.settingsStore.saveViewerName(viewer.name)
+        container.settingsStore.saveViewerAvatarUrl(viewer.avatarUrl)
+        container.settingsStore.saveViewerBannerImageUrl(viewer.bannerImageUrl)
+        container.settingsStore.saveAnilistMangaStats(viewer.mangaStats)
         container.settingsStore.saveAnilistScoreFormat(viewer.scoreFormat)
         container.settingsStore.saveAnilistTitleLanguage(viewer.titleLanguage)
         container.settingsStore.saveAnilistCustomLists(viewer.mangaCustomLists)

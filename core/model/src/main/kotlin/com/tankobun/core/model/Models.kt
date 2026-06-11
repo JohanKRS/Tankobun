@@ -111,6 +111,23 @@ data class AnilistMediaTag(
     val isAdult: Boolean,
 )
 
+data class AnilistMangaStats(
+    val count: Int,
+    val chaptersRead: Int,
+    val volumesRead: Int,
+    val meanScore: Double?,
+    val genres: List<AnilistStatItem> = emptyList(),
+    val tags: List<AnilistStatItem> = emptyList(),
+    val formats: List<AnilistStatItem> = emptyList(),
+    val statuses: List<AnilistStatItem> = emptyList(),
+)
+
+data class AnilistStatItem(
+    val name: String,
+    val count: Int,
+    val chaptersRead: Int,
+)
+
 data class AnilistListEntry(
     val id: Int,
     val mediaId: Int,

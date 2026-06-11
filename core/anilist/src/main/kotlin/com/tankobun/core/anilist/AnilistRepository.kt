@@ -1,18 +1,21 @@
 package com.tankobun.core.anilist
 
 import com.tankobun.core.model.AnilistListEntry
+import com.tankobun.core.model.AnilistMangaStats
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaDetails
 import com.tankobun.core.model.AnilistMediaPage
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistRecommendationPage
 import com.tankobun.core.model.AnilistScoreFormat
+import com.tankobun.core.model.AnilistStatItem
 import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.MediaStatus
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -41,7 +44,9 @@ class AnilistRepository(
         return AnilistViewer(
             id = requireNotNull(viewer["id"]?.jsonPrimitive?.intOrNull),
             name = requireNotNull(viewer["name"]?.jsonPrimitive?.content),
-            avatarUrl = viewer["avatar"]?.jsonObject?.get("large")?.jsonPrimitive?.content,
+            avatarUrl = viewer["avatar"]?.takeUnless { it is JsonNull }?.jsonObject?.get("large")?.jsonPrimitive?.content,
+            bannerImageUrl = viewer.stringOrNull("bannerImage"),
+            mangaStats = viewer.mangaStats(),
             scoreFormat = mediaListOptions
                 ?.stringOrNull("scoreFormat")
                 ?.toAnilistScoreFormat()
@@ -59,18 +64,21 @@ class AnilistRepository(
         page: Int = 1,
         perPage: Int = 50,
         accessToken: String? = null,
+        includeAdult: Boolean = false,
     ): List<AnilistMedia> =
-        searchMangaPage(query = query, page = page, perPage = perPage, accessToken = accessToken).media
+        searchMangaPage(query = query, page = page, perPage = perPage, accessToken = accessToken, includeAdult = includeAdult).media
 
     suspend fun searchMangaPage(
         query: String,
         page: Int = 1,
         perPage: Int = 50,
         accessToken: String? = null,
+        includeAdult: Boolean = false,
     ): AnilistMediaPage {
         query.extractAniListMangaId()?.let { mediaId ->
             val media = runCatching { listOf(mediaDetailsWithEntry(mediaId, accessToken = accessToken).media) }
                 .getOrDefault(emptyList())
+                .filter { includeAdult || !it.isAdult }
             return AnilistMediaPage(media = media, currentPage = 1, hasNextPage = false)
         }
 
@@ -80,13 +88,14 @@ class AnilistRepository(
                 put("search", query)
                 put("page", page)
                 put("perPage", perPage)
+                if (!includeAdult) put("isAdult", false)
             },
             accessToken = accessToken,
         )
         val directResults = AnilistJsonMapper.searchMediaPage(data)
         return if (page == 1 && directResults.media.isEmpty()) {
             AnilistMediaPage(
-                media = fallbackSearchManga(query, accessToken = accessToken),
+                media = fallbackSearchManga(query, accessToken = accessToken, includeAdult = includeAdult),
                 currentPage = 1,
                 hasNextPage = false,
             )
@@ -107,6 +116,7 @@ class AnilistRepository(
         page: Int = 1,
         perPage: Int = 50,
         accessToken: String? = null,
+        includeAdult: Boolean = false,
     ): List<AnilistMedia> =
         browseMangaPage(
             search = search,
@@ -120,6 +130,7 @@ class AnilistRepository(
             page = page,
             perPage = perPage,
             accessToken = accessToken,
+            includeAdult = includeAdult,
         ).media
 
     suspend fun browseMangaPage(
@@ -134,6 +145,7 @@ class AnilistRepository(
         page: Int = 1,
         perPage: Int = 50,
         accessToken: String? = null,
+        includeAdult: Boolean = false,
     ): AnilistMediaPage {
         val normalizedSearch = search?.trim().orEmpty()
         if (
@@ -147,6 +159,7 @@ class AnilistRepository(
             normalizedSearch.extractAniListMangaId()?.let { mediaId ->
                 val media = runCatching { listOf(mediaDetailsWithEntry(mediaId, accessToken = accessToken).media) }
                     .getOrDefault(emptyList())
+                    .filter { includeAdult || !it.isAdult }
                 return AnilistMediaPage(media = media, currentPage = 1, hasNextPage = false)
             }
         }
@@ -170,6 +183,7 @@ class AnilistRepository(
                     put("startDateGreater", year * 10_000 + 101)
                     put("startDateLesser", year * 10_000 + 12_31)
                 }
+                if (!includeAdult) put("isAdult", false)
                 put("sort", buildJsonArray { add(sort) })
             },
             accessToken = accessToken,
@@ -247,7 +261,11 @@ class AnilistRepository(
         return AnilistJsonMapper.media(media)
     }
 
-    private suspend fun fallbackSearchManga(query: String, accessToken: String?): List<AnilistMedia> {
+    private suspend fun fallbackSearchManga(
+        query: String,
+        accessToken: String?,
+        includeAdult: Boolean,
+    ): List<AnilistMedia> {
         val normalizedQuery = query.normalizedSearchTokens()
         if (normalizedQuery.isEmpty()) return emptyList()
 
@@ -260,6 +278,7 @@ class AnilistRepository(
                         variables = buildJsonObject {
                             put("page", page)
                             put("sort", buildJsonArray { add(sort) })
+                            if (!includeAdult) put("isAdult", false)
                         },
                         accessToken = accessToken,
                     ),
@@ -273,6 +292,7 @@ class AnilistRepository(
 
         return candidates
             .distinctBy { it.id }
+            .filter { includeAdult || !it.isAdult }
             .mapNotNull { media ->
                 val score = media.searchFallbackScore(normalizedQuery)
                 if (score <= 0) null else media to score
@@ -471,8 +491,60 @@ private fun String.toAnilistScoreFormat(): AnilistScoreFormat =
 private fun String.toAnilistTitleLanguage(): AnilistTitleLanguage =
     runCatching { AnilistTitleLanguage.valueOf(this) }.getOrDefault(AnilistTitleLanguage.ROMAJI)
 
+private fun JsonObject.mangaStats(): AnilistMangaStats? {
+    val manga = this["statistics"]
+        ?.takeUnless { it is JsonNull }
+        ?.jsonObject
+        ?.get("manga")
+        ?.takeUnless { it is JsonNull }
+        ?.jsonObject
+        ?: return null
+    return AnilistMangaStats(
+        count = manga.intOrZero("count"),
+        chaptersRead = manga.intOrZero("chaptersRead"),
+        volumesRead = manga.intOrZero("volumesRead"),
+        meanScore = manga.doubleOrNull("meanScore"),
+        genres = manga.statItems("genres", "genre"),
+        tags = manga.statItems("tags", "tag"),
+        formats = manga.statItems("formats", "format"),
+        statuses = manga.statItems("statuses", "status"),
+    )
+}
+
+private fun JsonObject.statItems(field: String, nameField: String): List<AnilistStatItem> =
+    (this[field]?.takeUnless { it is JsonNull } as? JsonArray)
+        .orEmpty()
+        .mapNotNull { element ->
+            val obj = element.jsonObject
+            val name = obj.statName(nameField) ?: return@mapNotNull null
+            AnilistStatItem(
+                name = name,
+                count = obj.intOrZero("count"),
+                chaptersRead = obj.intOrZero("chaptersRead"),
+            )
+        }
+        .sortedWith(
+            compareByDescending<AnilistStatItem> { it.count }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name },
+        )
+
+private fun JsonObject.statName(nameField: String): String? {
+    val value = this[nameField]?.takeUnless { it is JsonNull } ?: return null
+    return when (value) {
+        is JsonObject -> value.stringOrNull("name")
+        is JsonPrimitive -> value.content
+        else -> null
+    }?.trim()?.takeIf { it.isNotBlank() }
+}
+
+private fun JsonObject.intOrZero(name: String): Int =
+    this[name]?.takeUnless { it is JsonNull }?.jsonPrimitive?.intOrNull ?: 0
+
+private fun JsonObject.doubleOrNull(name: String): Double? =
+    this[name]?.takeUnless { it is JsonNull }?.jsonPrimitive?.doubleOrNull
+
 private fun kotlinx.serialization.json.JsonObject.stringOrNull(name: String): String? =
-    this[name]?.jsonPrimitive?.content
+    this[name]?.takeUnless { it is JsonNull }?.jsonPrimitive?.content
 
 private fun kotlinx.serialization.json.JsonObject.stringArray(name: String): List<String> =
     this[name]?.takeUnless { it is JsonNull }?.stringValues().orEmpty()

@@ -56,7 +56,11 @@ internal fun TankobunUiState.browseCacheKey(): String = buildString {
     append("|staff=").append(browseStaffName.orEmpty().normalizedSearchKey())
     append("|sort=").append(effectiveBrowseSort())
     append("|title=").append(anilistTitleLanguage.name)
+    append("|nsfw=").append(showNsfwContent)
 }
+
+internal fun TankobunUiState.browseLandingCacheKey(baseKey: String): String =
+    "$baseKey|nsfw=$showNsfwContent"
 
 internal fun String.normalizedSearchKey(): String =
     trim().lowercase(Locale.ROOT)

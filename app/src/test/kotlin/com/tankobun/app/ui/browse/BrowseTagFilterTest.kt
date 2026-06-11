@@ -15,7 +15,20 @@ class BrowseTagFilterTest {
 
         assertEquals(
             listOf("Ahegao", "Coming of Age", "Zombie"),
-            tags.visibleTags(query = "").map { it.name },
+            tags.visibleTags(query = "", includeAdult = true).map { it.name },
+        )
+    }
+
+    @Test
+    fun visibleTagsHidesAdultTagsWhenDisabled() {
+        val tags = listOf(
+            AnilistMediaTag(name = "Ahegao", category = "Adult", isAdult = true),
+            AnilistMediaTag(name = "Coming of Age", category = "Theme", isAdult = false),
+        )
+
+        assertEquals(
+            listOf("Coming of Age"),
+            tags.visibleTags(query = "", includeAdult = false).map { it.name },
         )
     }
 
@@ -29,7 +42,7 @@ class BrowseTagFilterTest {
 
         assertEquals(
             listOf("Archery", "Baseball"),
-            tags.visibleTags(query = "sports").map { it.name },
+            tags.visibleTags(query = "sports", includeAdult = false).map { it.name },
         )
     }
 }

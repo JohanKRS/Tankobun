@@ -79,8 +79,17 @@
     <string name="settings_custom_lists">Custom Lists</string>
     <string name="settings_backups">Backups</string>
     <string name="settings_sources">Sources</string>
+    <string name="settings_profile">Profile</string>
     <string name="settings_index_intro">Tune Tankobun for how you read, browse, and sync.</string>
     <string name="settings_unofficial_notice">Unofficial app. Source extensions and content providers are third parties.</string>
+    <string name="settings_profile_subtitle">Manage account display, reading stats, and content visibility.</string>
+    <string name="settings_profile_local">Local profile</string>
+    <string name="settings_profile_local_name">Tankobun reader</string>
+    <string name="settings_profile_signed_out">Connect AniList to show your avatar, banner, and account statistics.</string>
+    <string name="settings_nsfw_visible">NSFW visible</string>
+    <string name="settings_nsfw_hidden">NSFW hidden</string>
+    <string name="settings_show_nsfw_content">Show NSFW content</string>
+    <string name="settings_show_nsfw_content_desc">Allows adult AniList manga and adult tags to appear in browse, search, and filters.</string>
     <string name="settings_appearance_subtitle">Choose a theme and layout behavior for your reading setup.</string>
     <string name="settings_library_subtitle">Pick the default layout for your swipeable AniList lists.</string>
     <string name="settings_browse_subtitle">Pick the default layout for AniList search and discovery.</string>
@@ -142,6 +151,18 @@
     <string name="settings_delete_custom_list_message">Delete \"%1$s\" and remove it from %2$s? The manga will stay in their normal AniList status lists.</string>
     <string name="settings_list_name">List name</string>
     <string name="settings_delete_custom_list_cd">Delete custom list %1$s</string>
+    <string name="profile_avatar_cd">AniList avatar</string>
+    <string name="profile_reading_stats">Reading stats</string>
+    <string name="profile_metric_manga">Manga</string>
+    <string name="profile_metric_chapters">Chapters</string>
+    <string name="profile_metric_volumes">Volumes</string>
+    <string name="profile_metric_mean_score">Mean score</string>
+    <string name="profile_top_genres">Top genres</string>
+    <string name="profile_top_tags">Top tags</string>
+    <string name="profile_formats">Formats</string>
+    <string name="profile_statuses">Reading statuses</string>
+    <string name="profile_stats_empty">No data yet.</string>
+    <string name="profile_stat_detail">%1$d manga / %2$d chapters</string>
 
     <string name="language_all">Multilingual</string>
     <string name="language_af">Afrikaans</string>

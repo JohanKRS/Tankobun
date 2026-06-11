@@ -378,6 +378,7 @@ internal fun LibraryScreen(
         LibraryTagDialog(
             availableTags = tagOptions,
             selectedTags = tags,
+            includeAdultTags = state.showNsfwContent,
             onTagSelected = { tag, selected ->
                 tags = if (selected) tags + tag else tags - tag
             },
@@ -887,12 +888,13 @@ internal fun LibraryGenreDialog(
 internal fun LibraryTagDialog(
     availableTags: List<AnilistMediaTag>,
     selectedTags: Set<String>,
+    includeAdultTags: Boolean,
     onTagSelected: (String, Boolean) -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val visibleTags = availableTags.visibleTags(query)
+    val visibleTags = availableTags.visibleTags(query, includeAdult = includeAdultTags)
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         TankobunDialogSurface(fillMaxHeightFraction = 0.82f, scrollable = false) {

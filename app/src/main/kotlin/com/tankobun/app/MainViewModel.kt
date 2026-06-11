@@ -16,6 +16,7 @@ import com.tankobun.app.logic.BROWSE_TRENDING_CACHE_KEY
 import com.tankobun.app.logic.BulkDownloadResult
 import com.tankobun.app.logic.BrowseLandingData
 import com.tankobun.app.logic.browseCacheKey
+import com.tankobun.app.logic.browseLandingCacheKey
 import com.tankobun.app.logic.downloadSourceName
 import com.tankobun.app.logic.filteredScoreInput
 import com.tankobun.app.logic.formatTrackingScore
@@ -179,6 +180,10 @@ class MainViewModel(
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
             chapterListStartsAtFirst = container.settingsStore.chapterListStartsAtFirst(),
             keepNextTenDownloads = container.settingsStore.keepNextTenDownloads(),
+            viewerAvatarUrl = container.settingsStore.viewerAvatarUrl(),
+            viewerBannerImageUrl = container.settingsStore.viewerBannerImageUrl(),
+            anilistMangaStats = container.settingsStore.anilistMangaStats(),
+            showNsfwContent = container.settingsStore.showNsfwContent(),
             anilistAutoSaveTrackingChanges = container.settingsStore.anilistAutoSaveTrackingChanges(),
             anilistAutoSyncReaderProgress = container.settingsStore.anilistAutoSyncReaderProgress(),
             anilistSyncManualReadProgress = container.settingsStore.anilistSyncManualReadProgress(),
@@ -241,6 +246,9 @@ class MainViewModel(
     fun signOut() {
         container.tokenStore.clear()
         container.settingsStore.saveViewerName(null)
+        container.settingsStore.saveViewerAvatarUrl(null)
+        container.settingsStore.saveViewerBannerImageUrl(null)
+        container.settingsStore.saveAnilistMangaStats(null)
         container.settingsStore.saveAnilistScoreFormat(AnilistScoreFormat.POINT_100)
         container.settingsStore.saveAnilistTitleLanguage(AnilistTitleLanguage.ROMAJI)
         container.settingsStore.saveAnilistCustomLists(emptyList())
@@ -249,6 +257,9 @@ class MainViewModel(
             it.copy(
                 loggedIn = false,
                 viewerName = null,
+                viewerAvatarUrl = null,
+                viewerBannerImageUrl = null,
+                anilistMangaStats = null,
                 anilistScoreFormat = AnilistScoreFormat.POINT_100,
                 anilistTitleLanguage = AnilistTitleLanguage.ROMAJI,
                 anilistCustomLists = emptyList(),
@@ -284,6 +295,9 @@ class MainViewModel(
                 _state.update {
                     it.withAniListTitleLanguage(viewer.titleLanguage).copy(
                         viewerName = viewer.name,
+                        viewerAvatarUrl = viewer.avatarUrl,
+                        viewerBannerImageUrl = viewer.bannerImageUrl,
+                        anilistMangaStats = viewer.mangaStats,
                         anilistScoreFormat = viewer.scoreFormat,
                         anilistCustomLists = viewer.mangaCustomLists,
                     )
@@ -606,6 +620,9 @@ class MainViewModel(
                 _state.update {
                     it.copy(
                         viewerName = viewer.name,
+                        viewerAvatarUrl = viewer.avatarUrl,
+                        viewerBannerImageUrl = viewer.bannerImageUrl,
+                        anilistMangaStats = viewer.mangaStats,
                         anilistScoreFormat = viewer.scoreFormat,
                         anilistTitleLanguage = viewer.titleLanguage,
                         anilistCustomLists = viewer.mangaCustomLists,
@@ -1027,11 +1044,17 @@ class MainViewModel(
         if (!force && _state.value.browseLandingLoaded) return
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
+            val snapshot = _state.value
+            val includeAdult = snapshot.showNsfwContent
+            val trendingKey = snapshot.browseLandingCacheKey(BROWSE_TRENDING_CACHE_KEY)
+            val popularKey = snapshot.browseLandingCacheKey(BROWSE_POPULAR_CACHE_KEY)
+            val manhwaKey = snapshot.browseLandingCacheKey(BROWSE_MANHWA_CACHE_KEY)
+            val topMangaKey = snapshot.browseLandingCacheKey(BROWSE_TOP_MANGA_CACHE_KEY)
             val cachedLanding = BrowseLandingData(
-                trending = browseDataSource.cachedBrowseMedia(BROWSE_TRENDING_CACHE_KEY),
-                popular = browseDataSource.cachedBrowseMedia(BROWSE_POPULAR_CACHE_KEY),
-                popularManhwa = browseDataSource.cachedBrowseMedia(BROWSE_MANHWA_CACHE_KEY),
-                topManga = browseDataSource.cachedBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY).take(BROWSE_LANDING_SECTION_SIZE),
+                trending = browseDataSource.cachedBrowseMedia(trendingKey),
+                popular = browseDataSource.cachedBrowseMedia(popularKey),
+                popularManhwa = browseDataSource.cachedBrowseMedia(manhwaKey),
+                topManga = browseDataSource.cachedBrowseMedia(topMangaKey).take(BROWSE_LANDING_SECTION_SIZE),
             )
             val hasCachedLanding = cachedLanding.hasContent()
             if (hasCachedLanding) {
@@ -1048,33 +1071,37 @@ class MainViewModel(
             }
             runCatching {
                 val accessToken = container.tokenStore.accessToken()
-                val trending = browseDataSource.cachedAnilistBrowseMedia(BROWSE_TRENDING_CACHE_KEY) {
+                val trending = browseDataSource.cachedAnilistBrowseMedia(trendingKey) {
                     container.anilistRepository.browseManga(
                         sort = "TRENDING_DESC",
                         perPage = BROWSE_LANDING_SECTION_SIZE,
                         accessToken = accessToken,
+                        includeAdult = includeAdult,
                     )
                 }
-                val popular = browseDataSource.cachedAnilistBrowseMedia(BROWSE_POPULAR_CACHE_KEY) {
+                val popular = browseDataSource.cachedAnilistBrowseMedia(popularKey) {
                     container.anilistRepository.browseManga(
                         sort = "POPULARITY_DESC",
                         perPage = BROWSE_LANDING_SECTION_SIZE,
                         accessToken = accessToken,
+                        includeAdult = includeAdult,
                     )
                 }
-                val popularManhwa = browseDataSource.cachedAnilistBrowseMedia(BROWSE_MANHWA_CACHE_KEY) {
+                val popularManhwa = browseDataSource.cachedAnilistBrowseMedia(manhwaKey) {
                     container.anilistRepository.browseManga(
                         countryOfOrigin = "KR",
                         sort = "POPULARITY_DESC",
                         perPage = BROWSE_LANDING_SECTION_SIZE,
                         accessToken = accessToken,
+                        includeAdult = includeAdult,
                     )
                 }
-                val topManga = browseDataSource.cachedAnilistBrowseMedia(BROWSE_TOP_MANGA_CACHE_KEY) {
+                val topManga = browseDataSource.cachedAnilistBrowseMedia(topMangaKey) {
                     container.anilistRepository.browseManga(
                         sort = "SCORE_DESC",
                         perPage = BROWSE_LANDING_SECTION_SIZE,
                         accessToken = accessToken,
+                        includeAdult = includeAdult,
                     )
                 }.take(BROWSE_LANDING_SECTION_SIZE)
                 BrowseLandingData(trending, popular, popularManhwa, topManga)
@@ -1299,6 +1326,30 @@ class MainViewModel(
         _state.update { it.copy(anilistSyncManualReadProgress = enabled) }
     }
 
+    fun setShowNsfwContent(enabled: Boolean) {
+        container.settingsStore.saveShowNsfwContent(enabled)
+        _state.update {
+            it.copy(
+                showNsfwContent = enabled,
+                browseLandingLoaded = false,
+                searchResults = emptyList(),
+                browseSearched = false,
+                browseResultsPage = 0,
+                browseResultsHasMore = false,
+                browseResultsLoadingMore = false,
+                browseTags = if (enabled) {
+                    it.browseTags
+                } else {
+                    val adultTagNames = it.browseAvailableTags
+                        .filter { tag -> tag.isAdult }
+                        .map { tag -> tag.name }
+                        .toSet()
+                    it.browseTags - adultTagNames
+                },
+            )
+        }
+    }
+
     fun setAnilistTitleLanguage(language: AnilistTitleLanguage) {
         if (_state.value.anilistTitleLanguage == language) return
         val token = container.tokenStore.accessToken()
@@ -1314,6 +1365,9 @@ class MainViewModel(
                 _state.update {
                     it.withAniListTitleLanguage(viewer.titleLanguage).copy(
                         viewerName = viewer.name,
+                        viewerAvatarUrl = viewer.avatarUrl,
+                        viewerBannerImageUrl = viewer.bannerImageUrl,
+                        anilistMangaStats = viewer.mangaStats,
                         anilistScoreFormat = viewer.scoreFormat,
                         anilistCustomLists = viewer.mangaCustomLists,
                         busy = false,
@@ -1347,6 +1401,9 @@ class MainViewModel(
                 _state.update {
                     it.copy(
                         viewerName = viewer.name,
+                        viewerAvatarUrl = viewer.avatarUrl,
+                        viewerBannerImageUrl = viewer.bannerImageUrl,
+                        anilistMangaStats = viewer.mangaStats,
                         anilistScoreFormat = viewer.scoreFormat,
                         anilistTitleLanguage = viewer.titleLanguage,
                         anilistCustomLists = viewer.mangaCustomLists,

@@ -79,8 +79,17 @@
     <string name="settings_custom_lists">Listas personalizadas</string>
     <string name="settings_backups">Backups</string>
     <string name="settings_sources">Fontes</string>
+    <string name="settings_profile">Perfil</string>
     <string name="settings_index_intro">Ajuste o Tankobun para como você lê, explora e sincroniza.</string>
     <string name="settings_unofficial_notice">Aplicativo não oficial. Extensões de fonte e provedores de conteúdo são de terceiros.</string>
+    <string name="settings_profile_subtitle">Gerencie visual da conta, estatísticas de leitura e visibilidade de conteúdo.</string>
+    <string name="settings_profile_local">Perfil local</string>
+    <string name="settings_profile_local_name">Leitor do Tankobun</string>
+    <string name="settings_profile_signed_out">Conecte o AniList para mostrar seu avatar, banner e estatísticas da conta.</string>
+    <string name="settings_nsfw_visible">NSFW visível</string>
+    <string name="settings_nsfw_hidden">NSFW oculto</string>
+    <string name="settings_show_nsfw_content">Mostrar conteúdo NSFW</string>
+    <string name="settings_show_nsfw_content_desc">Permite que mangás adultos do AniList e tags adultas apareçam em exploração, busca e filtros.</string>
     <string name="settings_appearance_subtitle">Escolha um tema e o comportamento do layout para sua leitura.</string>
     <string name="settings_library_subtitle">Escolha o layout padrão das suas listas do AniList.</string>
     <string name="settings_browse_subtitle">Escolha o layout padrão para busca e descoberta no AniList.</string>
@@ -142,6 +151,18 @@
     <string name="settings_delete_custom_list_message">Excluir \"%1$s\" e removê-la de %2$s? Os mangás continuarão nas listas normais de status do AniList.</string>
     <string name="settings_list_name">Nome da lista</string>
     <string name="settings_delete_custom_list_cd">Excluir lista personalizada %1$s</string>
+    <string name="profile_avatar_cd">Avatar do AniList</string>
+    <string name="profile_reading_stats">Estatísticas de leitura</string>
+    <string name="profile_metric_manga">Mangás</string>
+    <string name="profile_metric_chapters">Capítulos</string>
+    <string name="profile_metric_volumes">Volumes</string>
+    <string name="profile_metric_mean_score">Nota média</string>
+    <string name="profile_top_genres">Gêneros principais</string>
+    <string name="profile_top_tags">Tags principais</string>
+    <string name="profile_formats">Formatos</string>
+    <string name="profile_statuses">Status de leitura</string>
+    <string name="profile_stats_empty">Ainda sem dados.</string>
+    <string name="profile_stat_detail">%1$d mangás / %2$d capítulos</string>
 
     <string name="language_all">Multilíngue</string>
     <string name="language_af">Africâner</string>

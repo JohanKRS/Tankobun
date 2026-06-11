@@ -7,6 +7,35 @@ object AnilistQueries {
             id
             name
             avatar { large }
+            bannerImage
+            statistics {
+              manga {
+                count
+                chaptersRead
+                volumesRead
+                meanScore
+                genres {
+                  genre
+                  count
+                  chaptersRead
+                }
+                tags {
+                  tag { name }
+                  count
+                  chaptersRead
+                }
+                formats {
+                  format
+                  count
+                  chaptersRead
+                }
+                statuses {
+                  status
+                  count
+                  chaptersRead
+                }
+              }
+            }
             options {
               titleLanguage
             }
@@ -21,10 +50,10 @@ object AnilistQueries {
     """
 
     const val SearchManga = """
-        query SearchManga(${'$'}page: Int!, ${'$'}perPage: Int!, ${'$'}search: String!) {
+        query SearchManga(${'$'}page: Int!, ${'$'}perPage: Int!, ${'$'}search: String!, ${'$'}isAdult: Boolean) {
           Page(page: ${'$'}page, perPage: ${'$'}perPage) {
             pageInfo { hasNextPage currentPage lastPage }
-            media(type: MANGA, search: ${'$'}search, sort: SEARCH_MATCH) {
+            media(type: MANGA, search: ${'$'}search, isAdult: ${'$'}isAdult, sort: SEARCH_MATCH) {
               id
               idMal
               title { romaji english native userPreferred }
@@ -51,9 +80,9 @@ object AnilistQueries {
     """
 
     const val SearchFallbackMangaPage = """
-        query SearchFallbackMangaPage(${'$'}page: Int!, ${'$'}sort: [MediaSort]) {
+        query SearchFallbackMangaPage(${'$'}page: Int!, ${'$'}sort: [MediaSort], ${'$'}isAdult: Boolean) {
           Page(page: ${'$'}page, perPage: 50) {
-            media(type: MANGA, sort: ${'$'}sort) {
+            media(type: MANGA, sort: ${'$'}sort, isAdult: ${'$'}isAdult) {
               id
               idMal
               title { romaji english native userPreferred }
@@ -155,6 +184,7 @@ object AnilistQueries {
           ${'$'}countryOfOrigin: CountryCode,
           ${'$'}startDateGreater: FuzzyDateInt,
           ${'$'}startDateLesser: FuzzyDateInt,
+          ${'$'}isAdult: Boolean,
           ${'$'}sort: [MediaSort]
         ) {
           Page(page: ${'$'}page, perPage: ${'$'}perPage) {
@@ -169,6 +199,7 @@ object AnilistQueries {
               countryOfOrigin: ${'$'}countryOfOrigin,
               startDate_greater: ${'$'}startDateGreater,
               startDate_lesser: ${'$'}startDateLesser,
+              isAdult: ${'$'}isAdult,
               sort: ${'$'}sort
             ) {
               id
@@ -524,6 +555,35 @@ object AnilistQueries {
             id
             name
             avatar { large }
+            bannerImage
+            statistics {
+              manga {
+                count
+                chaptersRead
+                volumesRead
+                meanScore
+                genres {
+                  genre
+                  count
+                  chaptersRead
+                }
+                tags {
+                  tag { name }
+                  count
+                  chaptersRead
+                }
+                formats {
+                  format
+                  count
+                  chaptersRead
+                }
+                statuses {
+                  status
+                  count
+                  chaptersRead
+                }
+              }
+            }
             options {
               titleLanguage
             }

@@ -1,8 +1,10 @@
 package com.tankobun.app
 
 import android.content.Context
+import com.tankobun.core.model.AnilistMangaStats
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistScoreFormat
+import com.tankobun.core.model.AnilistStatItem
 import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.ReaderMode
 import java.util.Base64
@@ -167,6 +169,13 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean(KEY_ANILIST_SYNC_MANUAL_READ_PROGRESS, enabled).apply()
     }
 
+    fun showNsfwContent(): Boolean =
+        preferences.getBoolean(KEY_SHOW_NSFW_CONTENT, false)
+
+    fun saveShowNsfwContent(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_SHOW_NSFW_CONTENT, enabled).apply()
+    }
+
     fun backupFolderUri(): String? =
         preferences.getString(KEY_BACKUP_FOLDER_URI, null)
 
@@ -264,6 +273,64 @@ class SettingsStore(context: Context) {
         preferences.edit().putString(KEY_VIEWER_NAME, name).apply()
     }
 
+    fun viewerAvatarUrl(): String? =
+        preferences.getString(KEY_VIEWER_AVATAR_URL, null)
+
+    fun saveViewerAvatarUrl(url: String?) {
+        preferences.edit().putString(KEY_VIEWER_AVATAR_URL, url).apply()
+    }
+
+    fun viewerBannerImageUrl(): String? =
+        preferences.getString(KEY_VIEWER_BANNER_IMAGE_URL, null)
+
+    fun saveViewerBannerImageUrl(url: String?) {
+        preferences.edit().putString(KEY_VIEWER_BANNER_IMAGE_URL, url).apply()
+    }
+
+    fun anilistMangaStats(): AnilistMangaStats? {
+        val lines = preferences.getString(KEY_ANILIST_MANGA_STATS, null)
+            ?.lineSequence()
+            ?.filter { it.isNotBlank() }
+            ?.toList()
+            .orEmpty()
+        val header = lines.firstOrNull()?.split('|') ?: return null
+        if (header.size != 4) return null
+        return AnilistMangaStats(
+            count = header[0].toIntOrNull() ?: 0,
+            chaptersRead = header[1].toIntOrNull() ?: 0,
+            volumesRead = header[2].toIntOrNull() ?: 0,
+            meanScore = header[3].toDoubleOrNull(),
+            genres = lines.statItems("genre"),
+            tags = lines.statItems("tag"),
+            formats = lines.statItems("format"),
+            statuses = lines.statItems("status"),
+        )
+    }
+
+    fun saveAnilistMangaStats(stats: AnilistMangaStats?) {
+        if (stats == null) {
+            preferences.edit().remove(KEY_ANILIST_MANGA_STATS).apply()
+            return
+        }
+        val lines = buildList {
+            add(
+                listOf(
+                    stats.count.toString(),
+                    stats.chaptersRead.toString(),
+                    stats.volumesRead.toString(),
+                    stats.meanScore?.toString().orEmpty(),
+                ).joinToString("|"),
+            )
+            stats.genres.forEach { add(it.toStatsLine("genre")) }
+            stats.tags.forEach { add(it.toStatsLine("tag")) }
+            stats.formats.forEach { add(it.toStatsLine("format")) }
+            stats.statuses.forEach { add(it.toStatsLine("status")) }
+        }
+        preferences.edit()
+            .putString(KEY_ANILIST_MANGA_STATS, lines.joinToString("\n"))
+            .apply()
+    }
+
     fun anilistScoreFormat(): AnilistScoreFormat =
         preferences.getString(KEY_ANILIST_SCORE_FORMAT, null)
             ?.let { stored -> runCatching { AnilistScoreFormat.valueOf(stored) }.getOrNull() }
@@ -337,6 +404,7 @@ class SettingsStore(context: Context) {
         const val KEY_ANILIST_AUTO_SAVE_TRACKING_CHANGES = "anilist.auto.save.tracking.changes"
         const val KEY_ANILIST_AUTO_SYNC_READER_PROGRESS = "anilist.auto.sync.reader.progress"
         const val KEY_ANILIST_SYNC_MANUAL_READ_PROGRESS = "anilist.sync.manual.read.progress"
+        const val KEY_SHOW_NSFW_CONTENT = "profile.show.nsfw.content"
         const val KEY_BACKUP_FOLDER_URI = "backup.folder.uri"
         const val KEY_BACKUP_SCHEDULE = "backup.schedule"
         const val KEY_BACKUP_LAST_RUN_AT = "backup.last.run.at"
@@ -346,6 +414,9 @@ class SettingsStore(context: Context) {
         const val KEY_SOURCE_LANGUAGES = "source.languages"
         const val KEY_DISABLED_SOURCE_KEYS = "source.disabled.keys"
         const val KEY_VIEWER_NAME = "anilist.viewer.name"
+        const val KEY_VIEWER_AVATAR_URL = "anilist.viewer.avatar.url"
+        const val KEY_VIEWER_BANNER_IMAGE_URL = "anilist.viewer.banner.image.url"
+        const val KEY_ANILIST_MANGA_STATS = "anilist.viewer.manga.stats"
         const val KEY_ANILIST_SCORE_FORMAT = "anilist.score.format"
         const val KEY_ANILIST_TITLE_LANGUAGE = "anilist.title.language"
         const val KEY_ANILIST_CUSTOM_LISTS = "anilist.custom.lists"
@@ -353,6 +424,22 @@ class SettingsStore(context: Context) {
         const val PHONE_TABLET_BREAKPOINT_DP = 600
     }
 }
+
+private fun List<String>.statItems(section: String): List<AnilistStatItem> =
+    drop(1).mapNotNull { line ->
+        val parts = line.split('|')
+        if (parts.size != 4 || parts[0] != section) return@mapNotNull null
+        runCatching {
+            AnilistStatItem(
+                name = decodePart(parts[1]),
+                count = parts[2].toIntOrNull() ?: 0,
+                chaptersRead = parts[3].toIntOrNull() ?: 0,
+            )
+        }.getOrNull()
+    }
+
+private fun AnilistStatItem.toStatsLine(section: String): String =
+    listOf(section, encodePart(name), count.toString(), chaptersRead.toString()).joinToString("|")
 
 private fun encodePart(value: String): String =
     Base64.getUrlEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
