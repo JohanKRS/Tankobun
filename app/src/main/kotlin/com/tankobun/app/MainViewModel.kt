@@ -1,9 +1,12 @@
 package com.tankobun.app
 
 import com.tankobun.app.backup.BackupDataSource
+import com.tankobun.app.backup.AppSettingsBackupDataSource
 import com.tankobun.app.backup.isDue
 import com.tankobun.app.anilist.AniListDataSource
 import com.tankobun.app.browse.BrowseDataSource
+import com.tankobun.app.cache.CacheClearTarget
+import com.tankobun.app.cache.CacheStorageDataSource
 import com.tankobun.app.download.DownloadDataSource
 import com.tankobun.app.extensions.ExtensionDataSource
 import com.tankobun.app.extensions.InstalledExtensionVersion
@@ -83,6 +86,7 @@ import com.tankobun.app.reader.ReaderDataSource
 import com.tankobun.app.source.SourceDataSource
 import com.tankobun.app.source.SourcePickerSearchUpdate
 import com.tankobun.app.state.ExtensionInstallRequest
+import com.tankobun.app.state.BackupMissingSource
 import com.tankobun.app.state.ReaderChapterSegment
 import com.tankobun.app.state.ReaderLoadError
 import com.tankobun.app.state.RecentReadingProgress
@@ -135,6 +139,8 @@ class MainViewModel(
     private val cachePolicy = CachePolicy()
     private val aniListDataSource = AniListDataSource(container, cachePolicy)
     private val backupDataSource = BackupDataSource(container)
+    private val appSettingsBackupDataSource = AppSettingsBackupDataSource(container)
+    private val cacheStorageDataSource = CacheStorageDataSource(container)
     private val downloadDataSource = DownloadDataSource(container)
     private val extensionDataSource = ExtensionDataSource(container)
     private val readerDataSource = ReaderDataSource(container)
@@ -221,6 +227,7 @@ class MainViewModel(
         if (_state.value.extensionRepositoryUrl.isNotBlank()) {
             refreshExtensionIndex(silent = true)
         }
+        refreshCacheStorageSummary()
         if (_state.value.loggedIn) {
             refreshAniListViewer()
             loadCachedLibrary(syncIfEmpty = true)
@@ -565,7 +572,16 @@ class MainViewModel(
                 version.versionCode >= request.expectedVersionCode -> string(R.string.msg_updated_extension, request.name, version.versionName)
                 else -> string(R.string.msg_extension_still_old, request.name, version.versionName)
             }
-            _state.update { it.copy(message = message) }
+            _state.update {
+                it.copy(
+                    backupMissingSources = if ((version?.versionCode ?: -1) >= request.expectedVersionCode) {
+                        it.backupMissingSources.filterNot { missing -> missing.packageName == request.packageName }
+                    } else {
+                        it.backupMissingSources
+                    },
+                    message = message,
+                )
+            }
             Log.i(
                 TAG,
                 "Installer returned for ${request.packageName}; installed=${version?.versionCode}, expected=${request.expectedVersionCode}",
@@ -717,6 +733,127 @@ class MainViewModel(
                 Log.e(TAG, "AniList backup restore failed", error)
                 _state.update { it.copy(busy = false, message = error.userMessage(localizedContext(), string(R.string.msg_restore_failed))) }
             }
+        }
+    }
+
+    fun saveAppSettingsBackup(uri: Uri) {
+        val snapshot = _state.value
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                appSettingsBackupDataSource.saveBackup(uri, snapshot)
+            }.onSuccess { sourcePackageCount ->
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = string(R.string.msg_app_settings_backup_saved, sourcePackageCount),
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "App settings backup failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_app_settings_backup_failed)),
+                    )
+                }
+            }
+        }
+    }
+
+    fun restoreAppSettingsBackup(uri: Uri) {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                appSettingsBackupDataSource.restoreBackup(uri)
+            }.onSuccess { result ->
+                applyRestoredAppSettings(
+                    missingSources = result.missingSources,
+                    message = if (result.missingSources.isEmpty()) {
+                        container.string(R.string.msg_app_settings_restored)
+                    } else {
+                        container.string(R.string.msg_app_settings_restored_with_missing_sources, result.missingSources.size)
+                    },
+                )
+                refreshInstalledSources()
+                refreshCacheStorageSummary()
+                if (_state.value.extensionRepositoryUrl.isNotBlank()) {
+                    refreshExtensionIndex(silent = true)
+                }
+                ScheduledBackupWork.update(container.application, container.settingsStore.backupSchedule())
+            }.onFailure { error ->
+                Log.e(TAG, "App settings restore failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_app_settings_restore_failed)),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun applyRestoredAppSettings(
+        missingSources: List<BackupMissingSource>,
+        message: String,
+    ) {
+        val store = container.settingsStore
+        val sourceLanguages = store.sourceLanguages()
+        val disabledSourceKeys = store.disabledSourceKeys()
+        _state.update { current ->
+            val visibleSources = current.allInstalledSources.preferredVisibleSources(sourceLanguages, disabledSourceKeys)
+            current.copy(
+                themeMode = store.themeMode(),
+                appLanguage = store.appLanguage(),
+                ignoreDisplayCutout = store.ignoreDisplayCutout(),
+                showAppStatusBar = store.showAppStatusBar(),
+                dockAlignment = store.dockAlignment(),
+                libraryViewMode = store.libraryViewMode(),
+                libraryCoverColumns = store.libraryCoverColumns(),
+                libraryShowWholeCovers = store.libraryShowWholeCovers(),
+                browseViewMode = store.browseViewMode(),
+                browseCoverColumns = store.browseCoverColumns(),
+                browseShowWholeCovers = store.browseShowWholeCovers(),
+                readerMode = store.readerMode(),
+                readerPageGapLevel = store.readerPageGapLevel(),
+                chapterListStartsAtFirst = store.chapterListStartsAtFirst(),
+                keepNextTenDownloads = store.keepNextTenDownloads(),
+                showNsfwContent = store.showNsfwContent(),
+                anilistScoreFormat = store.anilistScoreFormat(),
+                anilistTitleLanguage = store.anilistTitleLanguage(),
+                anilistAutoSaveTrackingChanges = store.anilistAutoSaveTrackingChanges(),
+                anilistAutoSyncReaderProgress = store.anilistAutoSyncReaderProgress(),
+                anilistSyncManualReadProgress = store.anilistSyncManualReadProgress(),
+                anilistCustomLists = store.anilistCustomLists(),
+                backupSchedule = store.backupSchedule(),
+                extensionRepositoryUrl = store.extensionRepositoryUrl(),
+                sourceLanguages = sourceLanguages,
+                disabledSourceKeys = disabledSourceKeys,
+                installedSources = visibleSources,
+                selectedSourceId = current.selectedSourceId
+                    ?.takeIf { selected -> visibleSources.any { source -> source.id == selected } }
+                    ?: visibleSources.firstOrNull()?.id,
+                backupMissingSources = missingSources,
+                busy = false,
+                message = message,
+            )
+        }
+    }
+
+    fun installBackupMissingSource(source: BackupMissingSource) {
+        val entry = _state.value.availableExtensions.firstOrNull { it.packageName == source.packageName }
+        if (entry == null) {
+            _state.update {
+                it.copy(message = string(R.string.msg_backup_missing_source_not_found, source.name))
+            }
+            return
+        }
+        installExtension(entry)
+    }
+
+    fun dismissBackupMissingSource(packageName: String) {
+        _state.update { current ->
+            current.copy(backupMissingSources = current.backupMissingSources.filterNot { it.packageName == packageName })
         }
     }
 
@@ -2759,6 +2896,66 @@ class MainViewModel(
             downloadDataSource.removeAll()
             refreshDownloadState()
             _state.update { it.copy(message = string(R.string.msg_removed_all_downloads)) }
+        }
+    }
+
+    fun refreshCacheStorageSummary() {
+        viewModelScope.launch {
+            runCatching {
+                cacheStorageDataSource.summary()
+            }.onSuccess { summary ->
+                _state.update { it.copy(cacheStorageSummary = summary) }
+            }.onFailure { error ->
+                Log.w(TAG, "Cache storage summary failed", error)
+            }
+        }
+    }
+
+    fun clearAnilistAndImageCache() {
+        clearCacheStorage(CacheClearTarget.ANILIST_IMAGES)
+    }
+
+    fun clearSourceNetworkCache() {
+        clearCacheStorage(CacheClearTarget.SOURCE_NETWORK)
+    }
+
+    fun clearReaderPageCache() {
+        cancelReaderPageCacheJobs()
+        clearCacheStorage(CacheClearTarget.READER_PAGES)
+    }
+
+    fun clearTemporaryCache() {
+        clearCacheStorage(CacheClearTarget.TEMPORARY_FILES)
+    }
+
+    fun clearAllCaches() {
+        cancelReaderPageCacheJobs()
+        clearCacheStorage(CacheClearTarget.ALL)
+    }
+
+    private fun clearCacheStorage(target: CacheClearTarget) {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                cacheStorageDataSource.clear(target)
+                cacheStorageDataSource.summary()
+            }.onSuccess { summary ->
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        cacheStorageSummary = summary,
+                        message = string(R.string.msg_cache_cleared),
+                    )
+                }
+            }.onFailure { error ->
+                Log.w(TAG, "Cache clear failed for $target", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_cache_clear_failed)),
+                    )
+                }
+            }
         }
     }
 

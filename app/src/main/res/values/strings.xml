@@ -22,6 +22,7 @@
     <string name="common_current">Current</string>
     <string name="common_dark">Dark</string>
     <string name="common_delete">Delete</string>
+    <string name="common_dismiss">Dismiss</string>
     <string name="common_download">Download</string>
     <string name="common_downloaded">Downloaded</string>
     <string name="common_downloads">Downloads</string>
@@ -97,7 +98,7 @@
     <string name="settings_anilist_subtitle">Manage sync and account connection.</string>
     <string name="settings_custom_lists_subtitle">Create, rename, and delete AniList manga custom lists. Manga stay in their normal AniList status lists.</string>
     <string name="settings_languages_subtitle">Choose the app language and which source languages Tankobun should show by default.</string>
-    <string name="settings_backups_subtitle">Save and restore your AniList manga list as MyAnimeList-compatible XML.</string>
+    <string name="settings_backups_subtitle">Save and restore your AniList manga list and app settings.</string>
     <string name="settings_sources_subtitle">Manage installed source extensions and repository entries.</string>
     <string name="settings_about_subtitle">A little context about what Tankobun is and is not.</string>
     <string name="settings_downloads_subtitle">Review local chapter storage and remove downloaded manga.</string>
@@ -464,6 +465,13 @@
     <string name="downloads_storage_detail">%1$d %2$s</string>
     <string name="downloads_storage_detail_complete">%1$d complete</string>
     <string name="downloads_storage_detail_active">%1$d active</string>
+    <string name="cache_storage_title">Cache</string>
+    <string name="cache_storage_desc">Temporary AniList, image, source, and reader page data.</string>
+    <string name="cache_storage_anilist_images">AniList and images</string>
+    <string name="cache_storage_source_network">Source network cache</string>
+    <string name="cache_storage_reader_pages">Reader page cache</string>
+    <string name="cache_storage_temporary">Temporary APK files</string>
+    <string name="cache_clear_all">Clear all cache</string>
 
     <string name="backup_anilist_manga">AniList manga backup</string>
     <string name="backup_mal_xml">MyAnimeList XML</string>
@@ -489,6 +497,14 @@
     <string name="backup_ready_for_mal">%1$d manga ready for MAL-ID based import.</string>
     <string name="backup_missing_mal">%1$d manga have MAL IDs; %2$d included without a MAL match.</string>
     <string name="backup_mal_matched_summary">%1$d / %2$d MAL matched</string>
+    <string name="backup_app_settings">App settings backup</string>
+    <string name="backup_app_settings_json">Tankobun settings JSON</string>
+    <string name="backup_app_settings_desc">Exports layout, reader, AniList preference, language, source filter, and installed-source manifest settings. It does not include your AniList token or APK files.</string>
+    <string name="backup_save_settings">Save settings</string>
+    <string name="backup_restore_settings">Restore settings</string>
+    <string name="backup_missing_sources">Missing sources</string>
+    <string name="backup_missing_sources_desc">These source APKs were present in the restored backup but are not installed on this device.</string>
+    <string name="backup_missing_source_unavailable">Not found in the loaded repository index.</string>
 
     <string name="about_version">Version %1$s (%2$d)</string>
     <string name="about_github">GitHub repository</string>
@@ -598,6 +614,14 @@
     <string name="msg_backup_already_running">Backup is already running</string>
     <string name="msg_scheduled_backup_saved">Scheduled backup saved (%1$s)</string>
     <string name="msg_scheduled_backup_failed">Scheduled backup failed</string>
+    <string name="msg_app_settings_backup_saved">App settings backup saved (%1$d source packages)</string>
+    <string name="msg_app_settings_backup_failed">App settings backup failed</string>
+    <string name="msg_app_settings_restored">App settings restored</string>
+    <string name="msg_app_settings_restored_with_missing_sources">App settings restored / %1$d missing sources</string>
+    <string name="msg_app_settings_restore_failed">App settings restore failed</string>
+    <string name="msg_backup_missing_source_not_found">%1$s is not in the loaded source repository</string>
+    <string name="msg_cache_cleared">Cache cleared</string>
+    <string name="msg_cache_clear_failed">Could not clear cache</string>
     <string name="msg_browse_failed">Browse failed</string>
     <string name="msg_search_failed">Search failed</string>
     <string name="msg_could_not_load_more_manga">Could not load more manga</string>

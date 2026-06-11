@@ -121,6 +121,8 @@ data class TankobunUiState(
     val currentPageScrollOffset: Int = 0,
     val downloads: List<DownloadJob> = emptyList(),
     val downloadStorageSummary: DownloadStorageSummary = DownloadStorageSummary(),
+    val cacheStorageSummary: CacheStorageSummary = CacheStorageSummary(),
+    val backupMissingSources: List<BackupMissingSource> = emptyList(),
     val keepNextTenDownloads: Boolean = false,
     val anilistAutoSaveTrackingChanges: Boolean = false,
     val anilistAutoSyncReaderProgress: Boolean = true,

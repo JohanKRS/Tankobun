@@ -231,6 +231,9 @@ internal fun DownloadsSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     var pendingDelete by remember { mutableStateOf<PendingDownloadDelete?>(null) }
+    LaunchedEffect(Unit) {
+        viewModel.refreshCacheStorageSummary()
+    }
     SettingsDetailPanel(
         title = tankobunString(R.string.common_downloads),
         subtitle = tankobunString(R.string.settings_downloads_subtitle),
@@ -268,6 +271,15 @@ internal fun DownloadsSettingsScreen(
                 )
             }
         }
+
+        CacheStoragePanel(
+            summary = state.cacheStorageSummary,
+            onClearAnilistImages = viewModel::clearAnilistAndImageCache,
+            onClearSourceNetwork = viewModel::clearSourceNetworkCache,
+            onClearReaderPages = viewModel::clearReaderPageCache,
+            onClearTemporary = viewModel::clearTemporaryCache,
+            onClearAll = viewModel::clearAllCaches,
+        )
 
         if (summary.items.isEmpty()) {
             Text(tankobunString(R.string.downloads_no_downloaded_chapters), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -331,6 +343,109 @@ internal fun DownloadsSettingsScreen(
                 pendingDelete = null
             },
         )
+    }
+}
+
+@Composable
+internal fun CacheStoragePanel(
+    summary: CacheStorageSummary,
+    onClearAnilistImages: () -> Unit,
+    onClearSourceNetwork: () -> Unit,
+    onClearReaderPages: () -> Unit,
+    onClearTemporary: () -> Unit,
+    onClearAll: () -> Unit,
+) {
+    TankobunPanel(
+        modifier = Modifier.fillMaxWidth(),
+        color = LocalTankobunStyle.current.colors.panel,
+        contentColor = LocalTankobunStyle.current.colors.panelContent,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(tankobunString(R.string.cache_storage_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        tankobunString(R.string.cache_storage_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    summary.totalBytes.formatFileSize(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            CacheStorageRow(
+                label = tankobunString(R.string.cache_storage_anilist_images),
+                bytes = summary.anilistAndImageBytes,
+                onClear = onClearAnilistImages,
+            )
+            CacheStorageRow(
+                label = tankobunString(R.string.cache_storage_source_network),
+                bytes = summary.sourceNetworkBytes,
+                onClear = onClearSourceNetwork,
+            )
+            CacheStorageRow(
+                label = tankobunString(R.string.cache_storage_reader_pages),
+                bytes = summary.readerPageBytes,
+                onClear = onClearReaderPages,
+            )
+            CacheStorageRow(
+                label = tankobunString(R.string.cache_storage_temporary),
+                bytes = summary.temporaryBytes,
+                onClear = onClearTemporary,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TankobunActionButton(
+                    label = tankobunString(R.string.cache_clear_all),
+                    icon = Icons.Default.Delete,
+                    onClick = onClearAll,
+                    enabled = summary.totalBytes > 0L,
+                    filled = false,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CacheStorageRow(
+    label: String,
+    bytes: Long,
+    onClear: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                bytes.formatFileSize(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        TextButton(
+            onClick = onClear,
+            enabled = bytes > 0L,
+        ) {
+            Text(tankobunString(R.string.common_clear))
+        }
     }
 }
 
@@ -629,6 +744,9 @@ internal fun suggestedAniListBackupFileName(viewerName: String?): String {
         ?: "user"
     return "tankobun_anilist_backup_${userPart}_${System.currentTimeMillis()}.xml"
 }
+
+internal fun suggestedAppSettingsBackupFileName(): String =
+    "tankobun_settings_${System.currentTimeMillis()}.json"
 
 @Composable
 internal fun TankobunUiState.downloadedMediaTitle(mediaId: Int): String =

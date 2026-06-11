@@ -125,8 +125,8 @@ object ReaderPageCache {
 
     suspend fun prune(
         context: Context,
-        maxChapterDirs: Int = 16,
-        minRecentChapterDirsPerMedia: Int = 2,
+        maxChapterDirs: Int = 32,
+        minRecentChapterDirsPerMedia: Int = 4,
     ) = withContext(Dispatchers.IO) {
         val root = rootDir(context)
         val chapterDirs = root
@@ -145,6 +145,15 @@ object ReaderPageCache {
             .filterNot { it in protectedChapterDirs }
             .drop(unprotectedToKeep)
             .forEach { it.deleteRecursively() }
+    }
+
+    suspend fun sizeBytes(context: Context): Long = withContext(Dispatchers.IO) {
+        rootDir(context).safeSizeBytes()
+    }
+
+    suspend fun clear(context: Context) = withContext(Dispatchers.IO) {
+        rootDir(context).deleteRecursively()
+        rootDir(context).mkdirs()
     }
 
     private fun cachedFile(
@@ -195,4 +204,12 @@ object ReaderPageCache {
     }
 
     private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "gif")
+}
+
+private fun File.safeSizeBytes(): Long {
+    if (!exists()) return 0L
+    if (isFile) return length().coerceAtLeast(0L)
+    return walkTopDown()
+        .filter { it.isFile }
+        .sumOf { file -> runCatching { file.length().coerceAtLeast(0L) }.getOrDefault(0L) }
 }

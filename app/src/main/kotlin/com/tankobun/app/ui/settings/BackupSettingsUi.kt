@@ -236,10 +236,20 @@ internal fun BackupsSettingsScreen(
     ) { uri ->
         uri?.let(viewModel::saveAniListBackup)
     }
+    val appSettingsBackupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        uri?.let(viewModel::saveAppSettingsBackup)
+    }
     val restoreLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         uri?.let(viewModel::restoreAniListBackup)
+    }
+    val appSettingsRestoreLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.let(viewModel::restoreAppSettingsBackup)
     }
     val folderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
@@ -330,6 +340,54 @@ internal fun BackupsSettingsScreen(
                 }
             }
         }
+        Text(tankobunString(R.string.backup_app_settings), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        TankobunPanel(
+            modifier = Modifier.fillMaxWidth(),
+            color = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(tankobunString(R.string.backup_app_settings_json), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    tankobunString(R.string.backup_app_settings_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TankobunActionButton(
+                        label = tankobunString(R.string.backup_save_settings),
+                        onClick = {
+                            appSettingsBackupLauncher.launch(suggestedAppSettingsBackupFileName())
+                        },
+                    )
+                    TankobunActionButton(
+                        label = tankobunString(R.string.backup_restore_settings),
+                        onClick = {
+                            appSettingsRestoreLauncher.launch(arrayOf("application/json", "text/json", "*/*"))
+                        },
+                        filled = false,
+                    )
+                }
+            }
+        }
+        if (state.backupMissingSources.isNotEmpty()) {
+            MissingBackupSourcesPanel(
+                missingSources = state.backupMissingSources,
+                availableExtensions = state.availableExtensions,
+                installingPackageName = state.installingExtensionPackageName,
+                iconUrlFor = viewModel::extensionIconUrl,
+                onInstall = viewModel::installBackupMissingSource,
+                onDismiss = viewModel::dismissBackupMissingSource,
+            )
+        }
         Text(tankobunString(R.string.backup_scheduled), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         TankobunPanel(
             modifier = Modifier.fillMaxWidth(),
@@ -385,6 +443,118 @@ internal fun BackupsSettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun MissingBackupSourcesPanel(
+    missingSources: List<BackupMissingSource>,
+    availableExtensions: List<ExtensionIndexEntry>,
+    installingPackageName: String?,
+    iconUrlFor: (ExtensionIndexEntry) -> String?,
+    onInstall: (BackupMissingSource) -> Unit,
+    onDismiss: (String) -> Unit,
+) {
+    val extensionByPackage = remember(availableExtensions) {
+        availableExtensions.associateBy { it.packageName }
+    }
+    TankobunPanel(
+        modifier = Modifier.fillMaxWidth(),
+        color = LocalTankobunStyle.current.colors.panel,
+        contentColor = LocalTankobunStyle.current.colors.panelContent,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(tankobunString(R.string.backup_missing_sources), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    tankobunString(R.string.backup_missing_sources_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            missingSources.forEach { source ->
+                val extension = extensionByPackage[source.packageName]
+                MissingBackupSourceRow(
+                    source = source,
+                    extension = extension,
+                    iconUrl = extension?.let(iconUrlFor),
+                    installing = installingPackageName == source.packageName,
+                    onInstall = { onInstall(source) },
+                    onDismiss = { onDismiss(source.packageName) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MissingBackupSourceRow(
+    source: BackupMissingSource,
+    extension: ExtensionIndexEntry?,
+    iconUrl: String?,
+    installing: Boolean,
+    onInstall: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        ExtensionIcon(
+            packageName = null,
+            name = source.name,
+            iconUrl = iconUrl,
+            modifier = Modifier.size(42.dp),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(source.name.extensionDisplayName(), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+            Text(
+                listOfNotNull(
+                    source.lang.takeIf { it.isNotBlank() }?.let { sourceLanguageDisplay(it) },
+                    source.versionName?.let { "v$it" },
+                    source.packageName,
+                ).joinToString(" / "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (extension == null) {
+                Text(
+                    tankobunString(R.string.backup_missing_source_unavailable),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Button(
+            onClick = onInstall,
+            enabled = extension != null && !installing,
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        ) {
+            if (installing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            } else {
+                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(tankobunString(R.string.common_install))
+            }
+        }
+        TextButton(onClick = onDismiss) {
+            Text(tankobunString(R.string.common_dismiss))
         }
     }
 }

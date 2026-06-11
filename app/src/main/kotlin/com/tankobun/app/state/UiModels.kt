@@ -57,3 +57,21 @@ data class DownloadStorageItem(
     val activeChapterCount: Int,
     val pageCount: Int,
 )
+
+data class CacheStorageSummary(
+    val anilistAndImageBytes: Long = 0L,
+    val sourceNetworkBytes: Long = 0L,
+    val readerPageBytes: Long = 0L,
+    val temporaryBytes: Long = 0L,
+) {
+    val totalBytes: Long
+        get() = anilistAndImageBytes + sourceNetworkBytes + readerPageBytes + temporaryBytes
+}
+
+data class BackupMissingSource(
+    val packageName: String,
+    val name: String,
+    val lang: String,
+    val versionName: String?,
+    val sourceNames: List<String> = emptyList(),
+)
