@@ -339,11 +339,6 @@ internal fun SettingsIndexPane(
                 )
             }
         }
-        Text(
-            tankobunString(R.string.settings_unofficial_notice),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

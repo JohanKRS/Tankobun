@@ -226,6 +226,13 @@ import com.tankobun.app.ui.reader.*
 import com.tankobun.app.ui.settings.*
 import com.tankobun.app.ui.shell.*
 
+private const val ReaderSideTapZoneWeight = 1f
+private const val ReaderCenterTapZoneWeight = 1.15f
+private const val ReaderTapZoneTotalWeight = ReaderSideTapZoneWeight + ReaderCenterTapZoneWeight + ReaderSideTapZoneWeight
+private const val ReaderPreviousTapZoneEndFraction = ReaderSideTapZoneWeight / ReaderTapZoneTotalWeight
+private const val ReaderNextTapZoneStartFraction =
+    (ReaderSideTapZoneWeight + ReaderCenterTapZoneWeight) / ReaderTapZoneTotalWeight
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
@@ -491,18 +498,20 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                         readerMotion.animateTransform(coroutineScope, nextScale, nextOffset)
                     },
                     onTap = { offset ->
-                        val centerX = size.width / 3f..size.width * 2f / 3f
-                        val centerY = size.height / 3f..size.height * 2f / 3f
+                        val previousZoneEndX = size.width * ReaderPreviousTapZoneEndFraction
+                        val nextZoneStartX = size.width * ReaderNextTapZoneStartFraction
                         when {
-                            offset.x in centerX && offset.y in centerY -> controlsVisible = !controlsVisible
+                            offset.x >= previousZoneEndX && offset.x <= nextZoneStartX -> {
+                                controlsVisible = !controlsVisible
+                            }
                             !controlsVisible &&
                                 readerScale <= 1.05f &&
                                 state.readerMode == ReaderMode.PAGED &&
-                                offset.x < size.width / 3f -> viewModel.moveReaderPage(-1)
+                                offset.x < previousZoneEndX -> viewModel.moveReaderPage(-1)
                             !controlsVisible &&
                                 readerScale <= 1.05f &&
                                 state.readerMode == ReaderMode.PAGED &&
-                                offset.x > size.width * 2f / 3f -> viewModel.moveReaderPage(1)
+                                offset.x > nextZoneStartX -> viewModel.moveReaderPage(1)
                         }
                     },
                 )
@@ -940,17 +949,17 @@ internal fun ReaderTutorialOverlay(readerMode: ReaderMode, onDismiss: () -> Unit
             ReaderTapZoneHint(
                 label = tankobunString(R.string.common_previous),
                 detail = tankobunString(R.string.reader_tutorial_previous),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(ReaderSideTapZoneWeight),
             )
             ReaderTapZoneHint(
                 label = tankobunString(R.string.common_options),
                 detail = tankobunString(R.string.reader_tutorial_controls),
-                modifier = Modifier.weight(1.15f),
+                modifier = Modifier.weight(ReaderCenterTapZoneWeight),
             )
             ReaderTapZoneHint(
                 label = tankobunString(R.string.common_next),
                 detail = tankobunString(R.string.reader_tutorial_previous),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(ReaderSideTapZoneWeight),
             )
         }
 

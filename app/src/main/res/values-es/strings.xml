@@ -520,9 +520,11 @@
 
     <string name="about_version">Versión %1$s (%2$d)</string>
     <string name="about_github">Repositorio de GitHub</string>
+    <string name="about_anilist_website">Sitio web de AniList</string>
     <string name="about_replay_tutorial">Repetir tutorial</string>
     <string name="about_summary">Tutorial y avisos</string>
     <string name="about_unofficial">Tankobun es un lector de manga no oficial y no está afiliado con AniList.</string>
+    <string name="about_anilist_thanks">Gracias a AniList por poner su API a disposición de usuarios y apps de la comunidad.</string>
     <string name="about_anilist_data">Los datos de AniList se acceden mediante la API de AniList autorizada por el usuario. Tankobun no aloja, sube ni proporciona contenido de manga o capítulos.</string>
     <string name="about_sources">Las fuentes y extensiones son de terceros. Tankobun solo funciona con formatos de extensión compatibles y configuración local del usuario.</string>
 

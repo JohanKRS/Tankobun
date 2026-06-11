@@ -262,6 +262,7 @@ internal enum class SettingsRoute {
 }
 
 internal const val TankobunGithubUrl = "https://github.com/JohanKRS/Tankobun"
+internal const val TankobunAniListUrl = "https://anilist.co"
 
 internal val SettingsDetailRoutes = listOf(
     SettingsRoute.PROFILE,
@@ -331,7 +332,7 @@ private const val FrostedGlassInputScale = 0.33f
 private const val FrostedGlassTintAlpha = 0.34f
 private const val FrostedGlassDimAlpha = 0.30f
 private const val FrostedGlassWashAlpha = 0.18f
-private const val FrostedGlassNoiseFactor = 0.08f
+private const val FrostedGlassNoiseFactor = 0f
 internal const val QuickDrawerSnapMillis = 240
 internal const val QuickDrawerScrimAlpha = 0.20f
 internal const val QuickDrawerBackdropBlurDp = 6f

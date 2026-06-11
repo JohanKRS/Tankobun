@@ -45,6 +45,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
@@ -213,6 +214,7 @@ internal fun TankobunActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
+    iconPainter: Painter? = null,
     enabled: Boolean = true,
     filled: Boolean = true,
     containerColor: Color? = null,
@@ -224,9 +226,15 @@ internal fun TankobunActionButton(
     val resolvedContainerColor = containerColor ?: LocalTankobunStyle.current.colors.action
     val resolvedContentColor = contentColor ?: LocalTankobunStyle.current.colors.actionContent
     val content: @Composable () -> Unit = {
-        icon?.let {
-            Icon(it, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(7.dp))
+        when {
+            icon != null -> {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(7.dp))
+            }
+            iconPainter != null -> {
+                Icon(iconPainter, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(7.dp))
+            }
         }
         Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

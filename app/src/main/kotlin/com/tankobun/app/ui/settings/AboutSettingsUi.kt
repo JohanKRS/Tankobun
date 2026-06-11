@@ -254,8 +254,15 @@ internal fun AboutSettingsScreen(
                 )
                 TankobunActionButton(
                     label = tankobunString(R.string.about_github),
-                    icon = Icons.Default.Link,
+                    iconPainter = painterResource(R.drawable.ic_github),
                     onClick = { uriHandler.openUri(TankobunGithubUrl) },
+                    modifier = Modifier.fillMaxWidth(),
+                    filled = false,
+                )
+                TankobunActionButton(
+                    label = tankobunString(R.string.about_anilist_website),
+                    icon = Icons.Default.Link,
+                    onClick = { uriHandler.openUri(TankobunAniListUrl) },
                     modifier = Modifier.fillMaxWidth(),
                     filled = false,
                 )
@@ -269,6 +276,11 @@ internal fun AboutSettingsScreen(
                 Text(
                     tankobunString(R.string.about_unofficial),
                     style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    tankobunString(R.string.about_anilist_thanks),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     tankobunString(R.string.about_anilist_data),
