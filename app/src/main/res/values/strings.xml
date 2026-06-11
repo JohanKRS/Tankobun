@@ -525,7 +525,7 @@
     <string name="about_summary">Tutorial and notices</string>
     <string name="about_unofficial">Tankobun is an unofficial manga reader and is not affiliated with AniList.</string>
     <string name="about_anilist_thanks">Thanks to AniList for making its API available to users and community apps.</string>
-    <string name="about_anilist_data">AniList data is accessed through the user-authorized AniList API. Tankobun does not host, upload, or provide manga or chapter content.</string>
+    <string name="about_anilist_data">AniList is an anime and manga database, tracking, and social site. It does not host, upload, share, sell, or provide manga, chapters, or scanlations. Tankobun only accesses AniList metadata through the user-authorized API.</string>
     <string name="about_sources">Sources and extensions are third-party. Tankobun only works with compatible extension formats and local user configuration.</string>
 
     <string name="sources_empty_installed">No installed Tachiyomi-compatible source extensions found.</string>

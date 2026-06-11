@@ -72,6 +72,8 @@ Requests of that kind may be closed or removed without response.
 
 Tankobun uses the AniList API with user authorization.
 
+AniList [describes itself](https://docs.anilist.co/guide/introduction) as an anime and manga database, tracking, and social site. AniList is not a manga host, source, or chapter provider, and it does not host, upload, share, sell, or provide manga, chapters, or scanlations.
+
 Tankobun is not affiliated with, endorsed by, sponsored by, or officially supported by AniList. AniList names, marks, data, and services belong to AniList and their respective owners.
 
 To build the app yourself, create your own AniList API client and use:
