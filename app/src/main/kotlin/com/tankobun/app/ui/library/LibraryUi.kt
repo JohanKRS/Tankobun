@@ -71,8 +71,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -157,6 +159,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
@@ -576,9 +581,10 @@ internal fun LibraryPager(
     val configuration = LocalConfiguration.current
     var searchHeaderHeightPx by remember { mutableIntStateOf(0) }
     var tabHeaderHeightPx by remember { mutableIntStateOf(0) }
-    var pageScrollOffsets by remember(sections.size) { mutableStateOf(List(sections.size) { 0 }) }
-    var pageScrollRequestOffsets by remember(sections.size) { mutableStateOf(List<Int?>(sections.size) { null }) }
-    var pageScrollRequestTokens by remember(sections.size) { mutableStateOf(List(sections.size) { 0 }) }
+    var headerCollapsePx by remember { mutableFloatStateOf(0f) }
+    val sectionKeys = remember(sections) { sections.map { it.key } }
+    val pageListStates = remember(sectionKeys) { List(sections.size) { LazyListState() } }
+    val pageGridStates = remember(sectionKeys) { List(sections.size) { LazyGridState() } }
     val visibleSections = remember(sections, query, genres, tags, format, publishingStatus, countryOfOrigin, year, sort) {
         sections.map { section ->
             section.copy(
@@ -603,73 +609,41 @@ internal fun LibraryPager(
         publishingStatus != null ||
         countryOfOrigin != null ||
         year != null
-    val currentPage = pagerState.currentPage.coerceIn(0, sections.lastIndex)
-    val targetPage = pagerState.targetPage.coerceIn(0, sections.lastIndex)
-    val currentScrollOffsetPx = pageScrollOffsets.getOrElse(currentPage) { 0 }
-    val targetScrollOffsetPx = pageScrollOffsets.getOrElse(targetPage) { 0 }
-    val currentHeaderIsPinned = searchHeaderHeightPx > 0 && currentScrollOffsetPx >= searchHeaderHeightPx
-    val scrollOffsetForHeader = if (
-        pagerState.isScrollInProgress &&
-        targetPage != currentPage &&
-        currentHeaderIsPinned
+    val searchHeaderCollapsePx = headerCollapsePx.coerceIn(0f, searchHeaderHeightPx.toFloat())
+    val headerTranslationY = -searchHeaderCollapsePx
+    val visibleHeaderHeight = with(density) {
+        (searchHeaderHeightPx + tabHeaderHeightPx - searchHeaderCollapsePx.roundToInt()).toDp()
+    }
+    val headerScrollConnection = remember(searchHeaderHeightPx) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (searchHeaderHeightPx <= 0) return Offset.Zero
+                return when {
+                    available.y < 0f && headerCollapsePx < searchHeaderHeightPx -> {
+                        val consumed = minOf(-available.y, searchHeaderHeightPx - headerCollapsePx)
+                        headerCollapsePx += consumed
+                        Offset(x = 0f, y = -consumed)
+                    }
+                    available.y > 0f && headerCollapsePx > 0f -> {
+                        val consumed = minOf(available.y, headerCollapsePx)
+                        headerCollapsePx -= consumed
+                        Offset(x = 0f, y = consumed)
+                    }
+                    else -> Offset.Zero
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(searchHeaderHeightPx) {
+        headerCollapsePx = headerCollapsePx.coerceIn(0f, searchHeaderHeightPx.toFloat())
+    }
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .nestedScroll(headerScrollConnection),
     ) {
-        maxOf(currentScrollOffsetPx, targetScrollOffsetPx)
-    } else {
-        currentScrollOffsetPx
-    }
-    val searchHeaderCollapsePx = scrollOffsetForHeader.coerceAtMost(searchHeaderHeightPx)
-    val headerTranslationY = -searchHeaderCollapsePx.toFloat()
-    val sharedHeaderHeight = with(density) { (searchHeaderHeightPx + tabHeaderHeightPx).toDp() }
-    var lastObservedPage by remember(sections.size) { mutableIntStateOf(currentPage) }
-
-    fun requestPageScrollOffset(index: Int, offsetPx: Int) {
-        if (searchHeaderHeightPx <= 0) return
-        val requestedOffsetPx = offsetPx.coerceAtLeast(0)
-        pageScrollOffsets = pageScrollOffsets.toMutableList().also { offsets ->
-            if (index in offsets.indices) {
-                offsets[index] = requestedOffsetPx
-            }
-        }
-        pageScrollRequestOffsets = pageScrollRequestOffsets.toMutableList().also { offsets ->
-            if (index in offsets.indices) {
-                offsets[index] = requestedOffsetPx
-            }
-        }
-        pageScrollRequestTokens = pageScrollRequestTokens.toMutableList().also { tokens ->
-            if (index in tokens.indices) {
-                tokens[index] = tokens[index] + 1
-            }
-        }
-    }
-
-    fun pinPageAtContentTop(index: Int) {
-        requestPageScrollOffset(index = index, offsetPx = searchHeaderHeightPx)
-    }
-
-    LaunchedEffect(targetPage, searchHeaderHeightPx) {
-        if (targetPage != currentPage) {
-            if (currentHeaderIsPinned) {
-                pinPageAtContentTop(targetPage)
-            } else {
-                requestPageScrollOffset(
-                    index = targetPage,
-                    offsetPx = currentScrollOffsetPx.coerceAtMost(searchHeaderHeightPx),
-                )
-            }
-        }
-    }
-
-    LaunchedEffect(currentPage, searchHeaderHeightPx) {
-        val previousPage = lastObservedPage
-        val previousPageWasPinned = searchHeaderHeightPx > 0 &&
-            pageScrollOffsets.getOrElse(previousPage) { 0 } >= searchHeaderHeightPx
-        lastObservedPage = currentPage
-        if (previousPage != currentPage && previousPageWasPinned) {
-            pinPageAtContentTop(currentPage)
-        }
-    }
-
-    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val supportedViewMode = viewMode.supportedMediaViewMode()
         val supportedCoverColumns = coverColumns
             .supportedCoverColumns()
@@ -736,7 +710,7 @@ internal fun LibraryPager(
             }
             val pageContentPadding = PaddingValues(
                 start = LibraryContentPadding,
-                top = chromeInsets.top + sharedHeaderHeight + LibraryContentPadding,
+                top = chromeInsets.top + visibleHeaderHeight + LibraryContentPadding,
                 end = LibraryContentPadding,
                 bottom = pageBottomPadding + chromeInsets.bottom,
             )
@@ -748,15 +722,6 @@ internal fun LibraryPager(
                 onSelectMedia = onSelectMedia,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = pageContentPadding,
-                onScrollOffsetChange = { scrollOffset ->
-                    pageScrollOffsets = pageScrollOffsets.toMutableList().also { offsets ->
-                        if (page in offsets.indices) {
-                            offsets[page] = scrollOffset
-                        }
-                    }
-                },
-                scrollToContentOffsetPx = pageScrollRequestOffsets.getOrNull(page),
-                scrollToContentOffsetRequest = pageScrollRequestTokens.getOrElse(page) { 0 },
                 onContentHeightMeasured = if (shouldMeasureShortPage) {
                     { heightPx ->
                         measuredPageContentHeightsPx = measuredPageContentHeightsPx.toMutableList().also { heights ->
@@ -773,6 +738,8 @@ internal fun LibraryPager(
                 } else {
                     tankobunString(R.string.library_list_empty)
                 },
+                providedListState = pageListStates[page],
+                providedGridState = pageGridStates[page],
             )
         }
         Column(
@@ -805,14 +772,6 @@ internal fun LibraryPager(
                         Tab(
                             selected = pagerState.currentPage == index,
                             onClick = {
-                                if (currentHeaderIsPinned) {
-                                    pinPageAtContentTop(index)
-                                } else {
-                                    requestPageScrollOffset(
-                                        index = index,
-                                        offsetPx = currentScrollOffsetPx.coerceAtMost(searchHeaderHeightPx),
-                                    )
-                                }
                                 scope.launch { pagerState.animateScrollToPage(index) }
                             },
                             text = {

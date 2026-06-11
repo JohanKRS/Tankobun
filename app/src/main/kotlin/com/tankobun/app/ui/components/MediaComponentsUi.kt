@@ -69,8 +69,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
@@ -277,6 +279,8 @@ internal fun MediaCollection(
     scrollToContentOffsetPx: Int? = null,
     scrollToContentOffsetRequest: Int = 0,
     onContentHeightMeasured: ((Int) -> Unit)? = null,
+    providedListState: LazyListState? = null,
+    providedGridState: LazyGridState? = null,
 ) {
     val configuration = LocalConfiguration.current
     val supportedCoverColumns = coverColumns
@@ -284,7 +288,7 @@ internal fun MediaCollection(
         .coerceAtMost(if (configuration.smallestScreenWidthDp in 1 until 600) 4 else 8)
 
     if (media.isEmpty()) {
-        val listState = rememberLazyListState()
+        val listState = providedListState ?: rememberLazyListState()
         val latestOnScrollOffsetChange by rememberUpdatedState(onScrollOffsetChange)
         val latestOnContentHeightMeasured by rememberUpdatedState(onContentHeightMeasured)
         LaunchedEffect(listState, latestOnScrollOffsetChange != null) {
@@ -342,7 +346,7 @@ internal fun MediaCollection(
     val supportedViewMode = viewMode.supportedMediaViewMode()
     when (supportedViewMode) {
         MediaViewMode.LIST -> {
-            val listState = rememberLazyListState()
+            val listState = providedListState ?: rememberLazyListState()
             val latestOnNearEnd by rememberUpdatedState(onNearEnd)
             val latestOnScrollOffsetChange by rememberUpdatedState(onScrollOffsetChange)
             val latestOnContentHeightMeasured by rememberUpdatedState(onContentHeightMeasured)
@@ -423,7 +427,7 @@ internal fun MediaCollection(
             }
         }
         else -> {
-            val gridState = rememberLazyGridState()
+            val gridState = providedGridState ?: rememberLazyGridState()
             val latestOnNearEnd by rememberUpdatedState(onNearEnd)
             val latestOnScrollOffsetChange by rememberUpdatedState(onScrollOffsetChange)
             val latestOnContentHeightMeasured by rememberUpdatedState(onContentHeightMeasured)
