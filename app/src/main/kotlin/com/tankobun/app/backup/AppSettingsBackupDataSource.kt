@@ -102,6 +102,7 @@ internal class AppSettingsBackupDataSource(
             .put("readerPageGapLevel", snapshot.readerPageGapLevel)
             .put("chapterListStartsAtFirst", snapshot.chapterListStartsAtFirst)
             .put("keepNextTenDownloads", snapshot.keepNextTenDownloads)
+            .put("newChapterChecksEnabled", snapshot.newChapterChecksEnabled)
             .put("showNsfwContent", snapshot.showNsfwContent)
             .put("anilistScoreFormat", snapshot.anilistScoreFormat.name)
             .put("anilistTitleLanguage", snapshot.anilistTitleLanguage.name)
@@ -179,6 +180,7 @@ internal class AppSettingsBackupDataSource(
         settings.optIntOrNull("readerPageGapLevel")?.let(store::saveReaderPageGapLevel)
         settings.optBooleanOrNull("chapterListStartsAtFirst")?.let(store::saveChapterListStartsAtFirst)
         settings.optBooleanOrNull("keepNextTenDownloads")?.let(store::saveKeepNextTenDownloads)
+        settings.optBooleanOrNull("newChapterChecksEnabled")?.let(store::saveNewChapterChecksEnabled)
         settings.optBooleanOrNull("showNsfwContent")?.let(store::saveShowNsfwContent)
         settings.enumOrNull<AnilistScoreFormat>("anilistScoreFormat")?.let(store::saveAnilistScoreFormat)
         settings.enumOrNull<AnilistTitleLanguage>("anilistTitleLanguage")?.let(store::saveAnilistTitleLanguage)
@@ -220,6 +222,8 @@ internal class AppSettingsBackupDataSource(
             readerPageGapLevel = store.readerPageGapLevel(),
             chapterListStartsAtFirst = store.chapterListStartsAtFirst(),
             keepNextTenDownloads = store.keepNextTenDownloads(),
+            newChapterChecksEnabled = store.newChapterChecksEnabled(),
+            lastNewChapterCheckAtEpochMillis = store.lastNewChapterCheckAtEpochMillis(),
             showNsfwContent = store.showNsfwContent(),
             anilistScoreFormat = store.anilistScoreFormat(),
             anilistTitleLanguage = store.anilistTitleLanguage(),

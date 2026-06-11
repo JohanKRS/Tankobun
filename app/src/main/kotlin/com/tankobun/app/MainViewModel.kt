@@ -192,6 +192,8 @@ class MainViewModel(
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
             chapterListStartsAtFirst = container.settingsStore.chapterListStartsAtFirst(),
             keepNextTenDownloads = container.settingsStore.keepNextTenDownloads(),
+            newChapterChecksEnabled = container.settingsStore.newChapterChecksEnabled(),
+            lastNewChapterCheckAtEpochMillis = container.settingsStore.lastNewChapterCheckAtEpochMillis(),
             viewerAvatarUrl = container.settingsStore.viewerAvatarUrl(),
             viewerBannerImageUrl = container.settingsStore.viewerBannerImageUrl(),
             anilistMangaStats = container.settingsStore.anilistMangaStats(),
@@ -385,6 +387,35 @@ class MainViewModel(
     fun setLibraryShowWholeCovers(enabled: Boolean) {
         container.settingsStore.saveLibraryShowWholeCovers(enabled)
         _state.update { it.copy(libraryShowWholeCovers = enabled) }
+    }
+
+    fun setNewChapterChecksEnabled(enabled: Boolean) {
+        container.settingsStore.saveNewChapterChecksEnabled(enabled)
+        _state.update {
+            it.copy(
+                newChapterChecksEnabled = enabled,
+                message = if (enabled) {
+                    string(R.string.msg_new_chapter_check_enabled)
+                } else {
+                    string(R.string.msg_new_chapter_check_disabled)
+                },
+            )
+        }
+        NewChapterCheckWork.update(container.application, enabled)
+        if (enabled) {
+            NewChapterCheckWork.runOnce(container.application)
+        }
+    }
+
+    fun onNewChapterNotificationPermissionDenied() {
+        container.settingsStore.saveNewChapterChecksEnabled(false)
+        _state.update {
+            it.copy(
+                newChapterChecksEnabled = false,
+                message = string(R.string.msg_notification_permission_denied),
+            )
+        }
+        NewChapterCheckWork.update(container.application, enabled = false)
     }
 
     fun setBrowseViewMode(mode: MediaViewMode) {
@@ -824,6 +855,8 @@ class MainViewModel(
                 readerPageGapLevel = store.readerPageGapLevel(),
                 chapterListStartsAtFirst = store.chapterListStartsAtFirst(),
                 keepNextTenDownloads = store.keepNextTenDownloads(),
+                newChapterChecksEnabled = store.newChapterChecksEnabled(),
+                lastNewChapterCheckAtEpochMillis = store.lastNewChapterCheckAtEpochMillis(),
                 showNsfwContent = store.showNsfwContent(),
                 anilistScoreFormat = store.anilistScoreFormat(),
                 anilistTitleLanguage = store.anilistTitleLanguage(),
@@ -845,6 +878,7 @@ class MainViewModel(
                 message = message,
             )
         }
+        NewChapterCheckWork.update(container.application, store.newChapterChecksEnabled())
     }
 
     fun installBackupMissingSource(source: BackupMissingSource) {

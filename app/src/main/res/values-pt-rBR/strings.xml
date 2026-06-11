@@ -111,6 +111,11 @@
     <string name="settings_ignore_camera_cutout">Ignorar recorte da câmera</string>
     <string name="settings_ignore_camera_cutout_desc">Permite que o conteúdo use toda a largura da tela como se o tablet não tivesse notch.</string>
     <string name="settings_library_view">Visualização da biblioteca</string>
+    <string name="settings_library_updates">Atualizações de capítulos</string>
+    <string name="settings_daily_chapter_check">Checar capítulos novos diariamente</string>
+    <string name="settings_daily_chapter_check_desc">Verifica mangás em Reading que ainda não foram finalizados e já têm uma source vinculada. O Tankobun atualiza listas de capítulos uma por vez para não sobrecarregar as sources.</string>
+    <string name="settings_daily_chapter_check_last">Última checagem: %1$s</string>
+    <string name="settings_daily_chapter_check_short">checagem de capítulos</string>
     <string name="settings_browse_view">Visualização da exploração</string>
     <string name="settings_covers_per_row">Capas por linha</string>
     <string name="settings_cover_framing">Enquadramento das capas</string>
@@ -629,6 +634,9 @@
     <string name="msg_backup_missing_source_not_found">%1$s não está no repositório de sources carregado</string>
     <string name="msg_cache_cleared">Cache limpo</string>
     <string name="msg_cache_clear_failed">Não foi possível limpar o cache</string>
+    <string name="msg_new_chapter_check_enabled">Checagem diária de capítulos ativada</string>
+    <string name="msg_new_chapter_check_disabled">Checagem diária de capítulos desativada</string>
+    <string name="msg_notification_permission_denied">Permissão de notificação negada. A checagem diária de capítulos ficou desligada.</string>
     <string name="msg_browse_failed">Falha ao explorar</string>
     <string name="msg_search_failed">Falha na busca</string>
     <string name="msg_could_not_load_more_manga">Não foi possível carregar mais mangás</string>
@@ -757,6 +765,12 @@
     <string name="anilist_error_request_failed">A requisição do AniList falhou%1$s.</string>
     <string name="anilist_error_status_suffix"> (%1$d)</string>
 
+    <string name="notification_channel_new_chapters_name">Capítulos novos</string>
+    <string name="notification_channel_new_chapters_desc">Avisos diários quando mangás em Reading com source vinculada recebem capítulos novos.</string>
+    <string name="notification_new_chapters_title">Novos capítulos disponíveis</string>
+    <string name="notification_new_chapters_text_single">%1$s em %2$s</string>
+    <string name="notification_new_chapters_text_multi">%1$s com %2$s</string>
+
     <plurals name="manga_count">
         <item quantity="one">%1$d mangá</item>
         <item quantity="other">%1$d mangás</item>
@@ -764,6 +778,10 @@
     <plurals name="chapter_count">
         <item quantity="one">%1$d capítulo</item>
         <item quantity="other">%1$d capítulos</item>
+    </plurals>
+    <plurals name="new_chapter_count">
+        <item quantity="one">%1$d capítulo novo</item>
+        <item quantity="other">%1$d capítulos novos</item>
     </plurals>
     <plurals name="page_count">
         <item quantity="one">%1$d página</item>

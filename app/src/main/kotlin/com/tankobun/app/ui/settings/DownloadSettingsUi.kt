@@ -677,10 +677,15 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
         SettingsRoute.LANGUAGES -> state.sourceLanguages.count { it != UNIVERSAL_SOURCE_LANGUAGE }.let { count ->
             tankobunQuantityString(R.plurals.source_language_count, count, count)
         }
-        SettingsRoute.LIBRARY -> state.libraryViewMode.mediaViewSettingsSummary(
-            columns = state.libraryCoverColumns,
-            showWholeCovers = state.libraryShowWholeCovers,
-        )
+        SettingsRoute.LIBRARY -> buildList {
+            add(
+                state.libraryViewMode.mediaViewSettingsSummary(
+                    columns = state.libraryCoverColumns,
+                    showWholeCovers = state.libraryShowWholeCovers,
+                ),
+            )
+            if (state.newChapterChecksEnabled) add(tankobunString(R.string.settings_daily_chapter_check_short))
+        }.joinToString(" / ")
         SettingsRoute.BROWSE -> state.browseViewMode.mediaViewSettingsSummary(
             columns = state.browseCoverColumns,
             showWholeCovers = state.browseShowWholeCovers,

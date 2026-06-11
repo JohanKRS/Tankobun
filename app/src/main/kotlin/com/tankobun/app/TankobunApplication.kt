@@ -56,6 +56,7 @@ class TankobunApplication : Application() {
                 .build()
         }
         ScheduledBackupWork.sync(this, container.settingsStore.backupSchedule())
+        NewChapterCheckWork.sync(this, container.settingsStore.newChapterChecksEnabled())
     }
 }
 

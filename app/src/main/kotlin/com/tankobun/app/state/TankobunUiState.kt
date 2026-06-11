@@ -126,6 +126,8 @@ data class TankobunUiState(
     val cacheStorageSummary: CacheStorageSummary = CacheStorageSummary(),
     val backupMissingSources: List<BackupMissingSource> = emptyList(),
     val keepNextTenDownloads: Boolean = false,
+    val newChapterChecksEnabled: Boolean = false,
+    val lastNewChapterCheckAtEpochMillis: Long = 0L,
     val anilistAutoSaveTrackingChanges: Boolean = false,
     val anilistAutoSyncReaderProgress: Boolean = true,
     val anilistSyncManualReadProgress: Boolean = true,

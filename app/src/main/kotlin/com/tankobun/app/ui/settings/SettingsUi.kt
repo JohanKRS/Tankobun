@@ -1,8 +1,10 @@
 package com.tankobun.app.ui.settings
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
@@ -17,6 +19,7 @@ import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -490,6 +493,8 @@ internal fun SettingsDetailContent(
                 showWholeCover = state.libraryShowWholeCovers,
                 onShowWholeCoverChange = viewModel::setLibraryShowWholeCovers,
             )
+            Text(tankobunString(R.string.settings_library_updates), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            LibraryNewChapterChecksToggle(state = state, viewModel = viewModel)
         }
         SettingsRoute.BROWSE -> SettingsDetailPanel(
             title = tankobunString(R.string.common_browse),
@@ -547,6 +552,42 @@ internal fun SettingsDetailContent(
         )
         SettingsRoute.SOURCES -> SourcesSettingsScreen(state, viewModel)
     }
+}
+
+@Composable
+private fun LibraryNewChapterChecksToggle(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+) {
+    val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            viewModel.setNewChapterChecksEnabled(true)
+        } else {
+            viewModel.onNewChapterNotificationPermissionDenied()
+        }
+    }
+    val subtitle = buildString {
+        append(tankobunString(R.string.settings_daily_chapter_check_desc))
+        state.lastNewChapterCheckAtEpochMillis.takeIf { it > 0 }?.let { lastCheck ->
+            append('\n')
+            append(tankobunString(R.string.settings_daily_chapter_check_last, cacheAgeLabel(lastCheck)))
+        }
+    }
+    SettingsToggleRow(
+        title = tankobunString(R.string.settings_daily_chapter_check),
+        subtitle = subtitle,
+        checked = state.newChapterChecksEnabled,
+        onCheckedChange = { enabled ->
+            if (!enabled) {
+                viewModel.setNewChapterChecksEnabled(false)
+            } else if (context.needsPostNotificationPermission()) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                viewModel.setNewChapterChecksEnabled(true)
+            }
+        },
+    )
 }
 
 @Composable
@@ -1450,3 +1491,7 @@ internal fun DockAlignmentRow(
         }
     }
 }
+
+private fun Context.needsPostNotificationPermission(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED

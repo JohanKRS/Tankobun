@@ -111,6 +111,11 @@
     <string name="settings_ignore_camera_cutout">Ignore camera cutout</string>
     <string name="settings_ignore_camera_cutout_desc">Let content use the full display width as if this tablet had no notch.</string>
     <string name="settings_library_view">Library view</string>
+    <string name="settings_library_updates">Chapter updates</string>
+    <string name="settings_daily_chapter_check">Check for new chapters daily</string>
+    <string name="settings_daily_chapter_check_desc">Checks Reading manga that are still releasing and already have a linked source. Tankobun refreshes chapter lists one at a time so sources are not flooded.</string>
+    <string name="settings_daily_chapter_check_last">Last check: %1$s</string>
+    <string name="settings_daily_chapter_check_short">chapter checks</string>
     <string name="settings_browse_view">Browse view</string>
     <string name="settings_covers_per_row">Covers per row</string>
     <string name="settings_cover_framing">Cover framing</string>
@@ -629,6 +634,9 @@
     <string name="msg_backup_missing_source_not_found">%1$s is not in the loaded source repository</string>
     <string name="msg_cache_cleared">Cache cleared</string>
     <string name="msg_cache_clear_failed">Could not clear cache</string>
+    <string name="msg_new_chapter_check_enabled">Daily chapter checks enabled</string>
+    <string name="msg_new_chapter_check_disabled">Daily chapter checks disabled</string>
+    <string name="msg_notification_permission_denied">Notification permission denied. Daily chapter checks stayed off.</string>
     <string name="msg_browse_failed">Browse failed</string>
     <string name="msg_search_failed">Search failed</string>
     <string name="msg_could_not_load_more_manga">Could not load more manga</string>
@@ -757,6 +765,12 @@
     <string name="anilist_error_request_failed">AniList request failed%1$s.</string>
     <string name="anilist_error_status_suffix"> (%1$d)</string>
 
+    <string name="notification_channel_new_chapters_name">New chapters</string>
+    <string name="notification_channel_new_chapters_desc">Daily alerts when linked Reading manga get new chapters.</string>
+    <string name="notification_new_chapters_title">New chapters available</string>
+    <string name="notification_new_chapters_text_single">%1$s in %2$s</string>
+    <string name="notification_new_chapters_text_multi">%1$s updated with %2$s</string>
+
     <plurals name="manga_count">
         <item quantity="one">%1$d manga</item>
         <item quantity="other">%1$d manga</item>
@@ -764,6 +778,10 @@
     <plurals name="chapter_count">
         <item quantity="one">%1$d chapter</item>
         <item quantity="other">%1$d chapters</item>
+    </plurals>
+    <plurals name="new_chapter_count">
+        <item quantity="one">%1$d new chapter</item>
+        <item quantity="other">%1$d new chapters</item>
     </plurals>
     <plurals name="page_count">
         <item quantity="one">%1$d page</item>

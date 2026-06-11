@@ -148,6 +148,13 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean(KEY_KEEP_NEXT_TEN_DOWNLOADS, enabled).apply()
     }
 
+    fun newChapterChecksEnabled(): Boolean =
+        preferences.getBoolean(KEY_NEW_CHAPTER_CHECKS_ENABLED, false)
+
+    fun saveNewChapterChecksEnabled(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_NEW_CHAPTER_CHECKS_ENABLED, enabled).apply()
+    }
+
     fun anilistAutoSaveTrackingChanges(): Boolean =
         preferences.getBoolean(KEY_ANILIST_AUTO_SAVE_TRACKING_CHANGES, false)
 
@@ -206,6 +213,13 @@ class SettingsStore(context: Context) {
 
     fun saveLastScheduledBackupAtEpochMillis(value: Long) {
         preferences.edit().putLong(KEY_BACKUP_LAST_RUN_AT, value).apply()
+    }
+
+    fun lastNewChapterCheckAtEpochMillis(): Long =
+        preferences.getLong(KEY_NEW_CHAPTER_CHECK_LAST_RUN_AT, 0L)
+
+    fun saveLastNewChapterCheckAtEpochMillis(value: Long) {
+        preferences.edit().putLong(KEY_NEW_CHAPTER_CHECK_LAST_RUN_AT, value).apply()
     }
 
     fun anilistTags(): List<AnilistMediaTag> =
@@ -410,6 +424,8 @@ class SettingsStore(context: Context) {
         const val KEY_READER_PAGE_GAP_LEVEL = "reader.page.gap.level"
         const val KEY_CHAPTER_LIST_STARTS_AT_FIRST = "chapters.list.starts.at.first"
         const val KEY_KEEP_NEXT_TEN_DOWNLOADS = "downloads.keep.next.ten"
+        const val KEY_NEW_CHAPTER_CHECKS_ENABLED = "library.new.chapter.checks.enabled"
+        const val KEY_NEW_CHAPTER_CHECK_LAST_RUN_AT = "library.new.chapter.check.last.run.at"
         const val KEY_ANILIST_AUTO_SAVE_TRACKING_CHANGES = "anilist.auto.save.tracking.changes"
         const val KEY_ANILIST_AUTO_SYNC_READER_PROGRESS = "anilist.auto.sync.reader.progress"
         const val KEY_ANILIST_SYNC_MANUAL_READ_PROGRESS = "anilist.sync.manual.read.progress"
