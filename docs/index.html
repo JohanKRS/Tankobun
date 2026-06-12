@@ -575,18 +575,22 @@
 
       .screen-gallery {
         display: grid;
-        grid-template-columns: minmax(0, 1.52fr) minmax(260px, 0.58fr);
-        grid-template-areas:
-          "library portrait"
-          "browse phones";
-        gap: 18px;
-        align-items: stretch;
+        gap: 26px;
       }
 
-      .screen-card,
-      .phone-strip figure {
-        position: relative;
+      .screen-duo {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 0.42fr);
+        gap: 26px;
+        align-items: start;
+      }
+
+      .screen-shot {
         margin: 0;
+        width: 100%;
+      }
+
+      .screen-frame {
         width: 100%;
         overflow: hidden;
         border: 1px solid var(--line);
@@ -595,8 +599,7 @@
         box-shadow: var(--shadow);
       }
 
-      .screen-card img,
-      .phone-strip img {
+      .screen-shot img {
         display: block;
         width: 100%;
         height: 100%;
@@ -604,66 +607,57 @@
         transition: transform 360ms ease;
       }
 
-      .screen-card:hover img,
-      .phone-strip figure:hover img {
+      .screen-shot:hover img {
         transform: scale(1.018);
       }
 
-      .screen-card.tablet-library {
-        grid-area: library;
+      .tablet-feature .screen-frame,
+      .tablet-browse .screen-frame {
         aspect-ratio: 1120 / 720;
       }
 
-      .screen-card.tablet-browse {
-        grid-area: browse;
-        aspect-ratio: 1120 / 720;
-      }
-
-      .screen-card.tablet-portrait {
-        grid-area: portrait;
+      .tablet-portrait .screen-frame {
         aspect-ratio: 10 / 16;
       }
 
       .phone-strip {
-        grid-area: phones;
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 18px;
-        align-self: start;
+        grid-template-columns: repeat(3, minmax(0, 250px));
+        justify-content: center;
+        gap: 22px;
       }
 
-      .phone-strip figure {
+      .phone-strip .screen-frame {
         aspect-ratio: 9 / 20;
       }
 
-      .screen-card figcaption,
-      .phone-strip figcaption {
-        position: absolute;
-        left: 12px;
-        bottom: 12px;
-        max-width: calc(100% - 24px);
-        padding: 7px 10px;
-        border: 1px solid rgba(246, 239, 230, 0.12);
-        border-radius: 6px;
-        background: rgba(16, 17, 18, 0.72);
-        color: var(--text);
-        font-size: 0.78rem;
-        font-weight: 850;
-        backdrop-filter: blur(12px);
+      .screen-shot figcaption {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 0.84rem;
+        line-height: 1.25;
       }
 
-      .screen-caption {
-        max-width: 720px;
-        margin: 18px 0 0;
-        color: var(--muted);
-        font-size: 0.96rem;
+      .screen-shot figcaption span:first-child {
+        color: var(--text);
+        font-weight: 850;
+      }
+
+      .screen-shot figcaption span:last-child {
+        color: var(--soft);
+        font-size: 0.72rem;
+        font-weight: 850;
+        text-transform: uppercase;
       }
 
       @supports (animation-timeline: view()) {
         .mode-panel,
         .feature,
-        .screen-card,
-        .phone-strip figure,
+        .screen-shot,
         .policy article,
         .download-box {
           animation: sectionReveal both ease-out;
@@ -788,17 +782,8 @@
           grid-template-columns: 1fr;
         }
 
-        .screen-gallery {
-          grid-template-areas:
-            "library"
-            "portrait"
-            "browse"
-            "phones";
-        }
-
-        .screen-card.tablet-portrait {
-          aspect-ratio: 10 / 16;
-          min-height: 0;
+        .screen-duo {
+          grid-template-columns: 1fr;
         }
 
         .feature-list {
@@ -926,13 +911,31 @@
           margin-bottom: 26px;
         }
 
-        .screen-card figcaption,
-        .phone-strip figcaption {
-          left: 8px;
-          bottom: 8px;
-          max-width: calc(100% - 16px);
-          padding: 5px 7px;
+        .screen-gallery {
+          gap: 20px;
+        }
+
+        .screen-duo {
+          gap: 20px;
+        }
+
+        .phone-strip {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .screen-shot figcaption {
+          display: block;
           font-size: 0.68rem;
+        }
+
+        .screen-shot figcaption span {
+          display: block;
+        }
+
+        .screen-shot figcaption span:last-child {
+          margin-top: 2px;
+          font-size: 0.62rem;
         }
       }
     </style>
@@ -947,7 +950,7 @@
         <div class="nav-links">
           <a href="#library">Library</a>
           <a href="#screens">Screens</a>
-          <a href="#policy">Policy</a>
+          <a href="#policy">Sources</a>
           <a href="https://github.com/JohanKRS/Tankobun">GitHub</a>
           <a class="nav-cta" href="https://github.com/JohanKRS/Tankobun/releases/download/v2.0.0/tankobun-2.0.0.apk">Download</a>
         </div>
@@ -1095,78 +1098,102 @@
       <section id="screens" class="screens">
         <div class="wrap">
           <div class="section-head">
-            <h2>The app, not a promise.</h2>
+            <h2>Screenshots</h2>
             <p>
-              These preview screens use original placeholder entries and abstract
-              cover art, so the page can show Tankobun without borrowing manga
-              content.
+              Captured from the current Android build with generated test titles
+              and cover art.
             </p>
           </div>
 
           <div class="screen-gallery">
-            <figure class="screen-card tablet-library">
-              <img src="mockups/web/tablet-library.webp" alt="Tankobun landscape tablet library screen with generated preview entries">
-              <figcaption>Tablet library</figcaption>
+            <figure class="screen-shot tablet-feature">
+              <div class="screen-frame">
+                <img src="mockups/web/tablet-library.webp" alt="Tankobun landscape tablet library screen with generated preview entries">
+              </div>
+              <figcaption>
+                <span>Library</span>
+                <span>Tablet landscape</span>
+              </figcaption>
             </figure>
 
-            <figure class="screen-card tablet-portrait">
-              <img src="mockups/web/tablet-portrait-browse.webp" alt="Tankobun portrait tablet browse screen with generated preview entries">
-              <figcaption>Portrait tablet</figcaption>
-            </figure>
+            <div class="screen-duo">
+              <figure class="screen-shot tablet-browse">
+                <div class="screen-frame">
+                  <img src="mockups/web/tablet-browse.webp" alt="Tankobun landscape tablet browse screen with generated preview entries">
+                </div>
+                <figcaption>
+                  <span>Browse</span>
+                  <span>Tablet landscape</span>
+                </figcaption>
+              </figure>
 
-            <figure class="screen-card tablet-browse">
-              <img src="mockups/web/tablet-browse.webp" alt="Tankobun landscape tablet browse screen with generated preview entries">
-              <figcaption>Tablet browse</figcaption>
-            </figure>
+              <figure class="screen-shot tablet-portrait">
+                <div class="screen-frame">
+                  <img src="mockups/web/tablet-portrait-browse.webp" alt="Tankobun portrait tablet browse screen with generated preview entries">
+                </div>
+                <figcaption>
+                  <span>Browse</span>
+                  <span>Tablet portrait</span>
+                </figcaption>
+              </figure>
+            </div>
 
             <div class="phone-strip">
-              <figure>
-                <img src="mockups/web/phone-library.webp" alt="Tankobun phone library screen with generated preview entries and cover art">
-                <figcaption>Phone library</figcaption>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/web/phone-library.webp" alt="Tankobun phone library screen with generated preview entries and cover art">
+                </div>
+                <figcaption>
+                  <span>Library</span>
+                  <span>Phone</span>
+                </figcaption>
               </figure>
-              <figure>
-                <img src="mockups/web/phone-browse.webp" alt="Tankobun phone browse screen with generated preview entries and cover art">
-                <figcaption>Phone browse</figcaption>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/web/phone-browse.webp" alt="Tankobun phone browse screen with generated preview entries and cover art">
+                </div>
+                <figcaption>
+                  <span>Browse</span>
+                  <span>Phone</span>
+                </figcaption>
               </figure>
-              <figure>
-                <img src="mockups/web/phone-detail.webp" alt="Tankobun phone manga detail screen with generated preview entry and cover art">
-                <figcaption>Tracking detail</figcaption>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/web/phone-detail.webp" alt="Tankobun phone manga detail screen with generated preview entry and cover art">
+                </div>
+                <figcaption>
+                  <span>Tracking</span>
+                  <span>Phone</span>
+                </figcaption>
               </figure>
             </div>
           </div>
-
-          <p class="screen-caption">
-            These screenshots use generated preview titles and cover art. Reading
-            sources are user-installed extensions and are not bundled with Tankobun.
-          </p>
         </div>
       </section>
 
       <section id="policy">
         <div class="wrap">
           <div class="section-head">
-            <h2>Clear boundaries.</h2>
+            <h2>Content & sources</h2>
             <p>
-              The site follows the same content, source, extension, and update
-              policy as the repository README.
+              Tankobun is a reader and library manager. It does not include manga
+              content, extensions, repositories, or content feeds.
             </p>
           </div>
 
           <div class="policy">
             <article>
-              <h3>No bundled content</h3>
+              <h3>No content bundled</h3>
               <p>
-                Tankobun does not host, upload, index, provide, sell, bundle, or
-                distribute manga, chapters, scanlations, source extensions, source
-                APKs, source repositories, or content feeds.
+                The APK installs Tankobun only. It does not provide manga,
+                chapters, scanlations, source APKs, or source repository URLs.
               </p>
             </article>
             <article>
               <h3>User-installed sources</h3>
               <p>
-                Any source extension used with Tankobun must be added and
-                installed by the user. Installing the APK does not provide access
-                to manga content by itself.
+                Any extension or source setup is managed by the user and stays
+                outside the official update manifest.
               </p>
             </article>
           </div>
