@@ -525,6 +525,7 @@
     <string name="about_anilist_website">Site do AniList</string>
     <string name="about_replay_tutorial">Rever tutorial</string>
     <string name="about_summary">Tutorial e avisos</string>
+    <string name="about_project_title">Sobre o Tankobun</string>
     <string name="about_updates">Atualizações do app</string>
     <string name="about_check_updates">Verificar atualizações</string>
     <string name="about_update_checking">Verificando atualizações...</string>
@@ -540,9 +541,6 @@
     <string name="about_changelog">Changelog</string>
     <string name="about_changelog_update_title">Versão %1$s</string>
     <string name="about_changelog_current_title">Versão atual %1$s</string>
-    <string name="about_changelog_update_english_title">Versão %1$s - English</string>
-    <string name="about_changelog_current_english_title">Versão atual %1$s - English</string>
-    <string name="about_changelog_translated_title">Notas traduzidas (%1$s)</string>
     <string name="about_changelog_bullet">- %1$s</string>
     <string name="about_changelog_v2_local_library">Adicionado modo de biblioteca local com status, notas, observações, marcação privada, progresso e listas personalizadas compatíveis com AniList.</string>
     <string name="about_changelog_v2_onboarding">Onboarding reformulado com modo da biblioteca, escolha de tema e um tour curto do app.</string>

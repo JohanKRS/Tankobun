@@ -340,6 +340,12 @@ private fun OnboardingChoiceButton(
     icon: ImageVector,
     onClick: () -> Unit,
 ) {
+    val choiceShape = RoundedCornerShape(LocalTankobunStyle.current.radii.control)
+    val bodyColor = if (selected) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
     val content: @Composable () -> Unit = {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -350,15 +356,15 @@ private fun OnboardingChoiceButton(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                 if (body.isNotBlank()) {
-                    Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(body, style = MaterialTheme.typography.bodySmall, color = bodyColor)
                 }
             }
         }
     }
     if (selected) {
-        Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) { content() }
+        Button(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = choiceShape) { content() }
     } else {
-        OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) { content() }
+        OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = choiceShape) { content() }
     }
 }
 

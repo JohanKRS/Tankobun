@@ -84,6 +84,7 @@ class AppContainer(application: Application) {
         AnilistGraphQlClient(
             okHttpClient = okHttpClient,
             rateLimiter = RespectfulRateLimiter(minSpacingMillis = 2_500L),
+            userAgent = tankobunAniListUserAgent(),
         ),
     )
 
@@ -287,3 +288,8 @@ class AppContainer(application: Application) {
         private val DOWNLOAD_IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "gif")
     }
 }
+
+private fun tankobunAniListUserAgent(): String =
+    "Tankobun/${BuildConfig.VERSION_NAME} (Android; ${BuildConfig.APPLICATION_ID}; $TANKOBUN_GITHUB_URL)"
+
+private const val TANKOBUN_GITHUB_URL = "https://github.com/JohanKRS/Tankobun"

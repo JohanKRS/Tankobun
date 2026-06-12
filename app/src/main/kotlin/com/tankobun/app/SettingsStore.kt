@@ -91,7 +91,7 @@ class SettingsStore(context: Context) {
         preferences.getString(KEY_LIBRARY_VIEW_MODE, null)
             ?.let { stored -> runCatching { MediaViewMode.valueOf(stored) }.getOrNull() }
             ?.supportedMediaViewMode()
-            ?: MediaViewMode.COVER_GRID
+            ?: MediaViewMode.COVER_WITH_INFO
 
     fun saveLibraryViewMode(mode: MediaViewMode) {
         preferences.edit().putString(KEY_LIBRARY_VIEW_MODE, mode.supportedMediaViewMode().name).apply()
@@ -116,7 +116,7 @@ class SettingsStore(context: Context) {
         preferences.getString(KEY_BROWSE_VIEW_MODE, null)
             ?.let { stored -> runCatching { MediaViewMode.valueOf(stored) }.getOrNull() }
             ?.supportedMediaViewMode()
-            ?: MediaViewMode.COVER_GRID
+            ?: MediaViewMode.COVER_WITH_INFO
 
     fun saveBrowseViewMode(mode: MediaViewMode) {
         preferences.edit().putString(KEY_BROWSE_VIEW_MODE, mode.supportedMediaViewMode().name).apply()

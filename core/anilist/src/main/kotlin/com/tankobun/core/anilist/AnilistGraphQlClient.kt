@@ -18,6 +18,7 @@ class AnilistGraphQlClient(
     private val okHttpClient: OkHttpClient,
     private val rateLimiter: RespectfulRateLimiter,
     private val endpoint: String = "https://graphql.anilist.co",
+    private val userAgent: String? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -40,6 +41,10 @@ class AnilistGraphQlClient(
                 .post(body)
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
+
+            userAgent?.takeIf { it.isNotBlank() }?.let { agent ->
+                requestBuilder.header("User-Agent", agent)
+            }
 
             if (!accessToken.isNullOrBlank()) {
                 requestBuilder.header("Authorization", "Bearer $accessToken")

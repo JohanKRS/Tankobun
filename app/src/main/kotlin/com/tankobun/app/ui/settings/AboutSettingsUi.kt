@@ -249,34 +249,59 @@ internal fun AboutSettingsScreen(
         subtitle = tankobunString(R.string.settings_about_subtitle),
         modifier = modifier,
     ) {
-        TankobunPanel(
-            modifier = Modifier.fillMaxWidth(),
-            color = LocalTankobunStyle.current.colors.panel,
-            contentColor = LocalTankobunStyle.current.colors.panelContent,
+        AboutIdentityContent(
+            onOpenGitHub = { uriHandler.openUri(TankobunGithubUrl) },
+            onOpenAniList = { uriHandler.openUri(TankobunAniListUrl) },
+            onReplayOnboarding = onReplayOnboarding,
+        )
+        AboutNoticeContent()
+        AppUpdatesContent(
+            state = state,
+            viewModel = viewModel,
+            context = context,
+            onOpenRelease = { url -> uriHandler.openUri(url) },
+        )
+        AboutChangelogContent(state = state)
+    }
+}
+
+@Composable
+private fun AboutIdentityContent(
+    onOpenGitHub: () -> Unit,
+    onOpenAniList: () -> Unit,
+    onReplayOnboarding: () -> Unit,
+) {
+    TankobunPanel(
+        modifier = Modifier.fillMaxWidth(),
+        color = LocalTankobunStyle.current.colors.panel,
+        contentColor = LocalTankobunStyle.current.colors.panelContent,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text("Tankobun", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
                     tankobunString(R.string.about_version, BuildConfig.VERSION_NAME),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 TankobunActionButton(
                     label = tankobunString(R.string.about_github),
                     iconPainter = painterResource(R.drawable.ic_github),
-                    onClick = { uriHandler.openUri(TankobunGithubUrl) },
+                    onClick = onOpenGitHub,
                     modifier = Modifier.fillMaxWidth(),
                     filled = false,
                 )
                 TankobunActionButton(
                     label = tankobunString(R.string.about_anilist_website),
                     icon = Icons.Default.Link,
-                    onClick = { uriHandler.openUri(TankobunAniListUrl) },
+                    onClick = onOpenAniList,
                     modifier = Modifier.fillMaxWidth(),
                     filled = false,
                 )
@@ -287,35 +312,47 @@ internal fun AboutSettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     filled = false,
                 )
-                Text(
-                    tankobunString(R.string.about_unofficial),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    tankobunString(R.string.about_anilist_thanks),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    tankobunString(R.string.about_anilist_data),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    tankobunString(R.string.about_sources),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                AppUpdatesContent(
-                    state = state,
-                    viewModel = viewModel,
-                    context = context,
-                    onOpenRelease = { url -> uriHandler.openUri(url) },
-                )
-                AboutChangelogContent(state = state)
             }
         }
     }
+}
+
+@Composable
+private fun AboutNoticeContent() {
+    AboutSection(title = tankobunString(R.string.about_project_title)) {
+        AboutParagraph(tankobunString(R.string.about_unofficial), emphasized = true)
+        AboutParagraph(tankobunString(R.string.about_anilist_thanks))
+        AboutParagraph(tankobunString(R.string.about_anilist_data))
+        AboutParagraph(tankobunString(R.string.about_sources))
+    }
+}
+
+@Composable
+private fun AboutSection(
+    title: String,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        content()
+    }
+}
+
+@Composable
+private fun AboutParagraph(text: String, emphasized: Boolean = false) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (emphasized) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+    )
 }
 
 @Composable
@@ -334,62 +371,72 @@ private fun AppUpdatesContent(
         update != null -> tankobunString(R.string.about_update_current)
         else -> tankobunString(R.string.about_update_not_checked)
     }
-    Text(tankobunString(R.string.about_updates), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    Text(statusText, style = MaterialTheme.typography.bodyMedium)
-    if (state.appUpdateLastCheckedAtEpochMillis > 0L) {
+    AboutSection(title = tankobunString(R.string.about_updates)) {
         Text(
-            tankobunString(R.string.about_update_last_checked, cacheAgeLabel(state.appUpdateLastCheckedAtEpochMillis)),
+            statusText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!state.appUpdateCheckInProgress) {
+            state.appUpdateMessage?.let { message ->
+                TankobunMessageBanner(message)
+            }
+        }
+        if (state.appUpdateLastCheckedAtEpochMillis > 0L) {
+            Text(
+                tankobunString(R.string.about_update_last_checked, cacheAgeLabel(state.appUpdateLastCheckedAtEpochMillis)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        update?.sizeBytes?.takeIf { it > 0L }?.let { size ->
+            Text(
+                tankobunString(R.string.about_update_size, size.formatFileSize()),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            tankobunString(R.string.about_update_policy),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-    update?.sizeBytes?.takeIf { it > 0L }?.let { size ->
-        Text(
-            tankobunString(R.string.about_update_size, size.formatFileSize()),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    Text(
-        tankobunString(R.string.about_update_policy),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    if (state.appUpdateCheckInProgress || state.appUpdateDownloadInProgress) {
-        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-    }
-    TankobunActionButton(
-        label = if (state.appUpdateCheckInProgress) {
-            tankobunString(R.string.about_update_checking)
-        } else {
-            tankobunString(R.string.about_check_updates)
-        },
-        icon = Icons.Default.Refresh,
-        onClick = viewModel::checkForAppUpdate,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = !state.appUpdateCheckInProgress && !state.appUpdateDownloadInProgress,
-        filled = false,
-    )
-    if (updateAvailable) {
+        if (state.appUpdateCheckInProgress || state.appUpdateDownloadInProgress) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
         TankobunActionButton(
-            label = if (state.appUpdateDownloadInProgress) {
-                tankobunString(R.string.about_downloading_update)
+            label = if (state.appUpdateCheckInProgress) {
+                tankobunString(R.string.about_update_checking)
             } else {
-                tankobunString(R.string.about_download_update)
+                tankobunString(R.string.about_check_updates)
             },
-            icon = Icons.Default.Download,
-            onClick = { requestAppUpdateDownload(context, viewModel) },
+            icon = Icons.Default.Refresh,
+            onClick = viewModel::checkForAppUpdate,
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.appUpdateCheckInProgress && !state.appUpdateDownloadInProgress,
+            filled = false,
         )
-        availableUpdate.releaseUrl?.takeIf { it.isNotBlank() }?.let { releaseUrl ->
+        if (updateAvailable) {
             TankobunActionButton(
-                label = tankobunString(R.string.about_open_release),
-                icon = Icons.Default.Link,
-                onClick = { onOpenRelease(releaseUrl) },
+                label = if (state.appUpdateDownloadInProgress) {
+                    tankobunString(R.string.about_downloading_update)
+                } else {
+                    tankobunString(R.string.about_download_update)
+                },
+                icon = Icons.Default.Download,
+                onClick = { requestAppUpdateDownload(context, viewModel) },
                 modifier = Modifier.fillMaxWidth(),
-                filled = false,
+                enabled = !state.appUpdateCheckInProgress && !state.appUpdateDownloadInProgress,
             )
+            availableUpdate.releaseUrl?.takeIf { it.isNotBlank() }?.let { releaseUrl ->
+                TankobunActionButton(
+                    label = tankobunString(R.string.about_open_release),
+                    icon = Icons.Default.Link,
+                    onClick = { onOpenRelease(releaseUrl) },
+                    modifier = Modifier.fillMaxWidth(),
+                    filled = false,
+                )
+            }
         }
     }
 }
@@ -399,42 +446,19 @@ private fun AboutChangelogContent(state: TankobunUiState) {
     val context = LocalContext.current
     val update = state.appUpdateInfo
     val availableUpdate = update?.takeIf { it.versionCode > BuildConfig.VERSION_CODE }
-    val translationLanguage = state.appLanguage.resolvedChangelogTranslationLanguage()
-    val updateChangelogEnglish = availableUpdate?.englishChangelog().orEmpty()
-    val updateChangelogTranslated = availableUpdate?.translatedChangelog(translationLanguage).orEmpty()
-    val currentChangelogEnglish = currentVersionChangelog(context, AppLanguage.ENGLISH)
-    val currentChangelogTranslated = translationLanguage
-        ?.let { currentVersionChangelog(context, it) }
-        .orEmpty()
-        .takeIf { it != currentChangelogEnglish }
-        .orEmpty()
-    Text(tankobunString(R.string.about_changelog), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    if (availableUpdate != null && updateChangelogEnglish.isNotEmpty()) {
+    val changelogLanguage = state.appLanguage.resolvedChangelogLanguage()
+    val updateChangelog = availableUpdate?.localizedChangelog(changelogLanguage).orEmpty()
+    val currentChangelog = currentVersionChangelog(context, changelogLanguage)
+    AboutSection(title = tankobunString(R.string.about_changelog)) {
+        if (availableUpdate != null && updateChangelog.isNotEmpty()) {
+            ChangelogList(
+                title = tankobunString(R.string.about_changelog_update_title, availableUpdate.versionName),
+                items = updateChangelog,
+            )
+        }
         ChangelogList(
-            title = tankobunString(R.string.about_changelog_update_english_title, availableUpdate.versionName),
-            items = updateChangelogEnglish,
-        )
-    }
-    if (availableUpdate != null && updateChangelogTranslated.isNotEmpty() && updateChangelogTranslated != updateChangelogEnglish) {
-        ChangelogList(
-            title = tankobunString(
-                R.string.about_changelog_translated_title,
-                translationLanguage?.let { tankobunString(it.changelogLanguageLabelRes()) }.orEmpty(),
-            ),
-            items = updateChangelogTranslated,
-        )
-    }
-    ChangelogList(
-        title = tankobunString(R.string.about_changelog_current_english_title, BuildConfig.VERSION_NAME),
-        items = currentChangelogEnglish,
-    )
-    if (translationLanguage != null && currentChangelogTranslated.isNotEmpty()) {
-        ChangelogList(
-            title = tankobunString(
-                R.string.about_changelog_translated_title,
-                tankobunString(translationLanguage.changelogLanguageLabelRes()),
-            ),
-            items = currentChangelogTranslated,
+            title = tankobunString(R.string.about_changelog_current_title, BuildConfig.VERSION_NAME),
+            items = currentChangelog,
         )
     }
 }
@@ -463,38 +487,28 @@ private fun currentVersionChangelog(context: Context, language: AppLanguage): Li
     )
 }
 
-private fun AppUpdateInfo.englishChangelog(): List<String> =
-    changelog["en"].orEmpty()
-
-private fun AppUpdateInfo.translatedChangelog(language: AppLanguage?): List<String> {
+private fun AppUpdateInfo.localizedChangelog(language: AppLanguage): List<String> {
     val preferredKeys = when (language) {
         AppLanguage.PORTUGUESE_BRAZIL -> listOf("pt-BR", "pt")
         AppLanguage.SPANISH -> listOf("es")
-        else -> emptyList()
+        AppLanguage.ENGLISH,
+        AppLanguage.SYSTEM -> emptyList()
     }
-    return preferredKeys.firstNotNullOfOrNull { key ->
+    return (preferredKeys + "en").firstNotNullOfOrNull { key ->
         changelog[key]?.takeIf { it.isNotEmpty() }
     }.orEmpty()
 }
 
-private fun AppLanguage.resolvedChangelogTranslationLanguage(): AppLanguage? =
+private fun AppLanguage.resolvedChangelogLanguage(): AppLanguage =
     when (this) {
         AppLanguage.PORTUGUESE_BRAZIL -> AppLanguage.PORTUGUESE_BRAZIL
         AppLanguage.SPANISH -> AppLanguage.SPANISH
-        AppLanguage.ENGLISH -> null
+        AppLanguage.ENGLISH -> AppLanguage.ENGLISH
         AppLanguage.SYSTEM -> when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
             "pt" -> AppLanguage.PORTUGUESE_BRAZIL
             "es" -> AppLanguage.SPANISH
-            else -> null
+            else -> AppLanguage.ENGLISH
         }
-    }
-
-private fun AppLanguage.changelogLanguageLabelRes(): Int =
-    when (this) {
-        AppLanguage.PORTUGUESE_BRAZIL -> R.string.settings_language_portuguese_brazil
-        AppLanguage.SPANISH -> R.string.settings_language_spanish
-        AppLanguage.ENGLISH,
-        AppLanguage.SYSTEM -> R.string.settings_language_english
     }
 
 internal fun requestAppUpdateDownload(

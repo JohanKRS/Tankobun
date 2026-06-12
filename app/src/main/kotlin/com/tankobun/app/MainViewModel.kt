@@ -757,7 +757,8 @@ class MainViewModel(
         val manifestUrl = BuildConfig.UPDATE_MANIFEST_URL.trim()
         if (manifestUrl.isBlank()) {
             if (!silent) {
-                _state.update { it.copy(message = string(R.string.msg_app_update_manifest_not_configured)) }
+                val resultMessage = string(R.string.msg_app_update_manifest_not_configured)
+                _state.update { it.copy(message = resultMessage, appUpdateMessage = resultMessage) }
             }
             return
         }
@@ -766,6 +767,7 @@ class MainViewModel(
             _state.update {
                 it.copy(
                     appUpdateCheckInProgress = true,
+                    appUpdateMessage = if (silent) it.appUpdateMessage else null,
                     message = if (silent) it.message else string(R.string.msg_checking_app_updates),
                 )
             }
@@ -776,23 +778,29 @@ class MainViewModel(
                 container.settingsStore.saveLastAppUpdateCheckAtEpochMillis(checkedAt)
                 val available = update.versionCode > BuildConfig.VERSION_CODE
                 _state.update {
+                    val resultMessage = when {
+                        available -> string(R.string.msg_app_update_available, update.versionName)
+                        else -> string(R.string.msg_app_update_current)
+                    }
                     it.copy(
                         appUpdateInfo = update,
                         appUpdateCheckInProgress = false,
                         appUpdateLastCheckedAtEpochMillis = checkedAt,
+                        appUpdateMessage = if (silent) it.appUpdateMessage else resultMessage,
                         message = when {
                             silent -> it.message
-                            available -> string(R.string.msg_app_update_available, update.versionName)
-                            else -> string(R.string.msg_app_update_current)
+                            else -> resultMessage
                         },
                     )
                 }
             }.onFailure { error ->
                 Log.w(TAG, "App update check failed", error)
                 _state.update {
+                    val resultMessage = string(R.string.msg_app_update_check_failed)
                     it.copy(
                         appUpdateCheckInProgress = false,
-                        message = if (silent) it.message else string(R.string.msg_app_update_check_failed),
+                        appUpdateMessage = if (silent) it.appUpdateMessage else resultMessage,
+                        message = if (silent) it.message else resultMessage,
                     )
                 }
             }
@@ -802,22 +810,26 @@ class MainViewModel(
     fun downloadAppUpdate() {
         val update = _state.value.appUpdateInfo
         if (update == null || update.versionCode <= BuildConfig.VERSION_CODE) {
-            _state.update { it.copy(message = string(R.string.msg_app_update_current)) }
+            val resultMessage = string(R.string.msg_app_update_current)
+            _state.update { it.copy(message = resultMessage, appUpdateMessage = resultMessage) }
             return
         }
         if (_state.value.appUpdateDownloadInProgress) return
         viewModelScope.launch {
             _state.update {
+                val resultMessage = string(R.string.msg_downloading_app_update, update.versionName)
                 it.copy(
                     appUpdateDownloadInProgress = true,
                     appUpdateInstallRequest = null,
-                    message = string(R.string.msg_downloading_app_update, update.versionName),
+                    appUpdateMessage = resultMessage,
+                    message = resultMessage,
                 )
             }
             runCatching {
                 appUpdateDataSource.downloadUpdateApk(update)
             }.onSuccess { apkUri ->
                 _state.update {
+                    val resultMessage = string(R.string.msg_ready_to_install_app_update, update.versionName)
                     it.copy(
                         appUpdateDownloadInProgress = false,
                         appUpdateInstallRequest = AppUpdateInstallRequest(
@@ -825,15 +837,18 @@ class MainViewModel(
                             expectedVersionCode = update.versionCode,
                             expectedVersionName = update.versionName,
                         ),
-                        message = string(R.string.msg_ready_to_install_app_update, update.versionName),
+                        appUpdateMessage = resultMessage,
+                        message = resultMessage,
                     )
                 }
             }.onFailure { error ->
                 Log.w(TAG, "App update APK download failed for ${update.versionName}", error)
                 _state.update {
+                    val resultMessage = string(R.string.msg_app_update_download_failed)
                     it.copy(
                         appUpdateDownloadInProgress = false,
-                        message = string(R.string.msg_app_update_download_failed),
+                        appUpdateMessage = resultMessage,
+                        message = resultMessage,
                     )
                 }
             }
@@ -841,7 +856,8 @@ class MainViewModel(
     }
 
     fun requireAppUpdateInstallPermission() {
-        _state.update { it.copy(message = string(R.string.msg_allow_app_update_install)) }
+        val resultMessage = string(R.string.msg_allow_app_update_install)
+        _state.update { it.copy(message = resultMessage, appUpdateMessage = resultMessage) }
     }
 
     fun consumeAppUpdateInstallRequest() {
