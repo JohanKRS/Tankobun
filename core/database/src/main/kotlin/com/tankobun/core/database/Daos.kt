@@ -47,8 +47,8 @@ interface ListEntryDao {
     @Upsert
     suspend fun upsertEntry(entry: AnilistListEntryEntity)
 
-    @Query("DELETE FROM anilist_list_entries WHERE id NOT IN (:ids)")
-    suspend fun deleteEntriesNotIn(ids: List<Int>)
+    @Query("DELETE FROM anilist_list_entries WHERE mediaId NOT IN (:mediaIds)")
+    suspend fun deleteEntriesNotIn(mediaIds: List<Int>)
 
     @Query("DELETE FROM anilist_list_entries")
     suspend fun deleteAllEntries()
@@ -109,6 +109,9 @@ interface SourceBindingDao {
     @Query("SELECT * FROM source_bindings")
     fun observeBindings(): Flow<List<SourceBindingEntity>>
 
+    @Query("SELECT * FROM source_bindings")
+    suspend fun cachedBindings(): List<SourceBindingEntity>
+
     @Upsert
     suspend fun upsertBinding(binding: SourceBindingEntity)
 
@@ -156,6 +159,9 @@ interface ProgressDao {
 
     @Query("SELECT * FROM reader_progress WHERE mediaId = :mediaId")
     suspend fun progressForMedia(mediaId: Int): List<ReadingProgressEntity>
+
+    @Query("SELECT * FROM reader_progress")
+    suspend fun allProgress(): List<ReadingProgressEntity>
 
     @Query(
         """

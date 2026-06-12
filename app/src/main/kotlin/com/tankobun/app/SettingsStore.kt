@@ -54,6 +54,25 @@ class SettingsStore(context: Context) {
         preferences.edit().putString(KEY_DOCK_ALIGNMENT, alignment.name).apply()
     }
 
+    fun libraryMode(): LibraryMode =
+        preferences.getString(KEY_LIBRARY_MODE, null)
+            ?.let { stored -> runCatching { LibraryMode.valueOf(stored) }.getOrNull() }
+            ?: LibraryMode.LOCAL
+
+    fun saveLibraryMode(mode: LibraryMode) {
+        preferences.edit().putString(KEY_LIBRARY_MODE, mode.name).apply()
+    }
+
+    fun onboardingVersion(): Int =
+        preferences.getInt(KEY_ONBOARDING_VERSION, if (onboardingCompleted()) 1 else 0)
+
+    fun saveOnboardingVersion(version: Int) {
+        preferences.edit()
+            .putInt(KEY_ONBOARDING_VERSION, version.coerceAtLeast(0))
+            .putBoolean(KEY_ONBOARDING_COMPLETED, version > 0)
+            .apply()
+    }
+
     fun onboardingCompleted(): Boolean =
         preferences.getBoolean(KEY_ONBOARDING_COMPLETED, false)
 
@@ -425,6 +444,8 @@ class SettingsStore(context: Context) {
         const val KEY_IGNORE_DISPLAY_CUTOUT = "layout.ignore.display.cutout"
         const val KEY_SHOW_APP_STATUS_BAR = "layout.show.app.status.bar"
         const val KEY_DOCK_ALIGNMENT = "layout.dock.alignment"
+        const val KEY_LIBRARY_MODE = "library.mode"
+        const val KEY_ONBOARDING_VERSION = "onboarding.version"
         const val KEY_ONBOARDING_COMPLETED = "onboarding.completed"
         const val KEY_READER_TUTORIAL_COMPLETED = "reader.tutorial.completed"
         const val KEY_LIBRARY_VIEW_MODE = "library.view.mode"
@@ -486,6 +507,11 @@ private fun encodePart(value: String): String =
 
 private fun decodePart(value: String): String =
     String(Base64.getUrlDecoder().decode(value), Charsets.UTF_8)
+
+enum class LibraryMode {
+    LOCAL,
+    ANILIST,
+}
 
 enum class TankobunThemeMode {
     SYSTEM,

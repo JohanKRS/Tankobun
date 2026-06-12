@@ -30,12 +30,15 @@ import com.tankobun.app.logic.nextInReadingOrderAfter
 import com.tankobun.app.logic.nextTenDownloadCandidates
 import com.tankobun.app.logic.normalizedLanguage
 import com.tankobun.app.logic.normalizedCustomLists
+import com.tankobun.app.logic.CURRENT_ONBOARDING_VERSION
 import com.tankobun.app.logic.preferredVisibleSources
 import com.tankobun.app.logic.previousInReadingOrderBefore
 import com.tankobun.app.logic.readerLoadErrorFor
 import com.tankobun.app.logic.readerSourceForChapter
 import com.tankobun.app.logic.ReaderSegmentDirection
 import com.tankobun.app.logic.selectedSourceChapterSelection
+import com.tankobun.app.logic.initialLibraryModeForStartup
+import com.tankobun.app.logic.shouldShowOnboarding
 import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.logic.sourcePickerDiagnosticDetail
 import com.tankobun.app.logic.sourcePickerSources
@@ -188,10 +191,18 @@ class MainViewModel(
     private var lastReaderProgressSavedAtEpochMillis: Long = 0L
     private var latestReaderPosition: ReaderPagePosition? = null
     private val readerPageCacheJobs = ConcurrentHashMap<String, Job>()
+    private val initialAccessToken = container.tokenStore.accessToken()
+    private val initialOnboardingVersion = container.settingsStore.onboardingVersion()
+    private val initialLibraryMode = initialLibraryModeForStartup(
+        storedMode = container.settingsStore.libraryMode(),
+        hasAccessToken = initialAccessToken != null,
+        onboardingVersion = initialOnboardingVersion,
+    )
     private val _state = MutableStateFlow(
         TankobunUiState(
-            loggedIn = container.tokenStore.accessToken() != null,
+            loggedIn = initialAccessToken != null,
             clientConfigured = BuildConfig.ANILIST_CLIENT_ID.isNotBlank(),
+            libraryMode = initialLibraryMode,
             viewerName = container.settingsStore.viewerName(),
             anilistScoreFormat = container.settingsStore.anilistScoreFormat(),
             anilistTitleLanguage = container.settingsStore.anilistTitleLanguage(),
@@ -216,7 +227,7 @@ class MainViewModel(
             ignoreDisplayCutout = container.settingsStore.ignoreDisplayCutout(),
             showAppStatusBar = container.settingsStore.showAppStatusBar(),
             dockAlignment = container.settingsStore.dockAlignment(),
-            onboardingVisible = !container.settingsStore.onboardingCompleted(),
+            onboardingVisible = shouldShowOnboarding(initialOnboardingVersion),
             readerTutorialVisible = !container.settingsStore.readerTutorialCompleted(),
             readerMode = container.settingsStore.readerMode(),
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
@@ -266,9 +277,11 @@ class MainViewModel(
             refreshExtensionIndex(silent = true)
         }
         refreshCacheStorageSummary()
+        if (_state.value.libraryMode == LibraryMode.LOCAL || _state.value.loggedIn) {
+            loadCachedLibrary(syncIfEmpty = _state.value.libraryMode == LibraryMode.ANILIST && _state.value.loggedIn)
+        }
         if (_state.value.loggedIn) {
             refreshAniListViewer()
-            loadCachedLibrary(syncIfEmpty = true)
             processPendingAniListSync()
         }
     }
@@ -293,8 +306,19 @@ class MainViewModel(
         }
         container.settingsStore.savePendingAnilistOAuthState(null)
         container.tokenStore.saveAccessToken(token.accessToken)
-        _state.update { it.copy(loggedIn = true, message = string(R.string.msg_anilist_connected)) }
-        refreshLibrary()
+        val shouldGuideMerge = _state.value.libraryMode == LibraryMode.LOCAL && _state.value.libraryItems.isNotEmpty()
+        _state.update {
+            it.copy(
+                loggedIn = true,
+                anilistMergePromptVisible = shouldGuideMerge,
+                message = string(R.string.msg_anilist_connected),
+            )
+        }
+        if (!shouldGuideMerge) {
+            container.settingsStore.saveLibraryMode(LibraryMode.ANILIST)
+            _state.update { it.copy(libraryMode = LibraryMode.ANILIST) }
+            refreshLibrary()
+        }
     }
 
     private fun newOAuthState(): String {
@@ -305,32 +329,97 @@ class MainViewModel(
 
     fun signOut() {
         container.tokenStore.clear()
+        container.settingsStore.saveLibraryMode(LibraryMode.LOCAL)
         container.settingsStore.savePendingAnilistOAuthState(null)
         container.settingsStore.saveViewerName(null)
         container.settingsStore.saveViewerAvatarUrl(null)
         container.settingsStore.saveViewerBannerImageUrl(null)
         container.settingsStore.saveAnilistMangaStats(null)
-        container.settingsStore.saveAnilistScoreFormat(AnilistScoreFormat.POINT_100)
-        container.settingsStore.saveAnilistTitleLanguage(AnilistTitleLanguage.ROMAJI)
-        container.settingsStore.saveAnilistCustomLists(emptyList())
-        container.settingsStore.saveLibrarySyncedAtEpochMillis(0L)
         _state.update {
             it.copy(
                 loggedIn = false,
+                libraryMode = LibraryMode.LOCAL,
                 viewerName = null,
                 viewerAvatarUrl = null,
                 viewerBannerImageUrl = null,
                 anilistMangaStats = null,
-                anilistScoreFormat = AnilistScoreFormat.POINT_100,
-                anilistTitleLanguage = AnilistTitleLanguage.ROMAJI,
-                anilistCustomLists = emptyList(),
-                library = emptyList(),
-                libraryItems = emptyList(),
-                librarySyncedAtEpochMillis = 0L,
-                recentReadingProgress = emptyList(),
                 message = string(R.string.msg_signed_out),
             )
         }
+    }
+
+    fun setLibraryMode(mode: LibraryMode) {
+        if (_state.value.libraryMode == mode) return
+        container.settingsStore.saveLibraryMode(mode)
+        _state.update { it.copy(libraryMode = mode) }
+        if (mode == LibraryMode.LOCAL) {
+            loadCachedLibrary()
+        } else if (_state.value.loggedIn) {
+            refreshLibrary()
+        }
+    }
+
+    fun dismissAniListMergePrompt() {
+        _state.update { it.copy(anilistMergePromptVisible = false) }
+    }
+
+    fun mergeLocalLibraryWithAniList() {
+        val token = container.tokenStore.accessToken() ?: return
+        val snapshot = _state.value
+        val localItems = snapshot.libraryItems
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null, anilistMergePromptVisible = false) }
+            runCatching {
+                aniListDataSource.mergeLocalLibraryToAniList(
+                    token = token,
+                    localItems = localItems,
+                    knownCustomLists = snapshot.anilistCustomLists,
+                    scoreFormat = snapshot.anilistScoreFormat,
+                )
+            }.onSuccess { synced ->
+                val viewer = synced.viewer
+                container.settingsStore.saveLibraryMode(LibraryMode.ANILIST)
+                _state.update {
+                    it.copy(
+                        libraryMode = LibraryMode.ANILIST,
+                        viewerName = viewer.name,
+                        viewerAvatarUrl = viewer.avatarUrl,
+                        viewerBannerImageUrl = viewer.bannerImageUrl,
+                        anilistMangaStats = viewer.mangaStats,
+                        anilistScoreFormat = viewer.scoreFormat,
+                        anilistTitleLanguage = viewer.titleLanguage,
+                        anilistCustomLists = viewer.mangaCustomLists,
+                        library = synced.items.map { item -> item.media },
+                        libraryItems = synced.items,
+                        librarySyncedAtEpochMillis = synced.syncedAtEpochMillis,
+                        busy = false,
+                        message = string(R.string.msg_library_merged),
+                    )
+                }
+                loadRecentReadingProgress()
+                runScheduledAniListBackupIfDue()
+            }.onFailure { error ->
+                Log.e(TAG, "AniList local library merge failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        anilistMergePromptVisible = true,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_library_merge_failed)),
+                    )
+                }
+            }
+        }
+    }
+
+    fun replaceLocalLibraryWithAniList() {
+        container.settingsStore.saveLibraryMode(LibraryMode.ANILIST)
+        _state.update {
+            it.copy(
+                libraryMode = LibraryMode.ANILIST,
+                anilistMergePromptVisible = false,
+            )
+        }
+        refreshLibrary()
     }
 
     fun showOnboarding() {
@@ -338,8 +427,26 @@ class MainViewModel(
     }
 
     fun dismissOnboarding() {
-        container.settingsStore.saveOnboardingCompleted(true)
+        container.settingsStore.saveOnboardingVersion(CURRENT_ONBOARDING_VERSION)
         _state.update { it.copy(onboardingVisible = false) }
+    }
+
+    fun completeOnboarding(mode: LibraryMode, themeMode: TankobunThemeMode) {
+        container.settingsStore.saveLibraryMode(mode)
+        container.settingsStore.saveThemeMode(themeMode)
+        container.settingsStore.saveOnboardingVersion(CURRENT_ONBOARDING_VERSION)
+        _state.update {
+            it.copy(
+                libraryMode = mode,
+                themeMode = themeMode,
+                onboardingVisible = false,
+            )
+        }
+        if (mode == LibraryMode.LOCAL) {
+            loadCachedLibrary()
+        } else if (_state.value.loggedIn) {
+            refreshLibrary()
+        }
     }
 
     fun dismissReaderTutorial() {
@@ -705,6 +812,11 @@ class MainViewModel(
     }
 
     fun refreshLibrary() {
+        if (_state.value.libraryMode == LibraryMode.LOCAL) {
+            loadCachedLibrary()
+            _state.update { it.copy(message = string(R.string.msg_library_loaded)) }
+            return
+        }
         val token = container.tokenStore.accessToken()
         if (token == null) {
             _state.update { it.copy(message = string(R.string.msg_connect_anilist_sync_library)) }
@@ -757,18 +869,26 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                backupDataSource.saveBackup(
-                    uri = uri,
-                    items = items,
-                    viewerName = snapshot.viewerName,
-                    scoreFormat = snapshot.anilistScoreFormat,
-                )
+                if (snapshot.libraryMode == LibraryMode.LOCAL) {
+                    backupDataSource.saveLocalLibraryBackup(uri = uri, snapshot = snapshot)
+                } else {
+                    backupDataSource.saveBackup(
+                        uri = uri,
+                        items = items,
+                        viewerName = snapshot.viewerName,
+                        scoreFormat = snapshot.anilistScoreFormat,
+                    )
+                }
             }.onSuccess {
                 _state.update {
                     it.copy(
                         busy = false,
                         message = string(
-                            R.string.msg_backup_saved,
+                            if (snapshot.libraryMode == LibraryMode.LOCAL) {
+                                R.string.msg_local_backup_saved
+                            } else {
+                                R.string.msg_backup_saved
+                            },
                             quantityString(R.plurals.manga_count, items.size, items.size),
                         ),
                     )
@@ -781,8 +901,9 @@ class MainViewModel(
     }
 
     fun restoreAniListBackup(uri: Uri) {
+        val snapshot = _state.value
         val token = container.tokenStore.accessToken()
-        if (token == null) {
+        if (snapshot.libraryMode == LibraryMode.ANILIST && token == null) {
             _state.update { it.copy(message = string(R.string.msg_connect_before_restore)) }
             return
         }
@@ -790,12 +911,20 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                backupDataSource.restoreBackup(
-                    uri = uri,
-                    accessToken = token,
-                    scoreFormat = _state.value.anilistScoreFormat,
-                    knownCustomLists = _state.value.anilistCustomLists,
-                )
+                if (snapshot.libraryMode == LibraryMode.LOCAL) {
+                    backupDataSource.restoreLocalLibraryBackup(
+                        uri = uri,
+                        scoreFormat = snapshot.anilistScoreFormat,
+                        knownCustomLists = snapshot.anilistCustomLists,
+                    )
+                } else {
+                    backupDataSource.restoreBackup(
+                        uri = uri,
+                        accessToken = requireNotNull(token),
+                        scoreFormat = snapshot.anilistScoreFormat,
+                        knownCustomLists = snapshot.anilistCustomLists,
+                    )
+                }
             }.onSuccess { result ->
                 container.settingsStore.saveAnilistCustomLists(result.customLists)
                 loadCachedLibrary()
@@ -893,6 +1022,7 @@ class MainViewModel(
                 ignoreDisplayCutout = store.ignoreDisplayCutout(),
                 showAppStatusBar = store.showAppStatusBar(),
                 dockAlignment = store.dockAlignment(),
+                libraryMode = store.libraryMode(),
                 libraryViewMode = store.libraryViewMode(),
                 libraryCoverColumns = store.libraryCoverColumns(),
                 libraryShowWholeCovers = store.libraryShowWholeCovers(),
@@ -1028,7 +1158,13 @@ class MainViewModel(
                     libraryItems = if (content.includesLibrary()) {
                         snapshot.libraryItems
                             .takeIf { it.isNotEmpty() }
-                            ?.let { backupDataSource.writeScheduledBackup(folderUri = folderUri, snapshot = snapshot) }
+                            ?.let {
+                                if (snapshot.libraryMode == LibraryMode.LOCAL) {
+                                    backupDataSource.writeScheduledLocalLibraryBackup(folderUri = folderUri, snapshot = snapshot)
+                                } else {
+                                    backupDataSource.writeScheduledBackup(folderUri = folderUri, snapshot = snapshot)
+                                }
+                            }
                     } else {
                         null
                     },
@@ -1101,6 +1237,23 @@ class MainViewModel(
             ?: snapshot.selectedListEntry?.progress
             ?: 0
         if (snapshot.selectedMedia?.id == media.id && chapterProgress <= trackedProgress) return
+
+        if (snapshot.libraryMode == LibraryMode.LOCAL) {
+            aniListDataSource.saveLocalProgressFromChapter(
+                media = media,
+                chapterProgress = chapterProgress,
+            )?.let { synced ->
+                _state.update {
+                    it.withSyncedListEntry(
+                        media = synced.media,
+                        entry = synced.entry,
+                        updateTrackingForm = synced.updateTrackingForm,
+                    )
+                }
+                loadRecentReadingProgress()
+            }
+            return
+        }
 
         aniListDataSource.syncProgressFromChapter(
             media = media,
@@ -1704,6 +1857,13 @@ class MainViewModel(
 
     fun setAnilistTitleLanguage(language: AnilistTitleLanguage) {
         if (_state.value.anilistTitleLanguage == language) return
+        if (_state.value.libraryMode == LibraryMode.LOCAL) {
+            container.settingsStore.saveAnilistTitleLanguage(language)
+            _state.update {
+                it.withAniListTitleLanguage(language).copy(message = string(R.string.msg_title_language_saved))
+            }
+            return
+        }
         val token = container.tokenStore.accessToken()
         if (token == null) {
             _state.update { it.copy(message = string(R.string.msg_connect_before_account_preferences)) }
@@ -1740,6 +1900,17 @@ class MainViewModel(
 
     fun setAnilistScoreFormat(format: AnilistScoreFormat) {
         if (_state.value.anilistScoreFormat == format) return
+        if (_state.value.libraryMode == LibraryMode.LOCAL) {
+            container.settingsStore.saveAnilistScoreFormat(format)
+            _state.update {
+                it.copy(
+                    anilistScoreFormat = format,
+                    trackingScore = it.selectedListEntry?.score.formatTrackingScore(format),
+                    message = string(R.string.msg_rating_format_saved),
+                )
+            }
+            return
+        }
         val token = container.tokenStore.accessToken()
         if (token == null) {
             _state.update { it.copy(message = string(R.string.msg_connect_before_account_preferences)) }
@@ -1780,17 +1951,27 @@ class MainViewModel(
     fun createAnilistCustomList(name: String) {
         val normalizedName = name.trim()
         if (normalizedName.isBlank()) return
-        val token = container.tokenStore.accessToken()
-        if (token == null) {
-            _state.update { it.copy(message = string(R.string.msg_connect_before_custom_lists)) }
-            return
-        }
         val currentLists = _state.value.anilistCustomLists.normalizedCustomLists()
         if (currentLists.any { it.equals(normalizedName, ignoreCase = true) }) {
             _state.update { it.copy(message = string(R.string.msg_custom_list_exists)) }
             return
         }
         val nextLists = (currentLists + normalizedName).normalizedCustomLists()
+        if (_state.value.libraryMode == LibraryMode.LOCAL) {
+            val savedLists = aniListDataSource.saveLocalCustomLists(nextLists)
+            _state.update {
+                it.copy(
+                    anilistCustomLists = savedLists,
+                    message = string(R.string.msg_custom_list_created),
+                )
+            }
+            return
+        }
+        val token = container.tokenStore.accessToken()
+        if (token == null) {
+            _state.update { it.copy(message = string(R.string.msg_connect_before_custom_lists)) }
+            return
+        }
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
@@ -1820,11 +2001,6 @@ class MainViewModel(
         val normalizedNewName = newName.trim()
         if (normalizedOldName.isBlank() || normalizedNewName.isBlank()) return
         if (normalizedOldName.equals(normalizedNewName, ignoreCase = true)) return
-        val token = container.tokenStore.accessToken()
-        if (token == null) {
-            _state.update { it.copy(message = string(R.string.msg_connect_before_custom_lists)) }
-            return
-        }
         val snapshot = _state.value
         val currentLists = snapshot.anilistCustomLists.normalizedCustomLists()
         if (currentLists.any { it.equals(normalizedNewName, ignoreCase = true) && !it.equals(normalizedOldName, ignoreCase = true) }) {
@@ -1834,6 +2010,43 @@ class MainViewModel(
         val nextLists = currentLists
             .map { if (it.equals(normalizedOldName, ignoreCase = true)) normalizedNewName else it }
             .normalizedCustomLists()
+        if (snapshot.libraryMode == LibraryMode.LOCAL) {
+            viewModelScope.launch {
+                _state.update { it.copy(busy = true, message = null) }
+                runCatching {
+                    aniListDataSource.renameLocalCustomListEntries(
+                        items = snapshot.libraryItems,
+                        oldName = normalizedOldName,
+                        newName = normalizedNewName,
+                        nextCustomLists = nextLists,
+                    )
+                }.onSuccess { result ->
+                    _state.update {
+                        it.withRenamedAniListCustomList(
+                            customLists = result.customLists,
+                            updatedEntries = result.updatedEntries,
+                            oldName = normalizedOldName,
+                            newName = normalizedNewName,
+                            successMessage = string(R.string.msg_custom_list_renamed),
+                        )
+                    }
+                }.onFailure { error ->
+                    Log.e(TAG, "Local custom list rename failed", error)
+                    _state.update {
+                        it.copy(
+                            busy = false,
+                            message = error.userMessage(localizedContext(), string(R.string.msg_custom_list_rename_failed)),
+                        )
+                    }
+                }
+            }
+            return
+        }
+        val token = container.tokenStore.accessToken()
+        if (token == null) {
+            _state.update { it.copy(message = string(R.string.msg_connect_before_custom_lists)) }
+            return
+        }
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
@@ -1870,16 +2083,46 @@ class MainViewModel(
     fun deleteAnilistCustomList(name: String) {
         val normalizedName = name.trim()
         if (normalizedName.isBlank()) return
-        val token = container.tokenStore.accessToken()
-        if (token == null) {
-            _state.update { it.copy(message = string(R.string.msg_connect_before_custom_lists)) }
-            return
-        }
         val snapshot = _state.value
         val currentLists = snapshot.anilistCustomLists.normalizedCustomLists()
         val nextLists = currentLists
             .filterNot { it.equals(normalizedName, ignoreCase = true) }
             .normalizedCustomLists()
+        if (snapshot.libraryMode == LibraryMode.LOCAL) {
+            viewModelScope.launch {
+                _state.update { it.copy(busy = true, message = null) }
+                runCatching {
+                    aniListDataSource.deleteLocalCustomListEntries(
+                        items = snapshot.libraryItems,
+                        listName = normalizedName,
+                        nextCustomLists = nextLists,
+                    )
+                }.onSuccess { result ->
+                    _state.update {
+                        it.withDeletedAniListCustomList(
+                            customLists = result.customLists,
+                            updatedEntries = result.updatedEntries,
+                            name = normalizedName,
+                            successMessage = string(R.string.msg_custom_list_deleted),
+                        )
+                    }
+                }.onFailure { error ->
+                    Log.e(TAG, "Local custom list delete failed", error)
+                    _state.update {
+                        it.copy(
+                            busy = false,
+                            message = error.userMessage(localizedContext(), string(R.string.msg_custom_list_delete_failed)),
+                        )
+                    }
+                }
+            }
+            return
+        }
+        val token = container.tokenStore.accessToken()
+        if (token == null) {
+            _state.update { it.copy(message = string(R.string.msg_connect_before_custom_lists)) }
+            return
+        }
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
@@ -1958,26 +2201,40 @@ class MainViewModel(
 
     private fun saveTrackingCustomListsOnly() {
         val media = _state.value.selectedMedia ?: return
-        val token = container.tokenStore.accessToken() ?: return
         val snapshot = _state.value
         val customLists = snapshot.trackingCustomLists.normalizedCustomLists()
         if (customLists.isEmpty() && snapshot.selectedListEntry == null) return
+        val token = container.tokenStore.accessToken()
+        if (snapshot.libraryMode == LibraryMode.ANILIST && token == null) return
 
         viewModelScope.launch {
             runCatching {
                 val knownCustomLists = snapshot.anilistCustomLists.normalizedCustomLists()
-                aniListDataSource.saveTracking(
-                    token = token,
-                    media = media,
-                    status = if (snapshot.selectedListEntry == null) snapshot.trackingStatus else null,
-                    progress = null,
-                    score = null,
-                    notes = null,
-                    private = null,
-                    customLists = customLists,
-                    knownCustomLists = knownCustomLists,
-                    scoreFormat = snapshot.anilistScoreFormat,
-                )
+                if (snapshot.libraryMode == LibraryMode.LOCAL) {
+                    aniListDataSource.saveLocalTracking(
+                        media = media,
+                        status = if (snapshot.selectedListEntry == null) snapshot.trackingStatus else snapshot.selectedListEntry.status,
+                        progress = snapshot.selectedListEntry?.progress,
+                        score = snapshot.selectedListEntry?.score,
+                        notes = snapshot.selectedListEntry?.notes,
+                        private = snapshot.selectedListEntry?.private ?: false,
+                        customLists = customLists,
+                        knownCustomLists = knownCustomLists,
+                    )
+                } else {
+                    aniListDataSource.saveTracking(
+                        token = requireNotNull(token),
+                        media = media,
+                        status = if (snapshot.selectedListEntry == null) snapshot.trackingStatus else null,
+                        progress = null,
+                        score = null,
+                        notes = null,
+                        private = null,
+                        customLists = customLists,
+                        knownCustomLists = knownCustomLists,
+                        scoreFormat = snapshot.anilistScoreFormat,
+                    )
+                }
             }.onSuccess { result ->
                 _state.update {
                     it.withTrackingCustomListSaveResult(
@@ -1997,7 +2254,8 @@ class MainViewModel(
 
     private fun scheduleTrackingAutoSave() {
         val snapshot = _state.value
-        if (!snapshot.anilistAutoSaveTrackingChanges || !snapshot.loggedIn || snapshot.selectedMedia == null) return
+        val canAutoSave = snapshot.libraryMode == LibraryMode.LOCAL || snapshot.loggedIn
+        if (!snapshot.anilistAutoSaveTrackingChanges || !canAutoSave || snapshot.selectedMedia == null) return
         trackingAutoSaveJob?.cancel()
         trackingAutoSaveJob = viewModelScope.launch {
             delay(TRACKING_AUTO_SAVE_DELAY_MILLIS)
@@ -2011,15 +2269,15 @@ class MainViewModel(
 
     private fun saveTracking(autoSave: Boolean) {
         val media = _state.value.selectedMedia ?: return
+        val snapshot = _state.value
         val token = container.tokenStore.accessToken()
-        if (token == null) {
+        if (snapshot.libraryMode == LibraryMode.ANILIST && token == null) {
             if (!autoSave) {
                 _state.update { it.copy(message = string(R.string.msg_connect_anilist_track_manga)) }
             }
             return
         }
 
-        val snapshot = _state.value
         val progress = snapshot.trackingProgress.toIntOrNull()?.coerceAtLeast(0)
         val score = snapshot.trackingScore.toAniListScore(snapshot.anilistScoreFormat)
         val notes = snapshot.trackingNotes.trim().ifBlank { null }
@@ -2051,18 +2309,31 @@ class MainViewModel(
                 )
             }
             runCatching {
-                aniListDataSource.saveTracking(
-                    token = token,
-                    media = media,
-                    status = snapshot.trackingStatus,
-                    progress = progress,
-                    score = score,
-                    notes = notes,
-                    private = snapshot.trackingPrivate,
-                    customLists = customLists,
-                    knownCustomLists = knownCustomLists,
-                    scoreFormat = snapshot.anilistScoreFormat,
-                )
+                if (snapshot.libraryMode == LibraryMode.LOCAL) {
+                    aniListDataSource.saveLocalTracking(
+                        media = media,
+                        status = snapshot.trackingStatus,
+                        progress = progress,
+                        score = score,
+                        notes = notes,
+                        private = snapshot.trackingPrivate,
+                        customLists = customLists,
+                        knownCustomLists = knownCustomLists,
+                    )
+                } else {
+                    aniListDataSource.saveTracking(
+                        token = requireNotNull(token),
+                        media = media,
+                        status = snapshot.trackingStatus,
+                        progress = progress,
+                        score = score,
+                        notes = notes,
+                        private = snapshot.trackingPrivate,
+                        customLists = customLists,
+                        knownCustomLists = knownCustomLists,
+                        scoreFormat = snapshot.anilistScoreFormat,
+                    )
+                }
             }.onSuccess { result ->
                 _state.update {
                     it.withTrackingSaveResult(
@@ -2070,7 +2341,11 @@ class MainViewModel(
                         entry = result.entry,
                         knownCustomLists = result.knownCustomLists,
                         autoSave = autoSave,
-                        successMessage = string(R.string.msg_tracking_saved),
+                        successMessage = if (snapshot.libraryMode == LibraryMode.LOCAL) {
+                            string(R.string.msg_tracking_saved_local)
+                        } else {
+                            string(R.string.msg_tracking_saved)
+                        },
                     )
                 }
             }.onFailure { error ->

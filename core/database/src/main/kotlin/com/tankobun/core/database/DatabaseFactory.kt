@@ -12,7 +12,15 @@ object DatabaseFactory {
             TankobunDatabase::class.java,
             "tankobun.db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+            )
             .build()
     }
 
@@ -96,6 +104,59 @@ object DatabaseFactory {
     private val MIGRATION_6_7 = object : Migration(6, 7) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `countryOfOrigin` TEXT")
+        }
+    }
+
+    private val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `anilist_list_entries` RENAME TO `anilist_list_entries_v7`")
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `anilist_list_entries` (
+                    `id` INTEGER NOT NULL,
+                    `mediaId` INTEGER NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `progress` INTEGER NOT NULL,
+                    `score` REAL,
+                    `notes` TEXT,
+                    `private` INTEGER NOT NULL,
+                    `customLists` TEXT NOT NULL,
+                    `updatedAtEpochSeconds` INTEGER,
+                    `fetchedAtEpochMillis` INTEGER NOT NULL,
+                    PRIMARY KEY(`mediaId`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                INSERT OR REPLACE INTO `anilist_list_entries` (
+                    `id`,
+                    `mediaId`,
+                    `status`,
+                    `progress`,
+                    `score`,
+                    `notes`,
+                    `private`,
+                    `customLists`,
+                    `updatedAtEpochSeconds`,
+                    `fetchedAtEpochMillis`
+                )
+                SELECT
+                    `id`,
+                    `mediaId`,
+                    `status`,
+                    `progress`,
+                    `score`,
+                    `notes`,
+                    `private`,
+                    `customLists`,
+                    `updatedAtEpochSeconds`,
+                    `fetchedAtEpochMillis`
+                FROM `anilist_list_entries_v7`
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE `anilist_list_entries_v7`")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_anilist_list_entries_mediaId` ON `anilist_list_entries` (`mediaId`)")
         }
     }
 }

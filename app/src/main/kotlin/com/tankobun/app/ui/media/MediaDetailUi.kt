@@ -1196,14 +1196,14 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
             Text(tankobunString(R.string.common_private), style = MaterialTheme.typography.bodyMedium)
             Switch(checked = state.trackingPrivate, onCheckedChange = viewModel::setTrackingPrivate)
             Spacer(Modifier.weight(1f))
-            val canSaveTracking = state.loggedIn &&
+            val canSaveTracking = (state.libraryMode == LibraryMode.LOCAL || state.loggedIn) &&
                 !state.trackingSaveInProgress &&
                 (state.selectedListEntry == null || state.trackingDirty || state.trackingSaveFailed)
             val actionLabel = when {
                 state.trackingSaveInProgress -> tankobunString(R.string.detail_saving)
                 state.trackingSaveFailed -> tankobunString(R.string.common_retry_save)
                 state.selectedListEntry == null -> tankobunString(R.string.detail_track_manga)
-                state.trackingDirty -> tankobunString(R.string.detail_save_anilist)
+                state.trackingDirty -> tankobunString(R.string.detail_save_tracking)
                 else -> tankobunString(R.string.common_saved)
             }
             val actionIcon = when {
@@ -1227,7 +1227,7 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
                 },
             )
         }
-        if (!state.loggedIn) {
+        if (state.libraryMode == LibraryMode.ANILIST && !state.loggedIn) {
             Text(
                 tankobunString(R.string.detail_connect_anilist_tracking),
                 style = MaterialTheme.typography.bodySmall,

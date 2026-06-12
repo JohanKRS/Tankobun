@@ -232,7 +232,7 @@ internal fun BackupsSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val backupLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/xml"),
+        ActivityResultContracts.CreateDocument(if (state.libraryMode == LibraryMode.LOCAL) "application/json" else "text/xml"),
     ) { uri ->
         uri?.let(viewModel::saveAniListBackup)
     }
@@ -269,7 +269,15 @@ internal fun BackupsSettingsScreen(
         subtitle = tankobunString(R.string.settings_backups_subtitle),
         modifier = modifier,
     ) {
-        Text(tankobunString(R.string.backup_anilist_manga), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(
+            if (state.libraryMode == LibraryMode.LOCAL) {
+                tankobunString(R.string.backup_local_library)
+            } else {
+                tankobunString(R.string.backup_anilist_manga)
+            },
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
         TankobunPanel(
             modifier = Modifier.fillMaxWidth(),
             color = LocalTankobunStyle.current.colors.panel,
@@ -287,7 +295,15 @@ internal fun BackupsSettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(tankobunString(R.string.backup_mal_xml), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (state.libraryMode == LibraryMode.LOCAL) {
+                                tankobunString(R.string.backup_tankobun_json)
+                            } else {
+                                tankobunString(R.string.backup_mal_xml)
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
                         Text(
                             backupCoverageLabel(totalItems, malMatchedItems, missingMalItems),
                             style = MaterialTheme.typography.bodySmall,
@@ -308,7 +324,11 @@ internal fun BackupsSettingsScreen(
                     )
                 }
                 Text(
-                    tankobunString(R.string.backup_restore_desc),
+                    if (state.libraryMode == LibraryMode.LOCAL) {
+                        tankobunString(R.string.backup_local_restore_desc)
+                    } else {
+                        tankobunString(R.string.backup_restore_desc)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -316,25 +336,33 @@ internal fun BackupsSettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    TankobunActionButton(
-                        label = tankobunString(R.string.backup_sync_first),
-                        onClick = viewModel::refreshLibrary,
-                        enabled = state.loggedIn,
-                        filled = false,
-                    )
+                    if (state.libraryMode == LibraryMode.ANILIST) {
+                        TankobunActionButton(
+                            label = tankobunString(R.string.backup_sync_first),
+                            onClick = viewModel::refreshLibrary,
+                            enabled = state.loggedIn,
+                            filled = false,
+                        )
+                    }
                     TankobunActionButton(
                         label = tankobunString(R.string.backup_save),
                         onClick = {
-                            backupLauncher.launch(suggestedAniListBackupFileName(state.viewerName))
+                            backupLauncher.launch(
+                                if (state.libraryMode == LibraryMode.LOCAL) {
+                                    suggestedTankobunLibraryBackupFileName()
+                                } else {
+                                    suggestedAniListBackupFileName(state.viewerName)
+                                },
+                            )
                         },
                         enabled = totalItems > 0,
                     )
                     TankobunActionButton(
                         label = tankobunString(R.string.backup_restore),
                         onClick = {
-                            restoreLauncher.launch(arrayOf("text/xml", "application/xml", "*/*"))
+                            restoreLauncher.launch(arrayOf("application/json", "text/xml", "application/xml", "*/*"))
                         },
-                        enabled = state.loggedIn,
+                        enabled = state.libraryMode == LibraryMode.LOCAL || state.loggedIn,
                         filled = false,
                     )
                 }
@@ -690,3 +718,6 @@ private fun backupFolderDisplayLabel(context: Context, uriString: String?): Stri
             ?.takeIf { it.isNotBlank() }
         ?: uri.authority
 }
+
+internal fun suggestedTankobunLibraryBackupFileName(): String =
+    "tankobun_library_${System.currentTimeMillis()}.json"

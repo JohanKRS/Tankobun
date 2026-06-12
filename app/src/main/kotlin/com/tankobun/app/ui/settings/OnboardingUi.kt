@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -44,7 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.tankobun.app.LocalTankobunStyle
+import com.tankobun.app.LibraryMode
 import com.tankobun.app.R
+import com.tankobun.app.TankobunThemeMode
 import com.tankobun.app.tankobunString
 import com.tankobun.app.ui.components.TankobunActionButton
 
@@ -105,15 +108,20 @@ private val TankobunOnboardingPages = listOf(
 
 @Composable
 internal fun OnboardingDialog(
-    onDismiss: () -> Unit,
+    initialLibraryMode: LibraryMode,
+    initialThemeMode: TankobunThemeMode,
+    onComplete: (LibraryMode, TankobunThemeMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var pageIndex by remember { mutableIntStateOf(0) }
-    val page = TankobunOnboardingPages[pageIndex]
-    val isLastPage = pageIndex == TankobunOnboardingPages.lastIndex
+    var selectedLibraryMode by remember(initialLibraryMode) { androidx.compose.runtime.mutableStateOf(initialLibraryMode) }
+    var selectedThemeMode by remember(initialThemeMode) { androidx.compose.runtime.mutableStateOf(initialThemeMode) }
+    val pageCount = 3
+    val isLastPage = pageIndex == pageCount - 1
+    val finish = { onComplete(selectedLibraryMode, selectedThemeMode) }
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = finish,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
@@ -140,12 +148,12 @@ internal fun OnboardingDialog(
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(tankobunString(R.string.onboarding_welcome), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            tankobunString(R.string.onboarding_step_count, pageIndex + 1, TankobunOnboardingPages.size),
+                            tankobunString(R.string.onboarding_step_count, pageIndex + 1, pageCount),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    IconButton(onClick = onDismiss) {
+                    IconButton(onClick = finish) {
                         Icon(Icons.Default.Close, contentDescription = tankobunString(R.string.onboarding_close_tutorial))
                     }
                 }
@@ -159,41 +167,28 @@ internal fun OnboardingDialog(
                     contentColor = LocalTankobunStyle.current.colors.selectedChipContent,
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(page.icon, contentDescription = null, modifier = Modifier.size(38.dp))
+                        Icon(
+                            when (pageIndex) {
+                                0 -> Icons.AutoMirrored.Filled.LibraryBooks
+                                1 -> Icons.Default.Settings
+                                else -> Icons.AutoMirrored.Filled.MenuBook
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(38.dp),
+                        )
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        tankobunString(page.titleRes),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
+                when (pageIndex) {
+                    0 -> OnboardingLibraryModeStep(
+                        selected = selectedLibraryMode,
+                        onSelected = { selectedLibraryMode = it },
                     )
-                    Text(
-                        tankobunString(page.bodyRes),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
+                    1 -> OnboardingThemeStep(
+                        selected = selectedThemeMode,
+                        onSelected = { selectedThemeMode = it },
                     )
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    page.pointRes.forEach { pointRes ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(top = 7.dp)
-                                    .size(7.dp)
-                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(999.dp)),
-                            )
-                            Text(
-                                tankobunString(pointRes),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                    else -> OnboardingTourStep()
                 }
 
                 Row(
@@ -201,7 +196,7 @@ internal fun OnboardingDialog(
                     horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TankobunOnboardingPages.indices.forEach { index ->
+                    repeat(pageCount) { index ->
                         val selected = index == pageIndex
                         Box(
                             modifier = Modifier
@@ -220,10 +215,10 @@ internal fun OnboardingDialog(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onDismiss) {
+                    TextButton(onClick = finish) {
                         Text(if (isLastPage) tankobunString(R.string.common_close) else tankobunString(R.string.onboarding_skip))
                     }
                     Spacer(Modifier.weight(1f))
@@ -234,7 +229,7 @@ internal fun OnboardingDialog(
                         label = if (isLastPage) tankobunString(R.string.common_start) else tankobunString(R.string.common_next),
                         onClick = {
                             if (isLastPage) {
-                                onDismiss()
+                                finish()
                             } else {
                                 pageIndex += 1
                             }
@@ -243,5 +238,143 @@ internal fun OnboardingDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OnboardingLibraryModeStep(
+    selected: LibraryMode,
+    onSelected: (LibraryMode) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        OnboardingStepHeader(
+            title = tankobunString(R.string.onboarding_library_mode_title),
+            body = tankobunString(R.string.onboarding_library_mode_body),
+        )
+        OnboardingChoiceButton(
+            selected = selected == LibraryMode.LOCAL,
+            title = tankobunString(R.string.onboarding_library_mode_local),
+            body = tankobunString(R.string.onboarding_library_mode_local_desc),
+            icon = Icons.AutoMirrored.Filled.LibraryBooks,
+            onClick = { onSelected(LibraryMode.LOCAL) },
+        )
+        OnboardingChoiceButton(
+            selected = selected == LibraryMode.ANILIST,
+            title = tankobunString(R.string.onboarding_library_mode_anilist),
+            body = tankobunString(R.string.onboarding_library_mode_anilist_desc),
+            icon = Icons.Default.Link,
+            onClick = { onSelected(LibraryMode.ANILIST) },
+        )
+    }
+}
+
+@Composable
+private fun OnboardingThemeStep(
+    selected: TankobunThemeMode,
+    onSelected: (TankobunThemeMode) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        OnboardingStepHeader(
+            title = tankobunString(R.string.onboarding_theme_title),
+            body = tankobunString(R.string.onboarding_theme_body),
+        )
+        listOf(
+            TankobunThemeMode.SYSTEM to tankobunString(R.string.onboarding_theme_system),
+            TankobunThemeMode.LIGHT to tankobunString(R.string.onboarding_theme_light),
+            TankobunThemeMode.DARK to tankobunString(R.string.onboarding_theme_dark),
+        ).forEach { (mode, label) ->
+            OnboardingChoiceButton(
+                selected = selected == mode,
+                title = label,
+                body = "",
+                icon = Icons.Default.Settings,
+                onClick = { onSelected(mode) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun OnboardingTourStep() {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        OnboardingStepHeader(
+            title = tankobunString(R.string.onboarding_tour_title),
+            body = tankobunString(R.string.onboarding_tour_body),
+        )
+        listOf(
+            R.string.onboarding_tour_bullet_library,
+            R.string.onboarding_tour_bullet_browse,
+            R.string.onboarding_tour_bullet_sources,
+            R.string.onboarding_tour_bullet_reader,
+            R.string.onboarding_tour_bullet_backups,
+            R.string.onboarding_tour_bullet_profile,
+        ).forEach { pointRes ->
+            OnboardingBullet(pointRes)
+        }
+    }
+}
+
+@Composable
+private fun OnboardingStepHeader(title: String, body: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            title,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun OnboardingChoiceButton(
+    selected: Boolean,
+    title: String,
+    body: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    val content: @Composable () -> Unit = {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                if (body.isNotBlank()) {
+                    Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+    if (selected) {
+        Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) { content() }
+    } else {
+        OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) { content() }
+    }
+}
+
+@Composable
+private fun OnboardingBullet(pointRes: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+        Box(
+            modifier = Modifier
+                .padding(top = 7.dp)
+                .size(7.dp)
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(999.dp)),
+        )
+        Text(
+            tankobunString(pointRes),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

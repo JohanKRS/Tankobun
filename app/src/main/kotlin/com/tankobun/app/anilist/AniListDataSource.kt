@@ -195,6 +195,112 @@ internal class AniListDataSource(
         )
     }
 
+    suspend fun saveLocalTracking(
+        media: AnilistMedia,
+        status: MediaStatus,
+        progress: Int?,
+        score: Double?,
+        notes: String?,
+        private: Boolean,
+        customLists: List<String>,
+        knownCustomLists: List<String>,
+    ): SavedTrackingData {
+        val now = System.currentTimeMillis()
+        val normalizedCustomLists = customLists.normalizedCustomLists()
+        val nextKnownCustomLists = (knownCustomLists + normalizedCustomLists).normalizedCustomLists()
+        val existing = container.database.listEntryDao().cachedEntry(media.id)?.toModel()
+        val entry = AnilistListEntry(
+            id = existing?.id ?: -media.id,
+            mediaId = media.id,
+            status = status,
+            progress = progress ?: existing?.progress ?: 0,
+            score = score,
+            notes = notes,
+            private = private,
+            customLists = normalizedCustomLists,
+            updatedAtEpochSeconds = now / 1000L,
+        )
+        container.database.mediaDao().upsertMedia(media.toEntity(now))
+        container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+        container.settingsStore.saveAnilistCustomLists(nextKnownCustomLists)
+        container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
+        return SavedTrackingData(
+            knownCustomLists = nextKnownCustomLists,
+            entry = entry,
+        )
+    }
+
+    suspend fun saveLocalProgressFromChapter(
+        media: AnilistMedia,
+        chapterProgress: Int,
+    ): SyncedListEntryData? {
+        val now = System.currentTimeMillis()
+        val existing = container.database.listEntryDao().cachedEntry(media.id)?.toModel()
+        if (existing != null && chapterProgress <= existing.progress) return null
+        val entry = AnilistListEntry(
+            id = existing?.id ?: -media.id,
+            mediaId = media.id,
+            status = existing?.status ?: MediaStatus.CURRENT,
+            progress = chapterProgress,
+            score = existing?.score,
+            notes = existing?.notes,
+            private = existing?.private ?: false,
+            customLists = existing?.customLists.orEmpty(),
+            updatedAtEpochSeconds = now / 1000L,
+        )
+        container.database.mediaDao().upsertMedia(media.toEntity(now))
+        container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+        container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
+        return SyncedListEntryData(media = media, entry = entry)
+    }
+
+    fun saveLocalCustomLists(customLists: List<String>): List<String> {
+        val normalizedLists = customLists.normalizedCustomLists()
+        container.settingsStore.saveAnilistCustomLists(normalizedLists)
+        return normalizedLists
+    }
+
+    suspend fun renameLocalCustomListEntries(
+        items: List<LibraryItem>,
+        oldName: String,
+        newName: String,
+        nextCustomLists: List<String>,
+    ): CustomListEntriesData {
+        val savedLists = saveLocalCustomLists(nextCustomLists)
+        val now = System.currentTimeMillis()
+        val updatedEntries = items
+            .filter { item -> item.entry.customLists.any { it.equals(oldName, ignoreCase = true) } }
+            .associate { item ->
+                val entry = item.entry.copy(
+                    customLists = item.entry.customLists.renamedCustomList(oldName, newName),
+                    updatedAtEpochSeconds = now / 1000L,
+                )
+                container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+                item.media.id to entry
+            }
+        return CustomListEntriesData(customLists = savedLists, updatedEntries = updatedEntries)
+    }
+
+    suspend fun deleteLocalCustomListEntries(
+        items: List<LibraryItem>,
+        listName: String,
+        nextCustomLists: List<String>,
+    ): CustomListEntriesData {
+        val savedLists = saveLocalCustomLists(nextCustomLists)
+        val now = System.currentTimeMillis()
+        val updatedEntries = items
+            .filter { item -> item.entry.customLists.any { it.equals(listName, ignoreCase = true) } }
+            .associate { item ->
+                val entry = item.entry.copy(
+                    customLists = item.entry.customLists.withoutCustomList(listName),
+                    updatedAtEpochSeconds = now / 1000L,
+                )
+                container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+                item.media.id to entry
+            }
+        return CustomListEntriesData(customLists = savedLists, updatedEntries = updatedEntries)
+    }
+
     suspend fun saveTracking(
         token: String,
         media: AnilistMedia,
@@ -336,11 +442,11 @@ internal class AniListDataSource(
         val now = System.currentTimeMillis()
         container.database.mediaDao().upsertMedia(preferredEntries.map { it.first.toEntity(now) })
         container.database.listEntryDao().upsertEntries(preferredEntries.map { it.second.toEntity(now) })
-        val entryIds = preferredEntries.map { it.second.id }
-        if (entryIds.isEmpty()) {
+        val mediaIds = preferredEntries.map { it.second.mediaId }
+        if (mediaIds.isEmpty()) {
             container.database.listEntryDao().deleteAllEntries()
         } else {
-            container.database.listEntryDao().deleteEntriesNotIn(entryIds)
+            container.database.listEntryDao().deleteEntriesNotIn(mediaIds)
         }
         saveViewerSettings(viewer)
         container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
@@ -349,6 +455,34 @@ internal class AniListDataSource(
             items = preferredEntries.map { (media, entry) -> LibraryItem(media, entry) }.sortedByTitle(),
             syncedAtEpochMillis = now,
         )
+    }
+
+    suspend fun mergeLocalLibraryToAniList(
+        token: String,
+        localItems: List<LibraryItem>,
+        knownCustomLists: List<String>,
+        scoreFormat: AnilistScoreFormat,
+    ): SyncedLibraryData {
+        val allCustomLists = (knownCustomLists + localItems.flatMap { it.entry.customLists }).normalizedCustomLists()
+        if (allCustomLists != knownCustomLists.normalizedCustomLists()) {
+            updateCustomLists(token = token, customLists = allCustomLists)
+        }
+        localItems.forEach { item ->
+            val entry = item.entry
+            saveTracking(
+                token = token,
+                media = item.media,
+                status = entry.status,
+                progress = entry.progress,
+                score = entry.score,
+                notes = entry.notes,
+                private = entry.private,
+                customLists = entry.customLists,
+                knownCustomLists = allCustomLists,
+                scoreFormat = scoreFormat,
+            )
+        }
+        return syncLibrary(token)
     }
 
     suspend fun recentReadingProgressItems(

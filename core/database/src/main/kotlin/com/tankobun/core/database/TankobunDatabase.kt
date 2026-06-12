@@ -18,7 +18,7 @@ import androidx.room.TypeConverters
         DownloadPageEntity::class,
         SyncMutationEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 @TypeConverters(TankobunTypeConverters::class)

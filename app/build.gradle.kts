@@ -35,8 +35,8 @@ android {
         applicationId = "com.tankobun.app"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 11
-        versionName = "1.0.1"
+        versionCode = 20
+        versionName = "2.0.0"
 
         val clientId = localProperties.getProperty("anilistClientId", "")
         buildConfigField("String", "ANILIST_CLIENT_ID", "\"$clientId\"")
@@ -112,4 +112,5 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20240303")
 }

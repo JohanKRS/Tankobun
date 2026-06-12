@@ -302,7 +302,7 @@ internal fun LibraryScreen(
                 TankobunMessageBanner(it)
             }
 
-            if (!state.loggedIn) {
+            if (state.libraryMode == LibraryMode.ANILIST && !state.loggedIn) {
                 LibraryConnectPrompt(
                     clientConfigured = state.clientConfigured,
                     onConnect = {

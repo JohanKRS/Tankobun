@@ -1,5 +1,6 @@
 package com.tankobun.app.logic
 
+import com.tankobun.app.LibraryMode
 import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.core.model.AnilistListEntry
@@ -7,6 +8,7 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistTitle
+import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.SourceChapter
@@ -244,6 +246,45 @@ class MainStateLogicTest {
     }
 
     @Test
+    fun localTrackingSaveResultUpdatesLibraryAndClearsDirtyState() {
+        val media = media(42, "Manga")
+        val localEntry = entry(
+            mediaId = 42,
+            status = MediaStatus.CURRENT,
+            progress = 12,
+            score = 87.0,
+            notes = "local note",
+            private = true,
+            customLists = listOf("Favorites"),
+        ).copy(id = -42)
+
+        val next = TankobunUiState(
+            libraryMode = LibraryMode.LOCAL,
+            loggedIn = false,
+            selectedMedia = media,
+            trackingDirty = false,
+            trackingSaveInProgress = true,
+            busy = true,
+            anilistScoreFormat = AnilistScoreFormat.POINT_100,
+        ).withTrackingSaveResult(
+            media = media,
+            entry = localEntry,
+            knownCustomLists = listOf("Favorites"),
+            autoSave = false,
+            successMessage = "Tracking saved",
+        )
+
+        assertEquals(localEntry, next.selectedListEntry)
+        assertEquals(listOf(42), next.libraryItems.map { it.media.id })
+        assertEquals(listOf("Favorites"), next.anilistCustomLists)
+        assertFalse(next.trackingDirty)
+        assertFalse(next.trackingSaveInProgress)
+        assertFalse(next.trackingSaveFailed)
+        assertFalse(next.busy)
+        assertEquals("Tracking saved", next.message)
+    }
+
+    @Test
     fun addedTrackingCustomListDoesNotMarkListAsKnownBeforeServerSave() {
         val entry = entry(mediaId = 42, customLists = emptyList())
 
@@ -356,6 +397,68 @@ class MainStateLogicTest {
         val state = TankobunUiState(message = "still here")
 
         assertSame(state, state.withoutSelectedMedia())
+    }
+
+    @Test
+    fun titleLanguagePreferenceUpdatesCachedLocalSurfaces() {
+        val media = media(42, "Romaji").copy(
+            title = AnilistTitle(
+                romaji = "Romaji",
+                english = "English",
+                native = "Native",
+                userPreferred = "Romaji",
+            ),
+        )
+        val recommendation = AnilistRecommendation(
+            media = media(7, "Neighbor Romaji").copy(
+                title = AnilistTitle(
+                    romaji = "Neighbor Romaji",
+                    english = "Neighbor English",
+                    native = null,
+                    userPreferred = "Neighbor Romaji",
+                ),
+            ),
+            rating = 1,
+        )
+
+        val next = TankobunUiState(
+            libraryMode = LibraryMode.LOCAL,
+            library = listOf(media),
+            libraryItems = listOf(LibraryItem(media, entry(mediaId = 42))),
+            searchResults = listOf(media),
+            selectedMedia = media,
+            selectedRecommendations = listOf(recommendation),
+        ).withAniListTitleLanguage(AnilistTitleLanguage.ENGLISH)
+
+        assertEquals(AnilistTitleLanguage.ENGLISH, next.anilistTitleLanguage)
+        assertEquals("English", next.library.single().title.userPreferred)
+        assertEquals("English", next.libraryItems.single().media.title.userPreferred)
+        assertEquals("English", next.searchResults.single().title.userPreferred)
+        assertEquals("English", next.selectedMedia!!.title.userPreferred)
+        assertEquals("Neighbor English", next.selectedRecommendations.single().media.title.userPreferred)
+    }
+
+    @Test
+    fun librarySectionsMapCustomListsBesideAniListStatuses() {
+        val current = LibraryItem(
+            media = media(42, "Reading"),
+            entry = entry(mediaId = 42, status = MediaStatus.CURRENT, customLists = listOf("Favorites")),
+        )
+        val planning = LibraryItem(
+            media = media(7, "Planning"),
+            entry = entry(mediaId = 7, status = MediaStatus.PLANNING, customLists = listOf("Favorites", "Reread")),
+        )
+
+        val sections = TankobunUiState(
+            libraryMode = LibraryMode.LOCAL,
+            libraryItems = listOf(planning, current),
+        ).librarySections
+
+        assertEquals(MediaStatus.CURRENT, sections.first { it.key == MediaStatus.CURRENT.name }.status)
+        assertEquals(listOf(42), sections.first { it.key == MediaStatus.CURRENT.name }.items.map { it.media.id })
+        assertEquals(listOf(7), sections.first { it.key == MediaStatus.PLANNING.name }.items.map { it.media.id })
+        assertEquals(listOf(7, 42), sections.first { it.key == "custom:Favorites" }.items.map { it.media.id }.sorted())
+        assertEquals(listOf(7), sections.first { it.key == "custom:Reread" }.items.map { it.media.id })
     }
 
     private fun media(id: Int, title: String): AnilistMedia =

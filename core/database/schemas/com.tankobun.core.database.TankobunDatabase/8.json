@@ -1,0 +1,871 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 8,
+    "identityHash": "ac965206c08344c118171dd35960881f",
+    "entities": [
+      {
+        "tableName": "anilist_media",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `idMal` INTEGER, `titleRomaji` TEXT, `titleEnglish` TEXT, `titleNative` TEXT, `titleUserPreferred` TEXT NOT NULL, `description` TEXT, `coverImage` TEXT, `bannerImage` TEXT, `chapters` INTEGER, `volumes` INTEGER, `format` TEXT, `countryOfOrigin` TEXT, `status` TEXT, `averageScore` INTEGER, `popularity` INTEGER, `startDateYear` INTEGER, `endDateYear` INTEGER, `siteUrl` TEXT, `genres` TEXT NOT NULL, `synonyms` TEXT NOT NULL, `staff` TEXT NOT NULL, `tags` TEXT NOT NULL, `isAdult` INTEGER NOT NULL, `updatedAtEpochSeconds` INTEGER, `fetchedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idMal",
+            "columnName": "idMal",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "titleRomaji",
+            "columnName": "titleRomaji",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "titleEnglish",
+            "columnName": "titleEnglish",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "titleNative",
+            "columnName": "titleNative",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "titleUserPreferred",
+            "columnName": "titleUserPreferred",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "coverImage",
+            "columnName": "coverImage",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "bannerImage",
+            "columnName": "bannerImage",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "chapters",
+            "columnName": "chapters",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "volumes",
+            "columnName": "volumes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "format",
+            "columnName": "format",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "countryOfOrigin",
+            "columnName": "countryOfOrigin",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "averageScore",
+            "columnName": "averageScore",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "popularity",
+            "columnName": "popularity",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "startDateYear",
+            "columnName": "startDateYear",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "endDateYear",
+            "columnName": "endDateYear",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "siteUrl",
+            "columnName": "siteUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "genres",
+            "columnName": "genres",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "synonyms",
+            "columnName": "synonyms",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "staff",
+            "columnName": "staff",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tags",
+            "columnName": "tags",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isAdult",
+            "columnName": "isAdult",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochSeconds",
+            "columnName": "updatedAtEpochSeconds",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "fetchedAtEpochMillis",
+            "columnName": "fetchedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "anilist_list_entries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `mediaId` INTEGER NOT NULL, `status` TEXT NOT NULL, `progress` INTEGER NOT NULL, `score` REAL, `notes` TEXT, `private` INTEGER NOT NULL, `customLists` TEXT NOT NULL, `updatedAtEpochSeconds` INTEGER, `fetchedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`mediaId`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "mediaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "progress",
+            "columnName": "progress",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "score",
+            "columnName": "score",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "private",
+            "columnName": "private",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "customLists",
+            "columnName": "customLists",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochSeconds",
+            "columnName": "updatedAtEpochSeconds",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "fetchedAtEpochMillis",
+            "columnName": "fetchedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "mediaId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_anilist_list_entries_mediaId",
+            "unique": false,
+            "columnNames": [
+              "mediaId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_anilist_list_entries_mediaId` ON `${TABLE_NAME}` (`mediaId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "anilist_recommendations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`mediaId` INTEGER NOT NULL, `recommendationMediaId` INTEGER NOT NULL, `rating` INTEGER, `fetchedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`mediaId`, `recommendationMediaId`))",
+        "fields": [
+          {
+            "fieldPath": "mediaId",
+            "columnName": "mediaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recommendationMediaId",
+            "columnName": "recommendationMediaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rating",
+            "columnName": "rating",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "fetchedAtEpochMillis",
+            "columnName": "fetchedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "mediaId",
+            "recommendationMediaId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_anilist_recommendations_mediaId",
+            "unique": false,
+            "columnNames": [
+              "mediaId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_anilist_recommendations_mediaId` ON `${TABLE_NAME}` (`mediaId`)"
+          },
+          {
+            "name": "index_anilist_recommendations_recommendationMediaId",
+            "unique": false,
+            "columnNames": [
+              "recommendationMediaId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_anilist_recommendations_recommendationMediaId` ON `${TABLE_NAME}` (`recommendationMediaId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "anilist_search_results",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`query` TEXT NOT NULL, `mediaId` INTEGER NOT NULL, `orderIndex` INTEGER NOT NULL, `fetchedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`query`, `mediaId`))",
+        "fields": [
+          {
+            "fieldPath": "query",
+            "columnName": "query",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "mediaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "orderIndex",
+            "columnName": "orderIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fetchedAtEpochMillis",
+            "columnName": "fetchedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "query",
+            "mediaId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_anilist_search_results_query",
+            "unique": false,
+            "columnNames": [
+              "query"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_anilist_search_results_query` ON `${TABLE_NAME}` (`query`)"
+          },
+          {
+            "name": "index_anilist_search_results_mediaId",
+            "unique": false,
+            "columnNames": [
+              "mediaId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_anilist_search_results_mediaId` ON `${TABLE_NAME}` (`mediaId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "source_bindings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`mediaId` INTEGER NOT NULL, `sourceId` INTEGER NOT NULL, `sourcePackageName` TEXT NOT NULL, `mangaUrl` TEXT NOT NULL, `mangaTitle` TEXT NOT NULL, `thumbnailUrl` TEXT, `selectedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`mediaId`))",
+        "fields": [
+          {
+            "fieldPath": "mediaId",
+            "columnName": "mediaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourcePackageName",
+            "columnName": "sourcePackageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mangaUrl",
+            "columnName": "mangaUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mangaTitle",
+            "columnName": "mangaTitle",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "thumbnailUrl",
+            "columnName": "thumbnailUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "selectedAtEpochMillis",
+            "columnName": "selectedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "mediaId"
+          ]
+        }
+      },
+      {
+        "tableName": "source_search_results",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`mediaId` INTEGER NOT NULL, `sourceId` INTEGER NOT NULL, `sourcePackageName` TEXT NOT NULL, `sourceName` TEXT NOT NULL, `sourceLang` TEXT NOT NULL, `mangaUrl` TEXT NOT NULL, `mangaTitle` TEXT NOT NULL, `mangaThumbnailUrl` TEXT, `score` REAL NOT NULL, `reasons` TEXT NOT NULL, `searchedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`mediaId`, `sourceId`, `mangaUrl`))",
+        "fields": [
+          {
+            "fieldPath": "mediaId",
+            "columnName": "mediaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourcePackageName",
+            "columnName": "sourcePackageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceName",
+            "columnName": "sourceName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceLang",
+            "columnName": "sourceLang",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mangaUrl",
+            "columnName": "mangaUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mangaTitle",
+            "columnName": "mangaTitle",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mangaThumbnailUrl",
+            "columnName": "mangaThumbnailUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "score",
+            "columnName": "score",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reasons",
+            "columnName": "reasons",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "searchedAtEpochMillis",
+            "columnName": "searchedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "mediaId",
+            "sourceId",
+            "mangaUrl"
+          ]
+        }
+      },
+      {
+        "tableName": "source_chapters",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sourceId` INTEGER NOT NULL, `mangaUrl` TEXT NOT NULL, `chapterUrl` TEXT NOT NULL, `name` TEXT NOT NULL, `chapterNumber` REAL NOT NULL, `scanlator` TEXT, `uploadedAtEpochMillis` INTEGER, `fetchedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`sourceId`, `chapterUrl`))",
+        "fields": [
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mangaUrl",
+            "columnName": "mangaUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterUrl",
+            "columnName": "chapterUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterNumber",
+            "columnName": "chapterNumber",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scanlator",
+            "columnName": "scanlator",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "uploadedAtEpochMillis",
+            "columnName": "uploadedAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "fetchedAtEpochMillis",
+            "columnName": "fetchedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sourceId",
+            "chapterUrl"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_source_chapters_mangaUrl",
+            "unique": false,
+            "columnNames": [
+              "mangaUrl"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_source_chapters_mangaUrl` ON `${TABLE_NAME}` (`mangaUrl`)"
+          }
+        ]
+      },
+      {
+        "tableName": "reader_progress",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`mediaId` INTEGER NOT NULL, `chapterUrl` TEXT NOT NULL, `chapterNumber` REAL NOT NULL, `pageIndex` INTEGER NOT NULL, `pageScrollOffset` INTEGER NOT NULL, `totalPages` INTEGER NOT NULL, `readerMode` TEXT NOT NULL, `completed` INTEGER NOT NULL, `updatedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`mediaId`, `chapterUrl`))",
+        "fields": [
+          {
+            "fieldPath": "mediaId",
+            "columnName": "mediaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterUrl",
+            "columnName": "chapterUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterNumber",
+            "columnName": "chapterNumber",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pageIndex",
+            "columnName": "pageIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pageScrollOffset",
+            "columnName": "pageScrollOffset",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalPages",
+            "columnName": "totalPages",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "readerMode",
+            "columnName": "readerMode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completed",
+            "columnName": "completed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMillis",
+            "columnName": "updatedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "mediaId",
+            "chapterUrl"
+          ]
+        }
+      },
+      {
+        "tableName": "download_jobs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `mediaId` INTEGER NOT NULL, `sourceId` INTEGER NOT NULL, `mangaUrl` TEXT NOT NULL, `chapterUrl` TEXT NOT NULL, `chapterName` TEXT NOT NULL, `state` TEXT NOT NULL, `pageCount` INTEGER NOT NULL, `completedPages` INTEGER NOT NULL, `retryCount` INTEGER NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, `updatedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "mediaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mangaUrl",
+            "columnName": "mangaUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterUrl",
+            "columnName": "chapterUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterName",
+            "columnName": "chapterName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pageCount",
+            "columnName": "pageCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completedPages",
+            "columnName": "completedPages",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "retryCount",
+            "columnName": "retryCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "createdAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMillis",
+            "columnName": "updatedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_download_jobs_mediaId",
+            "unique": false,
+            "columnNames": [
+              "mediaId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_download_jobs_mediaId` ON `${TABLE_NAME}` (`mediaId`)"
+          },
+          {
+            "name": "index_download_jobs_chapterUrl",
+            "unique": false,
+            "columnNames": [
+              "chapterUrl"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_download_jobs_chapterUrl` ON `${TABLE_NAME}` (`chapterUrl`)"
+          }
+        ]
+      },
+      {
+        "tableName": "download_pages",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`jobId` TEXT NOT NULL, `mediaId` INTEGER NOT NULL, `sourceId` INTEGER NOT NULL, `mangaUrl` TEXT NOT NULL, `chapterUrl` TEXT NOT NULL, `pageIndex` INTEGER NOT NULL, `imageUrl` TEXT NOT NULL, `filePath` TEXT NOT NULL, `updatedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`jobId`, `pageIndex`))",
+        "fields": [
+          {
+            "fieldPath": "jobId",
+            "columnName": "jobId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "mediaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mangaUrl",
+            "columnName": "mangaUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterUrl",
+            "columnName": "chapterUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pageIndex",
+            "columnName": "pageIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "imageUrl",
+            "columnName": "imageUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "filePath",
+            "columnName": "filePath",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMillis",
+            "columnName": "updatedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "jobId",
+            "pageIndex"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_download_pages_mediaId_chapterUrl",
+            "unique": false,
+            "columnNames": [
+              "mediaId",
+              "chapterUrl"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_download_pages_mediaId_chapterUrl` ON `${TABLE_NAME}` (`mediaId`, `chapterUrl`)"
+          },
+          {
+            "name": "index_download_pages_chapterUrl",
+            "unique": false,
+            "columnNames": [
+              "chapterUrl"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_download_pages_chapterUrl` ON `${TABLE_NAME}` (`chapterUrl`)"
+          }
+        ]
+      },
+      {
+        "tableName": "sync_mutations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `type` TEXT NOT NULL, `mediaId` INTEGER NOT NULL, `payloadJson` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `nextAttemptAtEpochMillis` INTEGER NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "mediaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadJson",
+            "columnName": "payloadJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attempts",
+            "columnName": "attempts",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nextAttemptAtEpochMillis",
+            "columnName": "nextAttemptAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "createdAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ac965206c08344c118171dd35960881f')"
+    ]
+  }
+}

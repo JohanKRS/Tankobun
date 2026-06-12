@@ -583,7 +583,69 @@ private fun TankobunAppRootContent(
                 FullScreenReader(state, viewModel)
             }
             if (state.onboardingVisible && !readerOpen) {
-                OnboardingDialog(onDismiss = viewModel::dismissOnboarding)
+                OnboardingDialog(
+                    initialLibraryMode = state.libraryMode,
+                    initialThemeMode = state.themeMode,
+                    onComplete = viewModel::completeOnboarding,
+                )
+            }
+            if (state.anilistMergePromptVisible && !readerOpen) {
+                AniListMergeDialog(
+                    onMerge = viewModel::mergeLocalLibraryWithAniList,
+                    onUseAniList = viewModel::replaceLocalLibraryWithAniList,
+                    onDismiss = viewModel::dismissAniListMergePrompt,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AniListMergeDialog(
+    onMerge: () -> Unit,
+    onUseAniList: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+            color = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
+            tonalElevation = 4.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(
+                    tankobunString(R.string.anilist_merge_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    tankobunString(R.string.anilist_merge_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(tankobunString(R.string.common_later))
+                    }
+                    Spacer(Modifier.weight(1f))
+                    TankobunActionButton(
+                        label = tankobunString(R.string.anilist_merge_use_anilist),
+                        onClick = onUseAniList,
+                        filled = false,
+                    )
+                    TankobunActionButton(
+                        label = tankobunString(R.string.anilist_merge_keep_local),
+                        onClick = onMerge,
+                    )
+                }
             }
         }
     }

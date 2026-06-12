@@ -613,6 +613,21 @@ internal fun ProfileSettingsScreen(
                 },
             )
         }
+        Text(tankobunString(R.string.settings_library_mode), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        FlowRowCompat {
+            TankobunChip(
+                selected = state.libraryMode == LibraryMode.LOCAL,
+                onClick = { viewModel.setLibraryMode(LibraryMode.LOCAL) },
+                enabled = !state.busy,
+                label = { Text(tankobunString(R.string.library_mode_local)) },
+            )
+            TankobunChip(
+                selected = state.libraryMode == LibraryMode.ANILIST,
+                onClick = { viewModel.setLibraryMode(LibraryMode.ANILIST) },
+                enabled = !state.busy,
+                label = { Text(tankobunString(R.string.library_mode_anilist)) },
+            )
+        }
         SettingsGroupDivider(label = "AniList")
         Text(tankobunString(R.string.settings_connection), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         TankobunPanel(
@@ -650,7 +665,17 @@ internal fun ProfileSettingsScreen(
                 TankobunActionButton(label = tankobunString(R.string.common_sign_out), onClick = viewModel::signOut, filled = false)
             }
         }
-        Text(tankobunString(R.string.settings_anilist_preferences), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(
+            tankobunString(
+                if (state.libraryMode == LibraryMode.LOCAL) {
+                    R.string.settings_library_preferences
+                } else {
+                    R.string.settings_anilist_preferences
+                },
+            ),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
         TankobunPanel(
             modifier = Modifier.fillMaxWidth(),
             color = LocalTankobunStyle.current.colors.panel,
@@ -658,7 +683,13 @@ internal fun ProfileSettingsScreen(
         ) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    tankobunString(R.string.settings_anilist_preferences_desc),
+                    tankobunString(
+                        if (state.libraryMode == LibraryMode.LOCAL) {
+                            R.string.settings_library_preferences_desc
+                        } else {
+                            R.string.settings_anilist_preferences_desc
+                        },
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -669,7 +700,7 @@ internal fun ProfileSettingsScreen(
                             TankobunChip(
                                 selected = state.anilistTitleLanguage == language,
                                 onClick = { viewModel.setAnilistTitleLanguage(language) },
-                                enabled = state.loggedIn && !state.busy,
+                                enabled = (state.libraryMode == LibraryMode.LOCAL || state.loggedIn) && !state.busy,
                                 label = { Text(language.settingsLabel()) },
                             )
                         }
@@ -682,13 +713,13 @@ internal fun ProfileSettingsScreen(
                             TankobunChip(
                                 selected = state.anilistScoreFormat == format,
                                 onClick = { viewModel.setAnilistScoreFormat(format) },
-                                enabled = state.loggedIn && !state.busy,
+                                enabled = (state.libraryMode == LibraryMode.LOCAL || state.loggedIn) && !state.busy,
                                 label = { Text(format.settingsLabel()) },
                             )
                         }
                     }
                 }
-                if (!state.loggedIn) {
+                if (state.libraryMode == LibraryMode.ANILIST && !state.loggedIn) {
                     Text(
                         tankobunString(R.string.settings_connect_anilist_before_account_preferences),
                         style = MaterialTheme.typography.bodySmall,
@@ -709,7 +740,7 @@ internal fun ProfileSettingsScreen(
             subtitle = tankobunString(R.string.settings_auto_save_tracking_edits_desc),
             checked = state.anilistAutoSaveTrackingChanges,
             onCheckedChange = viewModel::setAnilistAutoSaveTrackingChanges,
-            enabled = state.loggedIn,
+            enabled = state.libraryMode == LibraryMode.LOCAL || state.loggedIn,
         )
         SettingsToggleRow(
             title = tankobunString(R.string.settings_update_progress_from_reading),
@@ -1225,19 +1256,21 @@ internal fun CustomListsSettingsScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             TankobunActionButton(
                 label = tankobunString(R.string.settings_new_list),
-                enabled = state.loggedIn && !state.busy,
+                enabled = (state.libraryMode == LibraryMode.LOCAL || state.loggedIn) && !state.busy,
                 onClick = { creatingList = true },
             )
-            TankobunActionButton(
-                label = tankobunString(R.string.common_sync_anilist),
-                icon = Icons.Default.Refresh,
-                enabled = state.loggedIn && !state.busy,
-                onClick = viewModel::refreshLibrary,
-                filled = false,
-            )
+            if (state.libraryMode == LibraryMode.ANILIST) {
+                TankobunActionButton(
+                    label = tankobunString(R.string.common_sync_anilist),
+                    icon = Icons.Default.Refresh,
+                    enabled = state.loggedIn && !state.busy,
+                    onClick = viewModel::refreshLibrary,
+                    filled = false,
+                )
+            }
         }
 
-        if (!state.loggedIn) {
+        if (state.libraryMode == LibraryMode.ANILIST && !state.loggedIn) {
             TankobunMessageBanner(tankobunString(R.string.settings_connect_anilist_before_custom_lists))
         }
 
@@ -1249,7 +1282,7 @@ internal fun CustomListsSettingsScreen(
                     CustomListSettingsRow(
                         name = listName,
                         count = listCounts[listName.lowercase(Locale.ROOT)] ?: 0,
-                        enabled = state.loggedIn && !state.busy,
+                        enabled = (state.libraryMode == LibraryMode.LOCAL || state.loggedIn) && !state.busy,
                         onRename = { renamingList = listName },
                         onDelete = { deletingList = listName },
                     )

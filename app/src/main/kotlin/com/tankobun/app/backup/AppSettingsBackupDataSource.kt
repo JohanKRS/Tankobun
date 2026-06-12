@@ -92,6 +92,7 @@ internal class AppSettingsBackupDataSource(
             .put("ignoreDisplayCutout", snapshot.ignoreDisplayCutout)
             .put("showAppStatusBar", snapshot.showAppStatusBar)
             .put("dockAlignment", snapshot.dockAlignment.name)
+            .put("libraryMode", snapshot.libraryMode.name)
             .put("libraryViewMode", snapshot.libraryViewMode.name)
             .put("libraryCoverColumns", snapshot.libraryCoverColumns)
             .put("libraryShowWholeCovers", snapshot.libraryShowWholeCovers)
@@ -170,6 +171,7 @@ internal class AppSettingsBackupDataSource(
         settings.optBooleanOrNull("ignoreDisplayCutout")?.let(store::saveIgnoreDisplayCutout)
         settings.optBooleanOrNull("showAppStatusBar")?.let(store::saveShowAppStatusBar)
         settings.enumOrNull<DockAlignment>("dockAlignment")?.let(store::saveDockAlignment)
+        settings.enumOrNull<com.tankobun.app.LibraryMode>("libraryMode")?.let(store::saveLibraryMode)
         settings.enumOrNull<MediaViewMode>("libraryViewMode")?.let(store::saveLibraryViewMode)
         settings.optIntOrNull("libraryCoverColumns")?.let(store::saveLibraryCoverColumns)
         settings.optBooleanOrNull("libraryShowWholeCovers")?.let(store::saveLibraryShowWholeCovers)
@@ -207,6 +209,7 @@ internal class AppSettingsBackupDataSource(
         }.visibleSources()
         return TankobunUiState(
             loggedIn = container.tokenStore.accessToken() != null,
+            libraryMode = store.libraryMode(),
             themeMode = store.themeMode(),
             appLanguage = store.appLanguage(),
             ignoreDisplayCutout = store.ignoreDisplayCutout(),

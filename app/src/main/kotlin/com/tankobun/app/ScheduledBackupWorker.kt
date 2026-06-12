@@ -10,9 +10,11 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.tankobun.app.backup.AppSettingsBackupDataSource
+import com.tankobun.app.backup.BackupDataSource
 import com.tankobun.app.backup.buildMyAnimeListBackupXml
 import com.tankobun.app.backup.createDocumentInTree
 import com.tankobun.app.state.LibraryItem
+import com.tankobun.app.state.TankobunUiState
 import com.tankobun.core.database.toModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,6 +41,18 @@ class ScheduledBackupWorker(
                     val items = backupLibraryItems(container)
                     if (items.isEmpty()) {
                         false
+                    } else if (settings.libraryMode() == LibraryMode.LOCAL) {
+                        BackupDataSource(container).writeScheduledLocalLibraryBackup(
+                            folderUri = folderUri,
+                            snapshot = TankobunUiState(
+                                libraryMode = LibraryMode.LOCAL,
+                                libraryItems = items,
+                                anilistScoreFormat = settings.anilistScoreFormat(),
+                                anilistTitleLanguage = settings.anilistTitleLanguage(),
+                                anilistCustomLists = settings.anilistCustomLists(),
+                            ),
+                        )
+                        true
                     } else {
                         writeScheduledLibraryBackup(container, folderUri, items)
                         true

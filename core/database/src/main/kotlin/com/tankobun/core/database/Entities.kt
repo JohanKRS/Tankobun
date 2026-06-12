@@ -43,8 +43,8 @@ data class AnilistMediaEntity(
     indices = [Index("mediaId")],
 )
 data class AnilistListEntryEntity(
-    @PrimaryKey val id: Int,
-    val mediaId: Int,
+    val id: Int,
+    @PrimaryKey val mediaId: Int,
     val status: MediaStatus,
     val progress: Int,
     val score: Double?,
