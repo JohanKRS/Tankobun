@@ -1,0 +1,984 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tankobun - Android Manga Shelf</title>
+    <meta
+      name="description"
+      content="Tankobun is a personal Android manga shelf for local or AniList-synced tracking, reading, and backups."
+    >
+    <style>
+      @font-face {
+        font-family: "Bebas Neue";
+        src: url("fonts/bebas_neue_regular.ttf") format("truetype");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      :root {
+        color-scheme: dark;
+        --ink: #101112;
+        --ink-2: #151718;
+        --panel: #1b1d1e;
+        --panel-2: #232627;
+        --line: rgba(242, 235, 224, 0.14);
+        --line-strong: rgba(242, 235, 224, 0.24);
+        --text: #f6efe6;
+        --muted: #bdb4a8;
+        --soft: #8f877d;
+        --red: #d95a42;
+        --red-2: #f27858;
+        --amber: #f1b44d;
+        --green: #72bd8f;
+        --blue: #80aadb;
+        --radius: 8px;
+        --shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
+        --sans:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        --display: "Bebas Neue", Impact, Haettenschweiler, "Arial Narrow", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        background: var(--ink);
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        background:
+          linear-gradient(180deg, rgba(16, 17, 18, 0), var(--ink) 780px),
+          radial-gradient(circle at 78% 14%, rgba(217, 90, 66, 0.16), transparent 30%),
+          radial-gradient(circle at 12% 58%, rgba(128, 170, 219, 0.1), transparent 26%),
+          var(--ink);
+        font-family: var(--sans);
+        line-height: 1.5;
+        letter-spacing: 0;
+      }
+
+      img {
+        max-width: 100%;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .wrap {
+        width: min(1180px, calc(100% - 40px));
+        margin: 0 auto;
+      }
+
+      .site-nav {
+        position: fixed;
+        z-index: 30;
+        top: 0;
+        right: 0;
+        left: 0;
+        border-bottom: 1px solid rgba(246, 239, 230, 0.09);
+        background: rgba(16, 17, 18, 0.76);
+        backdrop-filter: blur(18px);
+      }
+
+      .nav-inner {
+        height: 74px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 22px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+        font-family: var(--display);
+        font-size: 2.05rem;
+        line-height: 1;
+      }
+
+      .brand img {
+        width: 40px;
+        height: 40px;
+        border-radius: var(--radius);
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        color: var(--muted);
+        font-size: 0.95rem;
+        font-weight: 700;
+      }
+
+      .nav-links a {
+        text-decoration: none;
+      }
+
+      .nav-links a:hover {
+        color: var(--text);
+      }
+
+      .nav-cta {
+        display: inline-flex;
+        min-height: 40px;
+        align-items: center;
+        justify-content: center;
+        padding: 0 15px;
+        border: 1px solid var(--red);
+        border-radius: var(--radius);
+        background: var(--red);
+        color: #fff8f2;
+        text-decoration: none;
+      }
+
+      .hero {
+        position: relative;
+        min-height: 100svh;
+        overflow: hidden;
+        border-bottom: 1px solid var(--line);
+        isolation: isolate;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -3;
+        background:
+          linear-gradient(90deg, rgba(16, 17, 18, 0.96) 0%, rgba(16, 17, 18, 0.84) 38%, rgba(16, 17, 18, 0.24) 78%),
+          linear-gradient(180deg, rgba(16, 17, 18, 0.14), var(--ink) 96%);
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -2;
+        background-image:
+          linear-gradient(rgba(246, 239, 230, 0.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(246, 239, 230, 0.045) 1px, transparent 1px);
+        background-size: 62px 62px;
+        mask-image: linear-gradient(90deg, black, transparent 72%);
+        opacity: 0.55;
+      }
+
+      .hero-stage {
+        position: absolute;
+        z-index: -1;
+        inset: 86px -9vw 0 47%;
+        min-height: 700px;
+      }
+
+      .phone {
+        position: absolute;
+        display: block;
+        overflow: hidden;
+        border: 1px solid rgba(246, 239, 230, 0.2);
+        border-radius: var(--radius);
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .phone img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .phone-main {
+        width: min(39vw, 530px);
+        aspect-ratio: 9 / 19.5;
+        right: 15vw;
+        top: 0;
+        transform: rotate(2deg);
+      }
+
+      .phone-side {
+        width: min(30vw, 390px);
+        aspect-ratio: 9 / 19.5;
+        right: 0;
+        top: 140px;
+        transform: rotate(8deg);
+        opacity: 0.88;
+      }
+
+      .phone-low {
+        width: min(31vw, 410px);
+        aspect-ratio: 9 / 19.5;
+        right: 21vw;
+        top: 320px;
+        transform: rotate(-7deg);
+        opacity: 0.75;
+      }
+
+      .hero-content {
+        min-height: 100svh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        width: min(620px, 100%);
+        padding: 130px 0 88px;
+      }
+
+      h1,
+      h2,
+      .display {
+        margin: 0;
+        font-family: var(--display);
+        font-weight: 400;
+        line-height: 0.88;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        font-size: clamp(5.8rem, 13vw, 12.5rem);
+        text-shadow: 0 14px 40px rgba(0, 0, 0, 0.68);
+      }
+
+      h2 {
+        font-size: clamp(3.2rem, 7vw, 6.4rem);
+      }
+
+      .lead {
+        max-width: 620px;
+        margin: 26px 0 0;
+        color: var(--muted);
+        font-size: clamp(1.08rem, 2vw, 1.32rem);
+        text-shadow: 0 2px 22px rgba(0, 0, 0, 0.92);
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 34px;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 50px;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        padding: 0 18px;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+        background: rgba(27, 29, 30, 0.7);
+        color: var(--text);
+        text-decoration: none;
+        font-size: 0.98rem;
+        font-weight: 800;
+      }
+
+      .button.primary {
+        border-color: var(--red);
+        background: linear-gradient(180deg, var(--red-2), var(--red));
+        color: #fff8f2;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+      }
+
+      .release-line {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        margin-top: 22px;
+        color: var(--soft);
+        font-size: 0.93rem;
+      }
+
+      .hash {
+        max-width: min(100%, 520px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .ticker {
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+        overflow: hidden;
+      }
+
+      .ticker-track {
+        display: flex;
+        width: max-content;
+        animation: slide 34s linear infinite;
+      }
+
+      .ticker span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 52px;
+        padding: 0 26px;
+        color: var(--muted);
+        font-family: var(--display);
+        font-size: 1.45rem;
+        white-space: nowrap;
+      }
+
+      .ticker span::after {
+        content: "";
+        width: 6px;
+        height: 6px;
+        margin-left: 26px;
+        border-radius: 50%;
+        background: var(--amber);
+      }
+
+      @keyframes slide {
+        from {
+          transform: translateX(0);
+        }
+
+        to {
+          transform: translateX(-50%);
+        }
+      }
+
+      section {
+        padding: 96px 0;
+      }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: minmax(0, 0.95fr) minmax(280px, 0.55fr);
+        gap: 44px;
+        align-items: end;
+        margin-bottom: 38px;
+      }
+
+      .section-head p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 1.05rem;
+      }
+
+      .mode-grid {
+        display: grid;
+        grid-template-columns: 1.07fr 0.93fr;
+        gap: 20px;
+      }
+
+      .mode-panel {
+        position: relative;
+        min-height: 430px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--panel);
+      }
+
+      .mode-panel .copy {
+        position: relative;
+        z-index: 2;
+        width: min(430px, 100%);
+        padding: 30px;
+      }
+
+      .mode-panel h3,
+      .policy h3 {
+        margin: 0 0 12px;
+        font-family: var(--display);
+        font-size: 2.7rem;
+        font-weight: 400;
+        line-height: 0.95;
+        letter-spacing: 0;
+      }
+
+      .mode-panel p,
+      .policy p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .mode-panel img {
+        position: absolute;
+        right: 22px;
+        bottom: -130px;
+        width: min(55%, 360px);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+
+      .mode-panel.local {
+        background:
+          linear-gradient(135deg, rgba(114, 189, 143, 0.14), transparent 42%),
+          var(--panel);
+      }
+
+      .mode-panel.sync {
+        background:
+          linear-gradient(135deg, rgba(128, 170, 219, 0.15), transparent 42%),
+          var(--panel);
+      }
+
+      .mode-panel.sync img {
+        width: min(62%, 420px);
+      }
+
+      .feature-list {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: var(--panel);
+      }
+
+      .feature {
+        min-height: 250px;
+        padding: 24px;
+        border-right: 1px solid var(--line);
+      }
+
+      .feature:last-child {
+        border-right: 0;
+      }
+
+      .feature .num {
+        display: block;
+        margin-bottom: 42px;
+        color: var(--accent, var(--amber));
+        font-family: var(--display);
+        font-size: 2.2rem;
+        line-height: 1;
+      }
+
+      .feature h3 {
+        margin: 0 0 12px;
+        font-size: 1.08rem;
+      }
+
+      .feature p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.96rem;
+      }
+
+      .screens {
+        background: var(--ink-2);
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .screen-wall {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .screen-large,
+      .screen-stack figure {
+        margin: 0;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .screen-large img,
+      .screen-stack img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .screen-large {
+        aspect-ratio: 0.64;
+      }
+
+      .screen-stack {
+        display: grid;
+        gap: 18px;
+      }
+
+      .screen-stack figure {
+        aspect-ratio: 1.2;
+      }
+
+      .screen-caption {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 0.96rem;
+      }
+
+      .policy {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+
+      .policy article {
+        min-height: 260px;
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--panel);
+      }
+
+      .policy article:first-child {
+        border-top-color: var(--red);
+      }
+
+      .policy article:last-child {
+        border-top-color: var(--amber);
+      }
+
+      .download-band {
+        padding-top: 0;
+      }
+
+      .download-box {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 24px;
+        align-items: center;
+        padding: 32px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background:
+          linear-gradient(120deg, rgba(217, 90, 66, 0.18), transparent 40%),
+          var(--panel-2);
+      }
+
+      .download-box h2 {
+        font-size: clamp(2.8rem, 6vw, 5.4rem);
+      }
+
+      .download-box p {
+        margin: 10px 0 0;
+        color: var(--muted);
+      }
+
+      footer {
+        padding: 36px 0 48px;
+        border-top: 1px solid var(--line);
+        color: var(--soft);
+      }
+
+      .footer-inner {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 18px;
+      }
+
+      footer a {
+        color: var(--text);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          scroll-behavior: auto !important;
+        }
+      }
+
+      @media (max-width: 960px) {
+        .nav-links a:not(.nav-cta) {
+          display: none;
+        }
+
+        .hero-stage {
+          inset: 88px -170px 0 24%;
+          opacity: 0.52;
+          mask-image: linear-gradient(180deg, black 0%, black 58%, transparent 88%);
+        }
+
+        .hero::before {
+          background:
+            linear-gradient(90deg, rgba(16, 17, 18, 0.98) 0%, rgba(16, 17, 18, 0.9) 52%, rgba(16, 17, 18, 0.42)),
+            linear-gradient(180deg, rgba(16, 17, 18, 0.12), var(--ink) 96%);
+        }
+
+        .section-head,
+        .mode-grid,
+        .screen-wall,
+        .policy,
+        .download-box {
+          grid-template-columns: 1fr;
+        }
+
+        .feature-list {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .feature:nth-child(2) {
+          border-right: 0;
+        }
+
+        .feature:nth-child(1),
+        .feature:nth-child(2) {
+          border-bottom: 1px solid var(--line);
+        }
+      }
+
+      @media (max-width: 620px) {
+        .wrap {
+          width: min(100% - 28px, 1180px);
+        }
+
+        .nav-inner {
+          height: 66px;
+        }
+
+        .brand {
+          font-size: 1.7rem;
+        }
+
+        .nav-cta {
+          min-height: 38px;
+          padding-inline: 12px;
+        }
+
+        .hero {
+          min-height: 860px;
+        }
+
+        .hero-stage {
+          inset: 86px -210px auto 14%;
+          height: 480px;
+          min-height: 0;
+          opacity: 0.48;
+        }
+
+        .phone-main {
+          width: 265px;
+          right: 160px;
+        }
+
+        .phone-side {
+          width: 230px;
+          right: 20px;
+          top: 76px;
+        }
+
+        .phone-low {
+          width: 230px;
+          right: 290px;
+          top: 126px;
+        }
+
+        .hero-content {
+          min-height: 860px;
+          justify-content: flex-end;
+          padding: 430px 0 58px;
+        }
+
+        h1 {
+          font-size: clamp(5.2rem, 26vw, 7.2rem);
+        }
+
+        .hero-actions,
+        .download-box .button {
+          width: 100%;
+        }
+
+        .button {
+          width: 100%;
+        }
+
+        section {
+          padding: 68px 0;
+        }
+
+        .mode-panel {
+          min-height: 520px;
+        }
+
+        .mode-panel img {
+          width: 74%;
+          right: -22px;
+          bottom: -120px;
+        }
+
+        .feature-list {
+          grid-template-columns: 1fr;
+        }
+
+        .feature {
+          min-height: 210px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .feature:last-child {
+          border-bottom: 0;
+        }
+
+        .feature .num {
+          margin-bottom: 26px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="Primary navigation">
+      <div class="wrap nav-inner">
+        <a class="brand" href="./" aria-label="Tankobun home">
+          <img src="app-icon.png" alt="" width="40" height="40">
+          <span>Tankobun</span>
+        </a>
+        <div class="nav-links">
+          <a href="#library">Library</a>
+          <a href="#screens">Screens</a>
+          <a href="#policy">Policy</a>
+          <a href="https://github.com/JohanKRS/Tankobun">GitHub</a>
+          <a class="nav-cta" href="https://github.com/JohanKRS/Tankobun/releases/download/v2.0.0/tankobun-2.0.0.apk">Download</a>
+        </div>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="hero-stage" aria-hidden="true">
+        <span class="phone phone-low">
+          <img src="mockups/browse-light.png" alt="">
+        </span>
+        <span class="phone phone-main">
+          <img src="mockups/manga-detail-dark.png" alt="">
+        </span>
+        <span class="phone phone-side">
+          <img src="mockups/library-dark.png" alt="">
+        </span>
+      </div>
+
+      <div class="wrap">
+        <div class="hero-content">
+          <h1>Tankobun</h1>
+          <p class="lead">
+            A personal Android manga shelf for local or AniList-synced tracking,
+            reading, and backups. Start locally, keep your data AniList-compatible,
+            and connect an account later when you want sync.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="https://github.com/JohanKRS/Tankobun/releases/download/v2.0.0/tankobun-2.0.0.apk">
+              Download APK
+            </a>
+            <a class="button" href="https://github.com/JohanKRS/Tankobun/releases/tag/v2.0.0">
+              Release notes
+            </a>
+            <a class="button" href="updates.json">
+              Update manifest
+            </a>
+          </div>
+          <div class="release-line" aria-label="Release metadata">
+            <span>Version 2.0.0</span>
+            <span>Android APK</span>
+            <span class="hash">SHA-256 4C6C799FAD3F59714CF22C9766A3D898D8E9DD07C2A5D6786749435C89319DCF</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker-track">
+        <span>Local library</span>
+        <span>AniList sync</span>
+        <span>Paged reader</span>
+        <span>Webtoon reader</span>
+        <span>JSON backups</span>
+        <span>XML backups</span>
+        <span>Local library</span>
+        <span>AniList sync</span>
+        <span>Paged reader</span>
+        <span>Webtoon reader</span>
+        <span>JSON backups</span>
+        <span>XML backups</span>
+      </div>
+    </div>
+
+    <main>
+      <section id="library">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Two library modes, one shelf.</h2>
+            <p>
+              Tankobun v2.0 is built around local-first use without closing the
+              door on AniList. Local entries stay matched to AniList manga
+              metadata for cleaner account sync later.
+            </p>
+          </div>
+
+          <div class="mode-grid">
+            <article class="mode-panel local">
+              <div class="copy">
+                <h3>Local library</h3>
+                <p>
+                  Track status, score, notes, private flags, progress, and custom
+                  lists on this device without signing in.
+                </p>
+              </div>
+              <img src="mockups/library-dark.png" alt="Tankobun local library screen">
+            </article>
+
+            <article class="mode-panel sync">
+              <div class="copy">
+                <h3>AniList sync</h3>
+                <p>
+                  Connect AniList when you want user-authorized account sync,
+                  list import, and remote tracking updates.
+                </p>
+              </div>
+              <img src="mockups/manga-detail-dark.png" alt="Tankobun manga detail and tracking screen">
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Built for daily reading.</h2>
+            <p>
+              The app keeps library organization, source selection, reading modes,
+              and backups close together without bundling content or source
+              repositories.
+            </p>
+          </div>
+
+          <div class="feature-list">
+            <article class="feature" style="--accent: var(--red)">
+              <span class="num">01</span>
+              <h3>AniList-compatible tracking</h3>
+              <p>Use familiar statuses, scores, notes, progress, and custom lists.</p>
+            </article>
+            <article class="feature" style="--accent: var(--green)">
+              <span class="num">02</span>
+              <h3>Reader modes</h3>
+              <p>Read with paged or webtoon layouts and keep local reading state.</p>
+            </article>
+            <article class="feature" style="--accent: var(--blue)">
+              <span class="num">03</span>
+              <h3>Portable backups</h3>
+              <p>Export native JSON for local libraries or XML for AniList mode.</p>
+            </article>
+            <article class="feature" style="--accent: var(--amber)">
+              <span class="num">04</span>
+              <h3>Update checks</h3>
+              <p>Official APK builds can be checked from a static GitHub manifest.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="screens" class="screens">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>The app, not a promise.</h2>
+            <p>
+              These are the same screenshots used in the project README: manga
+              details, library browsing, and AniList metadata discovery.
+            </p>
+          </div>
+
+          <div class="screen-wall">
+            <figure class="screen-large">
+              <img src="mockups/manga-detail-dark.png" alt="Tankobun manga detail screen in dark theme">
+            </figure>
+            <div>
+              <div class="screen-stack">
+                <figure>
+                  <img src="mockups/library-dark.png" alt="Tankobun library screen in dark theme">
+                </figure>
+                <figure>
+                  <img src="mockups/browse-light.png" alt="Tankobun browse screen in light theme">
+                </figure>
+              </div>
+              <p class="screen-caption">
+                Browse uses AniList metadata. Reading sources are user-installed
+                extensions and are not bundled with Tankobun.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="policy">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Clear boundaries.</h2>
+            <p>
+              The site follows the same content, source, extension, and update
+              policy as the repository README.
+            </p>
+          </div>
+
+          <div class="policy">
+            <article>
+              <h3>No bundled content</h3>
+              <p>
+                Tankobun does not host, upload, index, provide, sell, bundle, or
+                distribute manga, chapters, scanlations, source extensions, source
+                APKs, source repositories, or content feeds.
+              </p>
+            </article>
+            <article>
+              <h3>User-installed sources</h3>
+              <p>
+                Any source extension used with Tankobun must be added and
+                installed by the user. Installing the APK does not provide access
+                to manga content by itself.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="download-band">
+        <div class="wrap">
+          <div class="download-box">
+            <div>
+              <h2>Ready for testers.</h2>
+              <p>
+                Download the official v2.0.0 APK from GitHub Releases. Android
+                may ask you to confirm installation from outside an app store.
+              </p>
+            </div>
+            <a class="button primary" href="https://github.com/JohanKRS/Tankobun/releases/download/v2.0.0/tankobun-2.0.0.apk">
+              Download APK
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap footer-inner">
+        <span>Tankobun is an unofficial app and is not affiliated with AniList.</span>
+        <span>
+          <a href="https://github.com/JohanKRS/Tankobun">GitHub</a>
+          &middot;
+          <a href="updates.json">updates.json</a>
+          &middot;
+          <a href="https://github.com/JohanKRS/Tankobun/releases/tag/v2.0.0">Release</a>
+        </span>
+      </div>
+    </footer>
+  </body>
+</html>
