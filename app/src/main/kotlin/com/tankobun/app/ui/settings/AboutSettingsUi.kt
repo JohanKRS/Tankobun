@@ -188,6 +188,7 @@ import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.state.LibrarySection
 import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
+import com.tankobun.app.updates.AppUpdateInfo
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaTag
@@ -226,10 +227,23 @@ import com.tankobun.app.ui.shell.*
 
 @Composable
 internal fun AboutSettingsScreen(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
     onReplayOnboarding: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+    var launchedUpdateRequest by remember { mutableStateOf<AppUpdateInstallRequest?>(null) }
+    val updateInstallLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        launchedUpdateRequest = null
+    }
+    LaunchedEffect(state.appUpdateInstallRequest?.apkUri) {
+        val installRequest = state.appUpdateInstallRequest ?: return@LaunchedEffect
+        launchedUpdateRequest = installRequest
+        updateInstallLauncher.launch(downloadedAppUpdateInstallIntent(installRequest))
+        viewModel.consumeAppUpdateInstallRequest()
+    }
     SettingsDetailPanel(
         title = tankobunString(R.string.common_about),
         subtitle = tankobunString(R.string.settings_about_subtitle),
@@ -292,7 +306,215 @@ internal fun AboutSettingsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                AppUpdatesContent(
+                    state = state,
+                    viewModel = viewModel,
+                    context = context,
+                    onOpenRelease = { url -> uriHandler.openUri(url) },
+                )
+                AboutChangelogContent(state = state)
             }
         }
     }
 }
+
+@Composable
+private fun AppUpdatesContent(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    context: Context,
+    onOpenRelease: (String) -> Unit,
+) {
+    val update = state.appUpdateInfo
+    val availableUpdate = update?.takeIf { it.versionCode > BuildConfig.VERSION_CODE }
+    val updateAvailable = availableUpdate != null
+    val statusText = when {
+        state.appUpdateCheckInProgress -> tankobunString(R.string.about_update_checking)
+        availableUpdate != null -> tankobunString(R.string.about_update_available, availableUpdate.versionName)
+        update != null -> tankobunString(R.string.about_update_current)
+        else -> tankobunString(R.string.about_update_not_checked)
+    }
+    Text(tankobunString(R.string.about_updates), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Text(statusText, style = MaterialTheme.typography.bodyMedium)
+    if (state.appUpdateLastCheckedAtEpochMillis > 0L) {
+        Text(
+            tankobunString(R.string.about_update_last_checked, cacheAgeLabel(state.appUpdateLastCheckedAtEpochMillis)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    update?.sizeBytes?.takeIf { it > 0L }?.let { size ->
+        Text(
+            tankobunString(R.string.about_update_size, size.formatFileSize()),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    Text(
+        tankobunString(R.string.about_update_policy),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    if (state.appUpdateCheckInProgress || state.appUpdateDownloadInProgress) {
+        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+    }
+    TankobunActionButton(
+        label = if (state.appUpdateCheckInProgress) {
+            tankobunString(R.string.about_update_checking)
+        } else {
+            tankobunString(R.string.about_check_updates)
+        },
+        icon = Icons.Default.Refresh,
+        onClick = viewModel::checkForAppUpdate,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = !state.appUpdateCheckInProgress && !state.appUpdateDownloadInProgress,
+        filled = false,
+    )
+    if (updateAvailable) {
+        TankobunActionButton(
+            label = if (state.appUpdateDownloadInProgress) {
+                tankobunString(R.string.about_downloading_update)
+            } else {
+                tankobunString(R.string.about_download_update)
+            },
+            icon = Icons.Default.Download,
+            onClick = { requestAppUpdateDownload(context, viewModel) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !state.appUpdateCheckInProgress && !state.appUpdateDownloadInProgress,
+        )
+        availableUpdate.releaseUrl?.takeIf { it.isNotBlank() }?.let { releaseUrl ->
+            TankobunActionButton(
+                label = tankobunString(R.string.about_open_release),
+                icon = Icons.Default.Link,
+                onClick = { onOpenRelease(releaseUrl) },
+                modifier = Modifier.fillMaxWidth(),
+                filled = false,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AboutChangelogContent(state: TankobunUiState) {
+    val context = LocalContext.current
+    val update = state.appUpdateInfo
+    val availableUpdate = update?.takeIf { it.versionCode > BuildConfig.VERSION_CODE }
+    val translationLanguage = state.appLanguage.resolvedChangelogTranslationLanguage()
+    val updateChangelogEnglish = availableUpdate?.englishChangelog().orEmpty()
+    val updateChangelogTranslated = availableUpdate?.translatedChangelog(translationLanguage).orEmpty()
+    val currentChangelogEnglish = currentVersionChangelog(context, AppLanguage.ENGLISH)
+    val currentChangelogTranslated = translationLanguage
+        ?.let { currentVersionChangelog(context, it) }
+        .orEmpty()
+        .takeIf { it != currentChangelogEnglish }
+        .orEmpty()
+    Text(tankobunString(R.string.about_changelog), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    if (availableUpdate != null && updateChangelogEnglish.isNotEmpty()) {
+        ChangelogList(
+            title = tankobunString(R.string.about_changelog_update_english_title, availableUpdate.versionName),
+            items = updateChangelogEnglish,
+        )
+    }
+    if (availableUpdate != null && updateChangelogTranslated.isNotEmpty() && updateChangelogTranslated != updateChangelogEnglish) {
+        ChangelogList(
+            title = tankobunString(
+                R.string.about_changelog_translated_title,
+                translationLanguage?.let { tankobunString(it.changelogLanguageLabelRes()) }.orEmpty(),
+            ),
+            items = updateChangelogTranslated,
+        )
+    }
+    ChangelogList(
+        title = tankobunString(R.string.about_changelog_current_english_title, BuildConfig.VERSION_NAME),
+        items = currentChangelogEnglish,
+    )
+    if (translationLanguage != null && currentChangelogTranslated.isNotEmpty()) {
+        ChangelogList(
+            title = tankobunString(
+                R.string.about_changelog_translated_title,
+                tankobunString(translationLanguage.changelogLanguageLabelRes()),
+            ),
+            items = currentChangelogTranslated,
+        )
+    }
+}
+
+@Composable
+private fun ChangelogList(title: String, items: List<String>) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        items.forEach { item ->
+            Text(
+                text = tankobunString(R.string.about_changelog_bullet, item),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun currentVersionChangelog(context: Context, language: AppLanguage): List<String> {
+    val localized = context.withAppLanguage(language)
+    return listOf(
+        localized.getString(R.string.about_changelog_v2_local_library),
+        localized.getString(R.string.about_changelog_v2_onboarding),
+        localized.getString(R.string.about_changelog_v2_backups),
+        localized.getString(R.string.about_changelog_v2_updates),
+    )
+}
+
+private fun AppUpdateInfo.englishChangelog(): List<String> =
+    changelog["en"].orEmpty()
+
+private fun AppUpdateInfo.translatedChangelog(language: AppLanguage?): List<String> {
+    val preferredKeys = when (language) {
+        AppLanguage.PORTUGUESE_BRAZIL -> listOf("pt-BR", "pt")
+        AppLanguage.SPANISH -> listOf("es")
+        else -> emptyList()
+    }
+    return preferredKeys.firstNotNullOfOrNull { key ->
+        changelog[key]?.takeIf { it.isNotEmpty() }
+    }.orEmpty()
+}
+
+private fun AppLanguage.resolvedChangelogTranslationLanguage(): AppLanguage? =
+    when (this) {
+        AppLanguage.PORTUGUESE_BRAZIL -> AppLanguage.PORTUGUESE_BRAZIL
+        AppLanguage.SPANISH -> AppLanguage.SPANISH
+        AppLanguage.ENGLISH -> null
+        AppLanguage.SYSTEM -> when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
+            "pt" -> AppLanguage.PORTUGUESE_BRAZIL
+            "es" -> AppLanguage.SPANISH
+            else -> null
+        }
+    }
+
+private fun AppLanguage.changelogLanguageLabelRes(): Int =
+    when (this) {
+        AppLanguage.PORTUGUESE_BRAZIL -> R.string.settings_language_portuguese_brazil
+        AppLanguage.SPANISH -> R.string.settings_language_spanish
+        AppLanguage.ENGLISH,
+        AppLanguage.SYSTEM -> R.string.settings_language_english
+    }
+
+internal fun requestAppUpdateDownload(
+    context: Context,
+    viewModel: MainViewModel,
+) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+        viewModel.requireAppUpdateInstallPermission()
+        context.startActivity(
+            Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:${context.packageName}"),
+            ),
+        )
+        return
+    }
+    viewModel.downloadAppUpdate()
+}
+
+internal fun downloadedAppUpdateInstallIntent(installRequest: AppUpdateInstallRequest): Intent =
+    Intent(Intent.ACTION_VIEW)
+        .setDataAndType(Uri.parse(installRequest.apkUri), "application/vnd.android.package-archive")
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

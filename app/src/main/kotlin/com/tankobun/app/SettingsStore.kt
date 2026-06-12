@@ -241,6 +241,13 @@ class SettingsStore(context: Context) {
         preferences.edit().putLong(KEY_NEW_CHAPTER_CHECK_LAST_RUN_AT, value).apply()
     }
 
+    fun lastAppUpdateCheckAtEpochMillis(): Long =
+        preferences.getLong(KEY_APP_UPDATE_LAST_CHECK_AT, 0L)
+
+    fun saveLastAppUpdateCheckAtEpochMillis(value: Long) {
+        preferences.edit().putLong(KEY_APP_UPDATE_LAST_CHECK_AT, value).apply()
+    }
+
     fun anilistTags(): List<AnilistMediaTag> =
         preferences.getString(KEY_ANILIST_TAGS, "").orEmpty()
             .lineSequence()
@@ -460,6 +467,7 @@ class SettingsStore(context: Context) {
         const val KEY_KEEP_NEXT_TEN_DOWNLOADS = "downloads.keep.next.ten"
         const val KEY_NEW_CHAPTER_CHECKS_ENABLED = "library.new.chapter.checks.enabled"
         const val KEY_NEW_CHAPTER_CHECK_LAST_RUN_AT = "library.new.chapter.check.last.run.at"
+        const val KEY_APP_UPDATE_LAST_CHECK_AT = "app.update.last.check.at"
         const val KEY_ANILIST_AUTO_SAVE_TRACKING_CHANGES = "anilist.auto.save.tracking.changes"
         const val KEY_ANILIST_AUTO_SYNC_READER_PROGRESS = "anilist.auto.sync.reader.progress"
         const val KEY_ANILIST_SYNC_MANUAL_READ_PROGRESS = "anilist.sync.manual.read.progress"

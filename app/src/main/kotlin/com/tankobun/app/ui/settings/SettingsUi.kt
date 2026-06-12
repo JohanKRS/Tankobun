@@ -542,6 +542,8 @@ internal fun SettingsDetailContent(
         SettingsRoute.CUSTOM_LISTS -> CustomListsSettingsScreen(state, viewModel, modifier)
         SettingsRoute.BACKUPS -> BackupsSettingsScreen(state, viewModel, modifier)
         SettingsRoute.ABOUT -> AboutSettingsScreen(
+            state = state,
+            viewModel = viewModel,
             onReplayOnboarding = viewModel::showOnboarding,
             modifier = modifier,
         )

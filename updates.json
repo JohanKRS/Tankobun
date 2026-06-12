@@ -1,0 +1,34 @@
+{
+  "type": "tankobun.update-manifest",
+  "version": 1,
+  "stable": {
+    "versionCode": 20,
+    "versionName": "2.0.0",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v2.0.0/tankobun-2.0.0.apk",
+    "apkSha256": "",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v2.0.0",
+    "publishedAt": "2026-06-12T00:00:00Z",
+    "sizeBytes": null,
+    "mandatory": false,
+    "changelog": {
+      "en": [
+        "Added local library mode with AniList-compatible statuses, scoring, notes, private flag, progress, and custom lists.",
+        "Reworked onboarding with library mode, theme selection, and a short app tour.",
+        "Added native Tankobun JSON library backups for local mode while keeping XML backups for AniList mode.",
+        "Added GitHub-based app update checks and changelog display in About."
+      ],
+      "pt-BR": [
+        "Adicionado modo de biblioteca local com status, notas, observações, marcação privada, progresso e listas personalizadas compatíveis com AniList.",
+        "Onboarding reformulado com modo da biblioteca, escolha de tema e um tour curto do app.",
+        "Adicionados backups nativos JSON do Tankobun para o modo local, mantendo backups XML no modo AniList.",
+        "Adicionadas verificações de atualização pelo GitHub e exibição de changelog em Sobre."
+      ],
+      "es": [
+        "Se añadió modo de biblioteca local con estados, puntuación, notas, marca privada, progreso y listas personalizadas compatibles con AniList.",
+        "Onboarding rediseñado con modo de biblioteca, selección de tema y un breve tour de la app.",
+        "Se añadieron backups JSON nativos de Tankobun para el modo local y se mantienen backups XML para el modo AniList.",
+        "Se añadieron búsquedas de actualizaciones desde GitHub y changelog en Acerca de."
+      ]
+    }
+  }
+}

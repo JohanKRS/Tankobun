@@ -10,6 +10,7 @@ import com.tankobun.app.AppLanguage
 import com.tankobun.app.TankobunThemeMode
 import com.tankobun.app.defaultSourceLanguages
 import com.tankobun.app.logic.BROWSE_SORT_SEARCH_MATCH
+import com.tankobun.app.updates.AppUpdateInfo
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMangaStats
@@ -104,6 +105,11 @@ data class TankobunUiState(
     val availableExtensions: List<ExtensionIndexEntry> = emptyList(),
     val installingExtensionPackageName: String? = null,
     val extensionInstallRequest: ExtensionInstallRequest? = null,
+    val appUpdateInfo: AppUpdateInfo? = null,
+    val appUpdateCheckInProgress: Boolean = false,
+    val appUpdateDownloadInProgress: Boolean = false,
+    val appUpdateInstallRequest: AppUpdateInstallRequest? = null,
+    val appUpdateLastCheckedAtEpochMillis: Long = 0L,
     val sourceMatches: List<SourceSearchResult> = emptyList(),
     val sourceMatchChapterCounts: Map<String, Int> = emptyMap(),
     val sourcePickerOpen: Boolean = false,
@@ -149,6 +155,12 @@ data class TankobunUiState(
     val librarySections: List<LibrarySection>
         get() = libraryItems.toLibrarySections()
 }
+
+data class AppUpdateInstallRequest(
+    val apkUri: String,
+    val expectedVersionCode: Int,
+    val expectedVersionName: String,
+)
 
 private fun List<LibraryItem>.toLibrarySections(): List<LibrarySection> {
     val statusSections = listOf(

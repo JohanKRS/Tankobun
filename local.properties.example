@@ -10,3 +10,7 @@ tankobunReleaseStoreFile=
 tankobunReleaseStorePassword=
 tankobunReleaseKeyAlias=
 tankobunReleaseKeyPassword=
+
+# Optional: app update manifest used by Settings > About.
+# You can also provide TANKOBUN_UPDATE_MANIFEST_URL.
+tankobunUpdateManifestUrl=https://johankrs.github.io/Tankobun/updates.json

@@ -16,10 +16,23 @@ fun signingValue(propertyName: String, envName: String): String? =
     localProperties.getProperty(propertyName)?.takeIf { it.isNotBlank() }
         ?: System.getenv(envName)?.takeIf { it.isNotBlank() }
 
+fun configValue(propertyName: String, envName: String, defaultValue: String = ""): String =
+    localProperties.getProperty(propertyName)?.takeIf { it.isNotBlank() }
+        ?: System.getenv(envName)?.takeIf { it.isNotBlank() }
+        ?: defaultValue
+
+fun buildConfigString(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
 val releaseStoreFile = signingValue("tankobunReleaseStoreFile", "TANKOBUN_RELEASE_STORE_FILE")
 val releaseStorePassword = signingValue("tankobunReleaseStorePassword", "TANKOBUN_RELEASE_STORE_PASSWORD")
 val releaseKeyAlias = signingValue("tankobunReleaseKeyAlias", "TANKOBUN_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = signingValue("tankobunReleaseKeyPassword", "TANKOBUN_RELEASE_KEY_PASSWORD")
+val updateManifestUrl = configValue(
+    propertyName = "tankobunUpdateManifestUrl",
+    envName = "TANKOBUN_UPDATE_MANIFEST_URL",
+    defaultValue = "https://johankrs.github.io/Tankobun/updates.json",
+)
 val hasReleaseSigning = listOf(
     releaseStoreFile,
     releaseStorePassword,
@@ -41,6 +54,7 @@ android {
         val clientId = localProperties.getProperty("anilistClientId", "")
         buildConfigField("String", "ANILIST_CLIENT_ID", "\"$clientId\"")
         buildConfigField("String", "ANILIST_REDIRECT_URI", "\"tankobun://auth/anilist\"")
+        buildConfigField("String", "UPDATE_MANIFEST_URL", buildConfigString(updateManifestUrl))
     }
 
     buildFeatures {

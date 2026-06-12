@@ -54,6 +54,22 @@ The APK does not include manga content, source extensions, source repositories, 
 
 Tankobun is not distributed through Google Play. Android may show warnings when installing APKs from outside an app store. Install only if you understand and accept the risks of sideloading Android applications.
 
+## App Updates
+
+Tankobun can check for app updates from a static `updates.json` manifest hosted by this project, for example with GitHub Pages, with APK assets published through GitHub Releases.
+
+The update manifest is only for official Tankobun app APK builds. It must not include manga content, source extensions, extension repository URLs, source recommendations, content feeds, or bypass/access guidance.
+
+Release APK updates must keep the same application id and signing lineage as the installed build, and each new release must use a higher `versionCode`.
+
+For release builds, set `tankobunUpdateManifestUrl` in `local.properties` or `TANKOBUN_UPDATE_MANIFEST_URL` in the environment. The default points to:
+
+```text
+https://johankrs.github.io/Tankobun/updates.json
+```
+
+The app checks this manifest quietly at most once per day and also offers a manual check in Settings > About. Android still asks the user to confirm installation of downloaded APK updates.
+
 ## Support Policy
 
 Bug reports and feature requests about the app itself are welcome.

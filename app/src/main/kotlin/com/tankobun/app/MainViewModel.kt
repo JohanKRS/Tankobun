@@ -88,7 +88,9 @@ import com.tankobun.app.logic.withoutSelectedMedia
 import com.tankobun.app.reader.ReaderDataSource
 import com.tankobun.app.source.SourceDataSource
 import com.tankobun.app.source.SourcePickerSearchUpdate
+import com.tankobun.app.updates.AppUpdateDataSource
 import com.tankobun.app.state.ExtensionInstallRequest
+import com.tankobun.app.state.AppUpdateInstallRequest
 import com.tankobun.app.state.BackupMissingSource
 import com.tankobun.app.state.ReaderChapterSegment
 import com.tankobun.app.state.ReaderLoadError
@@ -178,6 +180,7 @@ class MainViewModel(
     private val cacheStorageDataSource = CacheStorageDataSource(container)
     private val downloadDataSource = DownloadDataSource(container)
     private val extensionDataSource = ExtensionDataSource(container)
+    private val appUpdateDataSource = AppUpdateDataSource(container)
     private val readerDataSource = ReaderDataSource(container)
     private var trackingAutoSaveJob: Job? = null
     private var pendingAniListSyncJob: Job? = null
@@ -235,6 +238,7 @@ class MainViewModel(
             keepNextTenDownloads = container.settingsStore.keepNextTenDownloads(),
             newChapterChecksEnabled = container.settingsStore.newChapterChecksEnabled(),
             lastNewChapterCheckAtEpochMillis = container.settingsStore.lastNewChapterCheckAtEpochMillis(),
+            appUpdateLastCheckedAtEpochMillis = container.settingsStore.lastAppUpdateCheckAtEpochMillis(),
             viewerAvatarUrl = container.settingsStore.viewerAvatarUrl(),
             viewerBannerImageUrl = container.settingsStore.viewerBannerImageUrl(),
             anilistMangaStats = container.settingsStore.anilistMangaStats(),
@@ -284,6 +288,7 @@ class MainViewModel(
             refreshAniListViewer()
             processPendingAniListSync()
         }
+        checkForAppUpdateIfDue()
     }
 
     fun loginUrl(): String? {
@@ -732,6 +737,115 @@ class MainViewModel(
 
     fun consumeExtensionInstallRequest() {
         _state.update { it.copy(extensionInstallRequest = null) }
+    }
+
+    private fun checkForAppUpdateIfDue() {
+        val manifestUrl = BuildConfig.UPDATE_MANIFEST_URL.trim()
+        if (manifestUrl.isBlank()) return
+        val lastCheck = container.settingsStore.lastAppUpdateCheckAtEpochMillis()
+        val now = System.currentTimeMillis()
+        if (now - lastCheck >= APP_UPDATE_CHECK_INTERVAL_MILLIS) {
+            checkForAppUpdate(silent = true)
+        }
+    }
+
+    fun checkForAppUpdate() {
+        checkForAppUpdate(silent = false)
+    }
+
+    private fun checkForAppUpdate(silent: Boolean) {
+        val manifestUrl = BuildConfig.UPDATE_MANIFEST_URL.trim()
+        if (manifestUrl.isBlank()) {
+            if (!silent) {
+                _state.update { it.copy(message = string(R.string.msg_app_update_manifest_not_configured)) }
+            }
+            return
+        }
+        if (_state.value.appUpdateCheckInProgress) return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    appUpdateCheckInProgress = true,
+                    message = if (silent) it.message else string(R.string.msg_checking_app_updates),
+                )
+            }
+            runCatching {
+                appUpdateDataSource.fetchUpdateInfo(manifestUrl)
+            }.onSuccess { update ->
+                val checkedAt = System.currentTimeMillis()
+                container.settingsStore.saveLastAppUpdateCheckAtEpochMillis(checkedAt)
+                val available = update.versionCode > BuildConfig.VERSION_CODE
+                _state.update {
+                    it.copy(
+                        appUpdateInfo = update,
+                        appUpdateCheckInProgress = false,
+                        appUpdateLastCheckedAtEpochMillis = checkedAt,
+                        message = when {
+                            silent -> it.message
+                            available -> string(R.string.msg_app_update_available, update.versionName)
+                            else -> string(R.string.msg_app_update_current)
+                        },
+                    )
+                }
+            }.onFailure { error ->
+                Log.w(TAG, "App update check failed", error)
+                _state.update {
+                    it.copy(
+                        appUpdateCheckInProgress = false,
+                        message = if (silent) it.message else string(R.string.msg_app_update_check_failed),
+                    )
+                }
+            }
+        }
+    }
+
+    fun downloadAppUpdate() {
+        val update = _state.value.appUpdateInfo
+        if (update == null || update.versionCode <= BuildConfig.VERSION_CODE) {
+            _state.update { it.copy(message = string(R.string.msg_app_update_current)) }
+            return
+        }
+        if (_state.value.appUpdateDownloadInProgress) return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    appUpdateDownloadInProgress = true,
+                    appUpdateInstallRequest = null,
+                    message = string(R.string.msg_downloading_app_update, update.versionName),
+                )
+            }
+            runCatching {
+                appUpdateDataSource.downloadUpdateApk(update)
+            }.onSuccess { apkUri ->
+                _state.update {
+                    it.copy(
+                        appUpdateDownloadInProgress = false,
+                        appUpdateInstallRequest = AppUpdateInstallRequest(
+                            apkUri = apkUri.toString(),
+                            expectedVersionCode = update.versionCode,
+                            expectedVersionName = update.versionName,
+                        ),
+                        message = string(R.string.msg_ready_to_install_app_update, update.versionName),
+                    )
+                }
+            }.onFailure { error ->
+                Log.w(TAG, "App update APK download failed for ${update.versionName}", error)
+                _state.update {
+                    it.copy(
+                        appUpdateDownloadInProgress = false,
+                        message = string(R.string.msg_app_update_download_failed),
+                    )
+                }
+            }
+        }
+    }
+
+    fun requireAppUpdateInstallPermission() {
+        _state.update { it.copy(message = string(R.string.msg_allow_app_update_install)) }
+    }
+
+    fun consumeAppUpdateInstallRequest() {
+        _state.update { it.copy(appUpdateInstallRequest = null) }
     }
 
     fun dismissMessage(message: String? = null) {
@@ -3586,6 +3700,7 @@ class MainViewModel(
         private const val OAUTH_STATE_BYTES = 24
         private const val RECENT_READING_LIMIT = 3
         private const val TRACKING_AUTO_SAVE_DELAY_MILLIS = 1_200L
+        private const val APP_UPDATE_CHECK_INTERVAL_MILLIS = 24L * 60L * 60L * 1_000L
         private val secureRandom = SecureRandom()
     }
 }
