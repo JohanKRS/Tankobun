@@ -5,11 +5,11 @@
 <h1 align="center">Tankobun</h1>
 
 <p align="center">
-  <strong>A personal Android manga shelf for reading, tracking, and AniList-first organization.</strong>
+  <strong>A personal Android manga shelf for reading, tracking, and AniList-compatible organization.</strong>
 </p>
 
 <p align="center">
-  Tankobun helps you keep your AniList library, reading progress, sources, downloads, and backups in one beautiful app.
+  Tankobun helps you keep a local or AniList-synced manga library, reading progress, sources, downloads, and backups in one beautiful app.
 </p>
 
 <p align="center">
@@ -20,20 +20,24 @@
 
 ## What Tankobun Is
 
-Tankobun is an Android reader and tracking client built around an AniList-first workflow.
+Tankobun is an Android reader and tracking client built around an AniList-compatible workflow.
 
-It is designed as a personal reading shelf: sign in with AniList, browse your lists, open a manga entry, choose a user-installed source when available, read in paged or webtoon mode, and keep your progress organized.
+It is designed as a personal reading shelf: use a local library or sign in with AniList, browse manga metadata, open a manga entry, choose a user-installed source when available, read in paged or webtoon mode, and keep your progress organized.
+
+Local library mode does not require an AniList account. Local entries are still matched to AniList manga metadata and use AniList-compatible statuses, scoring, notes, progress, and custom lists so a user can connect AniList later with cleaner sync/merge behavior.
 
 Tankobun is not a content service, content host, extension repository, or manga source.
 
 ## What Tankobun Does
 
+- Local manga library mode with AniList-matched entries.
 - AniList login and user-authorized library sync.
 - Manga list browsing, status management, scoring, custom lists, and progress updates.
 - Reader interface with paged and webtoon modes.
 - Local reading state, caching, and optional offline storage for user-selected sources where permitted by the source and applicable law.
 - Source selection through extensions installed by the user.
-- MyAnimeList-compatible XML backup export for AniList lists.
+- Native Tankobun JSON backup export for local libraries.
+- MyAnimeList-compatible XML backup export for AniList-mode lists.
 - In-app restore tools for supported backup files.
 
 ## Sources, Extensions, and Content
@@ -70,6 +74,8 @@ https://johankrs.github.io/Tankobun/updates.json
 
 The app checks this manifest quietly at most once per day and also offers a manual check in Settings > About. Android still asks the user to confirm installation of downloaded APK updates.
 
+The published manifest for official builds is stored as `docs/updates.json` and is served by GitHub Pages at the URL above.
+
 ## Support Policy
 
 Bug reports and feature requests about the app itself are welcome.
@@ -86,13 +92,13 @@ Requests of that kind may be closed or removed without response.
 
 ## AniList
 
-Tankobun uses the AniList API with user authorization.
+Tankobun uses AniList manga metadata for local and synced libraries. When a user chooses AniList sync, Tankobun uses the AniList API with user authorization.
 
 AniList [describes itself](https://docs.anilist.co/guide/introduction) as an anime and manga database, tracking, and social site. AniList is not a manga host, source, or chapter provider, and it does not host, upload, share, sell, or provide manga, chapters, or scanlations.
 
 Tankobun is not affiliated with, endorsed by, sponsored by, or officially supported by AniList. AniList names, marks, data, and services belong to AniList and their respective owners.
 
-To build the app yourself, create your own AniList API client and use:
+To enable AniList login in your own build, create your own AniList API client and use:
 
 ```text
 tankobun://auth/anilist
