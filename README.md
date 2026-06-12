@@ -13,9 +13,9 @@
 </p>
 
 <p align="center">
-  <img src="docs/mockups/manga-detail-dark.png" width="31%" alt="Tankobun manga detail screen in a dark theme">
-  <img src="docs/mockups/library-dark.png" width="31%" alt="Tankobun library screen in a dark theme">
-  <img src="docs/mockups/browse-light.png" width="31%" alt="Tankobun browse screen in a light theme">
+  <img src="docs/mockups/web/phone-detail.webp" width="31%" alt="Tankobun manga detail screen with generated preview content">
+  <img src="docs/mockups/web/phone-library.webp" width="31%" alt="Tankobun local library screen with generated preview content">
+  <img src="docs/mockups/web/phone-browse.webp" width="31%" alt="Tankobun browse screen with generated preview content">
 </p>
 
 ## What Tankobun Is
