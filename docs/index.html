@@ -183,6 +183,9 @@
         position: absolute;
         display: block;
         filter: drop-shadow(0 28px 60px rgba(0, 0, 0, 0.46));
+        transform: var(--pose);
+        animation: deviceFloat 10s ease-in-out infinite alternate;
+        will-change: transform;
       }
 
       .device img {
@@ -197,7 +200,10 @@
         aspect-ratio: 9 / 19.5;
         right: 18vw;
         top: 70px;
-        transform: rotate(2deg);
+        z-index: 3;
+        --pose: rotate(2deg);
+        --float-x: 8px;
+        --float-y: -14px;
       }
 
       .phone-side {
@@ -205,8 +211,13 @@
         aspect-ratio: 9 / 19.5;
         right: 3vw;
         top: 210px;
-        transform: rotate(8deg);
+        z-index: 2;
         opacity: 0.88;
+        --pose: rotate(8deg);
+        --float-x: -9px;
+        --float-y: -10px;
+        animation-duration: 12s;
+        animation-delay: -2.4s;
       }
 
       .phone-low {
@@ -214,8 +225,13 @@
         aspect-ratio: 9 / 19.5;
         right: 34vw;
         top: 250px;
-        transform: rotate(-7deg);
+        z-index: 1;
         opacity: 0.75;
+        --pose: rotate(-7deg);
+        --float-x: 10px;
+        --float-y: -9px;
+        animation-duration: 11s;
+        animation-delay: -4.2s;
       }
 
       .tablet-hero {
@@ -223,8 +239,27 @@
         aspect-ratio: 1120 / 720;
         right: 0;
         bottom: 55px;
-        transform: rotate(-2deg);
+        z-index: 0;
         opacity: 0.72;
+        --pose: rotate(-2deg);
+        --float-x: -12px;
+        --float-y: -12px;
+        animation-duration: 14s;
+        animation-delay: -1.3s;
+      }
+
+      .tablet-portrait-hero {
+        width: min(24vw, 320px);
+        aspect-ratio: 10 / 16;
+        right: 35vw;
+        top: 112px;
+        z-index: 2;
+        opacity: 0.82;
+        --pose: rotate(-5deg);
+        --float-x: 7px;
+        --float-y: -16px;
+        animation-duration: 13s;
+        animation-delay: -3.1s;
       }
 
       .hero-content {
@@ -234,6 +269,24 @@
         justify-content: center;
         width: min(620px, 100%);
         padding: 130px 0 88px;
+      }
+
+      .hero-content > * {
+        opacity: 0;
+        transform: translateY(18px);
+        animation: contentIn 760ms ease forwards;
+      }
+
+      .hero-content > :nth-child(2) {
+        animation-delay: 120ms;
+      }
+
+      .hero-content > :nth-child(3) {
+        animation-delay: 220ms;
+      }
+
+      .hero-content > :nth-child(4) {
+        animation-delay: 320ms;
       }
 
       h1,
@@ -284,6 +337,10 @@
         text-decoration: none;
         font-size: 0.98rem;
         font-weight: 800;
+        transition:
+          border-color 180ms ease,
+          background 180ms ease,
+          transform 180ms ease;
       }
 
       .button.primary {
@@ -355,6 +412,35 @@
         }
       }
 
+      @keyframes contentIn {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes deviceFloat {
+        from {
+          transform: var(--pose) translate3d(0, 0, 0);
+        }
+
+        to {
+          transform: var(--pose) translate3d(var(--float-x), var(--float-y), 0);
+        }
+      }
+
+      @keyframes sectionReveal {
+        from {
+          opacity: 0.35;
+          transform: translateY(28px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
       section {
         padding: 96px 0;
       }
@@ -419,6 +505,11 @@
         border: 1px solid var(--line);
         border-radius: var(--radius);
         box-shadow: var(--shadow);
+        transition: transform 300ms ease;
+      }
+
+      .mode-panel:hover img {
+        transform: translateY(-8px);
       }
 
       .mode-panel.local {
@@ -482,16 +573,21 @@
         border-bottom: 1px solid var(--line);
       }
 
-      .screen-wall {
+      .screen-gallery {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1.52fr) minmax(260px, 0.58fr);
+        grid-template-areas:
+          "library portrait"
+          "browse phones";
         gap: 18px;
         align-items: stretch;
       }
 
-      .screen-large,
-      .screen-stack figure {
+      .screen-card,
+      .phone-strip figure {
+        position: relative;
         margin: 0;
+        width: 100%;
         overflow: hidden;
         border: 1px solid var(--line);
         border-radius: var(--radius);
@@ -499,32 +595,81 @@
         box-shadow: var(--shadow);
       }
 
-      .screen-large img,
-      .screen-stack img {
+      .screen-card img,
+      .phone-strip img {
         display: block;
         width: 100%;
         height: 100%;
         object-fit: cover;
+        transition: transform 360ms ease;
       }
 
-      .screen-large {
+      .screen-card:hover img,
+      .phone-strip figure:hover img {
+        transform: scale(1.018);
+      }
+
+      .screen-card.tablet-library {
+        grid-area: library;
         aspect-ratio: 1120 / 720;
       }
 
-      .screen-stack {
+      .screen-card.tablet-browse {
+        grid-area: browse;
+        aspect-ratio: 1120 / 720;
+      }
+
+      .screen-card.tablet-portrait {
+        grid-area: portrait;
+        aspect-ratio: 10 / 16;
+      }
+
+      .phone-strip {
+        grid-area: phones;
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 18px;
+        align-self: start;
       }
 
-      .screen-stack figure {
-        aspect-ratio: 430 / 932;
+      .phone-strip figure {
+        aspect-ratio: 9 / 20;
+      }
+
+      .screen-card figcaption,
+      .phone-strip figcaption {
+        position: absolute;
+        left: 12px;
+        bottom: 12px;
+        max-width: calc(100% - 24px);
+        padding: 7px 10px;
+        border: 1px solid rgba(246, 239, 230, 0.12);
+        border-radius: 6px;
+        background: rgba(16, 17, 18, 0.72);
+        color: var(--text);
+        font-size: 0.78rem;
+        font-weight: 850;
+        backdrop-filter: blur(12px);
       }
 
       .screen-caption {
-        margin-top: 18px;
+        max-width: 720px;
+        margin: 18px 0 0;
         color: var(--muted);
         font-size: 0.96rem;
+      }
+
+      @supports (animation-timeline: view()) {
+        .mode-panel,
+        .feature,
+        .screen-card,
+        .phone-strip figure,
+        .policy article,
+        .download-box {
+          animation: sectionReveal both ease-out;
+          animation-timeline: view();
+          animation-range: entry 8% cover 28%;
+        }
       }
 
       .policy {
@@ -603,6 +748,18 @@
           animation-duration: 0.01ms !important;
           animation-iteration-count: 1 !important;
           scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+
+        .device {
+          animation: none !important;
+          transform: var(--pose) !important;
+        }
+
+        .hero-content > * {
+          animation: none !important;
+          opacity: 1;
+          transform: none;
         }
       }
 
@@ -625,10 +782,23 @@
 
         .section-head,
         .mode-grid,
-        .screen-wall,
+        .screen-gallery,
         .policy,
         .download-box {
           grid-template-columns: 1fr;
+        }
+
+        .screen-gallery {
+          grid-template-areas:
+            "library"
+            "portrait"
+            "browse"
+            "phones";
+        }
+
+        .screen-card.tablet-portrait {
+          aspect-ratio: 10 / 16;
+          min-height: 0;
         }
 
         .feature-list {
@@ -691,6 +861,13 @@
           top: 126px;
         }
 
+        .tablet-portrait-hero {
+          width: 230px;
+          right: 110px;
+          top: 92px;
+          opacity: 0.62;
+        }
+
         .tablet-hero {
           width: 500px;
           right: -100px;
@@ -748,6 +925,15 @@
         .feature .num {
           margin-bottom: 26px;
         }
+
+        .screen-card figcaption,
+        .phone-strip figcaption {
+          left: 8px;
+          bottom: 8px;
+          max-width: calc(100% - 16px);
+          padding: 5px 7px;
+          font-size: 0.68rem;
+        }
       }
     </style>
   </head>
@@ -772,6 +958,9 @@
       <div class="hero-stage" aria-hidden="true">
         <span class="device tablet-hero">
           <img src="mockups/web/tablet-browse.webp" alt="">
+        </span>
+        <span class="device tablet-portrait-hero">
+          <img src="mockups/web/tablet-portrait-browse.webp" alt="">
         </span>
         <span class="device phone-low">
           <img src="mockups/web/phone-library.webp" alt="">
@@ -914,29 +1103,42 @@
             </p>
           </div>
 
-          <div class="screen-wall">
-            <figure class="screen-large">
-              <img src="mockups/web/tablet-library.webp" alt="Tankobun tablet library screen with generated preview entries">
+          <div class="screen-gallery">
+            <figure class="screen-card tablet-library">
+              <img src="mockups/web/tablet-library.webp" alt="Tankobun landscape tablet library screen with generated preview entries">
+              <figcaption>Tablet library</figcaption>
             </figure>
-            <div>
-              <div class="screen-stack">
-                <figure>
-                  <img src="mockups/web/phone-library.webp" alt="Tankobun local library screen with generated preview entries and cover art">
-                </figure>
-                <figure>
-                  <img src="mockups/web/phone-browse.webp" alt="Tankobun browse screen with generated preview entries and cover art">
-                </figure>
-                <figure>
-                  <img src="mockups/web/phone-detail.webp" alt="Tankobun manga detail screen with generated preview entry and cover art">
-                </figure>
-              </div>
-              <p class="screen-caption">
-                These screenshots use generated preview titles and cover art.
-                Reading sources are user-installed extensions and are not bundled
-                with Tankobun.
-              </p>
+
+            <figure class="screen-card tablet-portrait">
+              <img src="mockups/web/tablet-portrait-browse.webp" alt="Tankobun portrait tablet browse screen with generated preview entries">
+              <figcaption>Portrait tablet</figcaption>
+            </figure>
+
+            <figure class="screen-card tablet-browse">
+              <img src="mockups/web/tablet-browse.webp" alt="Tankobun landscape tablet browse screen with generated preview entries">
+              <figcaption>Tablet browse</figcaption>
+            </figure>
+
+            <div class="phone-strip">
+              <figure>
+                <img src="mockups/web/phone-library.webp" alt="Tankobun phone library screen with generated preview entries and cover art">
+                <figcaption>Phone library</figcaption>
+              </figure>
+              <figure>
+                <img src="mockups/web/phone-browse.webp" alt="Tankobun phone browse screen with generated preview entries and cover art">
+                <figcaption>Phone browse</figcaption>
+              </figure>
+              <figure>
+                <img src="mockups/web/phone-detail.webp" alt="Tankobun phone manga detail screen with generated preview entry and cover art">
+                <figcaption>Tracking detail</figcaption>
+              </figure>
             </div>
           </div>
+
+          <p class="screen-caption">
+            These screenshots use generated preview titles and cover art. Reading
+            sources are user-installed extensions and are not bundled with Tankobun.
+          </p>
         </div>
       </section>
 
