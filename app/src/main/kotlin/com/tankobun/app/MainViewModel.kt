@@ -32,6 +32,7 @@ import com.tankobun.app.logic.normalizedLanguage
 import com.tankobun.app.logic.normalizedCustomLists
 import com.tankobun.app.logic.CURRENT_ONBOARDING_VERSION
 import com.tankobun.app.logic.preferredVisibleSources
+import com.tankobun.app.logic.preserveSelectedSourceOrFirst
 import com.tankobun.app.logic.previousInReadingOrderBefore
 import com.tankobun.app.logic.readerLoadErrorFor
 import com.tankobun.app.logic.readerSourceForChapter
@@ -490,13 +491,19 @@ class MainViewModel(
                 disabledSourceKeys = _state.value.disabledSourceKeys,
             )
             val selectedSourceId = _state.value.selectedSourceId
+            val selectedSourcePackageName = _state.value.selectedSourcePackageName
             _state.update {
+                val selectedSource = preserveSelectedSourceOrFirst(
+                    selectedSourceId = selectedSourceId,
+                    selectedSourcePackageName = selectedSourcePackageName,
+                    visibleSources = sourceState.preferredSources,
+                    allSources = sourceState.allSources,
+                )
                 it.copy(
                     allInstalledSources = sourceState.allSources,
                     installedSources = sourceState.preferredSources,
-                    selectedSourceId = selectedSourceId
-                        ?.takeIf { current -> sourceState.preferredSources.any { source -> source.id == current } }
-                        ?: sourceState.preferredSources.firstOrNull()?.id,
+                    selectedSourceId = selectedSource?.id,
+                    selectedSourcePackageName = selectedSource?.packageName,
                 )
             }
         }
@@ -607,12 +614,17 @@ class MainViewModel(
         container.settingsStore.saveSourceLanguages(next)
         _state.update {
             val sources = it.allInstalledSources.preferredVisibleSources(next, it.disabledSourceKeys)
+            val selectedSource = preserveSelectedSourceOrFirst(
+                selectedSourceId = it.selectedSourceId,
+                selectedSourcePackageName = it.selectedSourcePackageName,
+                visibleSources = sources,
+                allSources = it.allInstalledSources,
+            )
             it.copy(
                 sourceLanguages = next,
                 installedSources = sources,
-                selectedSourceId = it.selectedSourceId
-                    ?.takeIf { current -> sources.any { source -> source.id == current } }
-                    ?: sources.firstOrNull()?.id,
+                selectedSourceId = selectedSource?.id,
+                selectedSourcePackageName = selectedSource?.packageName,
             )
         }
     }
@@ -641,13 +653,18 @@ class MainViewModel(
         container.settingsStore.saveDisabledSourceKeys(nextDisabledKeys)
         _state.update { current ->
             val visibleSources = current.allInstalledSources.preferredVisibleSources(nextLanguages, nextDisabledKeys)
+            val selectedSource = preserveSelectedSourceOrFirst(
+                selectedSourceId = current.selectedSourceId,
+                selectedSourcePackageName = current.selectedSourcePackageName,
+                visibleSources = visibleSources,
+                allSources = current.allInstalledSources,
+            )
             current.copy(
                 sourceLanguages = nextLanguages,
                 disabledSourceKeys = nextDisabledKeys,
                 installedSources = visibleSources,
-                selectedSourceId = current.selectedSourceId
-                    ?.takeIf { selected -> visibleSources.any { source -> source.id == selected } }
-                    ?: visibleSources.firstOrNull()?.id,
+                selectedSourceId = selectedSource?.id,
+                selectedSourcePackageName = selectedSource?.packageName,
             )
         }
     }
@@ -1148,6 +1165,12 @@ class MainViewModel(
         val disabledSourceKeys = store.disabledSourceKeys()
         _state.update { current ->
             val visibleSources = current.allInstalledSources.preferredVisibleSources(sourceLanguages, disabledSourceKeys)
+            val selectedSource = preserveSelectedSourceOrFirst(
+                selectedSourceId = current.selectedSourceId,
+                selectedSourcePackageName = current.selectedSourcePackageName,
+                visibleSources = visibleSources,
+                allSources = current.allInstalledSources,
+            )
             current.copy(
                 themeMode = store.themeMode(),
                 appLanguage = store.appLanguage(),
@@ -1181,9 +1204,8 @@ class MainViewModel(
                 sourceLanguages = sourceLanguages,
                 disabledSourceKeys = disabledSourceKeys,
                 installedSources = visibleSources,
-                selectedSourceId = current.selectedSourceId
-                    ?.takeIf { selected -> visibleSources.any { source -> source.id == selected } }
-                    ?: visibleSources.firstOrNull()?.id,
+                selectedSourceId = selectedSource?.id,
+                selectedSourcePackageName = selectedSource?.packageName,
                 backupMissingSources = missingSources,
                 busy = false,
                 message = message,
@@ -2631,6 +2653,7 @@ class MainViewModel(
                         sourceMatches = cached.sourceMatches,
                         sourceMatchChapterCounts = cached.sourceMatchChapterCounts,
                         selectedSourceId = cached.boundSource?.id ?: it.selectedSourceId,
+                        selectedSourcePackageName = cached.boundSource?.packageName ?: it.selectedSourcePackageName,
                         selectedSourceManga = cached.boundManga,
                         sourceChapters = cached.sourceChapters,
                         latestProgress = cached.latestProgress,

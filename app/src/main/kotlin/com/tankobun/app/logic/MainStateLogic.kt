@@ -13,7 +13,11 @@ import com.tankobun.core.model.withTitleLanguage
 import java.util.Locale
 
 internal fun TankobunUiState.readerSourceForChapter(chapter: SourceChapter): SourceDescriptor? =
-    installedSources.firstOrNull { it.id == chapter.sourceId }
+    installedSources.firstOrNull {
+        it.id == chapter.sourceId && it.packageName == selectedSourcePackageName
+    } ?: allInstalledSources.firstOrNull {
+        it.id == chapter.sourceId && it.packageName == selectedSourcePackageName
+    } ?: installedSources.firstOrNull { it.id == chapter.sourceId }
         ?: allInstalledSources.firstOrNull { it.id == chapter.sourceId }
         ?: selectedSource?.takeIf { it.id == chapter.sourceId }
 
@@ -79,10 +83,21 @@ internal fun TankobunUiState.withSelectedMedia(
     ).withoutSourceReaderSelection()
 
 internal fun TankobunUiState.withSelectedSource(sourceId: Long): TankobunUiState {
-    val match = sourceMatches.firstOrNull { match -> match.source.id == sourceId }
-    val sameSource = selectedSourceId == sourceId
+    val match = sourceMatches.firstOrNull { match ->
+        match.source.id == sourceId && (
+            selectedSourcePackageName == null || match.source.packageName == selectedSourcePackageName
+        )
+    } ?: sourceMatches.firstOrNull { match -> match.source.id == sourceId }
+    val source = match?.source
+        ?: installedSources.firstOrNull { it.id == sourceId && it.packageName == selectedSourcePackageName }
+        ?: allInstalledSources.firstOrNull { it.id == sourceId && it.packageName == selectedSourcePackageName }
+        ?: installedSources.firstOrNull { it.id == sourceId }
+        ?: allInstalledSources.firstOrNull { it.id == sourceId }
+    val nextPackageName = source?.packageName ?: selectedSourcePackageName
+    val sameSource = selectedSourceId == sourceId && selectedSourcePackageName == nextPackageName
     return copy(
         selectedSourceId = sourceId,
+        selectedSourcePackageName = nextPackageName,
         selectedSourceManga = match?.manga ?: selectedSourceManga?.takeIf { manga ->
             sameSource && manga.sourceId == sourceId
         },

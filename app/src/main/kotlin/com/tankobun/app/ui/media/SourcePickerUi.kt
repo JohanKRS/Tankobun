@@ -306,13 +306,23 @@ private fun Bitmap.visibleAlphaBounds(alphaThreshold: Int = 8): Rect? {
 @Composable
 internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
     val matches = state.sourceMatches.filter { match ->
-        state.sourceMatchChapterCounts[sourceMatchKey(match.source.id, match.manga.url)] != null
+        state.sourceMatchChapterCounts[match.source.sourceMatchKey(match.manga.url)] != null
     }
-    val availableSources = remember(state.installedSources, state.selectedSourceId) {
+    val availableSources = remember(state.installedSources, state.selectedSourceId, state.selectedSourcePackageName) {
         state.installedSources
             .distinctBy { it.sourceSettingsKey() }
             .sortedWith(
-                compareBy<SourceDescriptor> { if (it.id == state.selectedSourceId) 0 else 1 }
+                compareBy<SourceDescriptor> {
+                    if (
+                        it.id == state.selectedSourceId &&
+                        (state.selectedSourcePackageName == null ||
+                            state.selectedSourcePackageName == it.packageName)
+                    ) {
+                        0
+                    } else {
+                        1
+                    }
+                }
                     .thenBy { sourceLanguageSortPriority(it.lang.normalizedSourceLanguage()) }
                     .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
                     .thenBy(String.CASE_INSENSITIVE_ORDER) { it.lang },
@@ -384,12 +394,14 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                         item {
                             Text(tankobunString(R.string.source_readable_matches), style = MaterialTheme.typography.titleMedium)
                         }
-                        items(matches, key = { "match:${it.source.id}:${it.manga.url}" }) { match ->
-                            val count = state.sourceMatchChapterCounts[sourceMatchKey(match.source.id, match.manga.url)] ?: 0
+                        items(matches, key = { "match:${it.source.sourceMatchKey(it.manga.url)}" }) { match ->
+                            val count = state.sourceMatchChapterCounts[match.source.sourceMatchKey(match.manga.url)] ?: 0
                             SourceMatchRow(
                                 match = match,
                                 chapterCount = count,
                                 current = state.selectedSourceId == match.source.id &&
+                                    (state.selectedSourcePackageName == null ||
+                                        state.selectedSourcePackageName == match.source.packageName) &&
                                     state.selectedSourceManga?.url == match.manga.url,
                                 mediaCover = media.coverImage,
                                 onClick = { viewModel.bindSourceMatch(match) },
@@ -404,7 +416,9 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                         items(fallbackSources, key = { "source:${it.sourceSettingsKey()}" }) { source ->
                             SourceCandidateRow(
                                 source = source,
-                                current = state.selectedSourceId == source.id,
+                                current = state.selectedSourceId == source.id &&
+                                    (state.selectedSourcePackageName == null ||
+                                        state.selectedSourcePackageName == source.packageName),
                                 onClick = { viewModel.bindSource(source) },
                             )
                         }

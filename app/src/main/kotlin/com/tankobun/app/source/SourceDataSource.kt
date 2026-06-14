@@ -61,7 +61,12 @@ internal class SourceDataSource(
         val binding = container.database.sourceBindingDao().bindingForMedia(mediaId)
         val cachedResults = container.database.sourceSearchDao().cachedSearchResults(mediaId)
         val cachedMatches = cachedResults.map { result ->
-            val source = sources.firstOrNull { it.id == result.sourceId || it.packageName == result.sourcePackageName }
+            val source = sources.sourceFor(
+                sourceId = result.sourceId,
+                packageName = result.sourcePackageName,
+                sourceName = result.sourceName,
+                sourceLang = result.sourceLang,
+            )
                 ?: SourceDescriptor(
                     id = result.sourceId,
                     name = result.sourceName,
@@ -73,7 +78,7 @@ internal class SourceDataSource(
                     installed = false,
                 )
             result.toSearchResult(source)
-        }.distinctBy { "${it.source.id}:${it.manga.url}:${it.manga.title}" }
+        }.distinctBy { "${it.source.packageName}:${it.source.id}:${it.manga.url}:${it.manga.title}" }
 
         val chapterCounts = mutableMapOf<String, Int>()
         val matches = buildList {
@@ -87,7 +92,10 @@ internal class SourceDataSource(
         }
 
         val boundSource = binding?.let { cached ->
-            sources.firstOrNull { it.id == cached.sourceId || it.packageName == cached.sourcePackageName }
+            sources.sourceFor(
+                sourceId = cached.sourceId,
+                packageName = cached.sourcePackageName,
+            )
         }
         val boundManga = binding?.let { cached ->
             SourceManga(
@@ -119,7 +127,13 @@ internal class SourceDataSource(
                 reasons = listOf("selected source"),
                 searchedAtEpochMillis = binding.selectedAtEpochMillis,
             )
-            if (visibleMatches.none { it.source.id == selectedMatch.source.id && it.manga.url == selectedMatch.manga.url }) {
+            if (
+                visibleMatches.none {
+                    it.source.id == selectedMatch.source.id &&
+                        it.source.packageName == selectedMatch.source.packageName &&
+                        it.manga.url == selectedMatch.manga.url
+                }
+            ) {
                 visibleMatches.add(0, selectedMatch)
             }
             chapterCounts[selectedMatch.sourceMatchKey()] = chapters.size
@@ -202,7 +216,8 @@ internal class SourceDataSource(
         val counts = verified.associate { it.match.sourceMatchKey() to it.chapterCount }
 
         VerifiedSourceMatches(
-            matches = matches.distinctBy { "${it.source.id}:${it.manga.url}" }.sortedByDescending { it.score },
+            matches = matches.distinctBy { "${it.source.packageName}:${it.source.id}:${it.manga.url}" }
+                .sortedByDescending { it.score },
             chapterCounts = counts,
         )
     }
@@ -313,7 +328,12 @@ internal class SourceDataSource(
         val counts = mutableMapOf<String, Int>()
 
         cachedResults.forEach { result ->
-            val source = sources.firstOrNull { it.id == result.sourceId || it.packageName == result.sourcePackageName }
+            val source = sources.sourceFor(
+                sourceId = result.sourceId,
+                packageName = result.sourcePackageName,
+                sourceName = result.sourceName,
+                sourceLang = result.sourceLang,
+            )
                 ?: return@forEach
             val match = result.toSearchResult(source)
             val chapters = cachedChapters(source, match.manga, now, requireFresh = false)
@@ -324,7 +344,8 @@ internal class SourceDataSource(
         }
 
         return VerifiedSourceMatches(
-            matches = matches.distinctBy { "${it.source.id}:${it.manga.url}" }.sortedByDescending { it.score },
+            matches = matches.distinctBy { "${it.source.packageName}:${it.source.id}:${it.manga.url}" }
+                .sortedByDescending { it.score },
             chapterCounts = counts,
         )
     }
@@ -452,6 +473,28 @@ internal class SourceDataSource(
             reasons = reasons,
             searchedAtEpochMillis = searchedAtEpochMillis,
         )
+
+    private fun List<SourceDescriptor>.sourceFor(
+        sourceId: Long,
+        packageName: String,
+        sourceName: String? = null,
+        sourceLang: String? = null,
+    ): SourceDescriptor? =
+        firstOrNull { source ->
+            source.id == sourceId && source.packageName == packageName
+        } ?: firstOrNull { source ->
+            source.packageName == packageName &&
+                sourceName != null &&
+                sourceLang != null &&
+                source.name.equals(sourceName, ignoreCase = true) &&
+                source.lang.equals(sourceLang, ignoreCase = true)
+        } ?: firstOrNull { source ->
+            source.id == sourceId &&
+                sourceName != null &&
+                source.name.equals(sourceName, ignoreCase = true)
+        } ?: firstOrNull { source ->
+            source.id == sourceId
+        }
 
     private companion object {
         private const val TAG = "TankobunSourceData"

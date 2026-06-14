@@ -72,6 +72,20 @@ class SourceSearchLogicTest {
     }
 
     @Test
+    fun sourcePickerSourcesPrioritizesSelectedPackageWhenIdsCollide() {
+        val english = source(id = 1, name = "Same", lang = "en", packageName = "pkg.en")
+        val portuguese = source(id = 1, name = "Same", lang = "pt-BR", packageName = "pkg.pt")
+
+        val sources = TankobunUiState(
+            installedSources = listOf(english, portuguese),
+            selectedSourceId = portuguese.id,
+            selectedSourcePackageName = portuguese.packageName,
+        ).sourcePickerSources()
+
+        assertEquals(portuguese, sources.first())
+    }
+
+    @Test
     fun sourcePickerSearchCompletedPreservesSelectedMatch() {
         val selectedSource = source(id = 1, name = "Selected")
         val selectedMatch = match(source = selectedSource, manga = manga(selectedSource, "selected"), score = 0.1)
@@ -144,6 +158,28 @@ class SourceSearchLogicTest {
     }
 
     @Test
+    fun selectedSourceChapterSelectionUsesPackageWhenSourceIdsCollide() {
+        val english = source(id = 1, name = "Same", lang = "en", packageName = "pkg.en")
+        val portuguese = source(id = 1, name = "Same", lang = "pt-BR", packageName = "pkg.pt")
+        val englishManga = manga(english, "english")
+        val portugueseManga = manga(portuguese, "portuguese")
+
+        val selection = TankobunUiState(
+            installedSources = listOf(english, portuguese),
+            sourceMatches = listOf(
+                match(source = english, manga = englishManga),
+                match(source = portuguese, manga = portugueseManga),
+            ),
+            selectedSourceId = portuguese.id,
+            selectedSourcePackageName = portuguese.packageName,
+            selectedSourceManga = portugueseManga,
+        ).selectedSourceChapterSelection()
+
+        assertEquals(portuguese, selection?.source)
+        assertEquals(portugueseManga, selection?.manga)
+    }
+
+    @Test
     fun selectedSourceChapterSelectionReturnsNullWithoutSourceAndManga() {
         assertNull(TankobunUiState().selectedSourceChapterSelection())
     }
@@ -169,7 +205,7 @@ class SourceSearchLogicTest {
         assertEquals(chapters, next.sourceChapters)
         assertFalse(next.selectingDownloadChapters)
         assertTrue(next.selectedDownloadChapterUrls.isEmpty())
-        assertEquals(1, next.sourceMatchChapterCounts[sourceMatchKey(source.id, manga.url)])
+        assertEquals(1, next.sourceMatchChapterCounts[source.sourceMatchKey(manga.url)])
         assertFalse(next.busy)
     }
 
@@ -211,12 +247,13 @@ class SourceSearchLogicTest {
         id: Long = 1L,
         name: String = "Source",
         lang: String = "en",
+        packageName: String = "pkg.$id",
     ): SourceDescriptor =
         SourceDescriptor(
             id = id,
             name = name,
             lang = lang,
-            packageName = "pkg.$id",
+            packageName = packageName,
             versionName = null,
             versionCode = null,
             isNsfw = false,

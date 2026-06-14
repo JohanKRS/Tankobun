@@ -26,6 +26,18 @@ internal fun List<SourceDescriptor>.preferredVisibleSources(
             .thenBy(String.CASE_INSENSITIVE_ORDER) { it.lang })
 }
 
+internal fun preserveSelectedSourceOrFirst(
+    selectedSourceId: Long?,
+    selectedSourcePackageName: String?,
+    visibleSources: List<SourceDescriptor>,
+    allSources: List<SourceDescriptor> = visibleSources,
+): SourceDescriptor? =
+    selectedSourceId?.let { sourceId ->
+        allSources.matchingSelectedSource(sourceId, selectedSourcePackageName)
+            ?: visibleSources.matchingSelectedSource(sourceId, selectedSourcePackageName)
+            ?: visibleSources.firstOrNull()
+    } ?: visibleSources.firstOrNull()
+
 internal fun SourceDescriptor.languageSortPriority(preferredLanguages: Set<String>): Int =
     when (normalizedLanguage()) {
         "en" -> 0
@@ -40,4 +52,14 @@ internal fun SourceDescriptor.normalizedLanguage(): String =
 
 internal fun SourceDescriptor.sourceSettingsKey(): String =
     "$packageName:$id"
+
+private fun List<SourceDescriptor>.matchingSelectedSource(
+    sourceId: Long,
+    packageName: String?,
+): SourceDescriptor? =
+    if (packageName == null) {
+        firstOrNull { it.id == sourceId }
+    } else {
+        firstOrNull { it.id == sourceId && it.packageName == packageName }
+    }
 

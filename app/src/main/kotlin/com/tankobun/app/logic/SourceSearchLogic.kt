@@ -72,7 +72,9 @@ internal fun TankobunUiState.sourcePickerSources(): List<SourceDescriptor> =
     installedSources
         .distinctBy { "${it.packageName}:${it.id}" }
         .sortedWith(
-            compareBy<SourceDescriptor> { if (it.id == selectedSourceId) 0 else 1 }
+            compareBy<SourceDescriptor> {
+                if (it.id == selectedSourceId && it.matchesSelectedSourcePackage(selectedSourcePackageName)) 0 else 1
+            }
                 .thenBy { it.languageSortPriority(sourceLanguages) }
                 .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
                 .thenBy(String.CASE_INSENSITIVE_ORDER) { it.lang },
@@ -162,6 +164,7 @@ internal fun TankobunUiState.withSourcePickerSearchCompleted(
 ): TankobunUiState {
     val selectedMatches = sourceMatches.filter { match ->
         selectedSourceId == match.source.id &&
+            match.source.matchesSelectedSourcePackage(selectedSourcePackageName) &&
             selectedSourceManga?.url == match.manga.url
     }
     val nextMatches = (selectedMatches + verified.matches)
@@ -183,6 +186,7 @@ internal fun TankobunUiState.withSourcePickerSearchCompleted(
 ): TankobunUiState {
     val selectedMatches = sourceMatches.filter { match ->
         selectedSourceId == match.source.id &&
+            match.source.matchesSelectedSourcePackage(selectedSourcePackageName) &&
             selectedSourceManga?.url == match.manga.url
     }
     val nextMatches = (selectedMatches + verified.matches)
@@ -239,6 +243,7 @@ internal fun TankobunUiState.withSourcePickerSourceSelected(
     return copy(
         sourceMatches = nextMatches,
         selectedSourceId = match.source.id,
+        selectedSourcePackageName = match.source.packageName,
         selectedSourceManga = match.manga,
         sourcePickerOpen = false,
         sourcePickerLoading = false,
@@ -259,6 +264,7 @@ internal fun TankobunUiState.withSourcePickerSourceSelected(
     return copy(
         sourceMatches = nextMatches,
         selectedSourceId = match.source.id,
+        selectedSourcePackageName = match.source.packageName,
         selectedSourceManga = match.manga,
         sourcePickerOpen = false,
         sourcePickerLoading = false,
@@ -281,23 +287,32 @@ internal fun TankobunUiState.withSourcePickerFailure(
 
 internal fun TankobunUiState.selectedSourceChapterSelection(): SourceChapterSelection? {
     val selectedSourceId = this.selectedSourceId
+    val selectedSourcePackageName = this.selectedSourcePackageName
     val selectedManga = this.selectedSourceManga
     val match = sourceMatches.firstOrNull { result ->
         result.source.id == selectedSourceId &&
+            result.source.matchesSelectedSourcePackage(selectedSourcePackageName) &&
             selectedManga != null &&
             result.manga.sourceId == selectedManga.sourceId &&
             result.manga.url == selectedManga.url
     } ?: sourceMatches.firstOrNull { result ->
         selectedManga != null &&
+            result.source.matchesSelectedSourcePackage(selectedSourcePackageName) &&
             result.manga.sourceId == selectedManga.sourceId &&
             result.manga.url == selectedManga.url
+    } ?: sourceMatches.firstOrNull {
+        it.source.id == selectedSourceId && it.source.matchesSelectedSourcePackage(selectedSourcePackageName)
     } ?: sourceMatches.firstOrNull { it.source.id == selectedSourceId }
     val manga = match?.manga ?: selectedManga?.takeIf { manga ->
         selectedSourceId == null || manga.sourceId == selectedSourceId
     }
     val source = match?.source
         ?: manga?.let { selected ->
-            installedSources.firstOrNull { it.id == selected.sourceId }
+            installedSources.firstOrNull {
+                it.id == selected.sourceId && it.matchesSelectedSourcePackage(selectedSourcePackageName)
+            } ?: allInstalledSources.firstOrNull {
+                it.id == selected.sourceId && it.matchesSelectedSourcePackage(selectedSourcePackageName)
+            } ?: installedSources.firstOrNull { it.id == selected.sourceId }
                 ?: allInstalledSources.firstOrNull { it.id == selected.sourceId }
         }
         ?: selectedSource
@@ -322,13 +337,15 @@ internal fun TankobunUiState.withSourceChaptersLoaded(
     chapterProgress: Map<String, ReadingProgress>,
 ): TankobunUiState =
     copy(
+        selectedSourceId = source.id,
+        selectedSourcePackageName = source.packageName,
         selectedSourceManga = manga,
         sourceChapters = chapters,
         chapterProgress = chapterProgress,
         selectingDownloadChapters = false,
         selectedDownloadChapterUrls = emptySet(),
         busy = false,
-        sourceMatchChapterCounts = sourceMatchChapterCounts + (sourceMatchKey(source.id, manga.url) to chapters.size),
+        sourceMatchChapterCounts = sourceMatchChapterCounts + (source.sourceMatchKey(manga.url) to chapters.size),
         message = if (chapters.isEmpty()) context.getString(R.string.source_picker_no_chapters) else null,
     )
 
@@ -339,13 +356,15 @@ internal fun TankobunUiState.withSourceChaptersLoaded(
     chapterProgress: Map<String, ReadingProgress>,
 ): TankobunUiState =
     copy(
+        selectedSourceId = source.id,
+        selectedSourcePackageName = source.packageName,
         selectedSourceManga = manga,
         sourceChapters = chapters,
         chapterProgress = chapterProgress,
         selectingDownloadChapters = false,
         selectedDownloadChapterUrls = emptySet(),
         busy = false,
-        sourceMatchChapterCounts = sourceMatchChapterCounts + (sourceMatchKey(source.id, manga.url) to chapters.size),
+        sourceMatchChapterCounts = sourceMatchChapterCounts + (source.sourceMatchKey(manga.url) to chapters.size),
         message = if (chapters.isEmpty()) "No chapters found" else null,
     )
 
@@ -450,7 +469,7 @@ internal fun cleanSourceSearchQuery(query: String): String =
     }.trim()
 
 internal fun SourceSearchResult.sourceMatchKey(): String =
-    sourceMatchKey(source.id, manga.url)
+    source.sourceMatchKey(manga.url)
 
 internal fun SourceSearchResult.isReadableMatchCandidate(): Boolean =
     score >= SOURCE_READABLE_MATCH_SCORE
@@ -458,8 +477,14 @@ internal fun SourceSearchResult.isReadableMatchCandidate(): Boolean =
 internal fun sourceMatchKey(sourceId: Long, mangaUrl: String): String =
     "$sourceId:$mangaUrl"
 
+internal fun SourceDescriptor.sourceMatchKey(mangaUrl: String): String =
+    "$packageName:$id:$mangaUrl"
+
 private fun List<SourceSearchResult>.distinctSourceMatches(): List<SourceSearchResult> =
-    distinctBy { match -> "${match.source.id}:${match.manga.url}" }
+    distinctBy { match -> "${match.source.packageName}:${match.source.id}:${match.manga.url}" }
+
+private fun SourceDescriptor.matchesSelectedSourcePackage(packageName: String?): Boolean =
+    packageName == null || this.packageName == packageName
 
 private fun sourcePickerSearchCompletedMessage(
     context: Context,

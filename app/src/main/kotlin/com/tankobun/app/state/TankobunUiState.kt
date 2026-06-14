@@ -145,18 +145,27 @@ data class TankobunUiState(
     val selectingDownloadChapters: Boolean = false,
     val selectedDownloadChapterUrls: Set<String> = emptySet(),
     val selectedSourceId: Long? = null,
+    val selectedSourcePackageName: String? = null,
     val readerMode: ReaderMode = ReaderMode.PAGED,
     val readerPageGapLevel: Int = 0,
     val busy: Boolean = false,
     val message: String? = null,
 ) {
     val selectedSource: SourceDescriptor?
-        get() = installedSources.firstOrNull { it.id == selectedSourceId }
-            ?: allInstalledSources.firstOrNull { it.id == selectedSourceId }
+        get() {
+            val sourceId = selectedSourceId ?: return null
+            return installedSources.firstOrNull { it.matchesSelectedSource(sourceId, selectedSourcePackageName) }
+                ?: allInstalledSources.firstOrNull { it.matchesSelectedSource(sourceId, selectedSourcePackageName) }
+                ?: installedSources.firstOrNull { it.id == sourceId }
+                ?: allInstalledSources.firstOrNull { it.id == sourceId }
+        }
 
     val librarySections: List<LibrarySection>
         get() = libraryItems.toLibrarySections()
 }
+
+private fun SourceDescriptor.matchesSelectedSource(sourceId: Long, packageName: String?): Boolean =
+    id == sourceId && (packageName == null || this.packageName == packageName)
 
 data class AppUpdateInstallRequest(
     val apkUri: String,
