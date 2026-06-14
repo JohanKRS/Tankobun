@@ -2,26 +2,26 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 22,
-    "versionName": "2.0.2",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v2.0.2/tankobun-2.0.2.apk",
-    "apkSha256": "EF100E81F837DEF121F5CDEE81FEA917071D2D768B1FF411FEF7F9C93CBBA8A8",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v2.0.2",
-    "publishedAt": "2026-06-14T14:30:15Z",
-    "sizeBytes": 11562180,
+    "versionCode": 23,
+    "versionName": "2.0.3",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v2.0.3/tankobun-2.0.3.apk",
+    "apkSha256": "314359E924D955148691AF65671E31DCFB4416F5B1C7BA9DEEFABEF8FCE1203B",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v2.0.3",
+    "publishedAt": "2026-06-14T17:16:58Z",
+    "sizeBytes": 11567676,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Added optional reading-based status updates: manga move to Reading after the halfway point, and only finished manga move to Completed after the final chapter.",
-        "Improved automatic tracker progress checks and refined the adaptive launcher icon sizing."
+        "Fixed source selection persistence so language/source settings changes no longer switch an existing manga binding to another installed source.",
+        "Resolved source identity collisions by preserving package information when restoring cached source matches and chapter lists."
       ],
       "pt-BR": [
-        "Adicionadas atualizações opcionais de status pela leitura: mangás vão para Lendo depois da metade do capítulo, e só mangás finalizados vão para Concluído ao terminar o último capítulo.",
-        "Melhoradas as verificações automáticas de progresso do tracker e refinado o tamanho do ícone adaptável do app."
+        "Corrigida a persistência da seleção de fonte para que mudanças nas configurações de idioma/fonte não troquem um vínculo existente do mangá para outra fonte instalada.",
+        "Resolvidas colisões de identidade de fontes preservando as informações de pacote ao restaurar buscas e listas de capítulos em cache."
       ],
       "es": [
-        "Se añadieron actualizaciones opcionales de estado desde la lectura: el manga pasa a Leyendo después de la mitad del capítulo, y solo el manga finalizado pasa a Completado al terminar el último capítulo.",
-        "Se mejoraron las comprobaciones automáticas del progreso del tracker y se ajustó el tamaño del icono adaptable de la app."
+        "Se corrigió la persistencia de la selección de fuente para que los cambios de idioma/fuente no cambien una vinculación existente del manga a otra fuente instalada.",
+        "Se resolvieron colisiones de identidad de fuentes preservando la información del paquete al restaurar búsquedas y listas de capítulos en caché."
       ]
     }
   }

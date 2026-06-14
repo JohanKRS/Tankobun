@@ -550,6 +550,7 @@
     <string name="about_changelog_v2_updates">Se añadieron búsquedas de actualizaciones desde GitHub y changelog en Acerca de.</string>
     <string name="about_changelog_v2_reader_status">Se añadieron actualizaciones opcionales de estado desde la lectura: el manga pasa a Leyendo después de la mitad del capítulo, y solo el manga finalizado pasa a Completado al terminar el último capítulo.</string>
     <string name="about_changelog_v2_tracker_fix">Se mejoraron las comprobaciones automáticas del progreso del tracker y se ajustó el tamaño del icono adaptable de la app.</string>
+    <string name="about_changelog_v2_source_binding_fix">Se corrigió la persistencia de la selección de fuente para que los cambios de idioma/fuente no cambien una vinculación existente del manga a otra fuente instalada.</string>
     <string name="about_unofficial">Tankobun es un lector de manga no oficial y no está afiliado con AniList.</string>
     <string name="about_anilist_thanks">Gracias a AniList por poner su API a disposición de usuarios y apps de la comunidad.</string>
     <string name="about_anilist_data">AniList es una base de datos y un sitio social de seguimiento de anime y manga. No aloja, sube, comparte, vende ni proporciona manga, capítulos o scanlations. Tankobun accede a metadatos de AniList mediante la API de AniList; la sincronización de cuenta usa autorización del usuario.</string>

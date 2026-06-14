@@ -480,6 +480,7 @@ private fun ChangelogList(title: String, items: List<String>) {
 private fun currentVersionChangelog(context: Context, language: AppLanguage): List<String> {
     val localized = context.withAppLanguage(language)
     return listOf(
+        localized.getString(R.string.about_changelog_v2_source_binding_fix),
         localized.getString(R.string.about_changelog_v2_reader_status),
         localized.getString(R.string.about_changelog_v2_tracker_fix),
     )

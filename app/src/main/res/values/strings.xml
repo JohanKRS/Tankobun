@@ -558,6 +558,7 @@
     <string name="about_changelog_v2_updates">Added GitHub-based app update checks and changelog display in About.</string>
     <string name="about_changelog_v2_reader_status">Added optional reading-based status updates: manga move to Reading after the halfway point, and only finished manga move to Completed after the final chapter.</string>
     <string name="about_changelog_v2_tracker_fix">Improved automatic tracker progress checks and refined the adaptive launcher icon sizing.</string>
+    <string name="about_changelog_v2_source_binding_fix">Fixed source selection persistence so language/source settings changes no longer switch an existing manga binding to another installed source.</string>
     <string name="about_unofficial">Tankobun is an unofficial manga reader and is not affiliated with AniList.</string>
     <string name="about_anilist_thanks">Thanks to AniList for making its API available to users and community apps.</string>
     <string name="about_anilist_data">AniList is an anime and manga database, tracking, and social site. It does not host, upload, share, sell, or provide manga, chapters, or scanlations. Tankobun accesses AniList metadata through the AniList API; account sync uses user authorization.</string>
