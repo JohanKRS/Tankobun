@@ -233,15 +233,18 @@ internal class AniListDataSource(
     suspend fun saveLocalProgressFromChapter(
         media: AnilistMedia,
         chapterProgress: Int,
+        status: MediaStatus? = null,
     ): SyncedListEntryData? {
         val now = System.currentTimeMillis()
         val existing = container.database.listEntryDao().cachedEntry(media.id)?.toModel()
-        if (existing != null && chapterProgress <= existing.progress) return null
+        val nextProgress = maxOf(chapterProgress.coerceAtLeast(0), existing?.progress ?: 0)
+        val nextStatus = status ?: existing?.status ?: MediaStatus.CURRENT
+        if (existing != null && nextProgress == existing.progress && nextStatus == existing.status) return null
         val entry = AnilistListEntry(
             id = existing?.id ?: -media.id,
             mediaId = media.id,
-            status = existing?.status ?: MediaStatus.CURRENT,
-            progress = chapterProgress,
+            status = nextStatus,
+            progress = nextProgress,
             score = existing?.score,
             notes = existing?.notes,
             private = existing?.private ?: false,
@@ -383,12 +386,15 @@ internal class AniListDataSource(
     suspend fun syncProgressFromChapter(
         media: AnilistMedia,
         chapterProgress: Int,
+        status: MediaStatus? = null,
         token: String?,
         scoreFormat: AnilistScoreFormat,
     ): SyncedListEntryData? {
         val now = System.currentTimeMillis()
+        val progress = chapterProgress.takeIf { it > 0 }
+        if (progress == null && status == null) return null
         if (token == null) {
-            queueProgressMutation(media.id, chapterProgress, now)
+            queueProgressMutation(media.id, progress, status, now)
             return null
         }
 
@@ -396,8 +402,8 @@ internal class AniListDataSource(
             saveListEntry(
                 token = token,
                 mediaId = media.id,
-                status = null,
-                progress = chapterProgress,
+                status = status,
+                progress = progress,
                 score = null,
                 notes = null,
                 private = null,
@@ -409,7 +415,7 @@ internal class AniListDataSource(
             SyncedListEntryData(media = media, entry = entry)
         }.onFailure { error ->
             Log.w(TAG, "AniList progress sync failed for ${media.id}", error)
-            queueProgressMutation(media.id, chapterProgress, now)
+            queueProgressMutation(media.id, progress, status, now)
         }.getOrNull()
     }
 
@@ -671,9 +677,15 @@ internal class AniListDataSource(
         return entry
     }
 
-    private suspend fun queueProgressMutation(mediaId: Int, progress: Int, nowMillis: Long) {
+    private suspend fun queueProgressMutation(
+        mediaId: Int,
+        progress: Int?,
+        status: MediaStatus?,
+        nowMillis: Long,
+    ) {
         val mutation = syncMutationFactory.saveMediaListEntry(
             mediaId = mediaId,
+            status = status,
             progress = progress,
             nowMillis = nowMillis,
         )

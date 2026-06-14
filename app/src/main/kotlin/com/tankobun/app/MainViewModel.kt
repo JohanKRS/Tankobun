@@ -37,6 +37,7 @@ import com.tankobun.app.logic.readerLoadErrorFor
 import com.tankobun.app.logic.readerSourceForChapter
 import com.tankobun.app.logic.ReaderSegmentDirection
 import com.tankobun.app.logic.selectedSourceChapterSelection
+import com.tankobun.app.logic.automaticStatusForReaderPosition
 import com.tankobun.app.logic.initialLibraryModeForStartup
 import com.tankobun.app.logic.shouldShowOnboarding
 import com.tankobun.app.logic.sourceSettingsKey
@@ -246,6 +247,7 @@ class MainViewModel(
             anilistAutoSaveTrackingChanges = container.settingsStore.anilistAutoSaveTrackingChanges(),
             anilistAutoSyncReaderProgress = container.settingsStore.anilistAutoSyncReaderProgress(),
             anilistSyncManualReadProgress = container.settingsStore.anilistSyncManualReadProgress(),
+            autoUpdateStatusFromReading = container.settingsStore.autoUpdateStatusFromReading(),
         ),
     )
     private fun localizedContext() =
@@ -1171,6 +1173,7 @@ class MainViewModel(
                 anilistAutoSaveTrackingChanges = store.anilistAutoSaveTrackingChanges(),
                 anilistAutoSyncReaderProgress = store.anilistAutoSyncReaderProgress(),
                 anilistSyncManualReadProgress = store.anilistSyncManualReadProgress(),
+                autoUpdateStatusFromReading = store.autoUpdateStatusFromReading(),
                 anilistCustomLists = store.anilistCustomLists(),
                 backupSchedule = store.backupSchedule(),
                 backupContent = store.backupContent(),
@@ -1358,20 +1361,27 @@ class MainViewModel(
         media: AnilistMedia,
         chapterProgress: Int,
         triggeredByManualRead: Boolean,
+        status: MediaStatus? = null,
     ) {
-        if (chapterProgress <= 0) return
         val snapshot = _state.value
-        if (!snapshot.anilistAutoSyncReaderProgress) return
-        if (triggeredByManualRead && !snapshot.anilistSyncManualReadProgress) return
-        val trackedProgress = snapshot.trackingProgress.toIntOrNull()
-            ?: snapshot.selectedListEntry?.progress
-            ?: 0
-        if (snapshot.selectedMedia?.id == media.id && chapterProgress <= trackedProgress) return
+        var nextProgress = chapterProgress.takeIf {
+            it > 0 &&
+                snapshot.anilistAutoSyncReaderProgress &&
+                (!triggeredByManualRead || snapshot.anilistSyncManualReadProgress)
+        }
+        var nextStatus = status
+        if (nextProgress == null && nextStatus == null) return
+        val trackedProgress = snapshot.trackedProgressFor(media.id)
+        val trackedStatus = snapshot.trackedListEntryFor(media.id)?.status
+        if (nextProgress != null && nextProgress <= trackedProgress) nextProgress = null
+        if (nextStatus != null && nextStatus == trackedStatus) nextStatus = null
+        if (nextProgress == null && nextStatus == null) return
 
         if (snapshot.libraryMode == LibraryMode.LOCAL) {
             aniListDataSource.saveLocalProgressFromChapter(
                 media = media,
-                chapterProgress = chapterProgress,
+                chapterProgress = nextProgress ?: 0,
+                status = nextStatus,
             )?.let { synced ->
                 _state.update {
                     it.withSyncedListEntry(
@@ -1387,7 +1397,8 @@ class MainViewModel(
 
         aniListDataSource.syncProgressFromChapter(
             media = media,
-            chapterProgress = chapterProgress,
+            chapterProgress = nextProgress ?: 0,
+            status = nextStatus,
             token = container.tokenStore.accessToken(),
             scoreFormat = snapshot.anilistScoreFormat,
         )?.let { synced ->
@@ -1399,6 +1410,16 @@ class MainViewModel(
                 )
             }
         }
+    }
+
+    private fun TankobunUiState.trackedListEntryFor(mediaId: Int): AnilistListEntry? =
+        selectedListEntry?.takeIf { selectedMedia?.id == mediaId || it.mediaId == mediaId }
+            ?: libraryItems.firstOrNull { it.media.id == mediaId }?.entry
+
+    private fun TankobunUiState.trackedProgressFor(mediaId: Int): Int {
+        val savedProgress = trackedListEntryFor(mediaId)?.progress ?: 0
+        if (selectedMedia?.id != mediaId) return savedProgress
+        return maxOf(savedProgress, trackingProgress.toIntOrNull() ?: savedProgress)
     }
 
     fun setSearchQuery(query: String) {
@@ -1946,6 +1967,11 @@ class MainViewModel(
     fun setAnilistSyncManualReadProgress(enabled: Boolean) {
         container.settingsStore.saveAnilistSyncManualReadProgress(enabled)
         _state.update { it.copy(anilistSyncManualReadProgress = enabled) }
+    }
+
+    fun setAutoUpdateStatusFromReading(enabled: Boolean) {
+        container.settingsStore.saveAutoUpdateStatusFromReading(enabled)
+        _state.update { it.copy(autoUpdateStatusFromReading = enabled) }
     }
 
     fun setShowNsfwContent(enabled: Boolean) {
@@ -3059,6 +3085,22 @@ class MainViewModel(
                 source = snapshot.readerSourceForChapter(chapter),
                 preferredDirection = nextIndex.compareTo(snapshot.currentPageIndex),
             )
+            if (nextIndex >= pages.lastIndex) {
+                saveReaderProgressFor(
+                    media = media,
+                    chapter = chapter,
+                    pages = pages,
+                    pageIndex = nextIndex,
+                    pageScrollOffset = nextOffset,
+                )
+            } else {
+                maybeSyncAutomaticReaderStatusForPosition(
+                    media = media,
+                    chapter = chapter,
+                    pages = pages,
+                    pageIndex = nextIndex,
+                )
+            }
         }
     }
 
@@ -3114,6 +3156,22 @@ class MainViewModel(
                 source = snapshot.readerSourceForChapter(chapter),
                 preferredDirection = nextIndex.compareTo(snapshot.currentPageIndex),
             )
+            if (nextIndex >= pages.lastIndex) {
+                saveReaderProgressFor(
+                    media = media,
+                    chapter = chapter,
+                    pages = pages,
+                    pageIndex = nextIndex,
+                    pageScrollOffset = nextOffset,
+                )
+            } else {
+                maybeSyncAutomaticReaderStatusForPosition(
+                    media = media,
+                    chapter = chapter,
+                    pages = pages,
+                    pageIndex = nextIndex,
+                )
+            }
         }
     }
 
@@ -3277,9 +3335,7 @@ class MainViewModel(
             )
             val syncProgress = result.syncProgress
             if (syncProgress != null) {
-                val trackedProgress = _state.value.trackingProgress.toIntOrNull()
-                    ?: _state.value.selectedListEntry?.progress
-                    ?: 0
+                val trackedProgress = _state.value.trackedProgressFor(media.id)
                 if (syncProgress > trackedProgress) {
                     syncAniListProgressFromChapter(
                         media = media,
@@ -3639,6 +3695,32 @@ class MainViewModel(
         )
     }
 
+    private fun maybeSyncAutomaticReaderStatusForPosition(
+        media: AnilistMedia,
+        chapter: SourceChapter,
+        pages: List<ReaderPage>,
+        pageIndex: Int,
+    ) {
+        val snapshot = _state.value
+        val status = automaticStatusForReaderPosition(
+            pageIndex = pageIndex,
+            pages = pages,
+            mediaStatus = media.status,
+            chapter = chapter,
+            sourceChapters = snapshot.sourceChapters,
+            currentStatus = snapshot.trackedListEntryFor(media.id)?.status,
+            enabled = snapshot.autoUpdateStatusFromReading,
+        ) ?: return
+        viewModelScope.launch {
+            syncAniListProgressFromChapter(
+                media = media,
+                chapterProgress = 0,
+                triggeredByManualRead = false,
+                status = status,
+            )
+        }
+    }
+
     private fun recordReaderPosition(chapterUrl: String, pageIndex: Int, pageScrollOffset: Int) {
         latestReaderPosition = ReaderPagePosition(
             chapterUrl = chapterUrl,
@@ -3681,11 +3763,24 @@ class MainViewModel(
             if (_state.value.keepNextTenDownloads) {
                 ensureNextTenDownloads()
             }
-            if (progress.completed && chapter.chapterNumber > 0) {
+            val snapshot = _state.value
+            val completedChapterNumber = chapter.chapterNumber.toInt()
+            val syncProgress = completedChapterNumber.takeIf { progress.completed && it > 0 }
+            val status = automaticStatusForReaderPosition(
+                pageIndex = progress.pageIndex,
+                totalPages = progress.totalPages,
+                mediaStatus = media.status,
+                chapter = chapter,
+                sourceChapters = snapshot.sourceChapters,
+                currentStatus = snapshot.trackedListEntryFor(media.id)?.status,
+                enabled = snapshot.autoUpdateStatusFromReading,
+            )
+            if (syncProgress != null || status != null) {
                 syncAniListProgressFromChapter(
                     media = media,
-                    chapterProgress = chapter.chapterNumber.toInt(),
+                    chapterProgress = syncProgress ?: 0,
                     triggeredByManualRead = false,
+                    status = status,
                 )
             }
         }

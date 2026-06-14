@@ -195,6 +195,13 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean(KEY_ANILIST_SYNC_MANUAL_READ_PROGRESS, enabled).apply()
     }
 
+    fun autoUpdateStatusFromReading(): Boolean =
+        preferences.getBoolean(KEY_AUTO_UPDATE_STATUS_FROM_READING, true)
+
+    fun saveAutoUpdateStatusFromReading(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_AUTO_UPDATE_STATUS_FROM_READING, enabled).apply()
+    }
+
     fun showNsfwContent(): Boolean =
         preferences.getBoolean(KEY_SHOW_NSFW_CONTENT, false)
 
@@ -471,6 +478,7 @@ class SettingsStore(context: Context) {
         const val KEY_ANILIST_AUTO_SAVE_TRACKING_CHANGES = "anilist.auto.save.tracking.changes"
         const val KEY_ANILIST_AUTO_SYNC_READER_PROGRESS = "anilist.auto.sync.reader.progress"
         const val KEY_ANILIST_SYNC_MANUAL_READ_PROGRESS = "anilist.sync.manual.read.progress"
+        const val KEY_AUTO_UPDATE_STATUS_FROM_READING = "library.auto.update.status.from.reading"
         const val KEY_SHOW_NSFW_CONTENT = "profile.show.nsfw.content"
         const val KEY_BACKUP_FOLDER_URI = "backup.folder.uri"
         const val KEY_BACKUP_SCHEDULE = "backup.schedule"

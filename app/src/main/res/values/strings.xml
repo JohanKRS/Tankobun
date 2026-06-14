@@ -135,6 +135,8 @@
     <string name="settings_auto_save_tracking_edits_desc">Status, score, progress, notes, privacy, and custom lists save after a short pause.</string>
     <string name="settings_update_progress_from_reading">Update progress from reading</string>
     <string name="settings_update_progress_from_reading_desc">Completed chapters move library progress to that chapter number.</string>
+    <string name="settings_auto_update_status_from_reading">Update status from reading</string>
+    <string name="settings_auto_update_status_from_reading_desc">After you pass halfway through a chapter, move the manga to Reading. Finishing the final chapter moves it to Completed.</string>
     <string name="settings_include_manual_read_marks">Include manual read marks</string>
     <string name="settings_include_manual_read_marks_desc">Mark-as-read actions can also move library progress forward.</string>
     <string name="settings_app_language">App language</string>

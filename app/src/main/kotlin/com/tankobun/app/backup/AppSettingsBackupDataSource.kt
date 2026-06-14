@@ -110,6 +110,7 @@ internal class AppSettingsBackupDataSource(
             .put("anilistAutoSaveTrackingChanges", snapshot.anilistAutoSaveTrackingChanges)
             .put("anilistAutoSyncReaderProgress", snapshot.anilistAutoSyncReaderProgress)
             .put("anilistSyncManualReadProgress", snapshot.anilistSyncManualReadProgress)
+            .put("autoUpdateStatusFromReading", snapshot.autoUpdateStatusFromReading)
             .put("anilistCustomLists", snapshot.anilistCustomLists.toJsonArray())
             .put("backupSchedule", snapshot.backupSchedule.name)
             .put("backupContent", snapshot.backupContent.name)
@@ -189,6 +190,7 @@ internal class AppSettingsBackupDataSource(
         settings.optBooleanOrNull("anilistAutoSaveTrackingChanges")?.let(store::saveAnilistAutoSaveTrackingChanges)
         settings.optBooleanOrNull("anilistAutoSyncReaderProgress")?.let(store::saveAnilistAutoSyncReaderProgress)
         settings.optBooleanOrNull("anilistSyncManualReadProgress")?.let(store::saveAnilistSyncManualReadProgress)
+        settings.optBooleanOrNull("autoUpdateStatusFromReading")?.let(store::saveAutoUpdateStatusFromReading)
         settings.optJSONArray("anilistCustomLists")?.stringValues()?.let(store::saveAnilistCustomLists)
         settings.enumOrNull<BackupSchedule>("backupSchedule")?.let(store::saveBackupSchedule)
         settings.enumOrNull<BackupContent>("backupContent")?.let(store::saveBackupContent)
@@ -233,6 +235,7 @@ internal class AppSettingsBackupDataSource(
             anilistAutoSaveTrackingChanges = store.anilistAutoSaveTrackingChanges(),
             anilistAutoSyncReaderProgress = store.anilistAutoSyncReaderProgress(),
             anilistSyncManualReadProgress = store.anilistSyncManualReadProgress(),
+            autoUpdateStatusFromReading = store.autoUpdateStatusFromReading(),
             anilistCustomLists = store.anilistCustomLists(),
             backupFolderUri = store.backupFolderUri(),
             backupSchedule = store.backupSchedule(),

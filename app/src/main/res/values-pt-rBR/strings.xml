@@ -131,6 +131,8 @@
     <string name="settings_auto_save_tracking_edits_desc">Status, nota, progresso, notas, privacidade e listas personalizadas são salvos após uma breve pausa.</string>
     <string name="settings_update_progress_from_reading">Atualizar progresso pela leitura</string>
     <string name="settings_update_progress_from_reading_desc">Capítulos concluídos avançam o progresso da biblioteca para aquele número de capítulo.</string>
+    <string name="settings_auto_update_status_from_reading">Atualizar status pela leitura</string>
+    <string name="settings_auto_update_status_from_reading_desc">Depois de passar da metade de um capítulo, move o mangá para Lendo. Ao terminar o último capítulo, move para Concluído.</string>
     <string name="settings_include_manual_read_marks">Incluir marcações manuais de lido</string>
     <string name="settings_include_manual_read_marks_desc">Ações de marcar como lido também podem avançar o progresso da biblioteca.</string>
     <string name="settings_app_language">Idioma do app</string>

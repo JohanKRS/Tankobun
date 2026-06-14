@@ -751,6 +751,12 @@ internal fun ProfileSettingsScreen(
             onCheckedChange = viewModel::setAnilistAutoSyncReaderProgress,
         )
         SettingsToggleRow(
+            title = tankobunString(R.string.settings_auto_update_status_from_reading),
+            subtitle = tankobunString(R.string.settings_auto_update_status_from_reading_desc),
+            checked = state.autoUpdateStatusFromReading,
+            onCheckedChange = viewModel::setAutoUpdateStatusFromReading,
+        )
+        SettingsToggleRow(
             title = tankobunString(R.string.settings_include_manual_read_marks),
             subtitle = tankobunString(R.string.settings_include_manual_read_marks_desc),
             checked = state.anilistSyncManualReadProgress,

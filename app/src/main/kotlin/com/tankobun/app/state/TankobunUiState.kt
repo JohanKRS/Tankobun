@@ -141,6 +141,7 @@ data class TankobunUiState(
     val anilistAutoSaveTrackingChanges: Boolean = false,
     val anilistAutoSyncReaderProgress: Boolean = true,
     val anilistSyncManualReadProgress: Boolean = true,
+    val autoUpdateStatusFromReading: Boolean = true,
     val selectingDownloadChapters: Boolean = false,
     val selectedDownloadChapterUrls: Set<String> = emptySet(),
     val selectedSourceId: Long? = null,

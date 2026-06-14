@@ -708,6 +708,7 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
             add(state.anilistScoreFormat.settingsLabel())
             if (state.anilistAutoSaveTrackingChanges) add(tankobunString(R.string.settings_auto_save_tracking_edits))
             if (state.anilistAutoSyncReaderProgress) add(tankobunString(R.string.settings_update_progress_from_reading))
+            if (state.autoUpdateStatusFromReading) add(tankobunString(R.string.settings_auto_update_status_from_reading))
         }.joinToString(" / ")
         SettingsRoute.CUSTOM_LISTS -> tankobunQuantityString(
             R.plurals.list_count,
