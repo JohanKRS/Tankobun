@@ -2,32 +2,26 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 20,
-    "versionName": "2.0.0",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v2.0.0/tankobun-2.0.0.apk",
-    "apkSha256": "4C6C799FAD3F59714CF22C9766A3D898D8E9DD07C2A5D6786749435C89319DCF",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v2.0.0",
-    "publishedAt": "2026-06-12T20:30:52Z",
-    "sizeBytes": 11655272,
+    "versionCode": 22,
+    "versionName": "2.0.2",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v2.0.2/tankobun-2.0.2.apk",
+    "apkSha256": "EF100E81F837DEF121F5CDEE81FEA917071D2D768B1FF411FEF7F9C93CBBA8A8",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v2.0.2",
+    "publishedAt": "2026-06-14T14:30:15Z",
+    "sizeBytes": 11562180,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Added local library mode with AniList-compatible statuses, scoring, notes, private flag, progress, and custom lists.",
-        "Reworked onboarding with library mode, theme selection, and a short app tour.",
-        "Added native Tankobun JSON library backups for local mode while keeping XML backups for AniList mode.",
-        "Added GitHub-based app update checks and changelog display in About."
+        "Added optional reading-based status updates: manga move to Reading after the halfway point, and only finished manga move to Completed after the final chapter.",
+        "Improved automatic tracker progress checks and refined the adaptive launcher icon sizing."
       ],
       "pt-BR": [
-        "Adicionado modo de biblioteca local com status, notas, observações, marcação privada, progresso e listas personalizadas compatíveis com AniList.",
-        "Onboarding reformulado com modo da biblioteca, escolha de tema e um tour curto do app.",
-        "Adicionados backups nativos JSON do Tankobun para o modo local, mantendo backups XML no modo AniList.",
-        "Adicionadas verificações de atualização pelo GitHub e exibição de changelog em Sobre."
+        "Adicionadas atualizações opcionais de status pela leitura: mangás vão para Lendo depois da metade do capítulo, e só mangás finalizados vão para Concluído ao terminar o último capítulo.",
+        "Melhoradas as verificações automáticas de progresso do tracker e refinado o tamanho do ícone adaptável do app."
       ],
       "es": [
-        "Se añadió modo de biblioteca local con estados, puntuación, notas, marca privada, progreso y listas personalizadas compatibles con AniList.",
-        "Onboarding rediseñado con modo de biblioteca, selección de tema y un breve tour de la app.",
-        "Se añadieron backups JSON nativos de Tankobun para el modo local y se mantienen backups XML para el modo AniList.",
-        "Se añadieron búsquedas de actualizaciones desde GitHub y changelog en Acerca de."
+        "Se añadieron actualizaciones opcionales de estado desde la lectura: el manga pasa a Leyendo después de la mitad del capítulo, y solo el manga finalizado pasa a Completado al terminar el último capítulo.",
+        "Se mejoraron las comprobaciones automáticas del progreso del tracker y se ajustó el tamaño del icono adaptable de la app."
       ]
     }
   }
