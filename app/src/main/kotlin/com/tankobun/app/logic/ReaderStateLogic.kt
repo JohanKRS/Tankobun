@@ -97,7 +97,7 @@ internal fun TankobunUiState.withRecentProgressOpened(
         selectedRecommendationsPage = 0,
         selectedRecommendationsHasMore = false,
         recommendationsLoading = false,
-        trackingStatus = existingEntry?.status ?: MediaStatus.CURRENT,
+        trackingStatus = existingEntry.trackingStatusForForm(MediaStatus.CURRENT),
         trackingProgress = (existingEntry?.progress ?: 0).toString(),
         trackingScore = existingEntry?.score.formatTrackingScore(anilistScoreFormat),
         trackingNotes = existingEntry?.notes.orEmpty(),

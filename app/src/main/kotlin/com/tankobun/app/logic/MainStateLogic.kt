@@ -46,6 +46,13 @@ internal fun TankobunUiState.mediaTitle(mediaId: Int, fallback: String = "Manga 
         ?: selectedMedia?.takeIf { it.id == mediaId }?.title?.userPreferred
         ?: fallback
 
+internal fun AnilistListEntry?.trackingStatusForForm(defaultStatus: MediaStatus): MediaStatus =
+    when {
+        this == null -> defaultStatus
+        hiddenFromStatusLists -> MediaStatus.UNKNOWN
+        else -> status
+    }
+
 internal fun TankobunUiState.downloadSourceName(sourceId: Long, fallback: String = "Source $sourceId"): String =
     installedSources.firstOrNull { it.id == sourceId }?.name
         ?: allInstalledSources.firstOrNull { it.id == sourceId }?.name
@@ -70,7 +77,7 @@ internal fun TankobunUiState.withSelectedMedia(
         selectedRecommendationsPage = 0,
         selectedRecommendationsHasMore = false,
         recommendationsLoading = false,
-        trackingStatus = existingEntry?.status ?: MediaStatus.PLANNING,
+        trackingStatus = existingEntry.trackingStatusForForm(MediaStatus.PLANNING),
         trackingProgress = (existingEntry?.progress ?: 0).toString(),
         trackingScore = existingEntry?.score.formatTrackingScore(anilistScoreFormat),
         trackingNotes = existingEntry?.notes.orEmpty(),
@@ -160,7 +167,7 @@ internal fun TankobunUiState.withSelectedAniListDetails(
         recommendationsLoading = recommendationsLoading,
         library = nextItems.map { item -> item.media },
         libraryItems = nextItems,
-        trackingStatus = if (preserveTrackingForm) trackingStatus else entry?.status ?: trackingStatus,
+        trackingStatus = if (preserveTrackingForm) trackingStatus else entry.trackingStatusForForm(trackingStatus),
         trackingProgress = if (preserveTrackingForm) {
             trackingProgress
         } else {
@@ -198,7 +205,7 @@ internal fun TankobunUiState.withSyncedListEntry(
         library = nextItems.map { it.media },
         libraryItems = nextItems,
         selectedListEntry = if (selected) entry else selectedListEntry,
-        trackingStatus = if (selected && updateTrackingForm) entry.status else trackingStatus,
+        trackingStatus = if (selected && updateTrackingForm) entry.trackingStatusForForm(trackingStatus) else trackingStatus,
         trackingProgress = if (selected) {
             if (updateTrackingForm) {
                 entry.progress.toString()

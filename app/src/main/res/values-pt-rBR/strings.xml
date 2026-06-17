@@ -143,6 +143,7 @@
     <string name="settings_language_english">Inglês</string>
     <string name="settings_language_portuguese_brazil">Português (Brasil)</string>
     <string name="settings_language_spanish">Espanhol</string>
+    <string name="settings_language_chinese_simplified">Chinês simplificado</string>
     <string name="settings_language_applied">O idioma da interface muda imediatamente. Conteúdo das fontes e títulos do AniList ainda seguem as próprias configurações.</string>
     <string name="settings_redirect_uri">URI de redirecionamento: %1$s</string>
     <string name="settings_library_cache">Cache da biblioteca: %1$s</string>
@@ -400,6 +401,7 @@
     <string name="detail_read_more">Ler mais</string>
     <string name="detail_show_less">Mostrar menos</string>
     <string name="detail_track_manga">Acompanhar mangá</string>
+    <string name="detail_choose_status">Escolha um status</string>
     <string name="detail_save_anilist">Salvar AniList</string>
     <string name="detail_saving">Salvando...</string>
     <string name="detail_connect_anilist_tracking">Conecte o AniList para acompanhar, avaliar e organizar este mangá.</string>
@@ -551,6 +553,11 @@
     <string name="about_changelog_v2_reader_status">Adicionadas atualizações opcionais de status pela leitura: mangás vão para Lendo depois da metade do capítulo, e só mangás finalizados vão para Concluído ao terminar o último capítulo.</string>
     <string name="about_changelog_v2_tracker_fix">Melhoradas as verificações automáticas de progresso do tracker e refinado o tamanho do ícone adaptável do app.</string>
     <string name="about_changelog_v2_source_binding_fix">Corrigida a persistência da seleção de fonte para que mudanças nas configurações de idioma/fonte não troquem um vínculo existente do mangá para outra fonte instalada.</string>
+    <string name="about_changelog_v3_book_club_release">A Release do Clube do Livro: compartilhe mangás selecionados da biblioteca como arquivos de recomendações .tankobun-recs.</string>
+    <string name="about_changelog_v3_recommendation_import">Visualize arquivos de recomendações antes de importar, escolha títulos individuais e adicione tudo a uma lista personalizada com nome.</string>
+    <string name="about_changelog_v3_batch_actions">A seleção em lote da biblioteca permite compartilhar recomendações, mudar status, editar listas personalizadas ou remover mangás entre abas.</string>
+    <string name="about_changelog_v3_chinese">Adicionado suporte ao idioma chinês simplificado no app.</string>
+    <string name="about_changelog_v3_custom_only_status">Melhorado o tratamento de recomendações só em listas personalizadas para manter listas fixas sem seleção até você escolher uma.</string>
     <string name="about_unofficial">Tankobun é um leitor de mangás não oficial e não é afiliado ao AniList.</string>
     <string name="about_anilist_thanks">Agradecemos ao AniList por disponibilizar sua API para usuários e apps da comunidade.</string>
     <string name="about_anilist_data">O AniList é uma base de dados, acompanhamento e site social de animes e mangás. Ele não hospeda, envia, compartilha, vende nem fornece mangás, capítulos ou scanlations. O Tankobun acessa metadados do AniList pela API do AniList; a sincronização da conta usa autorização do usuário.</string>
@@ -695,6 +702,7 @@
     <string name="msg_connect_anilist_track_manga">Conecte o AniList para acompanhar este mangá</string>
     <string name="msg_tracking_auto_save_failed">Falha ao salvar acompanhamento automaticamente. Toque em salvar para tentar de novo</string>
     <string name="msg_tracking_save_failed">Falha ao salvar acompanhamento</string>
+    <string name="msg_choose_tracking_status">Escolha um status antes de salvar o acompanhamento.</string>
     <string name="msg_recommendations_failed">Falha nas recomendações</string>
     <string name="msg_queued_next_chapters">%1$d próximos capítulos colocados na fila</string>
     <string name="msg_source_not_installed_title">Fonte não instalada</string>

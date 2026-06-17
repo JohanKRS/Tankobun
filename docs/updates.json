@@ -2,26 +2,42 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 23,
-    "versionName": "2.0.3",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v2.0.3/tankobun-2.0.3.apk",
-    "apkSha256": "314359E924D955148691AF65671E31DCFB4416F5B1C7BA9DEEFABEF8FCE1203B",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v2.0.3",
-    "publishedAt": "2026-06-14T17:16:58Z",
-    "sizeBytes": 11567676,
+    "versionCode": 30,
+    "versionName": "3.0.0",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.0.0/tankobun-3.0.0.apk",
+    "apkSha256": "4DACCF78DCB5E81103AE40C859C9FA1FB055AEBB226680F343F00027ACB52ED8",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.0.0",
+    "publishedAt": "2026-06-17T02:03:31Z",
+    "sizeBytes": 11742880,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Fixed source selection persistence so language/source settings changes no longer switch an existing manga binding to another installed source.",
-        "Resolved source identity collisions by preserving package information when restoring cached source matches and chapter lists."
+        "The Book Club Release: share selected library manga as .tankobun-recs recommendation files.",
+        "Preview recommendation files before importing, pick individual titles, and add them to a named custom list.",
+        "Batch library selection can share recommendations, change status, edit custom lists, or remove manga across tabs.",
+        "Added Simplified Chinese app language support.",
+        "Improved custom-only recommendation handling so fixed status lists stay unselected until you choose one."
       ],
       "pt-BR": [
-        "Corrigida a persistência da seleção de fonte para que mudanças nas configurações de idioma/fonte não troquem um vínculo existente do mangá para outra fonte instalada.",
-        "Resolvidas colisões de identidade de fontes preservando as informações de pacote ao restaurar buscas e listas de capítulos em cache."
+        "A Release do Clube do Livro: compartilhe mangás selecionados da biblioteca como arquivos de recomendações .tankobun-recs.",
+        "Visualize arquivos de recomendações antes de importar, escolha títulos individuais e adicione tudo a uma lista personalizada com nome.",
+        "A seleção em lote da biblioteca permite compartilhar recomendações, mudar status, editar listas personalizadas ou remover mangás entre abas.",
+        "Adicionado suporte ao idioma chinês simplificado no app.",
+        "Melhorado o tratamento de recomendações só em listas personalizadas para manter listas fixas sem seleção até você escolher uma."
       ],
       "es": [
-        "Se corrigió la persistencia de la selección de fuente para que los cambios de idioma/fuente no cambien una vinculación existente del manga a otra fuente instalada.",
-        "Se resolvieron colisiones de identidad de fuentes preservando la información del paquete al restaurar búsquedas y listas de capítulos en caché."
+        "La versión del club de lectura: comparte manga seleccionados de la biblioteca como archivos de recomendaciones .tankobun-recs.",
+        "Previsualiza archivos de recomendaciones antes de importar, elige títulos individuales y añádelos a una lista personalizada con nombre.",
+        "La selección por lotes de la biblioteca permite compartir recomendaciones, cambiar estados, editar listas personalizadas o eliminar manga entre pestañas.",
+        "Se añadió soporte de idioma chino simplificado en la app.",
+        "Se mejoró el manejo de recomendaciones solo en listas personalizadas para que las listas fijas queden sin selección hasta que elijas una."
+      ],
+      "zh-CN": [
+        "读书会版本：将书架中选择的漫画分享为 .tankobun-recs 推荐文件。",
+        "导入前可预览推荐文件，选择单个标题，并加入一个可命名的自定义列表。",
+        "书架批量选择现在可跨标签分享推荐、更改状态、编辑自定义列表或移除漫画。",
+        "新增简体中文应用语言支持。",
+        "改进仅在自定义列表中的推荐项处理：在你选择固定状态前，固定状态列表会保持未选中。"
       ]
     }
   }

@@ -2780,7 +2780,16 @@ class MainViewModel(
 
     private fun scheduleTrackingCustomListSave() {
         if (_state.value.anilistAutoSaveTrackingChanges) {
-            scheduleTrackingAutoSave()
+            val snapshot = _state.value
+            if (snapshot.selectedListEntry?.hiddenFromStatusLists == true && snapshot.trackingStatus == MediaStatus.UNKNOWN) {
+                trackingAutoSaveJob?.cancel()
+                trackingAutoSaveJob = viewModelScope.launch {
+                    delay(TRACKING_AUTO_SAVE_DELAY_MILLIS)
+                    saveTrackingCustomListsOnly()
+                }
+            } else {
+                scheduleTrackingAutoSave()
+            }
         }
     }
 
@@ -2843,6 +2852,7 @@ class MainViewModel(
         val snapshot = _state.value
         val canAutoSave = snapshot.libraryMode == LibraryMode.LOCAL || snapshot.loggedIn
         if (!snapshot.anilistAutoSaveTrackingChanges || !canAutoSave || snapshot.selectedMedia == null) return
+        if (snapshot.selectedListEntry?.hiddenFromStatusLists == true && snapshot.trackingStatus == MediaStatus.UNKNOWN) return
         trackingAutoSaveJob?.cancel()
         trackingAutoSaveJob = viewModelScope.launch {
             delay(TRACKING_AUTO_SAVE_DELAY_MILLIS)
@@ -2861,6 +2871,12 @@ class MainViewModel(
         if (snapshot.libraryMode == LibraryMode.ANILIST && token == null) {
             if (!autoSave) {
                 _state.update { it.copy(message = string(R.string.msg_connect_anilist_track_manga)) }
+            }
+            return
+        }
+        if (snapshot.selectedListEntry?.hiddenFromStatusLists == true && snapshot.trackingStatus == MediaStatus.UNKNOWN) {
+            if (!autoSave) {
+                _state.update { it.copy(message = string(R.string.msg_choose_tracking_status)) }
             }
             return
         }

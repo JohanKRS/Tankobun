@@ -143,6 +143,7 @@
     <string name="settings_language_english">Inglés</string>
     <string name="settings_language_portuguese_brazil">Portugués (Brasil)</string>
     <string name="settings_language_spanish">Español</string>
+    <string name="settings_language_chinese_simplified">Chino simplificado</string>
     <string name="settings_language_applied">El idioma de la interfaz se actualiza de inmediato. El contenido de las fuentes y los títulos de AniList siguen sus propios ajustes.</string>
     <string name="settings_redirect_uri">URI de redirección: %1$s</string>
     <string name="settings_library_cache">Caché de biblioteca: %1$s</string>
@@ -400,6 +401,7 @@
     <string name="detail_read_more">Leer más</string>
     <string name="detail_show_less">Mostrar menos</string>
     <string name="detail_track_manga">Seguir manga</string>
+    <string name="detail_choose_status">Elige un estado</string>
     <string name="detail_save_anilist">Guardar AniList</string>
     <string name="detail_saving">Guardando...</string>
     <string name="detail_connect_anilist_tracking">Conecta AniList para seguir, puntuar y organizar este manga.</string>
@@ -551,6 +553,11 @@
     <string name="about_changelog_v2_reader_status">Se añadieron actualizaciones opcionales de estado desde la lectura: el manga pasa a Leyendo después de la mitad del capítulo, y solo el manga finalizado pasa a Completado al terminar el último capítulo.</string>
     <string name="about_changelog_v2_tracker_fix">Se mejoraron las comprobaciones automáticas del progreso del tracker y se ajustó el tamaño del icono adaptable de la app.</string>
     <string name="about_changelog_v2_source_binding_fix">Se corrigió la persistencia de la selección de fuente para que los cambios de idioma/fuente no cambien una vinculación existente del manga a otra fuente instalada.</string>
+    <string name="about_changelog_v3_book_club_release">La versión del club de lectura: comparte manga seleccionados de la biblioteca como archivos de recomendaciones .tankobun-recs.</string>
+    <string name="about_changelog_v3_recommendation_import">Previsualiza archivos de recomendaciones antes de importar, elige títulos individuales y añádelos a una lista personalizada con nombre.</string>
+    <string name="about_changelog_v3_batch_actions">La selección por lotes de la biblioteca permite compartir recomendaciones, cambiar estados, editar listas personalizadas o eliminar manga entre pestañas.</string>
+    <string name="about_changelog_v3_chinese">Se añadió soporte de idioma chino simplificado en la app.</string>
+    <string name="about_changelog_v3_custom_only_status">Se mejoró el manejo de recomendaciones solo en listas personalizadas para que las listas fijas queden sin selección hasta que elijas una.</string>
     <string name="about_unofficial">Tankobun es un lector de manga no oficial y no está afiliado con AniList.</string>
     <string name="about_anilist_thanks">Gracias a AniList por poner su API a disposición de usuarios y apps de la comunidad.</string>
     <string name="about_anilist_data">AniList es una base de datos y un sitio social de seguimiento de anime y manga. No aloja, sube, comparte, vende ni proporciona manga, capítulos o scanlations. Tankobun accede a metadatos de AniList mediante la API de AniList; la sincronización de cuenta usa autorización del usuario.</string>
@@ -695,6 +702,7 @@
     <string name="msg_connect_anilist_track_manga">Conecta AniList para seguir este manga</string>
     <string name="msg_tracking_auto_save_failed">Falló el guardado automático de seguimiento. Toca guardar para reintentar</string>
     <string name="msg_tracking_save_failed">Falló el guardado del seguimiento</string>
+    <string name="msg_choose_tracking_status">Elige un estado antes de guardar el seguimiento.</string>
     <string name="msg_recommendations_failed">Fallaron las recomendaciones</string>
     <string name="msg_queued_next_chapters">%1$d próximos capítulos puestos en cola para descargar</string>
     <string name="msg_source_not_installed_title">Fuente no instalada</string>

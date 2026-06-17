@@ -1152,9 +1152,12 @@ internal fun AnilistMedia.publishingYearLabel(compact: Boolean): String {
 
 @Composable
 internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
+    val fixedStatusSelected = state.selectedListEntry?.hiddenFromStatusLists != true ||
+        state.trackingStatus != MediaStatus.UNKNOWN
+    val selectedFixedStatus = if (fixedStatusSelected) state.trackingStatus else null
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         AniListStatusSelector(
-            selected = state.trackingStatus,
+            selected = selectedFixedStatus,
             onSelected = viewModel::setTrackingStatus,
         )
 
@@ -1198,8 +1201,10 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
             Spacer(Modifier.weight(1f))
             val canSaveTracking = (state.libraryMode == LibraryMode.LOCAL || state.loggedIn) &&
                 !state.trackingSaveInProgress &&
+                fixedStatusSelected &&
                 (state.selectedListEntry == null || state.trackingDirty || state.trackingSaveFailed)
             val actionLabel = when {
+                !fixedStatusSelected -> tankobunString(R.string.detail_choose_status)
                 state.trackingSaveInProgress -> tankobunString(R.string.detail_saving)
                 state.trackingSaveFailed -> tankobunString(R.string.common_retry_save)
                 state.selectedListEntry == null -> tankobunString(R.string.detail_track_manga)
@@ -1238,11 +1243,22 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
 }
 
 @Composable
-internal fun AniListStatusSelector(selected: MediaStatus, onSelected: (MediaStatus) -> Unit) {
+internal fun AniListStatusSelector(selected: MediaStatus?, onSelected: (MediaStatus) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
-            Text(selected.displayName(), modifier = Modifier.weight(1f))
+            if (selected != null) {
+                Icon(
+                    trackingStatusIcon(selected),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                selected?.displayName() ?: tankobunString(R.string.detail_choose_status),
+                modifier = Modifier.weight(1f),
+            )
             Icon(Icons.Default.ExpandMore, contentDescription = null)
         }
         AnimatedVisibility(visible = expanded) {
@@ -1273,6 +1289,16 @@ internal fun AniListStatusSelector(selected: MediaStatus, onSelected: (MediaStat
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
+                            Icon(
+                                trackingStatusIcon(status),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = if (status == selected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
                             Text(
                                 status.displayName(),
                                 modifier = Modifier.weight(1f),
@@ -1667,6 +1693,16 @@ internal fun CoverZoomOverlay(media: AnilistMedia, onDismiss: () -> Unit) {
             }
         }
     }
+}
+
+internal fun trackingStatusIcon(status: MediaStatus): ImageVector = when (status) {
+    MediaStatus.CURRENT -> Icons.Default.PlayArrow
+    MediaStatus.PLANNING -> Icons.Default.StarBorder
+    MediaStatus.COMPLETED -> Icons.Default.Check
+    MediaStatus.PAUSED -> Icons.Default.Pause
+    MediaStatus.DROPPED -> Icons.Default.Close
+    MediaStatus.REPEATING -> Icons.Default.Replay
+    MediaStatus.UNKNOWN -> Icons.Default.Check
 }
 
 internal fun trackingStatuses(): List<MediaStatus> = listOf(

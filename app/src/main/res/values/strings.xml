@@ -147,6 +147,7 @@
     <string name="settings_language_english">English</string>
     <string name="settings_language_portuguese_brazil">Portuguese (Brazil)</string>
     <string name="settings_language_spanish">Spanish</string>
+    <string name="settings_language_chinese_simplified">Chinese (Simplified)</string>
     <string name="settings_language_applied">Interface language updates immediately. Source content and AniList titles still follow their own settings.</string>
     <string name="settings_redirect_uri">Redirect URI: %1$s</string>
     <string name="settings_library_cache">Library cache: %1$s</string>
@@ -404,6 +405,7 @@
     <string name="detail_read_more">Read more</string>
     <string name="detail_show_less">Show less</string>
     <string name="detail_track_manga">Track manga</string>
+    <string name="detail_choose_status">Choose status</string>
     <string name="detail_save_anilist">Save AniList</string>
     <string name="detail_save_tracking">Save tracking</string>
     <string name="detail_saving">Saving...</string>
@@ -559,6 +561,11 @@
     <string name="about_changelog_v2_reader_status">Added optional reading-based status updates: manga move to Reading after the halfway point, and only finished manga move to Completed after the final chapter.</string>
     <string name="about_changelog_v2_tracker_fix">Improved automatic tracker progress checks and refined the adaptive launcher icon sizing.</string>
     <string name="about_changelog_v2_source_binding_fix">Fixed source selection persistence so language/source settings changes no longer switch an existing manga binding to another installed source.</string>
+    <string name="about_changelog_v3_book_club_release">The Book Club Release: share selected library manga as .tankobun-recs recommendation files.</string>
+    <string name="about_changelog_v3_recommendation_import">Preview recommendation files before importing, pick individual titles, and add them to a named custom list.</string>
+    <string name="about_changelog_v3_batch_actions">Batch library selection can share recommendations, change status, edit custom lists, or remove manga across tabs.</string>
+    <string name="about_changelog_v3_chinese">Added Simplified Chinese app language support.</string>
+    <string name="about_changelog_v3_custom_only_status">Improved custom-only recommendation handling so fixed status lists stay unselected until you choose one.</string>
     <string name="about_unofficial">Tankobun is an unofficial manga reader and is not affiliated with AniList.</string>
     <string name="about_anilist_thanks">Thanks to AniList for making its API available to users and community apps.</string>
     <string name="about_anilist_data">AniList is an anime and manga database, tracking, and social site. It does not host, upload, share, sell, or provide manga, chapters, or scanlations. Tankobun accesses AniList metadata through the AniList API; account sync uses user authorization.</string>
@@ -730,6 +737,7 @@
     <string name="msg_connect_anilist_track_manga">Connect AniList to track this manga</string>
     <string name="msg_tracking_auto_save_failed">Tracking auto-save failed. Tap save to retry</string>
     <string name="msg_tracking_save_failed">Tracking save failed</string>
+    <string name="msg_choose_tracking_status">Choose a status before saving tracking.</string>
     <string name="msg_recommendations_failed">Recommendations failed</string>
     <string name="msg_queued_next_chapters">Queued %1$d next chapters for download</string>
     <string name="msg_source_not_installed_title">Source not installed</string>

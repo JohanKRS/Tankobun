@@ -83,6 +83,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
@@ -943,7 +944,7 @@ internal fun LibraryBatchActionBar(
                 onClick = onShare,
             )
             LibraryBatchIconAction(
-                icon = Icons.Default.Check,
+                icon = Icons.AutoMirrored.Filled.Label,
                 contentDescription = tankobunString(R.string.library_batch_status),
                 onClick = onChangeStatus,
             )
@@ -1064,8 +1065,13 @@ internal fun LibraryBatchStatusDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
                 ) {
+                    Icon(
+                        trackingStatusIcon(status),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
                     Text(status.displayName(), modifier = Modifier.weight(1f))
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
             }
         }

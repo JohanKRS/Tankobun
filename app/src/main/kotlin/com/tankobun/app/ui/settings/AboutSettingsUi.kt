@@ -480,9 +480,11 @@ private fun ChangelogList(title: String, items: List<String>) {
 private fun currentVersionChangelog(context: Context, language: AppLanguage): List<String> {
     val localized = context.withAppLanguage(language)
     return listOf(
-        localized.getString(R.string.about_changelog_v2_source_binding_fix),
-        localized.getString(R.string.about_changelog_v2_reader_status),
-        localized.getString(R.string.about_changelog_v2_tracker_fix),
+        localized.getString(R.string.about_changelog_v3_book_club_release),
+        localized.getString(R.string.about_changelog_v3_recommendation_import),
+        localized.getString(R.string.about_changelog_v3_batch_actions),
+        localized.getString(R.string.about_changelog_v3_chinese),
+        localized.getString(R.string.about_changelog_v3_custom_only_status),
     )
 }
 
@@ -490,6 +492,7 @@ private fun AppUpdateInfo.localizedChangelog(language: AppLanguage): List<String
     val preferredKeys = when (language) {
         AppLanguage.PORTUGUESE_BRAZIL -> listOf("pt-BR", "pt")
         AppLanguage.SPANISH -> listOf("es")
+        AppLanguage.CHINESE_SIMPLIFIED -> listOf("zh-CN", "zh-Hans", "zh")
         AppLanguage.ENGLISH,
         AppLanguage.SYSTEM -> emptyList()
     }
@@ -502,10 +505,12 @@ private fun AppLanguage.resolvedChangelogLanguage(): AppLanguage =
     when (this) {
         AppLanguage.PORTUGUESE_BRAZIL -> AppLanguage.PORTUGUESE_BRAZIL
         AppLanguage.SPANISH -> AppLanguage.SPANISH
+        AppLanguage.CHINESE_SIMPLIFIED -> AppLanguage.CHINESE_SIMPLIFIED
         AppLanguage.ENGLISH -> AppLanguage.ENGLISH
         AppLanguage.SYSTEM -> when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
             "pt" -> AppLanguage.PORTUGUESE_BRAZIL
             "es" -> AppLanguage.SPANISH
+            "zh" -> AppLanguage.CHINESE_SIMPLIFIED
             else -> AppLanguage.ENGLISH
         }
     }

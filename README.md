@@ -39,6 +39,8 @@ Tankobun is not a content service, content host, extension repository, or manga 
 - Native Tankobun JSON backup export for local libraries.
 - MyAnimeList-compatible XML backup export for AniList-mode lists.
 - In-app restore tools for supported backup files.
+- Library batch selection for sharing recommendations, changing status, editing custom lists, and removing manga.
+- `.tankobun-recs` recommendation files for sharing selected manga metadata with friends, with import preview and optional import into a named custom list.
 
 ## Sources, Extensions, and Content
 
@@ -49,6 +51,8 @@ Tankobun does not include a default extension repository. It does not recommend 
 Any source extension used with Tankobun must be added and installed by the user. The user is solely responsible for choosing which extensions, repositories, websites, or services they use, and for making sure their use complies with applicable laws, site terms, publisher rights, and creator rights.
 
 Tankobun is only a reader/tracking client. It does not grant permission to access, copy, download, or redistribute any third-party content.
+
+Recommendation sharing files contain manga metadata and recommendation list names only. They do not include manga content, chapter URLs, source links, downloaded files, source repositories, source APKs, notes, scores, private flags, or tokens.
 
 ## APK Releases
 

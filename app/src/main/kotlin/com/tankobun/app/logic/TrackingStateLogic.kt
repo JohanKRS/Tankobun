@@ -4,6 +4,7 @@ import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.MediaStatus
 import java.util.Locale
 import kotlin.math.abs
 
@@ -35,7 +36,12 @@ private fun TankobunUiState.hasTrackingFormChanges(): Boolean {
     val progress = trackingProgress.toIntOrNull()?.coerceAtLeast(0) ?: 0
     val score = trackingScore.toAniListScore(anilistScoreFormat)
     val notes = trackingNotes.trim().ifBlank { null }
-    return trackingStatus != entry.status ||
+    val statusChanged = if (entry.hiddenFromStatusLists) {
+        trackingStatus != MediaStatus.UNKNOWN
+    } else {
+        trackingStatus != entry.status
+    }
+    return statusChanged ||
         progress != entry.progress ||
         !score.sameAniListScore(entry.score) ||
         notes != entry.notes?.trim()?.ifBlank { null } ||
@@ -105,13 +111,10 @@ internal fun TankobunUiState.withTrackingCustomListSaveResult(
         library = nextItems.map { item -> item.media },
         libraryItems = nextItems,
         selectedListEntry = entry,
-        trackingStatus = entry.status,
-        trackingProgress = entry.progress.toString(),
-        trackingScore = entry.score.formatTrackingScore(anilistScoreFormat),
-        trackingNotes = entry.notes.orEmpty(),
-        trackingPrivate = entry.private,
+        trackingStatus = entry.trackingStatusForForm(trackingStatus),
         trackingCustomLists = entry.customLists.toSet(),
-    )
+        trackingSaveFailed = false,
+    ).withRecomputedTrackingDirty()
 }
 
 internal fun TankobunUiState.withTrackingSaveStarted(
@@ -150,7 +153,7 @@ internal fun TankobunUiState.withTrackingSaveResult(
         library = nextItems.map { item -> item.media },
         libraryItems = nextItems,
         selectedListEntry = if (selected) entry else selectedListEntry,
-        trackingStatus = if (!selected || preserveEditedForm) trackingStatus else entry.status,
+        trackingStatus = if (!selected || preserveEditedForm) trackingStatus else entry.trackingStatusForForm(trackingStatus),
         trackingProgress = if (!selected || preserveEditedForm) trackingProgress else entry.progress.toString(),
         trackingScore = if (!selected || preserveEditedForm) trackingScore else entry.score.formatTrackingScore(anilistScoreFormat),
         trackingNotes = if (!selected || preserveEditedForm) trackingNotes else entry.notes.orEmpty(),
