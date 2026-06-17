@@ -19,7 +19,7 @@
         android:theme="@style/Theme.Tankobun"
         android:usesCleartextTraffic="true">
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name=".TankobunFileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
@@ -44,7 +44,9 @@
                     android:path="/anilist"
                     android:scheme="tankobun" />
             </intent-filter>
-            <intent-filter>
+            <intent-filter
+                android:icon="@mipmap/ic_launcher"
+                android:label="@string/recommendations_file_label">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/vnd.tankobun.recommendations+json" />
@@ -52,29 +54,75 @@
                 <data android:mimeType="text/json" />
                 <data android:mimeType="application/octet-stream" />
             </intent-filter>
-            <intent-filter>
+            <intent-filter
+                android:icon="@mipmap/ic_launcher"
+                android:label="@string/recommendations_file_label">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data
                     android:host="*"
-                    android:pathPattern=".*\\.tankobun-recs"
+                    android:pathSuffix=".tankobun-recs"
                     android:scheme="content" />
                 <data
                     android:host="*"
-                    android:pathPattern=".*\\.tankobun-recs"
+                    android:pathPattern="/.*tankobun-recs"
+                    android:scheme="content" />
+                <data
+                    android:host="*"
+                    android:pathPattern=".*tankobun-recs"
+                    android:scheme="content" />
+                <data
+                    android:host="*"
+                    android:pathSuffix=".tankobun-recs"
                     android:scheme="file" />
                 <data
                     android:host="*"
-                    android:mimeType="*/*"
-                    android:pathPattern=".*\\.tankobun-recs"
-                    android:scheme="content" />
+                    android:pathPattern="/.*tankobun-recs"
+                    android:scheme="file" />
                 <data
                     android:host="*"
-                    android:mimeType="*/*"
-                    android:pathPattern=".*\\.tankobun-recs"
+                    android:pathPattern=".*tankobun-recs"
                     android:scheme="file" />
             </intent-filter>
-            <intent-filter>
+            <intent-filter
+                android:icon="@mipmap/ic_launcher"
+                android:label="@string/recommendations_file_label">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data
+                    android:host="*"
+                    android:mimeType="*/*"
+                    android:pathSuffix=".tankobun-recs"
+                    android:scheme="content" />
+                <data
+                    android:host="*"
+                    android:mimeType="*/*"
+                    android:pathPattern="/.*tankobun-recs"
+                    android:scheme="content" />
+                <data
+                    android:host="*"
+                    android:mimeType="*/*"
+                    android:pathPattern=".*tankobun-recs"
+                    android:scheme="content" />
+                <data
+                    android:host="*"
+                    android:mimeType="*/*"
+                    android:pathSuffix=".tankobun-recs"
+                    android:scheme="file" />
+                <data
+                    android:host="*"
+                    android:mimeType="*/*"
+                    android:pathPattern="/.*tankobun-recs"
+                    android:scheme="file" />
+                <data
+                    android:host="*"
+                    android:mimeType="*/*"
+                    android:pathPattern=".*tankobun-recs"
+                    android:scheme="file" />
+            </intent-filter>
+            <intent-filter
+                android:icon="@mipmap/ic_launcher"
+                android:label="@string/recommendations_file_label">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/vnd.tankobun.recommendations+json" />

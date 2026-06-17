@@ -119,6 +119,7 @@ data class TankobunUiState(
     val libraryBatchDeleteDialogVisible: Boolean = false,
     val libraryBatchRemoveCustomList: Boolean = false,
     val recommendationImportPreview: RecommendationImportPreview? = null,
+    val recommendationImportLoadingDetails: Boolean = false,
     val selectedRecommendationImportMediaIds: Set<Int> = emptySet(),
     val recommendationImportListName: String = "",
     val sourceMatches: List<SourceSearchResult> = emptyList(),

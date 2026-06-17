@@ -18,7 +18,7 @@ internal class RecommendationShareDataSource(
         check(selectedItems.isNotEmpty()) { "No recommendations selected" }
         val directory = File(container.application.cacheDir, "recommendations").also { it.mkdirs() }
         directory.listFiles()?.forEach { file -> file.delete() }
-        val file = File(directory, suggestedRecommendationFileName())
+        val file = File(directory, suggestedRecommendationFileName(suggestedListName))
         val payload = buildRecommendationShareJson(
             suggestedListName = suggestedListName,
             items = selectedItems.map { it.media },
@@ -40,5 +40,19 @@ internal class RecommendationShareDataSource(
     }
 }
 
-private fun suggestedRecommendationFileName(): String =
-    "tankobun_recommendations_${System.currentTimeMillis()}.$RECOMMENDATION_SHARE_EXTENSION"
+private fun suggestedRecommendationFileName(suggestedListName: String): String {
+    val friendlyName = suggestedListName
+        .trim()
+        .ifBlank { DEFAULT_RECOMMENDATION_FILE_NAME }
+        .replace(Regex("""[\\/:*?"<>|]+"""), " ")
+        .replace(Regex("""\s+"""), " ")
+        .trim()
+        .replace(' ', '_')
+        .take(MAX_RECOMMENDATION_FILE_NAME_LENGTH)
+        .trim('_', '.')
+        .ifBlank { DEFAULT_RECOMMENDATION_FILE_NAME }
+    return "$friendlyName.$RECOMMENDATION_SHARE_EXTENSION"
+}
+
+private const val DEFAULT_RECOMMENDATION_FILE_NAME = "tankobun_recommendations"
+private const val MAX_RECOMMENDATION_FILE_NAME_LENGTH = 72

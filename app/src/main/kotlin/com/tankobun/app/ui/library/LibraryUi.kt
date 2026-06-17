@@ -1202,9 +1202,11 @@ internal fun RecommendationImportDialog(
             label = { Text(tankobunString(R.string.library_batch_list_name)) },
             shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
         )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 tankobunString(
@@ -1212,89 +1214,121 @@ internal fun RecommendationImportDialog(
                     selectedCount,
                     preview.items.size,
                 ),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick = { viewModel.setAllRecommendationImportItemsSelected(true) }) {
-                Text(tankobunString(R.string.recommendations_import_select_all))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { viewModel.setAllRecommendationImportItemsSelected(true) }) {
+                    Text(tankobunString(R.string.recommendations_import_select_all))
+                }
+                TextButton(onClick = { viewModel.setAllRecommendationImportItemsSelected(false) }) {
+                    Text(tankobunString(R.string.recommendations_import_select_none))
+                }
             }
-            TextButton(onClick = { viewModel.setAllRecommendationImportItemsSelected(false) }) {
-                Text(tankobunString(R.string.recommendations_import_select_none))
-            }
-        }
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(
-                items = preview.items,
-                key = { item -> item.media.id },
-            ) { item ->
-                val selected = item.media.id in state.selectedRecommendationImportMediaIds
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.panel))
-                        .clickable { viewModel.toggleRecommendationImportItem(item.media.id) },
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        if (selected) {
-                            LocalTankobunStyle.current.colors.accent.copy(alpha = 0.58f)
-                        } else {
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
-                        },
-                    ),
+            if (state.recommendationImportLoadingDetails) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                item.media.title.userPreferred,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        },
-                        supportingContent = {
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(
-                                    listOfNotNull(
-                                        item.media.mediaTypeLabel(),
-                                        item.media.startDateYear?.toString(),
-                                    ).joinToString(" / "),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                if (item.alreadyInLibrary) {
-                                    Text(
-                                        tankobunString(R.string.recommendations_import_existing),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = LocalTankobunStyle.current.colors.accent,
-                                    )
-                                }
-                            }
-                        },
-                        leadingContent = {
-                            CoverImage(
-                                url = item.media.coverImage,
-                                title = item.media.title.userPreferred,
-                                modifier = Modifier.size(width = 46.dp, height = 66.dp),
-                            )
-                        },
-                        trailingContent = {
-                            Checkbox(
-                                checked = selected,
-                                onCheckedChange = { viewModel.toggleRecommendationImportItem(item.media.id) },
-                            )
-                        },
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text(
+                        tankobunString(R.string.recommendations_import_loading_details),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            ) {
+                if (preview.items.isEmpty()) {
+                    Text(
+                        tankobunString(R.string.recommendations_import_empty),
+                        modifier = Modifier.align(Alignment.Center),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(
+                            items = preview.items,
+                            key = { item -> item.media.id },
+                        ) { item ->
+                            val selected = item.media.id in state.selectedRecommendationImportMediaIds
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.panel))
+                                    .clickable { viewModel.toggleRecommendationImportItem(item.media.id) },
+                                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (selected) {
+                                        LocalTankobunStyle.current.colors.accent.copy(alpha = 0.58f)
+                                    } else {
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
+                                    },
+                                ),
+                            ) {
+                                ListItem(
+                                    headlineContent = {
+                                        Text(
+                                            item.media.title.userPreferred,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                    },
+                                    supportingContent = {
+                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(
+                                                listOfNotNull(
+                                                    item.media.mediaTypeLabel(),
+                                                    item.media.startDateYear?.toString(),
+                                                ).joinToString(" / "),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                            if (item.alreadyInLibrary) {
+                                                Text(
+                                                    tankobunString(R.string.recommendations_import_existing),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = LocalTankobunStyle.current.colors.accent,
+                                                )
+                                            }
+                                        }
+                                    },
+                                    leadingContent = {
+                                        CoverImage(
+                                            url = item.media.coverImage,
+                                            title = item.media.title.userPreferred,
+                                            modifier = Modifier.size(width = 46.dp, height = 66.dp),
+                                        )
+                                    },
+                                    trailingContent = {
+                                        Checkbox(
+                                            checked = selected,
+                                            onCheckedChange = { viewModel.toggleRecommendationImportItem(item.media.id) },
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

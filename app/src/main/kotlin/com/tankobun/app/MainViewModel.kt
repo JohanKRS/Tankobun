@@ -90,6 +90,7 @@ import com.tankobun.app.logic.withTrackingSaveStarted
 import com.tankobun.app.logic.withoutSelectedMedia
 import com.tankobun.app.reader.ReaderDataSource
 import com.tankobun.app.sharing.RECOMMENDATION_SHARE_MIME_TYPE
+import com.tankobun.app.sharing.RecommendationSharePayload
 import com.tankobun.app.sharing.RecommendationShareDataSource
 import com.tankobun.app.sharing.toImportPreview
 import com.tankobun.app.source.SourceDataSource
@@ -104,6 +105,7 @@ import com.tankobun.app.state.ReaderLoadError
 import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -199,6 +201,7 @@ class MainViewModel(
     private var readerAdjacentLoadJob: Job? = null
     private var sourcePickerJob: Job? = null
     private var sourcePickerRequestId: Long = 0L
+    private var recommendationImportRequestId: Long = 0L
     private var browseBackStack: List<BrowseCriteria> = emptyList()
     private var committedBrowseCriteria: BrowseCriteria = BrowseCriteria()
     private var lastReaderProgressSavedAtEpochMillis: Long = 0L
@@ -2427,6 +2430,7 @@ class MainViewModel(
                     suggestedListName = listName,
                 )
             }.onSuccess { uri ->
+                val shareTitle = listName.trim().ifBlank { string(R.string.recommendations_default_list_name) }
                 _state.update {
                     it.copy(
                         busy = false,
@@ -2439,7 +2443,9 @@ class MainViewModel(
                 val share = Intent(Intent.ACTION_SEND).apply {
                     type = RECOMMENDATION_SHARE_MIME_TYPE
                     putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_TITLE, listName.trim().ifBlank { string(R.string.recommendations_default_list_name) })
+                    putExtra(Intent.EXTRA_TITLE, shareTitle)
+                    putExtra(Intent.EXTRA_SUBJECT, shareTitle)
+                    clipData = ClipData.newUri(context.contentResolver, shareTitle, uri)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 context.startActivity(Intent.createChooser(share, string(R.string.recommendations_share_chooser)))
@@ -2456,36 +2462,91 @@ class MainViewModel(
     }
 
     fun openRecommendationImport(uri: Uri) {
+        val requestId = ++recommendationImportRequestId
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
+            _state.update {
+                it.copy(
+                    busy = true,
+                    message = null,
+                    recommendationImportLoadingDetails = false,
+                )
+            }
             runCatching {
                 recommendationShareDataSource.readShareFile(uri)
             }.onSuccess { payload ->
                 _state.update { current ->
+                    if (requestId != recommendationImportRequestId) return@update current
                     val preview = payload.toImportPreview(current.libraryItems.mapTo(mutableSetOf()) { item -> item.media.id })
                     current.copy(
                         busy = false,
                         recommendationImportPreview = preview,
+                        recommendationImportLoadingDetails = true,
                         recommendationImportListName = preview.suggestedListName,
                         selectedRecommendationImportMediaIds = preview.items.mapTo(mutableSetOf()) { item -> item.media.id },
                     )
                 }
+                enrichRecommendationImportPreview(requestId, payload)
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 Log.e(TAG, "Recommendation import preview failed", error)
-                _state.update {
-                    it.copy(
+                _state.update { current ->
+                    if (requestId != recommendationImportRequestId) {
+                        current
+                    } else {
+                        current.copy(
                         busy = false,
+                        recommendationImportLoadingDetails = false,
                         message = error.userMessage(localizedContext(), string(R.string.msg_recommendations_import_failed)),
                     )
+                    }
                 }
             }
         }
     }
 
+    private suspend fun enrichRecommendationImportPreview(
+        requestId: Long,
+        payload: RecommendationSharePayload,
+    ) {
+        val enrichedById = runCatching {
+            aniListDataSource.enrichRecommendationMedia(
+                media = payload.items,
+                accessToken = container.tokenStore.accessToken(),
+                titleLanguage = _state.value.anilistTitleLanguage,
+            ).associateBy { it.id }
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            Log.w(TAG, "Recommendation import detail refresh failed", error)
+        }.getOrNull().orEmpty()
+
+        _state.update { current ->
+            val preview = current.recommendationImportPreview
+            if (requestId != recommendationImportRequestId || preview == null) {
+                current
+            } else {
+                val existingMediaIds = current.libraryItems.mapTo(mutableSetOf()) { item -> item.media.id }
+                current.copy(
+                    recommendationImportPreview = preview.copy(
+                        items = preview.items.map { item ->
+                            item.copy(
+                                media = enrichedById[item.media.id]
+                                    ?: item.media.withTitleLanguage(current.anilistTitleLanguage),
+                                alreadyInLibrary = item.media.id in existingMediaIds,
+                            )
+                        },
+                    ),
+                    recommendationImportLoadingDetails = false,
+                )
+            }
+        }
+    }
+
     fun dismissRecommendationImport() {
+        recommendationImportRequestId++
         _state.update {
             it.copy(
                 recommendationImportPreview = null,
+                recommendationImportLoadingDetails = false,
                 selectedRecommendationImportMediaIds = emptySet(),
                 recommendationImportListName = "",
             )
@@ -2547,6 +2608,7 @@ class MainViewModel(
                         successMessage = string(R.string.msg_recommendations_imported, result.updatedItems.size),
                     ).copy(
                         recommendationImportPreview = null,
+                        recommendationImportLoadingDetails = false,
                         selectedRecommendationImportMediaIds = emptySet(),
                         recommendationImportListName = "",
                     )

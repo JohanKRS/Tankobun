@@ -848,12 +848,15 @@
     <string name="msg_tracking_saved_local">Seguimiento guardado</string>
 
     <string name="recommendations_default_list_name">Recomendaciones de Tankobun</string>
+    <string name="recommendations_file_label">Recomendaciones de Tankobun</string>
     <string name="recommendations_share_chooser">Compartir recomendaciones</string>
     <string name="recommendations_import_title">Importar recomendaciones</string>
     <string name="recommendations_import_desc">Revisa la lista antes de importar. Este archivo contiene solo metadatos de manga y recomendaciones, no contenido de manga.</string>
     <string name="recommendations_import_selected_count">%1$d de %2$d seleccionados</string>
     <string name="recommendations_import_select_all">Seleccionar todo</string>
     <string name="recommendations_import_select_none">No seleccionar nada</string>
+    <string name="recommendations_import_loading_details">Actualizando portadas desde AniList...</string>
+    <string name="recommendations_import_empty">No se encontraron recomendaciones en este archivo.</string>
     <string name="recommendations_import_existing">Ya está en tu biblioteca</string>
     <string name="recommendations_import_button">Importar seleccionados</string>
 

@@ -836,6 +836,25 @@ internal class AniListDataSource(
         )
     }
 
+    suspend fun enrichRecommendationMedia(
+        media: List<AnilistMedia>,
+        accessToken: String?,
+        titleLanguage: AnilistTitleLanguage,
+    ): List<AnilistMedia> {
+        if (media.isEmpty()) return emptyList()
+        val now = System.currentTimeMillis()
+        val enriched = media.distinctBy { it.id }.map { original ->
+            runCatching {
+                container.anilistRepository.mangaById(original.id, accessToken)
+                    ?.withTitleLanguage(titleLanguage)
+            }.onFailure { error ->
+                Log.w(TAG, "Failed to enrich recommendation media ${original.id}", error)
+            }.getOrNull() ?: original.withTitleLanguage(titleLanguage)
+        }
+        container.database.mediaDao().upsertMedia(enriched.map { it.toEntity(now) })
+        return enriched
+    }
+
     suspend fun fetchRecommendationPage(
         mediaId: Int,
         page: Int,
