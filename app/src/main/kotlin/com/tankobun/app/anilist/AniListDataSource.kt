@@ -82,6 +82,13 @@ internal data class CustomListEntriesData(
     val updatedEntries: Map<Int, AnilistListEntry>,
 )
 
+internal data class LibraryBatchMutationData(
+    val customLists: List<String>,
+    val updatedItems: List<LibraryItem>,
+    val removedMediaIds: Set<Int> = emptySet(),
+    val queuedRemoteUpdates: Int = 0,
+)
+
 internal class AniListDataSource(
     private val container: AppContainer,
     private val cachePolicy: CachePolicy,
@@ -155,6 +162,7 @@ internal class AniListDataSource(
                 notes = null,
                 private = null,
                 customLists = updatedCustomLists,
+                hiddenFromStatusLists = item.entry.hiddenFromStatusLists,
                 scoreFormat = scoreFormat,
             )
         }
@@ -186,6 +194,7 @@ internal class AniListDataSource(
                 notes = null,
                 private = null,
                 customLists = updatedCustomLists,
+                hiddenFromStatusLists = item.entry.hiddenFromStatusLists,
                 scoreFormat = scoreFormat,
             )
         }
@@ -204,6 +213,7 @@ internal class AniListDataSource(
         private: Boolean,
         customLists: List<String>,
         knownCustomLists: List<String>,
+        hiddenFromStatusLists: Boolean? = null,
     ): SavedTrackingData {
         val now = System.currentTimeMillis()
         val normalizedCustomLists = customLists.normalizedCustomLists()
@@ -219,6 +229,7 @@ internal class AniListDataSource(
             private = private,
             customLists = normalizedCustomLists,
             updatedAtEpochSeconds = now / 1000L,
+            hiddenFromStatusLists = hiddenFromStatusLists ?: existing?.hiddenFromStatusLists ?: false,
         )
         container.database.mediaDao().upsertMedia(media.toEntity(now))
         container.database.listEntryDao().upsertEntry(entry.toEntity(now))
@@ -239,7 +250,15 @@ internal class AniListDataSource(
         val existing = container.database.listEntryDao().cachedEntry(media.id)?.toModel()
         val nextProgress = maxOf(chapterProgress.coerceAtLeast(0), existing?.progress ?: 0)
         val nextStatus = status ?: existing?.status ?: MediaStatus.CURRENT
-        if (existing != null && nextProgress == existing.progress && nextStatus == existing.status) return null
+        val nextHiddenFromStatusLists = if (status != null) false else existing?.hiddenFromStatusLists ?: false
+        if (
+            existing != null &&
+            nextProgress == existing.progress &&
+            nextStatus == existing.status &&
+            nextHiddenFromStatusLists == existing.hiddenFromStatusLists
+        ) {
+            return null
+        }
         val entry = AnilistListEntry(
             id = existing?.id ?: -media.id,
             mediaId = media.id,
@@ -250,6 +269,7 @@ internal class AniListDataSource(
             private = existing?.private ?: false,
             customLists = existing?.customLists.orEmpty(),
             updatedAtEpochSeconds = now / 1000L,
+            hiddenFromStatusLists = nextHiddenFromStatusLists,
         )
         container.database.mediaDao().upsertMedia(media.toEntity(now))
         container.database.listEntryDao().upsertEntry(entry.toEntity(now))
@@ -304,6 +324,245 @@ internal class AniListDataSource(
         return CustomListEntriesData(customLists = savedLists, updatedEntries = updatedEntries)
     }
 
+    suspend fun importRecommendationList(
+        token: String?,
+        syncRemote: Boolean,
+        media: List<AnilistMedia>,
+        listName: String,
+        knownCustomLists: List<String>,
+        existingItems: List<LibraryItem>,
+        scoreFormat: AnilistScoreFormat,
+    ): LibraryBatchMutationData {
+        val normalizedListName = listName.trim().ifBlank { DEFAULT_RECOMMENDATION_LIST_NAME }
+        val requestedList = listOf(normalizedListName).normalizedCustomLists().first()
+        val nextKnownCustomLists = (knownCustomLists + requestedList).normalizedCustomLists()
+        val savedLists = saveCustomListsForBatch(token, syncRemote, nextKnownCustomLists)
+        val existingById = existingItems.associateBy { it.media.id }
+        val now = System.currentTimeMillis()
+        var queued = 0
+        val updatedItems = media.distinctBy { it.id }.map { recommendation ->
+            val existing = existingById[recommendation.id]
+            val entry = if (existing == null) {
+                AnilistListEntry(
+                    id = -recommendation.id,
+                    mediaId = recommendation.id,
+                    status = MediaStatus.PLANNING,
+                    progress = 0,
+                    score = null,
+                    notes = null,
+                    private = false,
+                    customLists = listOf(requestedList),
+                    updatedAtEpochSeconds = now / 1000L,
+                    hiddenFromStatusLists = true,
+                )
+            } else {
+                existing.entry.copy(
+                    customLists = (existing.entry.customLists + requestedList).normalizedCustomLists(),
+                    updatedAtEpochSeconds = now / 1000L,
+                )
+            }
+            container.database.mediaDao().upsertMedia(recommendation.toEntity(now))
+            container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+            val syncedEntry = syncOrQueueListEntry(
+                token = token.takeIf { syncRemote },
+                syncRemote = syncRemote,
+                mediaId = recommendation.id,
+                status = if (existing == null) entry.status else null,
+                progress = if (existing == null) entry.progress else null,
+                score = if (existing == null) entry.score else null,
+                notes = if (existing == null) entry.notes else null,
+                private = if (existing == null) entry.private else null,
+                customLists = entry.customLists,
+                hiddenFromStatusLists = entry.hiddenFromStatusLists,
+                scoreFormat = scoreFormat,
+                fallbackEntry = entry,
+                nowMillis = now,
+            )
+            if (syncedEntry.queued) queued += 1
+            LibraryItem(recommendation, syncedEntry.entry)
+        }
+        container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
+        return LibraryBatchMutationData(
+            customLists = savedLists,
+            updatedItems = updatedItems,
+            queuedRemoteUpdates = queued,
+        )
+    }
+
+    suspend fun updateBatchStatus(
+        token: String?,
+        syncRemote: Boolean,
+        items: List<LibraryItem>,
+        status: MediaStatus,
+        scoreFormat: AnilistScoreFormat,
+    ): LibraryBatchMutationData {
+        val now = System.currentTimeMillis()
+        var queued = 0
+        val updatedItems = items.map { item ->
+            val entry = item.entry.copy(
+                status = status,
+                hiddenFromStatusLists = false,
+                updatedAtEpochSeconds = now / 1000L,
+            )
+            container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+            val syncedEntry = syncOrQueueListEntry(
+                token = token.takeIf { syncRemote },
+                syncRemote = syncRemote,
+                mediaId = item.media.id,
+                status = status,
+                progress = null,
+                score = null,
+                notes = null,
+                private = null,
+                customLists = item.entry.customLists,
+                hiddenFromStatusLists = false,
+                scoreFormat = scoreFormat,
+                fallbackEntry = entry,
+                nowMillis = now,
+            )
+            if (syncedEntry.queued) queued += 1
+            item.copy(entry = syncedEntry.entry)
+        }
+        container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
+        return LibraryBatchMutationData(
+            customLists = container.settingsStore.anilistCustomLists(),
+            updatedItems = updatedItems,
+            queuedRemoteUpdates = queued,
+        )
+    }
+
+    suspend fun addBatchCustomList(
+        token: String?,
+        syncRemote: Boolean,
+        items: List<LibraryItem>,
+        listName: String,
+        knownCustomLists: List<String>,
+        scoreFormat: AnilistScoreFormat,
+    ): LibraryBatchMutationData {
+        val requestedList = listOf(listName.trim()).normalizedCustomLists().firstOrNull()
+            ?: return LibraryBatchMutationData(customLists = knownCustomLists, updatedItems = emptyList())
+        val savedLists = saveCustomListsForBatch(token, syncRemote, (knownCustomLists + requestedList).normalizedCustomLists())
+        val now = System.currentTimeMillis()
+        var queued = 0
+        val updatedItems = items.map { item ->
+            val entry = item.entry.copy(
+                customLists = (item.entry.customLists + requestedList).normalizedCustomLists(),
+                updatedAtEpochSeconds = now / 1000L,
+            )
+            container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+            val syncedEntry = syncOrQueueListEntry(
+                token = token.takeIf { syncRemote },
+                syncRemote = syncRemote,
+                mediaId = item.media.id,
+                status = null,
+                progress = null,
+                score = null,
+                notes = null,
+                private = null,
+                customLists = entry.customLists,
+                hiddenFromStatusLists = entry.hiddenFromStatusLists,
+                scoreFormat = scoreFormat,
+                fallbackEntry = entry,
+                nowMillis = now,
+            )
+            if (syncedEntry.queued) queued += 1
+            item.copy(entry = syncedEntry.entry)
+        }
+        container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
+        return LibraryBatchMutationData(
+            customLists = savedLists,
+            updatedItems = updatedItems,
+            queuedRemoteUpdates = queued,
+        )
+    }
+
+    suspend fun removeBatchCustomList(
+        token: String?,
+        syncRemote: Boolean,
+        items: List<LibraryItem>,
+        listName: String,
+        scoreFormat: AnilistScoreFormat,
+    ): LibraryBatchMutationData {
+        val now = System.currentTimeMillis()
+        var queued = 0
+        val updatedItems = mutableListOf<LibraryItem>()
+        val removedMediaIds = mutableSetOf<Int>()
+        items.forEach { item ->
+            val nextLists = item.entry.customLists.withoutCustomList(listName)
+            if (item.entry.hiddenFromStatusLists && nextLists.isEmpty()) {
+                val deleteQueued = deleteListEntryRemoteOrQueue(
+                    token = token.takeIf { syncRemote },
+                    syncRemote = syncRemote,
+                    entry = item.entry,
+                    nowMillis = now,
+                )
+                if (deleteQueued) queued += 1
+                container.database.listEntryDao().deleteEntryForMedia(item.media.id)
+                removedMediaIds += item.media.id
+            } else {
+                val entry = item.entry.copy(
+                    customLists = nextLists,
+                    updatedAtEpochSeconds = now / 1000L,
+                )
+                container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+                val syncedEntry = syncOrQueueListEntry(
+                    token = token.takeIf { syncRemote },
+                    syncRemote = syncRemote,
+                    mediaId = item.media.id,
+                    status = null,
+                    progress = null,
+                    score = null,
+                    notes = null,
+                    private = null,
+                    customLists = entry.customLists,
+                    hiddenFromStatusLists = entry.hiddenFromStatusLists,
+                    scoreFormat = scoreFormat,
+                    fallbackEntry = entry,
+                    nowMillis = now,
+                )
+                if (syncedEntry.queued) queued += 1
+                updatedItems += item.copy(entry = syncedEntry.entry)
+            }
+        }
+        container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
+        return LibraryBatchMutationData(
+            customLists = container.settingsStore.anilistCustomLists(),
+            updatedItems = updatedItems,
+            removedMediaIds = removedMediaIds,
+            queuedRemoteUpdates = queued,
+        )
+    }
+
+    suspend fun deleteBatchEntries(
+        token: String?,
+        syncRemote: Boolean,
+        items: List<LibraryItem>,
+        deleteLocalData: Boolean,
+    ): LibraryBatchMutationData {
+        val now = System.currentTimeMillis()
+        var queued = 0
+        items.forEach { item ->
+            val deleteQueued = deleteListEntryRemoteOrQueue(
+                token = token.takeIf { syncRemote },
+                syncRemote = syncRemote,
+                entry = item.entry,
+                nowMillis = now,
+            )
+            if (deleteQueued) queued += 1
+        }
+        deleteLocalEntries(
+            mediaIds = items.map { it.media.id },
+            deleteLocalData = deleteLocalData,
+        )
+        container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
+        return LibraryBatchMutationData(
+            customLists = container.settingsStore.anilistCustomLists(),
+            updatedItems = emptyList(),
+            removedMediaIds = items.mapTo(mutableSetOf()) { it.media.id },
+            queuedRemoteUpdates = queued,
+        )
+    }
+
     suspend fun saveTracking(
         token: String,
         media: AnilistMedia,
@@ -315,6 +574,7 @@ internal class AniListDataSource(
         customLists: List<String>,
         knownCustomLists: List<String>,
         scoreFormat: AnilistScoreFormat,
+        hiddenFromStatusLists: Boolean? = null,
     ): SavedTrackingData {
         val normalizedCustomLists = customLists.normalizedCustomLists()
         val normalizedKnownCustomLists = knownCustomLists.normalizedCustomLists()
@@ -338,6 +598,7 @@ internal class AniListDataSource(
             notes = notes,
             private = private,
             customLists = normalizedCustomLists,
+            hiddenFromStatusLists = hiddenFromStatusLists,
             scoreFormat = scoreFormat,
         )
         val now = System.currentTimeMillis()
@@ -408,6 +669,7 @@ internal class AniListDataSource(
                 notes = null,
                 private = null,
                 customLists = null,
+                hiddenFromStatusLists = status?.let { false },
                 scoreFormat = scoreFormat,
             )
         }.map { entry ->
@@ -486,6 +748,7 @@ internal class AniListDataSource(
                 customLists = entry.customLists,
                 knownCustomLists = allCustomLists,
                 scoreFormat = scoreFormat,
+                hiddenFromStatusLists = entry.hiddenFromStatusLists,
             )
         }
         return syncLibrary(token)
@@ -625,6 +888,14 @@ internal class AniListDataSource(
         when (mutation.type) {
             SyncMutationType.SAVE_MEDIA_LIST_ENTRY -> {
                 val payload = JSONObject(mutation.payloadJson)
+                val customLists = payload.nullableStringList("customLists")
+                if (!customLists.isNullOrEmpty()) {
+                    val knownCustomLists = container.settingsStore.anilistCustomLists()
+                    val nextCustomLists = (knownCustomLists + customLists).normalizedCustomLists()
+                    if (nextCustomLists != knownCustomLists.normalizedCustomLists()) {
+                        updateCustomLists(token, nextCustomLists)
+                    }
+                }
                 val entry = saveListEntry(
                     token = token,
                     mediaId = mutation.mediaId,
@@ -635,7 +906,8 @@ internal class AniListDataSource(
                     score = payload.nullableDouble("score"),
                     notes = payload.nullableString("notes"),
                     private = payload.nullableBoolean("private"),
-                    customLists = payload.nullableStringList("customLists"),
+                    customLists = customLists,
+                    hiddenFromStatusLists = payload.nullableBoolean("hiddenFromStatusLists"),
                     scoreFormat = scoreFormat,
                 )
                 val now = System.currentTimeMillis()
@@ -646,7 +918,12 @@ internal class AniListDataSource(
                 SyncedListEntryData(media = media, entry = entry)
             }
             SyncMutationType.DELETE_MEDIA_LIST_ENTRY -> {
-                Log.w(TAG, "Ignoring unsupported queued AniList delete for ${mutation.mediaId}")
+                val payload = JSONObject(mutation.payloadJson)
+                val entryId = payload.optInt("entryId", 0)
+                if (entryId > 0) {
+                    container.anilistRepository.deleteListEntry(token, entryId)
+                }
+                container.database.listEntryDao().deleteEntryForMedia(mutation.mediaId)
                 null
             }
         }
@@ -660,6 +937,7 @@ internal class AniListDataSource(
         notes: String?,
         private: Boolean?,
         customLists: List<String>?,
+        hiddenFromStatusLists: Boolean?,
         scoreFormat: AnilistScoreFormat,
     ): AnilistListEntry {
         val entry = container.anilistRepository.saveListEntry(
@@ -671,6 +949,7 @@ internal class AniListDataSource(
             notes = notes,
             private = private,
             customLists = customLists,
+            hiddenFromStatusLists = hiddenFromStatusLists,
             scoreFormat = scoreFormat,
         )
         container.database.listEntryDao().upsertEntry(entry.toEntity(System.currentTimeMillis()))
@@ -687,9 +966,124 @@ internal class AniListDataSource(
             mediaId = mediaId,
             status = status,
             progress = progress,
+            hiddenFromStatusLists = status?.let { false },
             nowMillis = nowMillis,
         )
         container.database.syncMutationDao().upsertMutation(mutation.toEntity())
+    }
+
+    private suspend fun saveCustomListsForBatch(
+        token: String?,
+        syncRemote: Boolean,
+        nextCustomLists: List<String>,
+    ): List<String> =
+        if (syncRemote && token != null) {
+            runCatching { updateCustomLists(token, nextCustomLists) }
+                .onFailure { error -> Log.w(TAG, "AniList custom list update failed; using local list", error) }
+                .getOrElse { saveLocalCustomLists(nextCustomLists) }
+        } else {
+            saveLocalCustomLists(nextCustomLists)
+        }
+
+    private suspend fun syncOrQueueListEntry(
+        token: String?,
+        syncRemote: Boolean,
+        mediaId: Int,
+        status: MediaStatus?,
+        progress: Int?,
+        score: Double?,
+        notes: String?,
+        private: Boolean?,
+        customLists: List<String>?,
+        hiddenFromStatusLists: Boolean?,
+        scoreFormat: AnilistScoreFormat,
+        fallbackEntry: AnilistListEntry,
+        nowMillis: Long,
+    ): SyncedOrQueuedEntry {
+        if (!syncRemote) return SyncedOrQueuedEntry(entry = fallbackEntry, queued = false)
+        if (token != null) {
+            runCatching {
+                saveListEntry(
+                    token = token,
+                    mediaId = mediaId,
+                    status = status,
+                    progress = progress,
+                    score = score,
+                    notes = notes,
+                    private = private,
+                    customLists = customLists,
+                    hiddenFromStatusLists = hiddenFromStatusLists,
+                    scoreFormat = scoreFormat,
+                )
+            }.onSuccess { entry ->
+                return SyncedOrQueuedEntry(entry = entry, queued = false)
+            }.onFailure { error ->
+                Log.w(TAG, "AniList batch save failed for $mediaId; queued", error)
+            }
+        }
+        container.database.syncMutationDao().upsertMutation(
+            syncMutationFactory.saveMediaListEntry(
+                mediaId = mediaId,
+                status = status,
+                progress = progress,
+                score = score,
+                notes = notes,
+                private = private,
+                customLists = customLists,
+                hiddenFromStatusLists = hiddenFromStatusLists,
+                nowMillis = nowMillis,
+            ).toEntity(),
+        )
+        return SyncedOrQueuedEntry(entry = fallbackEntry, queued = true)
+    }
+
+    private suspend fun deleteListEntryRemoteOrQueue(
+        token: String?,
+        syncRemote: Boolean,
+        entry: AnilistListEntry,
+        nowMillis: Long,
+    ): Boolean {
+        if (!syncRemote || entry.id <= 0) return false
+        if (token != null) {
+            runCatching {
+                check(container.anilistRepository.deleteListEntry(token, entry.id)) {
+                    "AniList delete did not confirm"
+                }
+            }.onSuccess {
+                return false
+            }.onFailure { error ->
+                Log.w(TAG, "AniList batch delete failed for ${entry.mediaId}; queued", error)
+            }
+        }
+        container.database.syncMutationDao().upsertMutation(
+            syncMutationFactory.deleteMediaListEntry(
+                mediaId = entry.mediaId,
+                entryId = entry.id,
+                nowMillis = nowMillis,
+            ).toEntity(),
+        )
+        return true
+    }
+
+    private suspend fun deleteLocalEntries(
+        mediaIds: List<Int>,
+        deleteLocalData: Boolean,
+    ) {
+        if (mediaIds.isEmpty()) return
+        val bindings = if (deleteLocalData) {
+            container.database.sourceBindingDao().cachedBindings().filter { it.mediaId in mediaIds }
+        } else {
+            emptyList()
+        }
+        container.database.listEntryDao().deleteEntriesForMedia(mediaIds)
+        if (!deleteLocalData) return
+        bindings.forEach { binding ->
+            container.database.chapterDao().deleteChaptersForSourceManga(binding.sourceId, binding.mangaUrl)
+        }
+        container.database.sourceBindingDao().deleteBindingsForMedia(mediaIds)
+        container.database.sourceSearchDao().clearForMedia(mediaIds)
+        container.database.progressDao().deleteProgressForMedia(mediaIds)
+        mediaIds.forEach { mediaId -> container.downloadCoordinator.removeMedia(mediaId) }
     }
 
     private fun List<LibraryItem>.sortedByTitle(): List<LibraryItem> =
@@ -697,5 +1091,11 @@ internal class AniListDataSource(
 
     private companion object {
         private const val TAG = "TankobunAniListData"
+        private const val DEFAULT_RECOMMENDATION_LIST_NAME = "Tankobun recommendations"
     }
 }
+
+private data class SyncedOrQueuedEntry(
+    val entry: AnilistListEntry,
+    val queued: Boolean,
+)

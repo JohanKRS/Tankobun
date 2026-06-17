@@ -138,6 +138,7 @@ data class AnilistListEntry(
     val private: Boolean,
     val customLists: List<String>,
     val updatedAtEpochSeconds: Long?,
+    val hiddenFromStatusLists: Boolean = false,
 )
 
 data class AnilistRecommendation(

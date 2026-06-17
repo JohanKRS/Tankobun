@@ -84,6 +84,7 @@ fun AnilistListEntry.toEntity(fetchedAtEpochMillis: Long): AnilistListEntryEntit
         private = private,
         customLists = customLists,
         updatedAtEpochSeconds = updatedAtEpochSeconds,
+        hiddenFromStatusLists = hiddenFromStatusLists,
         fetchedAtEpochMillis = fetchedAtEpochMillis,
     )
 
@@ -98,6 +99,7 @@ fun AnilistListEntryEntity.toModel(): AnilistListEntry =
         private = private,
         customLists = customLists,
         updatedAtEpochSeconds = updatedAtEpochSeconds,
+        hiddenFromStatusLists = hiddenFromStatusLists,
     )
 
 fun AnilistRecommendation.toEntity(mediaId: Int, fetchedAtEpochMillis: Long): AnilistRecommendationEntity =

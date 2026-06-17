@@ -74,6 +74,7 @@ object AnilistJsonMapper {
             private = obj.booleanOrFalse("private"),
             customLists = obj.stringArray("customLists"),
             updatedAtEpochSeconds = obj.longOrNull("updatedAt"),
+            hiddenFromStatusLists = obj.booleanOrFalse("hiddenFromStatusLists"),
         )
     }
 

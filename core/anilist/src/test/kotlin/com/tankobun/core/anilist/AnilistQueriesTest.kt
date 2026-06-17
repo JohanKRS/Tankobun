@@ -16,4 +16,20 @@ class AnilistQueriesTest {
         assertTrue(AnilistQueries.MangaListCollectionByUserName.contains("userName: \$userName"))
         assertFalse(AnilistQueries.MangaListCollectionByUserName.contains("userId"))
     }
+
+    @Test
+    fun listEntryQueriesIncludeHiddenFromStatusLists() {
+        assertTrue(AnilistQueries.MangaListCollectionByUserId.contains("hiddenFromStatusLists"))
+        assertTrue(AnilistQueries.MangaListCollectionByUserName.contains("hiddenFromStatusLists"))
+        assertTrue(AnilistQueries.MediaDetails.contains("hiddenFromStatusLists"))
+        assertTrue(AnilistQueries.SaveMediaListEntry.contains("\$hiddenFromStatusLists: Boolean"))
+        assertTrue(AnilistQueries.SaveMediaListEntry.contains("hiddenFromStatusLists: \$hiddenFromStatusLists"))
+    }
+
+    @Test
+    fun deleteMediaListEntryMutationUsesEntryId() {
+        assertTrue(AnilistQueries.DeleteMediaListEntry.contains("mutation DeleteMediaListEntry(\$id: Int!)"))
+        assertTrue(AnilistQueries.DeleteMediaListEntry.contains("DeleteMediaListEntry(id: \$id)"))
+        assertTrue(AnilistQueries.DeleteMediaListEntry.contains("deleted"))
+    }
 }

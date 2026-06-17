@@ -27,6 +27,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -281,6 +282,10 @@ internal fun MediaCollection(
     onContentHeightMeasured: ((Int) -> Unit)? = null,
     providedListState: LazyListState? = null,
     providedGridState: LazyGridState? = null,
+    selectedMediaIds: Set<Int> = emptySet(),
+    selectionMode: Boolean = false,
+    onToggleMediaSelection: ((AnilistMedia) -> Unit)? = null,
+    onLongPressMedia: ((AnilistMedia) -> Unit)? = null,
 ) {
     val configuration = LocalConfiguration.current
     val supportedCoverColumns = coverColumns
@@ -420,7 +425,16 @@ internal fun MediaCollection(
                     MediaRow(
                         media = item,
                         trackedStatus = trackedStatuses[item.id],
-                        onClick = { onSelectMedia(item) },
+                        selected = item.id in selectedMediaIds,
+                        selectionMode = selectionMode,
+                        onClick = {
+                            if (selectionMode) {
+                                onToggleMediaSelection?.invoke(item)
+                            } else {
+                                onSelectMedia(item)
+                            }
+                        },
+                        onLongClick = { onLongPressMedia?.invoke(item) },
                     )
                 }
                 if (isLoadingMore) {
@@ -510,7 +524,16 @@ internal fun MediaCollection(
                         viewMode = supportedViewMode,
                         showWholeCover = showWholeCovers,
                         trackedStatus = trackedStatuses[item.id],
-                        onClick = { onSelectMedia(item) },
+                        selected = item.id in selectedMediaIds,
+                        selectionMode = selectionMode,
+                        onClick = {
+                            if (selectionMode) {
+                                onToggleMediaSelection?.invoke(item)
+                            } else {
+                                onSelectMedia(item)
+                            }
+                        },
+                        onLongClick = { onLongPressMedia?.invoke(item) },
                     )
                 }
                 if (isLoadingMore) {
@@ -551,6 +574,9 @@ internal fun MediaCoverTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     trackedStatus: MediaStatus? = null,
+    selected: Boolean = false,
+    selectionMode: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val supportedViewMode = viewMode.supportedMediaViewMode()
     val coverModifier = Modifier
@@ -561,28 +587,45 @@ internal fun MediaCoverTile(
 
     Column(
         modifier = modifier
-            .clickable(
+            .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
+                onLongClick = onLongClick,
             ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Surface(
-            shape = RoundedCornerShape(coverCornerRadius),
-            color = if (showWholeCover) Color.Transparent else MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
-            shadowElevation = 0.dp,
-        ) {
-            TrackedCoverImage(
-                url = media.coverImage,
-                title = media.title.userPreferred,
-                trackedStatus = trackedStatus,
-                modifier = coverModifier,
-                contentScale = if (showWholeCover) ContentScale.Fit else ContentScale.Crop,
-                imageAlignment = if (showWholeCover) Alignment.BottomCenter else Alignment.Center,
-                cornerRadius = coverCornerRadius,
-            )
+        Box {
+            Surface(
+                shape = RoundedCornerShape(coverCornerRadius),
+                color = if (showWholeCover) Color.Transparent else MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
+                border = if (selected) {
+                    androidx.compose.foundation.BorderStroke(2.dp, LocalTankobunStyle.current.colors.accent)
+                } else {
+                    null
+                },
+            ) {
+                TrackedCoverImage(
+                    url = media.coverImage,
+                    title = media.title.userPreferred,
+                    trackedStatus = trackedStatus,
+                    modifier = coverModifier,
+                    contentScale = if (showWholeCover) ContentScale.Fit else ContentScale.Crop,
+                    imageAlignment = if (showWholeCover) Alignment.BottomCenter else Alignment.Center,
+                    cornerRadius = coverCornerRadius,
+                )
+            }
+            if (selectionMode) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = null,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp),
+                )
+            }
         }
         if (supportedViewMode != MediaViewMode.COVER_GRID) {
             Column(verticalArrangement = Arrangement.spacedBy(titleGap)) {
@@ -603,8 +646,21 @@ internal fun MediaCoverTile(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun MediaRow(media: AnilistMedia, trackedStatus: MediaStatus? = null, onClick: () -> Unit) {
-    ElevatedCard(onClick = onClick, shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
+internal fun MediaRow(
+    media: AnilistMedia,
+    trackedStatus: MediaStatus? = null,
+    selected: Boolean = false,
+    selectionMode: Boolean = false,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+) {
+    ElevatedCard(
+        modifier = Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick,
+        ),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+    ) {
         ListItem(
             headlineContent = {
                 Text(
@@ -636,12 +692,23 @@ internal fun MediaRow(media: AnilistMedia, trackedStatus: MediaStatus? = null, o
                 }
             },
             leadingContent = {
-                TrackedCoverImage(
-                    url = media.coverImage,
-                    title = media.title.userPreferred,
-                    trackedStatus = trackedStatus,
-                    modifier = Modifier.size(width = 56.dp, height = 78.dp),
-                )
+                Box {
+                    TrackedCoverImage(
+                        url = media.coverImage,
+                        title = media.title.userPreferred,
+                        trackedStatus = trackedStatus,
+                        modifier = Modifier.size(width = 56.dp, height = 78.dp),
+                    )
+                    if (selectionMode) {
+                        Checkbox(
+                            checked = selected,
+                            onCheckedChange = null,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(32.dp),
+                        )
+                    }
+                }
             },
         )
     }

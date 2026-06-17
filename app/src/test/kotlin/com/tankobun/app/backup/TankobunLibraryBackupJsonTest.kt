@@ -29,6 +29,7 @@ class TankobunLibraryBackupJsonTest {
                 private = true,
                 customLists = listOf("Favorites"),
                 updatedAtEpochSeconds = 1234L,
+                hiddenFromStatusLists = true,
             ),
         )
         val binding = SourceBinding(

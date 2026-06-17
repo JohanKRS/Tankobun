@@ -52,6 +52,7 @@ data class AnilistListEntryEntity(
     val private: Boolean,
     val customLists: List<String>,
     val updatedAtEpochSeconds: Long?,
+    val hiddenFromStatusLists: Boolean,
     val fetchedAtEpochMillis: Long,
 )
 

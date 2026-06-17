@@ -162,6 +162,7 @@ private fun AnilistListEntry.toJson(): JSONObject =
         .putNullable("notes", notes)
         .put("private", private)
         .put("customLists", customLists.toJsonArray())
+        .put("hiddenFromStatusLists", hiddenFromStatusLists)
         .putNullable("updatedAtEpochSeconds", updatedAtEpochSeconds)
 
 private fun JSONObject.toEntry(): AnilistListEntry =
@@ -175,6 +176,7 @@ private fun JSONObject.toEntry(): AnilistListEntry =
         private = optBoolean("private", false),
         customLists = optJSONArray("customLists").stringValues(),
         updatedAtEpochSeconds = optLongOrNull("updatedAtEpochSeconds"),
+        hiddenFromStatusLists = optBoolean("hiddenFromStatusLists", false),
     )
 
 private fun SourceBinding.toJson(): JSONObject =

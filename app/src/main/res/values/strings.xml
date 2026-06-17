@@ -846,6 +846,49 @@
     <string name="notification_new_chapters_text_single">%1$s in %2$s</string>
     <string name="notification_new_chapters_text_multi">%1$s updated with %2$s</string>
 
+    <string name="recommendations_default_list_name">Tankobun recommendations</string>
+    <string name="recommendations_share_chooser">Share recommendations</string>
+    <string name="recommendations_import_title">Import recommendations</string>
+    <string name="recommendations_import_desc">Review the list before importing. This file contains manga metadata and recommendations only, not manga content.</string>
+    <string name="recommendations_import_selected_count">%1$d of %2$d selected</string>
+    <string name="recommendations_import_select_all">Select all</string>
+    <string name="recommendations_import_select_none">Select none</string>
+    <string name="recommendations_import_existing">Already in your library</string>
+    <string name="recommendations_import_button">Import selected</string>
+
+    <string name="library_batch_selected_count_one">1 selected</string>
+    <string name="library_batch_selected_count">%1$d selected</string>
+    <string name="library_batch_selected_count_compact">%1$d sel.</string>
+    <string name="library_batch_share">Share</string>
+    <string name="library_batch_status">Status</string>
+    <string name="library_batch_add_list">Add list</string>
+    <string name="library_batch_remove_list">Remove list</string>
+    <string name="library_batch_delete">Delete</string>
+    <string name="library_batch_share_title">Share recommendations</string>
+    <string name="library_batch_share_desc">Creates a .tankobun-recs file for %1$d selected manga. It includes metadata only; no manga content, source links, downloads, notes, scores, or tokens.</string>
+    <string name="library_batch_list_name">List name</string>
+    <string name="library_batch_status_title">Change status</string>
+    <string name="library_batch_status_desc">Applies the status to %1$d selected manga and keeps their existing tracking details.</string>
+    <string name="library_batch_custom_list_add_title">Add to custom list</string>
+    <string name="library_batch_custom_list_remove_title">Remove from custom list</string>
+    <string name="library_batch_custom_list_desc">Updates a custom list for %1$d selected manga without changing status or progress.</string>
+    <string name="library_batch_no_custom_lists">The selected manga are not in any custom list.</string>
+    <string name="library_batch_delete_title">Remove selected manga</string>
+    <string name="library_batch_delete_desc">Choose how much local data to remove for %1$d selected manga.</string>
+    <string name="library_batch_delete_library_only">Remove from library</string>
+    <string name="library_batch_delete_with_local_data">Remove from library and local data</string>
+
+    <string name="msg_recommendations_share_ready">Recommendations ready to share</string>
+    <string name="msg_recommendations_share_failed">Recommendation sharing failed</string>
+    <string name="msg_recommendations_import_failed">Recommendation import failed</string>
+    <string name="msg_recommendations_imported">Imported %1$d recommendations</string>
+    <string name="msg_library_batch_status_updated">Updated status for %1$d manga</string>
+    <string name="msg_library_batch_failed">Batch action failed</string>
+    <string name="msg_library_batch_custom_list_removed">Removed custom list from %1$d manga</string>
+    <string name="msg_library_batch_custom_list_added">Added custom list to %1$d manga</string>
+    <string name="msg_library_batch_deleted">Removed %1$d manga from library</string>
+    <string name="msg_library_batch_queued">%1$d AniList updates were queued.</string>
+
     <plurals name="manga_count">
         <item quantity="one">%1$d manga</item>
         <item quantity="other">%1$d manga</item>

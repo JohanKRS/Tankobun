@@ -19,6 +19,7 @@ class SyncMutationFactory {
         notes: String? = null,
         private: Boolean? = null,
         customLists: List<String>? = null,
+        hiddenFromStatusLists: Boolean? = null,
         nowMillis: Long,
     ): SyncMutation {
         val payload = buildJsonObject {
@@ -32,6 +33,11 @@ class SyncMutationFactory {
             } else {
                 put("customLists", JsonNull)
             }
+            if (hiddenFromStatusLists != null) {
+                put("hiddenFromStatusLists", hiddenFromStatusLists)
+            } else {
+                put("hiddenFromStatusLists", JsonNull)
+            }
         }
         return SyncMutation(
             id = UUID.randomUUID().toString(),
@@ -43,4 +49,19 @@ class SyncMutationFactory {
             createdAtEpochMillis = nowMillis,
         )
     }
+
+    fun deleteMediaListEntry(
+        mediaId: Int,
+        entryId: Int,
+        nowMillis: Long,
+    ): SyncMutation =
+        SyncMutation(
+            id = UUID.randomUUID().toString(),
+            type = SyncMutationType.DELETE_MEDIA_LIST_ENTRY,
+            mediaId = mediaId,
+            payloadJson = buildJsonObject { put("entryId", entryId) }.toString(),
+            attempts = 0,
+            nextAttemptAtEpochMillis = nowMillis,
+            createdAtEpochMillis = nowMillis,
+        )
 }

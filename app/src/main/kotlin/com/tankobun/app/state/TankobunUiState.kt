@@ -11,6 +11,7 @@ import com.tankobun.app.TankobunThemeMode
 import com.tankobun.app.defaultSourceLanguages
 import com.tankobun.app.logic.BROWSE_SORT_SEARCH_MATCH
 import com.tankobun.app.updates.AppUpdateInfo
+import com.tankobun.app.sharing.RecommendationImportPreview
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMangaStats
@@ -111,6 +112,15 @@ data class TankobunUiState(
     val appUpdateInstallRequest: AppUpdateInstallRequest? = null,
     val appUpdateLastCheckedAtEpochMillis: Long = 0L,
     val appUpdateMessage: String? = null,
+    val selectedLibraryMediaIds: Set<Int> = emptySet(),
+    val libraryShareDialogVisible: Boolean = false,
+    val libraryBatchStatusDialogVisible: Boolean = false,
+    val libraryBatchCustomListDialogVisible: Boolean = false,
+    val libraryBatchDeleteDialogVisible: Boolean = false,
+    val libraryBatchRemoveCustomList: Boolean = false,
+    val recommendationImportPreview: RecommendationImportPreview? = null,
+    val selectedRecommendationImportMediaIds: Set<Int> = emptySet(),
+    val recommendationImportListName: String = "",
     val sourceMatches: List<SourceSearchResult> = emptyList(),
     val sourceMatchChapterCounts: Map<String, Int> = emptyMap(),
     val sourcePickerOpen: Boolean = false,
@@ -183,7 +193,7 @@ private fun List<LibraryItem>.toLibrarySections(): List<LibrarySection> {
         MediaStatus.REPEATING,
         MediaStatus.UNKNOWN,
     ).mapNotNull { status ->
-        val items = filter { it.entry.status == status }
+        val items = filter { it.entry.status == status && !it.entry.hiddenFromStatusLists }
         if (items.isEmpty()) null else LibrarySection(status.name, status.name, items, status)
     }
 

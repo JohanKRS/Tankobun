@@ -20,6 +20,7 @@ object DatabaseFactory {
                 MIGRATION_5_6,
                 MIGRATION_6_7,
                 MIGRATION_7_8,
+                MIGRATION_8_9,
             )
             .build()
     }
@@ -157,6 +158,12 @@ object DatabaseFactory {
             )
             db.execSQL("DROP TABLE `anilist_list_entries_v7`")
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_anilist_list_entries_mediaId` ON `anilist_list_entries` (`mediaId`)")
+        }
+    }
+
+    private val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `anilist_list_entries` ADD COLUMN `hiddenFromStatusLists` INTEGER NOT NULL DEFAULT 0")
         }
     }
 }

@@ -50,6 +50,12 @@ interface ListEntryDao {
     @Query("DELETE FROM anilist_list_entries WHERE mediaId NOT IN (:mediaIds)")
     suspend fun deleteEntriesNotIn(mediaIds: List<Int>)
 
+    @Query("DELETE FROM anilist_list_entries WHERE mediaId = :mediaId")
+    suspend fun deleteEntryForMedia(mediaId: Int)
+
+    @Query("DELETE FROM anilist_list_entries WHERE mediaId IN (:mediaIds)")
+    suspend fun deleteEntriesForMedia(mediaIds: List<Int>)
+
     @Query("DELETE FROM anilist_list_entries")
     suspend fun deleteAllEntries()
 }
@@ -117,6 +123,12 @@ interface SourceBindingDao {
 
     @Delete
     suspend fun deleteBinding(binding: SourceBindingEntity)
+
+    @Query("DELETE FROM source_bindings WHERE mediaId = :mediaId")
+    suspend fun deleteBindingForMedia(mediaId: Int)
+
+    @Query("DELETE FROM source_bindings WHERE mediaId IN (:mediaIds)")
+    suspend fun deleteBindingsForMedia(mediaIds: List<Int>)
 }
 
 @Dao
@@ -129,6 +141,9 @@ interface SourceSearchDao {
 
     @Query("DELETE FROM source_search_results WHERE mediaId = :mediaId")
     suspend fun clearForMedia(mediaId: Int)
+
+    @Query("DELETE FROM source_search_results WHERE mediaId IN (:mediaIds)")
+    suspend fun clearForMedia(mediaIds: List<Int>)
 
     @Upsert
     suspend fun upsertResults(results: List<SourceSearchResultEntity>)
@@ -147,6 +162,9 @@ interface ChapterDao {
 
     @Upsert
     suspend fun upsertChapters(chapters: List<SourceChapterEntity>)
+
+    @Query("DELETE FROM source_chapters WHERE sourceId = :sourceId AND mangaUrl = :mangaUrl")
+    suspend fun deleteChaptersForSourceManga(sourceId: Long, mangaUrl: String)
 }
 
 @Dao
@@ -189,6 +207,12 @@ interface ProgressDao {
 
     @Query("DELETE FROM reader_progress WHERE mediaId = :mediaId AND chapterUrl = :chapterUrl")
     suspend fun deleteProgressForChapter(mediaId: Int, chapterUrl: String)
+
+    @Query("DELETE FROM reader_progress WHERE mediaId = :mediaId")
+    suspend fun deleteProgressForMedia(mediaId: Int)
+
+    @Query("DELETE FROM reader_progress WHERE mediaId IN (:mediaIds)")
+    suspend fun deleteProgressForMedia(mediaIds: List<Int>)
 }
 
 @Dao

@@ -85,6 +85,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
@@ -94,11 +95,13 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistRemove
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
@@ -158,6 +161,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -264,6 +268,10 @@ internal fun LibraryScreen(
     val statusOptions = remember(sections) { libraryStatusOptions(sections) }
     val countryOptions = remember(sections) { libraryCountryOptions(sections) }
     val yearOptions = remember(sections) { libraryYearOptions(sections) }
+    val selectedLibraryItems = remember(state.libraryItems, state.selectedLibraryMediaIds) {
+        state.libraryItems.filter { item -> item.media.id in state.selectedLibraryMediaIds }
+    }
+    val selectedCount = state.selectedLibraryMediaIds.size
     val resetLibraryControls = {
         query = ""
         genres = emptySet()
@@ -273,6 +281,10 @@ internal fun LibraryScreen(
         countryOfOrigin = null
         year = null
         sort = LIBRARY_SORT_LIST_ORDER
+    }
+
+    BackHandler(enabled = selectedCount > 0) {
+        viewModel.clearLibraryBatchSelection()
     }
 
     val libraryHeader: @Composable () -> Unit = {
@@ -316,6 +328,7 @@ internal fun LibraryScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        val chromeInsets = LocalTankobunChromeInsets.current
         LibraryPager(
             sections = sections,
             query = query,
@@ -332,7 +345,32 @@ internal fun LibraryScreen(
             modifier = Modifier.fillMaxSize(),
             header = libraryHeader,
             onSelectMedia = onSelectMedia,
+            selectedMediaIds = state.selectedLibraryMediaIds,
+            selectionMode = selectedCount > 0,
+            onToggleMediaSelection = { media -> viewModel.toggleLibraryBatchSelection(media.id) },
+            onLongPressMedia = { media -> viewModel.startLibraryBatchSelection(media.id) },
         )
+        AnimatedVisibility(
+            visible = selectedCount > 0,
+            modifier = Modifier
+                .align(state.dockAlignment.libraryBatchBarAlignment())
+                .padding(horizontal = 14.dp)
+                .padding(bottom = chromeInsets.bottom + 8.dp),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            LibraryBatchActionBar(
+                selectedCount = selectedCount,
+                canRemoveCustomList = selectedLibraryItems.any { item -> item.entry.customLists.isNotEmpty() },
+                onShare = viewModel::showLibraryShareDialog,
+                onChangeStatus = viewModel::showLibraryBatchStatusDialog,
+                onAddCustomList = viewModel::showLibraryBatchAddCustomListDialog,
+                onRemoveCustomList = viewModel::showLibraryBatchRemoveCustomListDialog,
+                onDelete = viewModel::showLibraryBatchDeleteDialog,
+                onClose = viewModel::clearLibraryBatchSelection,
+                modifier = Modifier.widthIn(max = 560.dp),
+            )
+        }
     }
 
     picker?.let { activePicker ->
@@ -400,6 +438,45 @@ internal fun LibraryScreen(
             onSortChange = { sort = it ?: LIBRARY_SORT_LIST_ORDER },
             onReset = resetLibraryControls,
             onDismiss = { optionsOpen = false },
+        )
+    }
+
+    if (state.libraryShareDialogVisible) {
+        LibraryShareDialog(
+            selectedCount = selectedCount,
+            onShare = { name -> viewModel.shareSelectedRecommendations(context, name) },
+            onDismiss = viewModel::dismissLibraryBatchDialogs,
+        )
+    }
+
+    if (state.libraryBatchStatusDialogVisible) {
+        LibraryBatchStatusDialog(
+            selectedCount = selectedCount,
+            onSelectStatus = viewModel::applyLibraryBatchStatus,
+            onDismiss = viewModel::dismissLibraryBatchDialogs,
+        )
+    }
+
+    if (state.libraryBatchCustomListDialogVisible) {
+        val removableLists = selectedLibraryItems
+            .flatMap { item -> item.entry.customLists }
+            .distinctBy { it.lowercase(Locale.ROOT) }
+            .sortedWith(String.CASE_INSENSITIVE_ORDER)
+        LibraryBatchCustomListDialog(
+            selectedCount = selectedCount,
+            remove = state.libraryBatchRemoveCustomList,
+            availableLists = if (state.libraryBatchRemoveCustomList) removableLists else state.anilistCustomLists,
+            onConfirm = { name -> viewModel.applyLibraryBatchCustomList(name, state.libraryBatchRemoveCustomList) },
+            onDismiss = viewModel::dismissLibraryBatchDialogs,
+        )
+    }
+
+    if (state.libraryBatchDeleteDialogVisible) {
+        LibraryBatchDeleteDialog(
+            selectedCount = selectedCount,
+            onDeleteLibraryOnly = { viewModel.deleteSelectedLibraryEntries(deleteLocalData = false) },
+            onDeleteWithLocalData = { viewModel.deleteSelectedLibraryEntries(deleteLocalData = true) },
+            onDismiss = viewModel::dismissLibraryBatchDialogs,
         )
     }
 }
@@ -552,6 +629,10 @@ internal fun LibraryPager(
     modifier: Modifier,
     header: @Composable () -> Unit,
     onSelectMedia: (AnilistMedia) -> Unit,
+    selectedMediaIds: Set<Int> = emptySet(),
+    selectionMode: Boolean = false,
+    onToggleMediaSelection: (AnilistMedia) -> Unit = {},
+    onLongPressMedia: (AnilistMedia) -> Unit = {},
 ) {
     val chromeInsets = LocalTankobunChromeInsets.current
     if (sections.isEmpty()) {
@@ -740,6 +821,10 @@ internal fun LibraryPager(
                 },
                 providedListState = pageListStates[page],
                 providedGridState = pageGridStates[page],
+                selectedMediaIds = selectedMediaIds,
+                selectionMode = selectionMode,
+                onToggleMediaSelection = onToggleMediaSelection,
+                onLongPressMedia = onLongPressMedia,
             )
         }
         Column(
@@ -799,6 +884,431 @@ internal fun LibraryPager(
                         .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
                 )
             }
+        }
+    }
+}
+
+@Composable
+internal fun LibraryBatchActionBar(
+    selectedCount: Int,
+    canRemoveCustomList: Boolean,
+    onShare: () -> Unit,
+    onChangeStatus: () -> Unit,
+    onAddCustomList: () -> Unit,
+    onRemoveCustomList: () -> Unit,
+    onDelete: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val configuration = LocalConfiguration.current
+    val useCompactCount = configuration.screenWidthDp < 600
+    val selectedCountText = if (useCompactCount) {
+        tankobunString(R.string.library_batch_selected_count_compact, selectedCount)
+    } else if (selectedCount == 1) {
+        tankobunString(R.string.library_batch_selected_count_one)
+    } else {
+        tankobunString(R.string.library_batch_selected_count, selectedCount)
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = LocalTankobunStyle.current.colors.panel.copy(alpha = 0.96f),
+        contentColor = LocalTankobunStyle.current.colors.panelContent,
+        tonalElevation = 3.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            LocalTankobunStyle.current.colors.outline.copy(alpha = 0.22f),
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                selectedCountText,
+                modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            LibraryBatchSeparator()
+            LibraryBatchIconAction(
+                icon = Icons.Default.Share,
+                contentDescription = tankobunString(R.string.library_batch_share),
+                onClick = onShare,
+            )
+            LibraryBatchIconAction(
+                icon = Icons.Default.Check,
+                contentDescription = tankobunString(R.string.library_batch_status),
+                onClick = onChangeStatus,
+            )
+            LibraryBatchIconAction(
+                icon = Icons.AutoMirrored.Filled.PlaylistAdd,
+                contentDescription = tankobunString(R.string.library_batch_add_list),
+                onClick = onAddCustomList,
+            )
+            LibraryBatchIconAction(
+                icon = Icons.Default.PlaylistRemove,
+                contentDescription = tankobunString(R.string.library_batch_remove_list),
+                enabled = canRemoveCustomList,
+                onClick = onRemoveCustomList,
+            )
+            LibraryBatchIconAction(
+                icon = Icons.Default.Delete,
+                contentDescription = tankobunString(R.string.library_batch_delete),
+                onClick = onDelete,
+            )
+            LibraryBatchSeparator()
+            LibraryBatchIconAction(
+                icon = Icons.Default.Close,
+                contentDescription = tankobunString(R.string.common_close),
+                onClick = onClose,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LibraryBatchSeparator() {
+    Box(
+        modifier = Modifier
+            .height(26.dp)
+            .width(1.dp)
+            .background(LocalTankobunStyle.current.colors.outline.copy(alpha = 0.24f)),
+    )
+}
+
+@Composable
+internal fun LibraryBatchIconAction(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(38.dp),
+    ) {
+        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(19.dp))
+    }
+}
+
+private fun DockAlignment.libraryBatchBarAlignment(): Alignment =
+    when (this) {
+        DockAlignment.LEFT -> Alignment.BottomStart
+        DockAlignment.CENTER -> Alignment.BottomCenter
+        DockAlignment.RIGHT -> Alignment.BottomEnd
+    }
+
+@Composable
+internal fun LibraryShareDialog(
+    selectedCount: Int,
+    onShare: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val defaultName = tankobunString(R.string.recommendations_default_list_name)
+    var listName by remember(defaultName) { mutableStateOf(defaultName) }
+    TankobunDialog(onDismiss = onDismiss) {
+        TankobunDialogHeader(title = tankobunString(R.string.library_batch_share_title), onDismiss = onDismiss)
+        Text(
+            tankobunString(R.string.library_batch_share_desc, selectedCount),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = listName,
+            onValueChange = { listName = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text(tankobunString(R.string.library_batch_list_name)) },
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onDismiss) {
+                Text(tankobunString(R.string.common_cancel))
+            }
+            Spacer(Modifier.weight(1f))
+            TankobunActionButton(
+                label = tankobunString(R.string.library_batch_share),
+                icon = Icons.Default.Share,
+                enabled = listName.trim().isNotBlank(),
+                onClick = { onShare(listName) },
+            )
+        }
+    }
+}
+
+@Composable
+internal fun LibraryBatchStatusDialog(
+    selectedCount: Int,
+    onSelectStatus: (MediaStatus) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    TankobunDialog(onDismiss = onDismiss) {
+        TankobunDialogHeader(title = tankobunString(R.string.library_batch_status_title), onDismiss = onDismiss)
+        Text(
+            tankobunString(R.string.library_batch_status_desc, selectedCount),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            trackingStatuses().forEach { status ->
+                OutlinedButton(
+                    onClick = { onSelectStatus(status) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                ) {
+                    Text(status.displayName(), modifier = Modifier.weight(1f))
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun LibraryBatchCustomListDialog(
+    selectedCount: Int,
+    remove: Boolean,
+    availableLists: List<String>,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val initialName = if (remove) availableLists.firstOrNull().orEmpty() else ""
+    var listName by remember(remove, availableLists) { mutableStateOf(initialName) }
+    val title = if (remove) {
+        tankobunString(R.string.library_batch_custom_list_remove_title)
+    } else {
+        tankobunString(R.string.library_batch_custom_list_add_title)
+    }
+    TankobunDialog(onDismiss = onDismiss) {
+        TankobunDialogHeader(title = title, onDismiss = onDismiss)
+        Text(
+            tankobunString(R.string.library_batch_custom_list_desc, selectedCount),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!remove) {
+            OutlinedTextField(
+                value = listName,
+                onValueChange = { listName = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(tankobunString(R.string.library_batch_list_name)) },
+                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            )
+        }
+        if (availableLists.isNotEmpty()) {
+            FlowRowCompat {
+                availableLists.forEach { customList ->
+                    TankobunChip(
+                        selected = customList.equals(listName, ignoreCase = true),
+                        onClick = { listName = customList },
+                        label = { Text(customList, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    )
+                }
+            }
+        } else if (remove) {
+            Text(
+                tankobunString(R.string.library_batch_no_custom_lists),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onDismiss) {
+                Text(tankobunString(R.string.common_cancel))
+            }
+            Spacer(Modifier.weight(1f))
+            TankobunActionButton(
+                label = if (remove) {
+                    tankobunString(R.string.library_batch_remove_list)
+                } else {
+                    tankobunString(R.string.library_batch_add_list)
+                },
+                icon = if (remove) Icons.Default.PlaylistRemove else Icons.AutoMirrored.Filled.PlaylistAdd,
+                enabled = listName.trim().isNotBlank(),
+                onClick = { onConfirm(listName) },
+            )
+        }
+    }
+}
+
+@Composable
+internal fun LibraryBatchDeleteDialog(
+    selectedCount: Int,
+    onDeleteLibraryOnly: () -> Unit,
+    onDeleteWithLocalData: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    TankobunDialog(onDismiss = onDismiss) {
+        TankobunDialogHeader(title = tankobunString(R.string.library_batch_delete_title), onDismiss = onDismiss)
+        Text(
+            tankobunString(R.string.library_batch_delete_desc, selectedCount),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            TankobunActionButton(
+                label = tankobunString(R.string.library_batch_delete_library_only),
+                icon = Icons.Default.Delete,
+                filled = false,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onDeleteLibraryOnly,
+            )
+            TankobunActionButton(
+                label = tankobunString(R.string.library_batch_delete_with_local_data),
+                icon = Icons.Default.Delete,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onDeleteWithLocalData,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun RecommendationImportDialog(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+) {
+    val preview = state.recommendationImportPreview ?: return
+    val selectedCount = state.selectedRecommendationImportMediaIds.size
+    TankobunDialog(
+        onDismiss = viewModel::dismissRecommendationImport,
+        maxWidth = 680.dp,
+        fillMaxHeightFraction = 0.86f,
+        scrollable = false,
+    ) {
+        TankobunDialogHeader(
+            title = tankobunString(R.string.recommendations_import_title),
+            onDismiss = viewModel::dismissRecommendationImport,
+        )
+        Text(
+            tankobunString(R.string.recommendations_import_desc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = state.recommendationImportListName,
+            onValueChange = viewModel::setRecommendationImportListName,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text(tankobunString(R.string.library_batch_list_name)) },
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                tankobunString(
+                    R.string.recommendations_import_selected_count,
+                    selectedCount,
+                    preview.items.size,
+                ),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = { viewModel.setAllRecommendationImportItemsSelected(true) }) {
+                Text(tankobunString(R.string.recommendations_import_select_all))
+            }
+            TextButton(onClick = { viewModel.setAllRecommendationImportItemsSelected(false) }) {
+                Text(tankobunString(R.string.recommendations_import_select_none))
+            }
+        }
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(
+                items = preview.items,
+                key = { item -> item.media.id },
+            ) { item ->
+                val selected = item.media.id in state.selectedRecommendationImportMediaIds
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.panel))
+                        .clickable { viewModel.toggleRecommendationImportItem(item.media.id) },
+                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (selected) {
+                            LocalTankobunStyle.current.colors.accent.copy(alpha = 0.58f)
+                        } else {
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
+                        },
+                    ),
+                ) {
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                item.media.title.userPreferred,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        },
+                        supportingContent = {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    listOfNotNull(
+                                        item.media.mediaTypeLabel(),
+                                        item.media.startDateYear?.toString(),
+                                    ).joinToString(" / "),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                if (item.alreadyInLibrary) {
+                                    Text(
+                                        tankobunString(R.string.recommendations_import_existing),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = LocalTankobunStyle.current.colors.accent,
+                                    )
+                                }
+                            }
+                        },
+                        leadingContent = {
+                            CoverImage(
+                                url = item.media.coverImage,
+                                title = item.media.title.userPreferred,
+                                modifier = Modifier.size(width = 46.dp, height = 66.dp),
+                            )
+                        },
+                        trailingContent = {
+                            Checkbox(
+                                checked = selected,
+                                onCheckedChange = { viewModel.toggleRecommendationImportItem(item.media.id) },
+                            )
+                        },
+                    )
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = viewModel::dismissRecommendationImport) {
+                Text(tankobunString(R.string.common_cancel))
+            }
+            Spacer(Modifier.weight(1f))
+            TankobunActionButton(
+                label = tankobunString(R.string.recommendations_import_button),
+                icon = Icons.AutoMirrored.Filled.PlaylistAdd,
+                enabled = selectedCount > 0 && state.recommendationImportListName.trim().isNotBlank(),
+                onClick = viewModel::importSelectedRecommendations,
+            )
         }
     }
 }

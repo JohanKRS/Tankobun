@@ -4,6 +4,7 @@ import com.tankobun.app.backup.BackupDataSource
 import com.tankobun.app.backup.AppSettingsBackupDataSource
 import com.tankobun.app.backup.isDue
 import com.tankobun.app.anilist.AniListDataSource
+import com.tankobun.app.anilist.LibraryBatchMutationData
 import com.tankobun.app.browse.BrowseDataSource
 import com.tankobun.app.cache.CacheClearTarget
 import com.tankobun.app.cache.CacheStorageDataSource
@@ -88,17 +89,23 @@ import com.tankobun.app.logic.withTrackingSaveResult
 import com.tankobun.app.logic.withTrackingSaveStarted
 import com.tankobun.app.logic.withoutSelectedMedia
 import com.tankobun.app.reader.ReaderDataSource
+import com.tankobun.app.sharing.RECOMMENDATION_SHARE_MIME_TYPE
+import com.tankobun.app.sharing.RecommendationShareDataSource
+import com.tankobun.app.sharing.toImportPreview
 import com.tankobun.app.source.SourceDataSource
 import com.tankobun.app.source.SourcePickerSearchUpdate
 import com.tankobun.app.updates.AppUpdateDataSource
 import com.tankobun.app.state.ExtensionInstallRequest
 import com.tankobun.app.state.AppUpdateInstallRequest
 import com.tankobun.app.state.BackupMissingSource
+import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.state.ReaderChapterSegment
 import com.tankobun.app.state.ReaderLoadError
 import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.annotation.PluralsRes
@@ -179,6 +186,7 @@ class MainViewModel(
     private val aniListDataSource = AniListDataSource(container, cachePolicy)
     private val backupDataSource = BackupDataSource(container)
     private val appSettingsBackupDataSource = AppSettingsBackupDataSource(container)
+    private val recommendationShareDataSource = RecommendationShareDataSource(container)
     private val cacheStorageDataSource = CacheStorageDataSource(container)
     private val downloadDataSource = DownloadDataSource(container)
     private val extensionDataSource = ExtensionDataSource(container)
@@ -2332,6 +2340,343 @@ class MainViewModel(
         }
     }
 
+    fun startLibraryBatchSelection(mediaId: Int) {
+        _state.update {
+            it.copy(
+                selectedLibraryMediaIds = setOf(mediaId),
+                message = null,
+            )
+        }
+    }
+
+    fun toggleLibraryBatchSelection(mediaId: Int) {
+        _state.update { current ->
+            val selected = if (mediaId in current.selectedLibraryMediaIds) {
+                current.selectedLibraryMediaIds - mediaId
+            } else {
+                current.selectedLibraryMediaIds + mediaId
+            }
+            current.copy(selectedLibraryMediaIds = selected)
+        }
+    }
+
+    fun clearLibraryBatchSelection() {
+        _state.update {
+            it.copy(
+                selectedLibraryMediaIds = emptySet(),
+                libraryShareDialogVisible = false,
+                libraryBatchStatusDialogVisible = false,
+                libraryBatchCustomListDialogVisible = false,
+                libraryBatchDeleteDialogVisible = false,
+                libraryBatchRemoveCustomList = false,
+            )
+        }
+    }
+
+    fun dismissLibraryBatchDialogs() {
+        _state.update {
+            it.copy(
+                libraryShareDialogVisible = false,
+                libraryBatchStatusDialogVisible = false,
+                libraryBatchCustomListDialogVisible = false,
+                libraryBatchDeleteDialogVisible = false,
+                libraryBatchRemoveCustomList = false,
+            )
+        }
+    }
+
+    fun showLibraryShareDialog() {
+        _state.update { it.copy(libraryShareDialogVisible = it.selectedLibraryMediaIds.isNotEmpty()) }
+    }
+
+    fun showLibraryBatchStatusDialog() {
+        _state.update { it.copy(libraryBatchStatusDialogVisible = it.selectedLibraryMediaIds.isNotEmpty()) }
+    }
+
+    fun showLibraryBatchAddCustomListDialog() {
+        _state.update {
+            it.copy(
+                libraryBatchCustomListDialogVisible = it.selectedLibraryMediaIds.isNotEmpty(),
+                libraryBatchRemoveCustomList = false,
+            )
+        }
+    }
+
+    fun showLibraryBatchRemoveCustomListDialog() {
+        _state.update {
+            it.copy(
+                libraryBatchCustomListDialogVisible = it.selectedLibraryMediaIds.isNotEmpty(),
+                libraryBatchRemoveCustomList = true,
+            )
+        }
+    }
+
+    fun showLibraryBatchDeleteDialog() {
+        _state.update { it.copy(libraryBatchDeleteDialogVisible = it.selectedLibraryMediaIds.isNotEmpty()) }
+    }
+
+    fun shareSelectedRecommendations(context: Context, listName: String) {
+        val snapshot = _state.value
+        val items = snapshot.selectedLibraryItems()
+        if (items.isEmpty()) return
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                recommendationShareDataSource.createShareFile(
+                    selectedItems = items,
+                    suggestedListName = listName,
+                )
+            }.onSuccess { uri ->
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        selectedLibraryMediaIds = emptySet(),
+                        libraryShareDialogVisible = false,
+                        libraryBatchRemoveCustomList = false,
+                        message = string(R.string.msg_recommendations_share_ready),
+                    )
+                }
+                val share = Intent(Intent.ACTION_SEND).apply {
+                    type = RECOMMENDATION_SHARE_MIME_TYPE
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_TITLE, listName.trim().ifBlank { string(R.string.recommendations_default_list_name) })
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(share, string(R.string.recommendations_share_chooser)))
+            }.onFailure { error ->
+                Log.e(TAG, "Recommendation share failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_recommendations_share_failed)),
+                    )
+                }
+            }
+        }
+    }
+
+    fun openRecommendationImport(uri: Uri) {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                recommendationShareDataSource.readShareFile(uri)
+            }.onSuccess { payload ->
+                _state.update { current ->
+                    val preview = payload.toImportPreview(current.libraryItems.mapTo(mutableSetOf()) { item -> item.media.id })
+                    current.copy(
+                        busy = false,
+                        recommendationImportPreview = preview,
+                        recommendationImportListName = preview.suggestedListName,
+                        selectedRecommendationImportMediaIds = preview.items.mapTo(mutableSetOf()) { item -> item.media.id },
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "Recommendation import preview failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_recommendations_import_failed)),
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissRecommendationImport() {
+        _state.update {
+            it.copy(
+                recommendationImportPreview = null,
+                selectedRecommendationImportMediaIds = emptySet(),
+                recommendationImportListName = "",
+            )
+        }
+    }
+
+    fun setRecommendationImportListName(name: String) {
+        _state.update { it.copy(recommendationImportListName = name) }
+    }
+
+    fun toggleRecommendationImportItem(mediaId: Int) {
+        _state.update { current ->
+            val selected = if (mediaId in current.selectedRecommendationImportMediaIds) {
+                current.selectedRecommendationImportMediaIds - mediaId
+            } else {
+                current.selectedRecommendationImportMediaIds + mediaId
+            }
+            current.copy(selectedRecommendationImportMediaIds = selected)
+        }
+    }
+
+    fun setAllRecommendationImportItemsSelected(selected: Boolean) {
+        _state.update { current ->
+            current.copy(
+                selectedRecommendationImportMediaIds = if (selected) {
+                    current.recommendationImportPreview?.items.orEmpty().mapTo(mutableSetOf()) { it.media.id }
+                } else {
+                    emptySet()
+                },
+            )
+        }
+    }
+
+    fun importSelectedRecommendations() {
+        val snapshot = _state.value
+        val preview = snapshot.recommendationImportPreview ?: return
+        val selectedMedia = preview.items
+            .filter { item -> item.media.id in snapshot.selectedRecommendationImportMediaIds }
+            .map { it.media }
+        if (selectedMedia.isEmpty()) return
+        val listName = snapshot.recommendationImportListName.trim()
+            .ifBlank { string(R.string.recommendations_default_list_name) }
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                aniListDataSource.importRecommendationList(
+                    token = container.tokenStore.accessToken(),
+                    syncRemote = snapshot.libraryMode == LibraryMode.ANILIST,
+                    media = selectedMedia,
+                    listName = listName,
+                    knownCustomLists = snapshot.anilistCustomLists,
+                    existingItems = snapshot.libraryItems,
+                    scoreFormat = snapshot.anilistScoreFormat,
+                )
+            }.onSuccess { result ->
+                _state.update {
+                    it.withLibraryBatchMutationResult(
+                        result = result,
+                        successMessage = string(R.string.msg_recommendations_imported, result.updatedItems.size),
+                    ).copy(
+                        recommendationImportPreview = null,
+                        selectedRecommendationImportMediaIds = emptySet(),
+                        recommendationImportListName = "",
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "Recommendation import failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_recommendations_import_failed)),
+                    )
+                }
+            }
+        }
+    }
+
+    fun applyLibraryBatchStatus(status: MediaStatus) {
+        val snapshot = _state.value
+        val items = snapshot.selectedLibraryItems()
+        if (items.isEmpty()) return
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                aniListDataSource.updateBatchStatus(
+                    token = container.tokenStore.accessToken(),
+                    syncRemote = snapshot.libraryMode == LibraryMode.ANILIST,
+                    items = items,
+                    status = status,
+                    scoreFormat = snapshot.anilistScoreFormat,
+                )
+            }.onSuccess { result ->
+                _state.update {
+                    it.withLibraryBatchMutationResult(
+                        result = result,
+                        successMessage = string(R.string.msg_library_batch_status_updated, result.updatedItems.size),
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "Batch status update failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_library_batch_failed)),
+                    )
+                }
+            }
+        }
+    }
+
+    fun applyLibraryBatchCustomList(name: String, remove: Boolean) {
+        val normalizedName = name.trim()
+        val snapshot = _state.value
+        val items = snapshot.selectedLibraryItems()
+        if (normalizedName.isBlank() || items.isEmpty()) return
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                if (remove) {
+                    aniListDataSource.removeBatchCustomList(
+                        token = container.tokenStore.accessToken(),
+                        syncRemote = snapshot.libraryMode == LibraryMode.ANILIST,
+                        items = items,
+                        listName = normalizedName,
+                        scoreFormat = snapshot.anilistScoreFormat,
+                    )
+                } else {
+                    aniListDataSource.addBatchCustomList(
+                        token = container.tokenStore.accessToken(),
+                        syncRemote = snapshot.libraryMode == LibraryMode.ANILIST,
+                        items = items,
+                        listName = normalizedName,
+                        knownCustomLists = snapshot.anilistCustomLists,
+                        scoreFormat = snapshot.anilistScoreFormat,
+                    )
+                }
+            }.onSuccess { result ->
+                _state.update {
+                    it.withLibraryBatchMutationResult(
+                        result = result,
+                        successMessage = if (remove) {
+                            string(R.string.msg_library_batch_custom_list_removed, items.size)
+                        } else {
+                            string(R.string.msg_library_batch_custom_list_added, result.updatedItems.size)
+                        },
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "Batch custom list update failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_library_batch_failed)),
+                    )
+                }
+            }
+        }
+    }
+
+    fun deleteSelectedLibraryEntries(deleteLocalData: Boolean) {
+        val snapshot = _state.value
+        val items = snapshot.selectedLibraryItems()
+        if (items.isEmpty()) return
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                aniListDataSource.deleteBatchEntries(
+                    token = container.tokenStore.accessToken(),
+                    syncRemote = snapshot.libraryMode == LibraryMode.ANILIST,
+                    items = items,
+                    deleteLocalData = deleteLocalData,
+                )
+            }.onSuccess { result ->
+                _state.update {
+                    it.withLibraryBatchMutationResult(
+                        result = result,
+                        successMessage = string(R.string.msg_library_batch_deleted, result.removedMediaIds.size),
+                    )
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "Batch delete failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_library_batch_failed)),
+                    )
+                }
+            }
+        }
+    }
+
     fun setTrackingStatus(status: MediaStatus) {
         _state.update { it.copy(trackingStatus = status).withRecomputedTrackingDirty() }
         scheduleTrackingAutoSave()
@@ -2398,6 +2743,7 @@ class MainViewModel(
                         private = snapshot.selectedListEntry?.private ?: false,
                         customLists = customLists,
                         knownCustomLists = knownCustomLists,
+                        hiddenFromStatusLists = snapshot.selectedListEntry?.hiddenFromStatusLists,
                     )
                 } else {
                     aniListDataSource.saveTracking(
@@ -2411,6 +2757,7 @@ class MainViewModel(
                         customLists = customLists,
                         knownCustomLists = knownCustomLists,
                         scoreFormat = snapshot.anilistScoreFormat,
+                        hiddenFromStatusLists = snapshot.selectedListEntry?.hiddenFromStatusLists,
                     )
                 }
             }.onSuccess { result ->
@@ -2475,6 +2822,7 @@ class MainViewModel(
             private = snapshot.trackingPrivate,
             customLists = customLists,
             updatedAtEpochSeconds = System.currentTimeMillis() / 1000L,
+            hiddenFromStatusLists = false,
         )
 
         viewModelScope.launch {
@@ -2497,6 +2845,7 @@ class MainViewModel(
                         private = snapshot.trackingPrivate,
                         customLists = customLists,
                         knownCustomLists = knownCustomLists,
+                        hiddenFromStatusLists = false,
                     )
                 } else {
                     aniListDataSource.saveTracking(
@@ -2510,6 +2859,7 @@ class MainViewModel(
                         customLists = customLists,
                         knownCustomLists = knownCustomLists,
                         scoreFormat = snapshot.anilistScoreFormat,
+                        hiddenFromStatusLists = false,
                     )
                 }
             }.onSuccess { result ->
@@ -3818,6 +4168,58 @@ class MainViewModel(
         }
         lastReaderProgressSavedAtEpochMillis = next
         return next
+    }
+
+    private fun TankobunUiState.selectedLibraryItems(): List<LibraryItem> =
+        libraryItems.filter { item -> item.media.id in selectedLibraryMediaIds }
+
+    private fun TankobunUiState.withLibraryBatchMutationResult(
+        result: LibraryBatchMutationData,
+        successMessage: String,
+    ): TankobunUiState {
+        val updatedById = result.updatedItems.associateBy { it.media.id }
+        val existingIds = libraryItems.mapTo(mutableSetOf()) { it.media.id }
+        val nextItems = (
+            libraryItems
+                .filterNot { item -> item.media.id in result.removedMediaIds }
+                .map { item -> updatedById[item.media.id] ?: item } +
+                result.updatedItems.filterNot { item -> item.media.id in existingIds }
+            )
+            .distinctBy { item -> item.media.id }
+            .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
+        val selectedId = selectedMedia?.id
+        val nextSelectedEntry = when {
+            selectedId == null -> selectedListEntry
+            selectedId in result.removedMediaIds -> null
+            selectedId in updatedById -> updatedById[selectedId]?.entry
+            else -> selectedListEntry
+        }
+        val preserveTrackingForm = selectedId != null && trackingDirty
+        val queuedSuffix = if (result.queuedRemoteUpdates > 0) {
+            " ${string(R.string.msg_library_batch_queued, result.queuedRemoteUpdates)}"
+        } else {
+            ""
+        }
+        return copy(
+            anilistCustomLists = result.customLists,
+            libraryItems = nextItems,
+            library = nextItems.map { item -> item.media },
+            selectedListEntry = nextSelectedEntry,
+            trackingStatus = if (nextSelectedEntry != null && !preserveTrackingForm) nextSelectedEntry.status else trackingStatus,
+            trackingProgress = if (nextSelectedEntry != null && !preserveTrackingForm) nextSelectedEntry.progress.toString() else trackingProgress,
+            trackingScore = if (nextSelectedEntry != null && !preserveTrackingForm) nextSelectedEntry.score.formatTrackingScore(anilistScoreFormat) else trackingScore,
+            trackingNotes = if (nextSelectedEntry != null && !preserveTrackingForm) nextSelectedEntry.notes.orEmpty() else trackingNotes,
+            trackingPrivate = if (nextSelectedEntry != null && !preserveTrackingForm) nextSelectedEntry.private else trackingPrivate,
+            trackingCustomLists = if (nextSelectedEntry != null && !preserveTrackingForm) nextSelectedEntry.customLists.toSet() else trackingCustomLists,
+            selectedLibraryMediaIds = emptySet(),
+            libraryShareDialogVisible = false,
+            libraryBatchStatusDialogVisible = false,
+            libraryBatchCustomListDialogVisible = false,
+            libraryBatchDeleteDialogVisible = false,
+            libraryBatchRemoveCustomList = false,
+            busy = false,
+            message = successMessage + queuedSuffix,
+        )
     }
 
     @Suppress("UNCHECKED_CAST")

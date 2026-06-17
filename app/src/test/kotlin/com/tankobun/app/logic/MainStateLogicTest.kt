@@ -448,16 +448,25 @@ class MainStateLogicTest {
             media = media(7, "Planning"),
             entry = entry(mediaId = 7, status = MediaStatus.PLANNING, customLists = listOf("Favorites", "Reread")),
         )
+        val customOnly = LibraryItem(
+            media = media(99, "Recommendations"),
+            entry = entry(
+                mediaId = 99,
+                status = MediaStatus.PLANNING,
+                customLists = listOf("Favorites"),
+                hiddenFromStatusLists = true,
+            ),
+        )
 
         val sections = TankobunUiState(
             libraryMode = LibraryMode.LOCAL,
-            libraryItems = listOf(planning, current),
+            libraryItems = listOf(planning, current, customOnly),
         ).librarySections
 
         assertEquals(MediaStatus.CURRENT, sections.first { it.key == MediaStatus.CURRENT.name }.status)
         assertEquals(listOf(42), sections.first { it.key == MediaStatus.CURRENT.name }.items.map { it.media.id })
         assertEquals(listOf(7), sections.first { it.key == MediaStatus.PLANNING.name }.items.map { it.media.id })
-        assertEquals(listOf(7, 42), sections.first { it.key == "custom:Favorites" }.items.map { it.media.id }.sorted())
+        assertEquals(listOf(7, 42, 99), sections.first { it.key == "custom:Favorites" }.items.map { it.media.id }.sorted())
         assertEquals(listOf(7), sections.first { it.key == "custom:Reread" }.items.map { it.media.id })
     }
 
@@ -497,6 +506,7 @@ class MainStateLogicTest {
         notes: String? = null,
         private: Boolean = false,
         customLists: List<String> = emptyList(),
+        hiddenFromStatusLists: Boolean = false,
     ): AnilistListEntry =
         AnilistListEntry(
             id = mediaId * 10,
@@ -508,6 +518,7 @@ class MainStateLogicTest {
             private = private,
             customLists = customLists,
             updatedAtEpochSeconds = null,
+            hiddenFromStatusLists = hiddenFromStatusLists,
         )
 
     private fun source(id: Long = 1L, name: String = "Source"): SourceDescriptor =

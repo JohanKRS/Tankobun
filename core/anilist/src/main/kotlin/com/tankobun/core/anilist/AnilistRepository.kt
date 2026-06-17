@@ -378,6 +378,7 @@ class AnilistRepository(
         notes: String?,
         private: Boolean?,
         customLists: List<String>?,
+        hiddenFromStatusLists: Boolean? = null,
         scoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
     ): AnilistListEntry {
         val data = graphQlClient.execute(
@@ -392,11 +393,28 @@ class AnilistRepository(
                 if (customLists != null) {
                     put("customLists", buildJsonArray { customLists.forEach { add(it) } })
                 }
+                if (hiddenFromStatusLists != null) put("hiddenFromStatusLists", hiddenFromStatusLists)
                 put("scoreFormat", scoreFormat.name)
             },
             accessToken = accessToken,
         )
         return AnilistJsonMapper.listEntry(requireNotNull(data["SaveMediaListEntry"]))
+    }
+
+    suspend fun deleteListEntry(
+        accessToken: String,
+        entryId: Int,
+    ): Boolean {
+        val data = graphQlClient.execute(
+            query = AnilistQueries.DeleteMediaListEntry,
+            variables = buildJsonObject { put("id", entryId) },
+            accessToken = accessToken,
+        )
+        return data["DeleteMediaListEntry"]
+            ?.jsonObject
+            ?.get("deleted")
+            ?.jsonPrimitive
+            ?.booleanOrNull == true
     }
 
     suspend fun updateMangaCustomLists(

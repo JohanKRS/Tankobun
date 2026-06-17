@@ -847,6 +847,49 @@
     <string name="msg_local_backup_saved">Copia de biblioteca local guardada (%1$s)</string>
     <string name="msg_tracking_saved_local">Seguimiento guardado</string>
 
+    <string name="recommendations_default_list_name">Recomendaciones de Tankobun</string>
+    <string name="recommendations_share_chooser">Compartir recomendaciones</string>
+    <string name="recommendations_import_title">Importar recomendaciones</string>
+    <string name="recommendations_import_desc">Revisa la lista antes de importar. Este archivo contiene solo metadatos de manga y recomendaciones, no contenido de manga.</string>
+    <string name="recommendations_import_selected_count">%1$d de %2$d seleccionados</string>
+    <string name="recommendations_import_select_all">Seleccionar todo</string>
+    <string name="recommendations_import_select_none">No seleccionar nada</string>
+    <string name="recommendations_import_existing">Ya está en tu biblioteca</string>
+    <string name="recommendations_import_button">Importar seleccionados</string>
+
+    <string name="library_batch_selected_count_one">1 seleccionado</string>
+    <string name="library_batch_selected_count">%1$d seleccionados</string>
+    <string name="library_batch_selected_count_compact">%1$d sel.</string>
+    <string name="library_batch_share">Compartir</string>
+    <string name="library_batch_status">Estado</string>
+    <string name="library_batch_add_list">Agregar lista</string>
+    <string name="library_batch_remove_list">Quitar lista</string>
+    <string name="library_batch_delete">Eliminar</string>
+    <string name="library_batch_share_title">Compartir recomendaciones</string>
+    <string name="library_batch_share_desc">Crea un archivo .tankobun-recs para %1$d manga seleccionados. Incluye solo metadatos; sin contenido de manga, enlaces de fuentes, descargas, notas, puntuaciones ni tokens.</string>
+    <string name="library_batch_list_name">Nombre de la lista</string>
+    <string name="library_batch_status_title">Cambiar estado</string>
+    <string name="library_batch_status_desc">Aplica el estado a %1$d manga seleccionados y conserva sus detalles de seguimiento existentes.</string>
+    <string name="library_batch_custom_list_add_title">Agregar a lista personalizada</string>
+    <string name="library_batch_custom_list_remove_title">Quitar de lista personalizada</string>
+    <string name="library_batch_custom_list_desc">Actualiza una lista personalizada para %1$d manga seleccionados sin cambiar estado ni progreso.</string>
+    <string name="library_batch_no_custom_lists">Los manga seleccionados no están en ninguna lista personalizada.</string>
+    <string name="library_batch_delete_title">Quitar manga seleccionados</string>
+    <string name="library_batch_delete_desc">Elige cuántos datos locales quitar para %1$d manga seleccionados.</string>
+    <string name="library_batch_delete_library_only">Quitar de la biblioteca</string>
+    <string name="library_batch_delete_with_local_data">Quitar de la biblioteca y datos locales</string>
+
+    <string name="msg_recommendations_share_ready">Recomendaciones listas para compartir</string>
+    <string name="msg_recommendations_share_failed">Falló el compartir recomendaciones</string>
+    <string name="msg_recommendations_import_failed">Falló la importación de recomendaciones</string>
+    <string name="msg_recommendations_imported">%1$d recomendaciones importadas</string>
+    <string name="msg_library_batch_status_updated">Estado actualizado para %1$d manga</string>
+    <string name="msg_library_batch_failed">Falló la acción en lote</string>
+    <string name="msg_library_batch_custom_list_removed">Lista personalizada quitada de %1$d manga</string>
+    <string name="msg_library_batch_custom_list_added">Lista personalizada agregada a %1$d manga</string>
+    <string name="msg_library_batch_deleted">%1$d manga quitados de la biblioteca</string>
+    <string name="msg_library_batch_queued">%1$d actualizaciones de AniList quedaron en cola.</string>
+
     <plurals name="manga_count">
         <item quantity="one">%1$d manga</item>
         <item quantity="other">%1$d mangas</item>

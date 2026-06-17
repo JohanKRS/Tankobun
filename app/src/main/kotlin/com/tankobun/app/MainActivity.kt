@@ -1,6 +1,7 @@
 package com.tankobun.app
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -48,8 +49,25 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        val data = intent?.data ?: return
-        viewModel.handleOAuthRedirect(data.toString())
+        if (intent == null) return
+        val data = intent.data
+        if (data?.scheme == "tankobun") {
+            viewModel.handleOAuthRedirect(data.toString())
+            return
+        }
+        recommendationUriFromIntent(intent)?.let(viewModel::openRecommendationImport)
     }
 
 }
+
+private fun recommendationUriFromIntent(intent: Intent): Uri? =
+    when (intent.action) {
+        Intent.ACTION_VIEW -> intent.data
+        Intent.ACTION_SEND -> if (Build.VERSION.SDK_INT >= 33) {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
+        }
+        else -> null
+    }

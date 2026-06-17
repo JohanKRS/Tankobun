@@ -317,6 +317,7 @@ object AnilistQueries {
               notes
               private
               customLists(asArray: true)
+              hiddenFromStatusLists
               updatedAt
             }
             recommendations(sort: RATING_DESC, page: ${'$'}recommendationsPage, perPage: ${'$'}recommendationsPerPage) {
@@ -419,6 +420,7 @@ object AnilistQueries {
                 notes
                 private
                 customLists(asArray: true)
+                hiddenFromStatusLists
                 updatedAt
                 media {
                   id
@@ -469,6 +471,7 @@ object AnilistQueries {
                 notes
                 private
                 customLists(asArray: true)
+                hiddenFromStatusLists
                 updatedAt
                 media {
                   id
@@ -513,6 +516,7 @@ object AnilistQueries {
           ${'$'}notes: String,
           ${'$'}private: Boolean,
           ${'$'}customLists: [String],
+          ${'$'}hiddenFromStatusLists: Boolean,
           ${'$'}scoreFormat: ScoreFormat
         ) {
           SaveMediaListEntry(
@@ -522,7 +526,8 @@ object AnilistQueries {
             score: ${'$'}score,
             notes: ${'$'}notes,
             private: ${'$'}private,
-            customLists: ${'$'}customLists
+            customLists: ${'$'}customLists,
+            hiddenFromStatusLists: ${'$'}hiddenFromStatusLists
           ) {
             id
             mediaId
@@ -532,7 +537,16 @@ object AnilistQueries {
             notes
             private
             customLists(asArray: true)
+            hiddenFromStatusLists
             updatedAt
+          }
+        }
+    """
+
+    const val DeleteMediaListEntry = """
+        mutation DeleteMediaListEntry(${'$'}id: Int!) {
+          DeleteMediaListEntry(id: ${'$'}id) {
+            deleted
           }
         }
     """

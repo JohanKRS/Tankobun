@@ -964,6 +964,9 @@ internal fun TankobunScaffold(
                             .graphicsLayer { translationX = overlayDrawerTranslationPx },
                     )
                 }
+                if (state.recommendationImportPreview != null) {
+                    RecommendationImportDialog(state = state, viewModel = viewModel)
+                }
                 if (state.busy && !(state.sourcePickerOpen && state.sourcePickerLoading)) {
                     LinearProgressIndicator(
                         Modifier
