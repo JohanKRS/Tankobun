@@ -2,7 +2,7 @@ package com.tankobun.app.logic
 
 import com.tankobun.app.LibraryMode
 
-internal const val CURRENT_ONBOARDING_VERSION = 2
+internal const val CURRENT_ONBOARDING_VERSION = 3
 
 internal fun initialLibraryModeForStartup(
     storedMode: LibraryMode,

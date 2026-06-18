@@ -2,42 +2,38 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 30,
-    "versionName": "3.0.0",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.0.0/tankobun-3.0.0.apk",
-    "apkSha256": "4DACCF78DCB5E81103AE40C859C9FA1FB055AEBB226680F343F00027ACB52ED8",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.0.0",
-    "publishedAt": "2026-06-17T02:03:31Z",
-    "sizeBytes": 11742880,
+    "versionCode": 31,
+    "versionName": "3.1.0",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.1.0/tankobun-3.1.0.apk",
+    "apkSha256": "19BDFB1E1D2E08F5B907602D77B7F773EF033DD61B8D51B81ECF746CF4BEB543",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.1.0",
+    "publishedAt": "2026-06-18T02:17:11Z",
+    "sizeBytes": 11799080,
     "mandatory": false,
     "changelog": {
       "en": [
-        "The Book Club Release: share selected library manga as .tankobun-recs recommendation files.",
-        "Preview recommendation files before importing, pick individual titles, and add them to a named custom list.",
-        "Batch library selection can share recommendations, change status, edit custom lists, or remove manga across tabs.",
-        "Added Simplified Chinese app language support.",
-        "Improved custom-only recommendation handling so fixed status lists stay unselected until you choose one."
+        "Rebuilt onboarding as a full-screen setup with library mode, theme selection, and a guided app tour.",
+        "The tour now opens the first Popular manga from Browse to show details, tracking, and quick actions with real metadata.",
+        "Theme choices in onboarding now apply immediately, just like Appearance settings.",
+        "Browse content preloads during onboarding so new users arrive with content already loading or ready."
       ],
       "pt-BR": [
-        "A Release do Clube do Livro: compartilhe mangás selecionados da biblioteca como arquivos de recomendações .tankobun-recs.",
-        "Visualize arquivos de recomendações antes de importar, escolha títulos individuais e adicione tudo a uma lista personalizada com nome.",
-        "A seleção em lote da biblioteca permite compartilhar recomendações, mudar status, editar listas personalizadas ou remover mangás entre abas.",
-        "Adicionado suporte ao idioma chinês simplificado no app.",
-        "Melhorado o tratamento de recomendações só em listas personalizadas para manter listas fixas sem seleção até você escolher uma."
+        "Onboarding reconstruído como setup em tela cheia com modo da biblioteca, escolha de tema e tour guiado do app.",
+        "O tour agora abre o primeiro mangá de Mais populares em Explorar para mostrar detalhes, acompanhamento e ações rápidas com metadados reais.",
+        "Temas escolhidos no onboarding agora são aplicados imediatamente, igual nas configurações de Aparência.",
+        "O conteúdo de Explorar é pré-carregado durante o onboarding para novos usuários chegarem com conteúdo carregando ou pronto."
       ],
       "es": [
-        "La versión del club de lectura: comparte manga seleccionados de la biblioteca como archivos de recomendaciones .tankobun-recs.",
-        "Previsualiza archivos de recomendaciones antes de importar, elige títulos individuales y añádelos a una lista personalizada con nombre.",
-        "La selección por lotes de la biblioteca permite compartir recomendaciones, cambiar estados, editar listas personalizadas o eliminar manga entre pestañas.",
-        "Se añadió soporte de idioma chino simplificado en la app.",
-        "Se mejoró el manejo de recomendaciones solo en listas personalizadas para que las listas fijas queden sin selección hasta que elijas una."
+        "Onboarding reconstruido como configuración a pantalla completa con modo de biblioteca, selección de tema y tour guiado de la app.",
+        "El tour ahora abre el primer manga de Más populares en Explorar para mostrar detalles, seguimiento y acciones rápidas con metadatos reales.",
+        "Los temas elegidos en onboarding ahora se aplican de inmediato, igual que en los ajustes de Apariencia.",
+        "El contenido de Explorar se precarga durante onboarding para que los usuarios nuevos lleguen con contenido cargando o listo."
       ],
       "zh-CN": [
-        "读书会版本：将书架中选择的漫画分享为 .tankobun-recs 推荐文件。",
-        "导入前可预览推荐文件，选择单个标题，并加入一个可命名的自定义列表。",
-        "书架批量选择现在可跨标签分享推荐、更改状态、编辑自定义列表或移除漫画。",
-        "新增简体中文应用语言支持。",
-        "改进仅在自定义列表中的推荐项处理：在你选择固定状态前，固定状态列表会保持未选中。"
+        "入门流程改为全屏设置，包含书架模式、主题选择和应用导览。",
+        "导览现在会打开“最受欢迎”中的第一部漫画，用真实元数据展示详情、追踪和快捷操作。",
+        "入门流程中选择主题会立即应用，和“外观”设置保持一致。",
+        "入门流程期间会预加载“浏览”内容，新用户进入后可看到正在加载或已准备好的内容。"
       ]
     }
   }

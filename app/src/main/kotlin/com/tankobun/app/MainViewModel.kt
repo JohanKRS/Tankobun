@@ -443,7 +443,7 @@ class MainViewModel(
     }
 
     fun showOnboarding() {
-        _state.update { it.copy(onboardingVisible = true) }
+        _state.update { it.copy(onboardingVisible = true, appTourVisible = false) }
     }
 
     fun dismissOnboarding() {
@@ -451,7 +451,12 @@ class MainViewModel(
         _state.update { it.copy(onboardingVisible = false) }
     }
 
-    fun completeOnboarding(mode: LibraryMode, themeMode: TankobunThemeMode) {
+    fun prepareOnboardingBrowseContent() {
+        loadBrowseLanding()
+        loadBrowseTags()
+    }
+
+    fun completeOnboardingSetup(mode: LibraryMode, themeMode: TankobunThemeMode) {
         container.settingsStore.saveLibraryMode(mode)
         container.settingsStore.saveThemeMode(themeMode)
         container.settingsStore.saveOnboardingVersion(CURRENT_ONBOARDING_VERSION)
@@ -460,6 +465,7 @@ class MainViewModel(
                 libraryMode = mode,
                 themeMode = themeMode,
                 onboardingVisible = false,
+                appTourVisible = true,
             )
         }
         if (mode == LibraryMode.LOCAL) {
@@ -467,6 +473,15 @@ class MainViewModel(
         } else if (_state.value.loggedIn) {
             refreshLibrary()
         }
+    }
+
+    fun startAppTour() {
+        prepareOnboardingBrowseContent()
+        _state.update { it.copy(onboardingVisible = false, appTourVisible = true) }
+    }
+
+    fun dismissAppTour() {
+        _state.update { it.copy(appTourVisible = false) }
     }
 
     fun dismissReaderTutorial() {

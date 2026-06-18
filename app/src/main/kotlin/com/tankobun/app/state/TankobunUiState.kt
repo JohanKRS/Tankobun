@@ -42,6 +42,7 @@ data class TankobunUiState(
     val dockIndicatorAnimation: DockIndicatorAnimation = DockIndicatorAnimation.POP,
     val libraryMode: LibraryMode = LibraryMode.LOCAL,
     val onboardingVisible: Boolean = false,
+    val appTourVisible: Boolean = false,
     val anilistMergePromptVisible: Boolean = false,
     val readerTutorialVisible: Boolean = false,
     val viewerName: String? = null,

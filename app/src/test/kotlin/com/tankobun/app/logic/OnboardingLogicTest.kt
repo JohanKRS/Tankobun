@@ -8,7 +8,7 @@ import org.junit.Test
 
 class OnboardingLogicTest {
     @Test
-    fun existingTokenBeforeVersionTwoDefaultsToAniListMode() {
+    fun existingTokenBeforeCurrentVersionDefaultsToAniListMode() {
         assertEquals(
             LibraryMode.ANILIST,
             initialLibraryModeForStartup(
@@ -20,7 +20,7 @@ class OnboardingLogicTest {
     }
 
     @Test
-    fun completedVersionTwoKeepsStoredLibraryModeEvenWithToken() {
+    fun completedCurrentVersionKeepsStoredLibraryModeEvenWithToken() {
         assertEquals(
             LibraryMode.LOCAL,
             initialLibraryModeForStartup(
@@ -35,5 +35,11 @@ class OnboardingLogicTest {
     fun onboardingShowsOnlyBelowCurrentVersion() {
         assertTrue(shouldShowOnboarding(CURRENT_ONBOARDING_VERSION - 1))
         assertFalse(shouldShowOnboarding(CURRENT_ONBOARDING_VERSION))
+    }
+
+    @Test
+    fun versionTwoUsersSeeOnboardingVersionThree() {
+        assertTrue(shouldShowOnboarding(2))
+        assertFalse(shouldShowOnboarding(3))
     }
 }

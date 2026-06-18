@@ -412,6 +412,7 @@ private fun TankobunAppRootContent(
     ).normalized()
     val latestCurrentRoute = rememberUpdatedState(currentRoute)
     val latestSelectedMedia = rememberUpdatedState(selectedMedia)
+    val tourExampleMedia = state.browsePopular.firstOrNull()
 
     fun resetBackPressWindows() {
         lastHomeBackPressAt = 0L
@@ -451,6 +452,28 @@ private fun TankobunAppRootContent(
             resetBackPressWindows()
         } else {
             applyRoute(normalized)
+        }
+    }
+
+    fun showTourStep(step: AppTourStep) {
+        val exampleMedia = tourExampleMedia
+        routeHistory = emptyList()
+        applyRoute(
+            when (step) {
+                AppTourStep.LIBRARY -> TankobunRoute(tab = 0)
+                AppTourStep.BROWSE -> TankobunRoute(tab = 1)
+                AppTourStep.TRACKING,
+                AppTourStep.QUICK_ACTIONS,
+                AppTourStep.READER -> TankobunRoute(tab = 1, media = exampleMedia)
+                AppTourStep.SOURCES -> TankobunRoute(tab = 3, settingsRoute = SettingsRoute.SOURCES)
+                AppTourStep.BACKUPS -> TankobunRoute(tab = 3, settingsRoute = SettingsRoute.BACKUPS)
+                AppTourStep.PROFILE -> TankobunRoute(tab = 3, settingsRoute = SettingsRoute.PROFILE)
+            },
+        )
+        quickDrawerMode = if (step == AppTourStep.QUICK_ACTIONS && exampleMedia != null) {
+            QuickDrawerMode.OVERLAY
+        } else {
+            QuickDrawerMode.CLOSED
         }
     }
 
@@ -588,7 +611,17 @@ private fun TankobunAppRootContent(
                 OnboardingDialog(
                     initialLibraryMode = state.libraryMode,
                     initialThemeMode = state.themeMode,
-                    onComplete = viewModel::completeOnboarding,
+                    onPrepareBrowse = viewModel::prepareOnboardingBrowseContent,
+                    onThemeSelected = viewModel::setThemeMode,
+                    onComplete = viewModel::completeOnboardingSetup,
+                )
+            }
+            if (state.appTourVisible && !state.onboardingVisible && !readerOpen) {
+                AppTourOverlay(
+                    libraryMode = state.libraryMode,
+                    tourExampleMediaId = tourExampleMedia?.id,
+                    onStepChanged = ::showTourStep,
+                    onDismiss = viewModel::dismissAppTour,
                 )
             }
             if (state.anilistMergePromptVisible && !readerOpen) {

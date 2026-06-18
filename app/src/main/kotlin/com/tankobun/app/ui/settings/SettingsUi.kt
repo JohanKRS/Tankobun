@@ -549,7 +549,7 @@ internal fun SettingsDetailContent(
         SettingsRoute.ABOUT -> AboutSettingsScreen(
             state = state,
             viewModel = viewModel,
-            onReplayOnboarding = viewModel::showOnboarding,
+            onReplayOnboarding = viewModel::startAppTour,
             modifier = modifier,
         )
         SettingsRoute.SOURCES -> SourcesSettingsScreen(state, viewModel)
