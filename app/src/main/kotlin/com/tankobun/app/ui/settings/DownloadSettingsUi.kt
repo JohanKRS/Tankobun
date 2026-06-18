@@ -673,6 +673,7 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
         SettingsRoute.APPEARANCE -> buildList {
             add(tankobunThemeChoices().firstOrNull { it.mode == state.themeMode }?.name ?: "Neon Koi")
             add(tankobunString(R.string.dock_summary, state.dockAlignment.settingsLabel()))
+            add(state.dockIndicatorAnimation.settingsLabel())
         }.joinToString(" / ")
         SettingsRoute.LANGUAGES -> state.sourceLanguages.count { it != UNIVERSAL_SOURCE_LANGUAGE }.let { count ->
             tankobunQuantityString(R.plurals.source_language_count, count, count)

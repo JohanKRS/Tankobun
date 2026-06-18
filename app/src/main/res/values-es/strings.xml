@@ -104,6 +104,7 @@
     <string name="settings_downloads_subtitle">Revisa el almacenamiento local de capítulos y elimina manga descargado.</string>
     <string name="settings_theme_section">Tema</string>
     <string name="settings_dock_position">Posición del dock</string>
+    <string name="settings_dock_animation">Animación del dock</string>
     <string name="settings_system_ui">Interfaz del sistema</string>
     <string name="settings_layout">Diseño</string>
     <string name="settings_show_android_status_bar">Mostrar barra de estado de Android</string>
@@ -236,6 +237,11 @@
     <string name="dock_left">Izquierda</string>
     <string name="dock_center">Centro</string>
     <string name="dock_right">Derecha</string>
+    <string name="dock_animation_bouncy">Rebote</string>
+    <string name="dock_animation_inchworm">Gusanito</string>
+    <string name="dock_animation_rubber_band">Elástico</string>
+    <string name="dock_animation_pop">Pop</string>
+    <string name="dock_animation_comet">Estela de cometa</string>
     <string name="dock_summary">Dock %1$s</string>
 
     <string name="media_view_cover_only">Solo portada</string>

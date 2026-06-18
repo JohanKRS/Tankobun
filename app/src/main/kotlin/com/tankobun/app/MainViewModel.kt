@@ -243,6 +243,7 @@ class MainViewModel(
             ignoreDisplayCutout = container.settingsStore.ignoreDisplayCutout(),
             showAppStatusBar = container.settingsStore.showAppStatusBar(),
             dockAlignment = container.settingsStore.dockAlignment(),
+            dockIndicatorAnimation = container.settingsStore.dockIndicatorAnimation(),
             onboardingVisible = shouldShowOnboarding(initialOnboardingVersion),
             readerTutorialVisible = !container.settingsStore.readerTutorialCompleted(),
             readerMode = container.settingsStore.readerMode(),
@@ -548,6 +549,11 @@ class MainViewModel(
     fun setDockAlignment(alignment: DockAlignment) {
         container.settingsStore.saveDockAlignment(alignment)
         _state.update { it.copy(dockAlignment = alignment) }
+    }
+
+    fun setDockIndicatorAnimation(animation: DockIndicatorAnimation) {
+        container.settingsStore.saveDockIndicatorAnimation(animation)
+        _state.update { it.copy(dockIndicatorAnimation = animation) }
     }
 
     fun setLibraryViewMode(mode: MediaViewMode) {
@@ -1188,6 +1194,7 @@ class MainViewModel(
                 ignoreDisplayCutout = store.ignoreDisplayCutout(),
                 showAppStatusBar = store.showAppStatusBar(),
                 dockAlignment = store.dockAlignment(),
+                dockIndicatorAnimation = store.dockIndicatorAnimation(),
                 libraryMode = store.libraryMode(),
                 libraryViewMode = store.libraryViewMode(),
                 libraryCoverColumns = store.libraryCoverColumns(),

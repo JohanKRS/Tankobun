@@ -455,6 +455,11 @@ internal fun SettingsDetailContent(
                 selected = state.dockAlignment,
                 onSelect = viewModel::setDockAlignment,
             )
+            Text(tankobunString(R.string.settings_dock_animation), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            DockIndicatorAnimationRow(
+                selected = state.dockIndicatorAnimation,
+                onSelect = viewModel::setDockIndicatorAnimation,
+            )
             Text(tankobunString(R.string.settings_system_ui), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             SettingsToggleRow(
                 title = tankobunString(R.string.settings_show_android_status_bar),
@@ -1533,6 +1538,22 @@ internal fun DockAlignmentRow(
                 selected = selected == alignment,
                 onClick = { onSelect(alignment) },
                 label = { Text(alignment.settingsLabel()) },
+            )
+        }
+    }
+}
+
+@Composable
+internal fun DockIndicatorAnimationRow(
+    selected: DockIndicatorAnimation,
+    onSelect: (DockIndicatorAnimation) -> Unit,
+) {
+    FlowRowCompat {
+        DockIndicatorAnimation.entries.forEach { animation ->
+            TankobunChip(
+                selected = selected == animation,
+                onClick = { onSelect(animation) },
+                label = { Text(animation.settingsLabel()) },
             )
         }
     }

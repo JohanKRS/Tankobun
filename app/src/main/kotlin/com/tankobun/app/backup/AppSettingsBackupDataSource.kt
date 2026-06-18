@@ -6,6 +6,7 @@ import com.tankobun.app.AppLanguage
 import com.tankobun.app.BackupContent
 import com.tankobun.app.BackupSchedule
 import com.tankobun.app.DockAlignment
+import com.tankobun.app.DockIndicatorAnimation
 import com.tankobun.app.MediaViewMode
 import com.tankobun.app.TankobunThemeMode
 import com.tankobun.app.defaultSourceLanguages
@@ -92,6 +93,7 @@ internal class AppSettingsBackupDataSource(
             .put("ignoreDisplayCutout", snapshot.ignoreDisplayCutout)
             .put("showAppStatusBar", snapshot.showAppStatusBar)
             .put("dockAlignment", snapshot.dockAlignment.name)
+            .put("dockIndicatorAnimation", snapshot.dockIndicatorAnimation.name)
             .put("libraryMode", snapshot.libraryMode.name)
             .put("libraryViewMode", snapshot.libraryViewMode.name)
             .put("libraryCoverColumns", snapshot.libraryCoverColumns)
@@ -172,6 +174,7 @@ internal class AppSettingsBackupDataSource(
         settings.optBooleanOrNull("ignoreDisplayCutout")?.let(store::saveIgnoreDisplayCutout)
         settings.optBooleanOrNull("showAppStatusBar")?.let(store::saveShowAppStatusBar)
         settings.enumOrNull<DockAlignment>("dockAlignment")?.let(store::saveDockAlignment)
+        settings.enumOrNull<DockIndicatorAnimation>("dockIndicatorAnimation")?.let(store::saveDockIndicatorAnimation)
         settings.enumOrNull<com.tankobun.app.LibraryMode>("libraryMode")?.let(store::saveLibraryMode)
         settings.enumOrNull<MediaViewMode>("libraryViewMode")?.let(store::saveLibraryViewMode)
         settings.optIntOrNull("libraryCoverColumns")?.let(store::saveLibraryCoverColumns)
@@ -217,6 +220,7 @@ internal class AppSettingsBackupDataSource(
             ignoreDisplayCutout = store.ignoreDisplayCutout(),
             showAppStatusBar = store.showAppStatusBar(),
             dockAlignment = store.dockAlignment(),
+            dockIndicatorAnimation = store.dockIndicatorAnimation(),
             libraryViewMode = store.libraryViewMode(),
             libraryCoverColumns = store.libraryCoverColumns(),
             libraryShowWholeCovers = store.libraryShowWholeCovers(),

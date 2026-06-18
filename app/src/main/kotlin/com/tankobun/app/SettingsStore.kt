@@ -54,6 +54,19 @@ class SettingsStore(context: Context) {
         preferences.edit().putString(KEY_DOCK_ALIGNMENT, alignment.name).apply()
     }
 
+    fun dockIndicatorAnimation(): DockIndicatorAnimation {
+        val stored = preferences.getString(KEY_DOCK_INDICATOR_ANIMATION, null)
+        val animation = stored?.let { value -> runCatching { DockIndicatorAnimation.valueOf(value) }.getOrNull() }
+        if (stored != null && animation == null) {
+            saveDockIndicatorAnimation(DockIndicatorAnimation.POP)
+        }
+        return animation ?: DockIndicatorAnimation.POP
+    }
+
+    fun saveDockIndicatorAnimation(animation: DockIndicatorAnimation) {
+        preferences.edit().putString(KEY_DOCK_INDICATOR_ANIMATION, animation.name).apply()
+    }
+
     fun libraryMode(): LibraryMode =
         preferences.getString(KEY_LIBRARY_MODE, null)
             ?.let { stored -> runCatching { LibraryMode.valueOf(stored) }.getOrNull() }
@@ -458,6 +471,7 @@ class SettingsStore(context: Context) {
         const val KEY_IGNORE_DISPLAY_CUTOUT = "layout.ignore.display.cutout"
         const val KEY_SHOW_APP_STATUS_BAR = "layout.show.app.status.bar"
         const val KEY_DOCK_ALIGNMENT = "layout.dock.alignment"
+        const val KEY_DOCK_INDICATOR_ANIMATION = "layout.dock.indicator.animation"
         const val KEY_LIBRARY_MODE = "library.mode"
         const val KEY_ONBOARDING_VERSION = "onboarding.version"
         const val KEY_ONBOARDING_COMPLETED = "onboarding.completed"
@@ -560,6 +574,14 @@ enum class DockAlignment {
     LEFT,
     CENTER,
     RIGHT,
+}
+
+enum class DockIndicatorAnimation {
+    BOUNCY,
+    INCHWORM,
+    RUBBER_BAND,
+    POP,
+    COMET,
 }
 
 enum class BackupSchedule {

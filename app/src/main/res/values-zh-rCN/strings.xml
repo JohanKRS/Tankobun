@@ -105,6 +105,7 @@
     <string name="settings_downloads_subtitle">查看本地章节存储并移除已下载漫画。</string>
     <string name="settings_theme_section">主题</string>
     <string name="settings_dock_position">Dock 位置</string>
+    <string name="settings_dock_animation">Dock 动画</string>
     <string name="settings_system_ui">系统界面</string>
     <string name="settings_layout">布局</string>
     <string name="settings_show_android_status_bar">显示 Android 状态栏</string>
@@ -240,6 +241,11 @@
     <string name="dock_left">左侧</string>
     <string name="dock_center">居中</string>
     <string name="dock_right">右侧</string>
+    <string name="dock_animation_bouncy">弹跳</string>
+    <string name="dock_animation_inchworm">尺蠖</string>
+    <string name="dock_animation_rubber_band">橡皮筋</string>
+    <string name="dock_animation_pop">弹出</string>
+    <string name="dock_animation_comet">彗星尾迹</string>
     <string name="dock_summary">%1$s Dock</string>
 
     <string name="media_view_cover_only">仅封面</string>

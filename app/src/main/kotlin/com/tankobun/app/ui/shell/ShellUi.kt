@@ -157,11 +157,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -867,6 +869,7 @@ internal fun TankobunScaffold(
                             quickActionsVisible = showQuickActionsButton,
                             quickActionsOpen = quickDrawerMode != QuickDrawerMode.CLOSED,
                             onToggleQuickActions = ::toggleQuickDrawer,
+                            indicatorAnimation = state.dockIndicatorAnimation,
                             modifier = Modifier.height(FrostedDockHeight),
                         )
                     }
@@ -1305,6 +1308,7 @@ internal fun TankobunBottomNavigationBar(
     quickActionsVisible: Boolean = false,
     quickActionsOpen: Boolean = false,
     onToggleQuickActions: (() -> Unit)? = null,
+    indicatorAnimation: DockIndicatorAnimation = DockIndicatorAnimation.POP,
     modifier: Modifier = Modifier,
 ) {
     val styleColors = LocalTankobunStyle.current.colors
@@ -1318,44 +1322,6 @@ internal fun TankobunBottomNavigationBar(
     val itemSize = 44.dp
     val itemSpacing = 8.dp
     val indicatorSize = 40.dp
-    val density = LocalDensity.current
-    val indicatorOffsetPx = remember { Animatable(0f) }
-    val indicatorStretchPx = remember { Animatable(0f) }
-    val itemStridePx = with(density) { (itemSize + itemSpacing).toPx() }
-    val maxStretchPx = with(density) { 26.dp.toPx() }
-    val indicatorOffset = with(density) { indicatorOffsetPx.value.toDp() }
-    val indicatorWidth = with(density) { (indicatorSize.toPx() + indicatorStretchPx.value).toDp() }
-
-    LaunchedEffect(selectedIndex, itemStridePx) {
-        val targetOffsetPx = itemStridePx * selectedIndex
-        val travelPx = abs(targetOffsetPx - indicatorOffsetPx.value)
-        val stretchTargetPx = (travelPx * 0.42f).coerceIn(0f, maxStretchPx)
-        val slide = launch {
-            indicatorOffsetPx.animateTo(
-                targetValue = targetOffsetPx,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            )
-        }
-        val stretch = launch {
-            if (stretchTargetPx > 0f) {
-                indicatorStretchPx.animateTo(
-                    targetValue = stretchTargetPx,
-                    animationSpec = tween(durationMillis = 90),
-                )
-            }
-            indicatorStretchPx.animateTo(
-                targetValue = 0f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMedium,
-                ),
-            )
-        }
-        joinAll(slide, stretch)
-    }
 
     Box(
         modifier = modifier
@@ -1363,20 +1329,15 @@ internal fun TankobunBottomNavigationBar(
             .fillMaxWidth(),
         contentAlignment = Alignment.CenterStart,
     ) {
-        Box(
-            modifier = Modifier
-                .offset(x = indicatorOffset)
-                .size(itemSize),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(indicatorWidth)
-                    .height(indicatorSize)
-                    .clip(CircleShape)
-                    .background(styleColors.accent.copy(alpha = 0.88f)),
-            )
-        }
+        DockSelectionIndicator(
+            selectedIndex = selectedIndex,
+            animation = indicatorAnimation,
+            itemSize = itemSize,
+            itemSpacing = itemSpacing,
+            indicatorSize = indicatorSize,
+            color = styleColors.accent.copy(alpha = 0.88f),
+            modifier = Modifier.fillMaxSize(),
+        )
         Row(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.spacedBy(itemSpacing),
@@ -1438,6 +1399,260 @@ internal fun TankobunBottomNavigationBar(
                         modifier = Modifier.size(26.dp),
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DockSelectionIndicator(
+    selectedIndex: Int,
+    animation: DockIndicatorAnimation,
+    itemSize: Dp,
+    itemSpacing: Dp,
+    indicatorSize: Dp,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val density = LocalDensity.current
+    val itemSizePx = with(density) { itemSize.toPx() }
+    val itemStridePx = with(density) { (itemSize + itemSpacing).toPx() }
+    val indicatorSizePx = with(density) { indicatorSize.toPx() }
+    val maxStretchPx = with(density) { 32.dp.toPx() }
+    val initialCenterPx = itemSizePx / 2f + itemStridePx * selectedIndex
+    val centerPx = remember { Animatable(initialCenterPx) }
+    val trailCenterPx = remember { Animatable(initialCenterPx) }
+    val stretchPx = remember { Animatable(0f) }
+    val scale = remember { Animatable(1f) }
+    val alpha = remember { Animatable(1f) }
+    val leftEdgePx = remember { Animatable(initialCenterPx - indicatorSizePx / 2f) }
+    val rightEdgePx = remember { Animatable(initialCenterPx + indicatorSizePx / 2f) }
+
+    LaunchedEffect(selectedIndex, itemStridePx, indicatorSizePx, animation) {
+        val targetCenterPx = itemSizePx / 2f + itemStridePx * selectedIndex
+        when (animation) {
+            DockIndicatorAnimation.BOUNCY -> {
+                alpha.snapTo(1f)
+                scale.snapTo(1f)
+                val travelPx = abs(targetCenterPx - centerPx.value)
+                val stretchTargetPx = (travelPx * 0.42f).coerceIn(0f, maxStretchPx * 0.82f)
+                val slide = launch {
+                    centerPx.animateTo(
+                        targetValue = targetCenterPx,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMediumLow,
+                        ),
+                    )
+                }
+                val stretch = launch {
+                    if (stretchTargetPx > 0f) {
+                        stretchPx.animateTo(stretchTargetPx, tween(durationMillis = 90))
+                    }
+                    stretchPx.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium,
+                        ),
+                    )
+                }
+                joinAll(slide, stretch)
+                trailCenterPx.snapTo(targetCenterPx)
+                leftEdgePx.snapTo(targetCenterPx - indicatorSizePx / 2f)
+                rightEdgePx.snapTo(targetCenterPx + indicatorSizePx / 2f)
+            }
+
+            DockIndicatorAnimation.INCHWORM -> {
+                alpha.snapTo(1f)
+                scale.snapTo(1f)
+                stretchPx.snapTo(0f)
+                val currentCenterPx = (leftEdgePx.value + rightEdgePx.value) / 2f
+                if (abs(currentCenterPx - centerPx.value) > itemStridePx) {
+                    leftEdgePx.snapTo(centerPx.value - indicatorSizePx / 2f)
+                    rightEdgePx.snapTo(centerPx.value + indicatorSizePx / 2f)
+                }
+                val targetLeftPx = targetCenterPx - indicatorSizePx / 2f
+                val targetRightPx = targetCenterPx + indicatorSizePx / 2f
+                if (targetCenterPx >= (leftEdgePx.value + rightEdgePx.value) / 2f) {
+                    rightEdgePx.animateTo(targetRightPx, tween(durationMillis = 155))
+                    delay(35L)
+                    leftEdgePx.animateTo(
+                        targetValue = targetLeftPx,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium,
+                        ),
+                    )
+                } else {
+                    leftEdgePx.animateTo(targetLeftPx, tween(durationMillis = 155))
+                    delay(35L)
+                    rightEdgePx.animateTo(
+                        targetValue = targetRightPx,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium,
+                        ),
+                    )
+                }
+                centerPx.snapTo(targetCenterPx)
+                trailCenterPx.snapTo(targetCenterPx)
+            }
+
+            DockIndicatorAnimation.RUBBER_BAND -> {
+                alpha.snapTo(1f)
+                scale.snapTo(1f)
+                val travelPx = abs(targetCenterPx - centerPx.value)
+                val stretchTargetPx = (travelPx * 0.58f).coerceIn(0f, maxStretchPx)
+                val slide = launch {
+                    centerPx.animateTo(
+                        targetValue = targetCenterPx,
+                        animationSpec = spring(
+                            dampingRatio = 0.58f,
+                            stiffness = Spring.StiffnessMedium,
+                        ),
+                    )
+                }
+                val stretch = launch {
+                    if (stretchTargetPx > 0f) {
+                        stretchPx.animateTo(stretchTargetPx, tween(durationMillis = 105))
+                    }
+                    stretchPx.animateTo(-indicatorSizePx * 0.08f, tween(durationMillis = 80))
+                    stretchPx.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium,
+                        ),
+                    )
+                }
+                joinAll(slide, stretch)
+                trailCenterPx.snapTo(targetCenterPx)
+                leftEdgePx.snapTo(targetCenterPx - indicatorSizePx / 2f)
+                rightEdgePx.snapTo(targetCenterPx + indicatorSizePx / 2f)
+            }
+
+            DockIndicatorAnimation.POP -> {
+                stretchPx.snapTo(0f)
+                val shrink = launch { scale.animateTo(0.56f, tween(durationMillis = 65)) }
+                val fade = launch { alpha.animateTo(0.48f, tween(durationMillis = 65)) }
+                joinAll(shrink, fade)
+                centerPx.snapTo(targetCenterPx)
+                trailCenterPx.snapTo(targetCenterPx)
+                leftEdgePx.snapTo(targetCenterPx - indicatorSizePx / 2f)
+                rightEdgePx.snapTo(targetCenterPx + indicatorSizePx / 2f)
+                val grow = launch { scale.animateTo(1.14f, tween(durationMillis = 115)) }
+                val appear = launch { alpha.animateTo(1f, tween(durationMillis = 90)) }
+                joinAll(grow, appear)
+                scale.animateTo(
+                    targetValue = 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium,
+                    ),
+                )
+            }
+
+            DockIndicatorAnimation.COMET -> {
+                alpha.snapTo(1f)
+                scale.snapTo(1f)
+                stretchPx.snapTo(0f)
+                val slide = launch {
+                    centerPx.animateTo(
+                        targetValue = targetCenterPx,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium,
+                        ),
+                    )
+                }
+                val tail = launch {
+                    delay(30L)
+                    trailCenterPx.animateTo(
+                        targetValue = targetCenterPx,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = 105f,
+                        ),
+                    )
+                }
+                joinAll(slide, tail)
+                leftEdgePx.snapTo(targetCenterPx - indicatorSizePx / 2f)
+                rightEdgePx.snapTo(targetCenterPx + indicatorSizePx / 2f)
+            }
+        }
+    }
+
+    Canvas(modifier = modifier) {
+        val centerY = size.height / 2f
+        val base = indicatorSizePx
+        when (animation) {
+            DockIndicatorAnimation.BOUNCY -> {
+                val width = base + stretchPx.value.coerceAtLeast(0f)
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(centerPx.value - width / 2f, centerY - base / 2f),
+                    size = Size(width, base),
+                    cornerRadius = CornerRadius(base / 2f, base / 2f),
+                )
+            }
+
+            DockIndicatorAnimation.INCHWORM -> {
+                val left = minOf(leftEdgePx.value, rightEdgePx.value)
+                val right = maxOf(leftEdgePx.value, rightEdgePx.value)
+                val height = base
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(left, centerY - height / 2f),
+                    size = Size((right - left).coerceAtLeast(base * 0.76f), height),
+                    cornerRadius = CornerRadius(height / 2f, height / 2f),
+                )
+            }
+
+            DockIndicatorAnimation.RUBBER_BAND -> {
+                val stretch = stretchPx.value.coerceAtLeast(0f)
+                val stretchRatio = (stretch / maxStretchPx).coerceIn(0f, 1f)
+                val width = base + stretch
+                val height = base * (1f - 0.16f * stretchRatio)
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(centerPx.value - width / 2f, centerY - height / 2f),
+                    size = Size(width, height),
+                    cornerRadius = CornerRadius(height / 2f, height / 2f),
+                )
+            }
+
+            DockIndicatorAnimation.POP -> {
+                drawCircle(
+                    color = color.copy(alpha = color.alpha * alpha.value),
+                    radius = base / 2f * scale.value,
+                    center = Offset(centerPx.value, centerY),
+                )
+            }
+
+            DockIndicatorAnimation.COMET -> {
+                val start = trailCenterPx.value
+                val end = centerPx.value
+                val left = minOf(start, end)
+                val right = maxOf(start, end)
+                if (right - left > base * 0.22f) {
+                    drawRoundRect(
+                        color = color.copy(alpha = color.alpha * 0.16f),
+                        topLeft = Offset(left, centerY - base * 0.08f),
+                        size = Size(right - left, base * 0.16f),
+                        cornerRadius = CornerRadius(base * 0.08f, base * 0.08f),
+                    )
+                }
+                (5 downTo 1).forEach { index ->
+                    val amount = index / 6f
+                    val x = start + (end - start) * amount
+                    drawCircle(
+                        color = color.copy(alpha = color.alpha * (0.1f + 0.06f * index)),
+                        radius = base * (0.08f + 0.035f * index),
+                        center = Offset(x, centerY),
+                    )
+                }
+                drawCircle(color = color, radius = base / 2f, center = Offset(end, centerY))
             }
         }
     }

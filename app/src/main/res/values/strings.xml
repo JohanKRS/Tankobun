@@ -105,6 +105,7 @@
     <string name="settings_downloads_subtitle">Review local chapter storage and remove downloaded manga.</string>
     <string name="settings_theme_section">Theme</string>
     <string name="settings_dock_position">Dock position</string>
+    <string name="settings_dock_animation">Dock animation</string>
     <string name="settings_system_ui">System UI</string>
     <string name="settings_layout">Layout</string>
     <string name="settings_show_android_status_bar">Show Android status bar</string>
@@ -240,6 +241,11 @@
     <string name="dock_left">Left</string>
     <string name="dock_center">Center</string>
     <string name="dock_right">Right</string>
+    <string name="dock_animation_bouncy">Bouncy</string>
+    <string name="dock_animation_inchworm">Inchworm</string>
+    <string name="dock_animation_rubber_band">Rubber band</string>
+    <string name="dock_animation_pop">Pop</string>
+    <string name="dock_animation_comet">Comet trail</string>
     <string name="dock_summary">%1$s dock</string>
 
     <string name="media_view_cover_only">Cover only</string>
