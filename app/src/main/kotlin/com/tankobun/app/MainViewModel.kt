@@ -2418,7 +2418,7 @@ class MainViewModel(
         _state.update { it.copy(libraryBatchDeleteDialogVisible = it.selectedLibraryMediaIds.isNotEmpty()) }
     }
 
-    fun shareSelectedRecommendations(context: Context, listName: String) {
+    fun shareSelectedRecommendations(context: Context, listName: String, messagesByMediaId: Map<Int, String>) {
         val snapshot = _state.value
         val items = snapshot.selectedLibraryItems()
         if (items.isEmpty()) return
@@ -2428,6 +2428,7 @@ class MainViewModel(
                 recommendationShareDataSource.createShareFile(
                     selectedItems = items,
                     suggestedListName = listName,
+                    messagesByMediaId = messagesByMediaId,
                 )
             }.onSuccess { uri ->
                 val shareTitle = listName.trim().ifBlank { string(R.string.recommendations_default_list_name) }
@@ -2510,7 +2511,7 @@ class MainViewModel(
     ) {
         val enrichedById = runCatching {
             aniListDataSource.enrichRecommendationMedia(
-                media = payload.items,
+                media = payload.items.map { item -> item.media },
                 accessToken = container.tokenStore.accessToken(),
                 titleLanguage = _state.value.anilistTitleLanguage,
             ).associateBy { it.id }

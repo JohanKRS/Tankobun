@@ -198,6 +198,7 @@ import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import com.tankobun.app.logic.nextInReadingOrderAfter
 import com.tankobun.app.logic.sourceSettingsKey
+import com.tankobun.app.sharing.RECOMMENDATION_MESSAGE_MAX_LENGTH
 import com.tankobun.app.state.DownloadStorageItem
 import com.tankobun.app.state.ExtensionInstallRequest
 import com.tankobun.app.state.LibraryItem
@@ -444,8 +445,10 @@ internal fun LibraryScreen(
 
     if (state.libraryShareDialogVisible) {
         LibraryShareDialog(
-            selectedCount = selectedCount,
-            onShare = { name -> viewModel.shareSelectedRecommendations(context, name) },
+            selectedItems = selectedLibraryItems,
+            onShare = { name, messagesByMediaId ->
+                viewModel.shareSelectedRecommendations(context, name, messagesByMediaId)
+            },
             onDismiss = viewModel::dismissLibraryBatchDialogs,
         )
     }
@@ -1009,16 +1012,28 @@ private fun DockAlignment.libraryBatchBarAlignment(): Alignment =
 
 @Composable
 internal fun LibraryShareDialog(
-    selectedCount: Int,
-    onShare: (String) -> Unit,
+    selectedItems: List<LibraryItem>,
+    onShare: (String, Map<Int, String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val defaultName = tankobunString(R.string.recommendations_default_list_name)
+    val shareItems = remember(selectedItems) {
+        selectedItems.sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
+    }
     var listName by remember(defaultName) { mutableStateOf(defaultName) }
-    TankobunDialog(onDismiss = onDismiss) {
+    var expandedMessageIds by remember(shareItems) { mutableStateOf(emptySet<Int>()) }
+    var messagesByMediaId by remember(shareItems) {
+        mutableStateOf(shareItems.associate { item -> item.media.id to "" })
+    }
+    TankobunDialog(
+        onDismiss = onDismiss,
+        maxWidth = 680.dp,
+        fillMaxHeightFraction = 0.86f,
+        scrollable = false,
+    ) {
         TankobunDialogHeader(title = tankobunString(R.string.library_batch_share_title), onDismiss = onDismiss)
         Text(
-            tankobunString(R.string.library_batch_share_desc, selectedCount),
+            tankobunString(R.string.library_batch_share_desc, shareItems.size),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -1030,6 +1045,49 @@ internal fun LibraryShareDialog(
             label = { Text(tankobunString(R.string.library_batch_list_name)) },
             shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
         )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+        ) {
+            if (shareItems.isEmpty()) {
+                Text(
+                    tankobunString(R.string.recommendations_import_empty),
+                    modifier = Modifier.align(Alignment.Center),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(
+                        items = shareItems,
+                        key = { item -> item.media.id },
+                    ) { item ->
+                        val mediaId = item.media.id
+                        val message = messagesByMediaId[mediaId].orEmpty()
+                        val expanded = mediaId in expandedMessageIds
+                        RecommendationShareItemRow(
+                            item = item,
+                            message = message,
+                            expanded = expanded,
+                            onToggleExpanded = {
+                                expandedMessageIds = if (expanded) {
+                                    expandedMessageIds - mediaId
+                                } else {
+                                    expandedMessageIds + mediaId
+                                }
+                            },
+                            onMessageChange = { next ->
+                                messagesByMediaId = messagesByMediaId + (mediaId to next.take(RECOMMENDATION_MESSAGE_MAX_LENGTH))
+                            },
+                        )
+                    }
+                }
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onDismiss) {
                 Text(tankobunString(R.string.common_cancel))
@@ -1038,9 +1096,107 @@ internal fun LibraryShareDialog(
             TankobunActionButton(
                 label = tankobunString(R.string.library_batch_share),
                 icon = Icons.Default.Share,
-                enabled = listName.trim().isNotBlank(),
-                onClick = { onShare(listName) },
+                enabled = listName.trim().isNotBlank() && shareItems.isNotEmpty(),
+                onClick = { onShare(listName, messagesByMediaId) },
             )
+        }
+    }
+}
+
+@Composable
+private fun RecommendationShareItemRow(
+    item: LibraryItem,
+    message: String,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onMessageChange: (String) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.16f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CoverImage(
+                    url = item.media.coverImage,
+                    title = item.media.title.userPreferred,
+                    modifier = Modifier.size(width = 42.dp, height = 60.dp),
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        item.media.title.userPreferred,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        listOfNotNull(
+                            item.media.mediaTypeLabel(),
+                            item.media.startDateYear?.toString(),
+                        ).joinToString(" / "),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (!expanded && message.isNotBlank()) {
+                        Text(
+                            message,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                TextButton(onClick = onToggleExpanded) {
+                    Text(
+                        when {
+                            expanded -> tankobunString(R.string.recommendations_share_message_done)
+                            message.isBlank() -> tankobunString(R.string.recommendations_share_add_message)
+                            else -> tankobunString(R.string.recommendations_share_edit_message)
+                        },
+                        maxLines = 1,
+                    )
+                }
+            }
+            AnimatedVisibility(visible = expanded) {
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = onMessageChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 3,
+                    label = { Text(tankobunString(R.string.recommendations_share_message_label)) },
+                    placeholder = { Text(tankobunString(R.string.recommendations_share_message_placeholder)) },
+                    supportingText = {
+                        Text(
+                            tankobunString(
+                                R.string.recommendations_share_message_counter,
+                                message.length,
+                                RECOMMENDATION_MESSAGE_MAX_LENGTH,
+                            ),
+                        )
+                    },
+                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                )
+            }
         }
     }
 }
@@ -1314,6 +1470,21 @@ internal fun RecommendationImportDialog(
                                                     tankobunString(R.string.recommendations_import_existing),
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = LocalTankobunStyle.current.colors.accent,
+                                                )
+                                            }
+                                            item.message?.takeIf { it.isNotBlank() }?.let { message ->
+                                                Text(
+                                                    tankobunString(R.string.recommendations_import_message_label),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                )
+                                                Text(
+                                                    message,
+                                                    maxLines = 4,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
                                             }
                                         }

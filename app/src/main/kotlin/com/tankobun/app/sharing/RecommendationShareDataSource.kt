@@ -14,6 +14,7 @@ internal class RecommendationShareDataSource(
     suspend fun createShareFile(
         selectedItems: List<LibraryItem>,
         suggestedListName: String,
+        messagesByMediaId: Map<Int, String> = emptyMap(),
     ): Uri = withContext(Dispatchers.IO) {
         check(selectedItems.isNotEmpty()) { "No recommendations selected" }
         val directory = File(container.application.cacheDir, "recommendations").also { it.mkdirs() }
@@ -21,7 +22,12 @@ internal class RecommendationShareDataSource(
         val file = File(directory, suggestedRecommendationFileName(suggestedListName))
         val payload = buildRecommendationShareJson(
             suggestedListName = suggestedListName,
-            items = selectedItems.map { it.media },
+            items = selectedItems.map { item ->
+                RecommendationShareItem(
+                    media = item.media,
+                    message = messagesByMediaId[item.media.id]?.trim()?.take(RECOMMENDATION_MESSAGE_MAX_LENGTH),
+                )
+            },
         )
         file.writeText(payload, Charsets.UTF_8)
         FileProvider.getUriForFile(

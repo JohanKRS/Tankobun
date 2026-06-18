@@ -859,13 +859,14 @@
     <string name="recommendations_file_label">Recomendações do Tankobun</string>
     <string name="recommendations_share_chooser">Compartilhar recomendações</string>
     <string name="recommendations_import_title">Importar recomendações</string>
-    <string name="recommendations_import_desc">Revise a lista antes de importar. Este arquivo contém apenas metadados de mangá e recomendações, não conteúdo de mangá.</string>
+    <string name="recommendations_import_desc">Revise a lista antes de importar. Este arquivo contém apenas metadados de mangá, recomendações e mensagens curtas opcionais, não conteúdo de mangá.</string>
     <string name="recommendations_import_selected_count">%1$d de %2$d selecionados</string>
     <string name="recommendations_import_select_all">Selecionar todos</string>
     <string name="recommendations_import_select_none">Selecionar nenhum</string>
     <string name="recommendations_import_loading_details">Atualizando capas pelo AniList...</string>
     <string name="recommendations_import_empty">Nenhuma recomendação foi encontrada neste arquivo.</string>
     <string name="recommendations_import_existing">Já está na sua biblioteca</string>
+    <string name="recommendations_import_message_label">Por que recomendaram</string>
     <string name="recommendations_import_button">Importar selecionados</string>
 
     <string name="library_batch_selected_count_one">1 selecionado</string>
@@ -877,7 +878,13 @@
     <string name="library_batch_remove_list">Remover lista</string>
     <string name="library_batch_delete">Excluir</string>
     <string name="library_batch_share_title">Compartilhar recomendações</string>
-    <string name="library_batch_share_desc">Cria um arquivo .tankobun-recs para %1$d mangás selecionados. Ele inclui apenas metadados; sem conteúdo de mangá, links de fontes, downloads, notas, pontuações ou tokens.</string>
+    <string name="library_batch_share_desc">Cria um arquivo .tankobun-recs para %1$d mangás selecionados. Ele inclui apenas metadados e mensagens curtas opcionais; sem conteúdo de mangá, links de fontes, downloads, notas do tracker, pontuações ou tokens.</string>
+    <string name="recommendations_share_add_message">Adicionar nota</string>
+    <string name="recommendations_share_edit_message">Editar nota</string>
+    <string name="recommendations_share_message_done">Pronto</string>
+    <string name="recommendations_share_message_label">Nota da recomendação</string>
+    <string name="recommendations_share_message_placeholder">Um motivo rápido para a pessoa gostar</string>
+    <string name="recommendations_share_message_counter">%1$d/%2$d</string>
     <string name="library_batch_list_name">Nome da lista</string>
     <string name="library_batch_status_title">Alterar status</string>
     <string name="library_batch_status_desc">Aplica o status a %1$d mangás selecionados e mantém os detalhes de acompanhamento existentes.</string>

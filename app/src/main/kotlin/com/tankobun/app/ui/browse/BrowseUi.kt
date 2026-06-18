@@ -596,6 +596,7 @@ internal fun BrowseLanding(
 private val BrowseLandingContentPadding = 18.dp
 private val BrowseHeaderTextGap = 24.dp
 private val BrowseShelfTitleHeight = 62.dp
+private val BrowseShelfItemGap = 12.dp
 
 @Composable
 internal fun BrowseMangaShelf(
@@ -629,7 +630,7 @@ internal fun BrowseMangaShelf(
             } else {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = BrowseLandingContentPadding),
-                    horizontalArrangement = Arrangement.spacedBy(28.dp),
+                    horizontalArrangement = Arrangement.spacedBy(BrowseShelfItemGap),
                 ) {
                     items(shelfMedia, key = { it.id }) { item ->
                         BrowseShelfTile(

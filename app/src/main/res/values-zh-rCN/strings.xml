@@ -858,13 +858,14 @@
     <string name="recommendations_file_label">Tankobun 推荐</string>
     <string name="recommendations_share_chooser">分享推荐</string>
     <string name="recommendations_import_title">导入推荐</string>
-    <string name="recommendations_import_desc">导入前先查看列表。此文件只包含漫画元数据和推荐，不包含漫画内容。</string>
+    <string name="recommendations_import_desc">导入前先查看列表。此文件只包含漫画元数据、推荐和可选短消息，不包含漫画内容。</string>
     <string name="recommendations_import_selected_count">已选择 %1$d / %2$d 项</string>
     <string name="recommendations_import_select_all">全选</string>
     <string name="recommendations_import_select_none">全不选</string>
     <string name="recommendations_import_loading_details">正在从 AniList 刷新封面...</string>
     <string name="recommendations_import_empty">此文件中未找到推荐。</string>
     <string name="recommendations_import_existing">已在你的书架中</string>
+    <string name="recommendations_import_message_label">推荐理由</string>
     <string name="recommendations_import_button">导入所选项</string>
 
     <string name="library_batch_selected_count_one">已选择 1 项</string>
@@ -876,7 +877,13 @@
     <string name="library_batch_remove_list">移除列表</string>
     <string name="library_batch_delete">删除</string>
     <string name="library_batch_share_title">分享推荐</string>
-    <string name="library_batch_share_desc">为 %1$d 部已选择漫画创建 .tankobun-recs 文件。它只包含元数据；不包含漫画内容、来源链接、下载、备注、评分或令牌。</string>
+    <string name="library_batch_share_desc">为 %1$d 部已选择漫画创建 .tankobun-recs 文件。它只包含元数据和可选短消息；不包含漫画内容、来源链接、下载、追踪备注、评分或令牌。</string>
+    <string name="recommendations_share_add_message">添加备注</string>
+    <string name="recommendations_share_edit_message">编辑备注</string>
+    <string name="recommendations_share_message_done">完成</string>
+    <string name="recommendations_share_message_label">推荐备注</string>
+    <string name="recommendations_share_message_placeholder">简单说说朋友可能喜欢的原因</string>
+    <string name="recommendations_share_message_counter">%1$d/%2$d</string>
     <string name="library_batch_list_name">列表名称</string>
     <string name="library_batch_status_title">更改状态</string>
     <string name="library_batch_status_desc">将状态应用到 %1$d 部已选择漫画，并保留它们现有的追踪详情。</string>

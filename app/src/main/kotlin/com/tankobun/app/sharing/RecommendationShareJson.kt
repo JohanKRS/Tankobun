@@ -7,11 +7,17 @@ import org.json.JSONObject
 
 internal const val RECOMMENDATION_SHARE_MIME_TYPE = "application/vnd.tankobun.recommendations+json"
 internal const val RECOMMENDATION_SHARE_EXTENSION = "tankobun-recs"
+internal const val RECOMMENDATION_MESSAGE_MAX_LENGTH = 240
 
 internal data class RecommendationSharePayload(
     val suggestedListName: String,
     val createdAtEpochMillis: Long,
-    val items: List<AnilistMedia>,
+    val items: List<RecommendationShareItem>,
+)
+
+internal data class RecommendationShareItem(
+    val media: AnilistMedia,
+    val message: String? = null,
 )
 
 data class RecommendationImportPreview(
@@ -22,11 +28,12 @@ data class RecommendationImportPreview(
 data class RecommendationImportPreviewItem(
     val media: AnilistMedia,
     val alreadyInLibrary: Boolean,
+    val message: String? = null,
 )
 
 internal fun buildRecommendationShareJson(
     suggestedListName: String,
-    items: List<AnilistMedia>,
+    items: List<RecommendationShareItem>,
     createdAtEpochMillis: Long = System.currentTimeMillis(),
 ): String =
     JSONObject()
@@ -34,14 +41,21 @@ internal fun buildRecommendationShareJson(
         .put("version", RECOMMENDATION_SHARE_VERSION)
         .put("createdAtEpochMillis", createdAtEpochMillis)
         .put("suggestedListName", suggestedListName.trim().ifBlank { DEFAULT_RECOMMENDATION_LIST_NAME })
-        .put("items", items.distinctBy { it.id }.sortedBy { it.title.userPreferred.lowercase() }.map { it.toJson() }.toJsonArray())
+        .put(
+            "items",
+            items
+                .distinctBy { it.media.id }
+                .sortedBy { it.media.title.userPreferred.lowercase() }
+                .map { it.toJson() }
+                .toJsonArray(),
+        )
         .toString(JSON_INDENT)
 
 internal fun parseRecommendationShareJson(text: String): RecommendationSharePayload {
     val root = JSONObject(text)
     check(root.optString("type") == RECOMMENDATION_SHARE_TYPE) { "Unsupported Tankobun recommendations file" }
     check(root.optInt("version") == RECOMMENDATION_SHARE_VERSION) { "Unsupported Tankobun recommendations version" }
-    val items = root.optJSONArray("items").objectValues().map { it.toMedia() }.distinctBy { it.id }
+    val items = root.optJSONArray("items").objectValues().map { it.toRecommendationShareItem() }.distinctBy { it.media.id }
     check(items.isNotEmpty()) { "No recommendations found" }
     return RecommendationSharePayload(
         suggestedListName = root.optString("suggestedListName")
@@ -55,10 +69,19 @@ internal fun parseRecommendationShareJson(text: String): RecommendationSharePayl
 internal fun RecommendationSharePayload.toImportPreview(existingMediaIds: Set<Int>): RecommendationImportPreview =
     RecommendationImportPreview(
         suggestedListName = suggestedListName,
-        items = items.map { media ->
-            RecommendationImportPreviewItem(media = media, alreadyInLibrary = media.id in existingMediaIds)
+        items = items.map { item ->
+            RecommendationImportPreviewItem(
+                media = item.media,
+                alreadyInLibrary = item.media.id in existingMediaIds,
+                message = item.message,
+            )
         },
     )
+
+private fun RecommendationShareItem.toJson(): JSONObject =
+    media.toJson().also { json ->
+        message.normalizedRecommendationMessage()?.let { json.put("message", it) }
+    }
 
 private fun AnilistMedia.toJson(): JSONObject =
     JSONObject()
@@ -90,6 +113,12 @@ private fun AnilistMedia.toJson(): JSONObject =
         .putNullable("updatedAtEpochSeconds", updatedAtEpochSeconds)
         .put("staff", staff.toJsonArray())
         .put("tags", tags.toJsonArray())
+
+private fun JSONObject.toRecommendationShareItem(): RecommendationShareItem =
+    RecommendationShareItem(
+        media = toMedia(),
+        message = optStringOrNull("message").normalizedRecommendationMessage(),
+    )
 
 private fun JSONObject.toMedia(): AnilistMedia {
     val title = optJSONObject("title") ?: JSONObject()
@@ -151,6 +180,12 @@ private fun JSONObject.optIntOrNull(name: String): Int? =
 
 private fun JSONObject.optLongOrNull(name: String): Long? =
     if (has(name) && !isNull(name)) optLong(name) else null
+
+private fun String?.normalizedRecommendationMessage(): String? =
+    this
+        ?.trim()
+        ?.take(RECOMMENDATION_MESSAGE_MAX_LENGTH)
+        ?.takeIf { it.isNotBlank() }
 
 private const val RECOMMENDATION_SHARE_TYPE = "tankobun.recommendations"
 private const val RECOMMENDATION_SHARE_VERSION = 1
