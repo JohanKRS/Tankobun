@@ -92,6 +92,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronRight
@@ -110,6 +111,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
@@ -122,6 +124,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -240,6 +244,7 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import com.tankobun.core.model.AnilistListEntry
 
 
 import com.tankobun.app.*
@@ -275,6 +280,7 @@ internal fun MangaDetailScreen(
     val listState = rememberLazyListState()
     val trackedStatuses = remember(state.libraryItems) { state.libraryItems.trackedMediaStatuses() }
     var coverZoomOpen by remember(media.id) { mutableStateOf(false) }
+    var detailShareOpen by remember(media.id) { mutableStateOf(false) }
     val detailBlur by animateDpAsState(
         targetValue = when {
             state.sourcePickerOpen -> 8.dp
@@ -355,10 +361,14 @@ internal fun MangaDetailScreen(
                     Column(Modifier.padding(horizontal = MediaDetailContentPadding)) {
                         Spacer(Modifier.height(4.dp))
                         MangaHeroSection(
+                            state = state,
                             media = media,
                             onTagClick = onBrowseTag,
                             onAuthorClick = onBrowseAuthor,
                             onCoverClick = { coverZoomOpen = true },
+                            onAddToLibrary = viewModel::saveTracking,
+                            onTrackingStatusSelected = viewModel::setTrackingStatus,
+                            onShareMedia = { detailShareOpen = true },
                         )
                     }
                 }
@@ -508,7 +518,36 @@ internal fun MangaDetailScreen(
         if (state.sourcePickerOpen) {
             SourcePickerDialog(state, viewModel, media)
         }
+
+        if (detailShareOpen) {
+            LibraryShareDialog(
+                selectedItems = listOf(state.detailShareItem(media)),
+                onShare = { name, messagesByMediaId ->
+                    detailShareOpen = false
+                    viewModel.shareMediaRecommendation(context, media, name, messagesByMediaId)
+                },
+                onDismiss = { detailShareOpen = false },
+            )
+        }
     }
+}
+
+private fun TankobunUiState.detailShareItem(media: AnilistMedia): LibraryItem {
+    val entry = selectedListEntry
+        ?.takeIf { it.mediaId == media.id }
+        ?: AnilistListEntry(
+            id = -media.id,
+            mediaId = media.id,
+            status = trackingStatus,
+            progress = trackingProgress.toIntOrNull()?.coerceAtLeast(0) ?: 0,
+            score = trackingScore.toAniListScore(anilistScoreFormat),
+            notes = trackingNotes.trim().ifBlank { null },
+            private = trackingPrivate,
+            customLists = trackingCustomLists.normalizedCustomLists(),
+            updatedAtEpochSeconds = 0L,
+            hiddenFromStatusLists = false,
+        )
+    return LibraryItem(media, entry)
 }
 
 @Composable
@@ -584,10 +623,14 @@ internal fun DetailIconBadge(icon: ImageVector, modifier: Modifier = Modifier) {
 
 @Composable
 internal fun MangaHeroSection(
+    state: TankobunUiState,
     media: AnilistMedia,
     onTagClick: (String) -> Unit,
     onAuthorClick: (String) -> Unit,
     onCoverClick: () -> Unit,
+    onAddToLibrary: () -> Unit,
+    onTrackingStatusSelected: (MediaStatus) -> Unit,
+    onShareMedia: () -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val compact = maxWidth < 620.dp
@@ -652,7 +695,183 @@ internal fun MangaHeroSection(
                 }
             }
             MangaInfoRow(media = media, compact = compact, onAuthorClick = onAuthorClick)
+            MediaDetailQuickActions(
+                state = state,
+                compact = compact,
+                onAddToLibrary = onAddToLibrary,
+                onTrackingStatusSelected = onTrackingStatusSelected,
+                onShareMedia = onShareMedia,
+            )
             MangaDescriptionAndTags(media = media, compact = compact, onTagClick = onTagClick)
+        }
+    }
+}
+
+@Composable
+internal fun MediaDetailQuickActions(
+    state: TankobunUiState,
+    compact: Boolean,
+    onAddToLibrary: () -> Unit,
+    onTrackingStatusSelected: (MediaStatus) -> Unit,
+    onShareMedia: () -> Unit,
+) {
+    val fixedStatusSelected = state.selectedListEntry?.hiddenFromStatusLists != true ||
+        state.trackingStatus != MediaStatus.UNKNOWN
+    val selectedFixedStatus = if (fixedStatusSelected) state.trackingStatus else null
+    val canSaveTracking = (state.libraryMode == LibraryMode.LOCAL || state.loggedIn) &&
+        !state.trackingSaveInProgress &&
+        fixedStatusSelected &&
+        (state.selectedListEntry == null || state.trackingDirty || state.trackingSaveFailed)
+    val actionLabel = when {
+        !fixedStatusSelected -> tankobunString(R.string.detail_choose_status)
+        state.trackingSaveInProgress -> tankobunString(R.string.detail_saving)
+        state.trackingSaveFailed -> tankobunString(R.string.common_retry_save)
+        state.selectedListEntry == null -> {
+            if (compact) {
+                tankobunString(R.string.detail_add_to_library_compact)
+            } else {
+                tankobunString(R.string.detail_add_to_library)
+            }
+        }
+        state.trackingDirty -> tankobunString(R.string.detail_save_tracking)
+        else -> tankobunString(R.string.common_saved)
+    }
+    val actionIcon = when {
+        state.trackingSaveInProgress || state.trackingSaveFailed -> Icons.Default.Refresh
+        state.selectedListEntry == null -> Icons.Default.Add
+        !state.trackingDirty -> Icons.Default.Check
+        else -> Icons.AutoMirrored.Filled.LibraryBooks
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TankobunActionButton(
+            label = actionLabel,
+            onClick = onAddToLibrary,
+            modifier = Modifier.weight(1.16f),
+            icon = actionIcon,
+            enabled = canSaveTracking,
+            disabledContainerColor = if (state.trackingSaveInProgress || state.selectedListEntry != null && !state.trackingDirty) {
+                LocalTankobunStyle.current.colors.selectedChip
+            } else {
+                null
+            },
+            disabledContentColor = if (state.trackingSaveInProgress || state.selectedListEntry != null && !state.trackingDirty) {
+                LocalTankobunStyle.current.colors.selectedChipContent
+            } else {
+                null
+            },
+        )
+        MediaDetailStatusDropdown(
+            selected = selectedFixedStatus,
+            onSelected = onTrackingStatusSelected,
+            modifier = Modifier.weight(0.96f),
+        )
+        if (compact) {
+            TankobunIconActionButton(
+                icon = Icons.Default.Share,
+                contentDescription = tankobunString(R.string.detail_share_manga),
+                onClick = onShareMedia,
+                enabled = !state.busy,
+            )
+        } else {
+            TankobunActionButton(
+                label = tankobunString(R.string.library_batch_share),
+                icon = Icons.Default.Share,
+                onClick = onShareMedia,
+                enabled = !state.busy,
+                filled = false,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MediaDetailStatusDropdown(
+    selected: MediaStatus?,
+    onSelected: (MediaStatus) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = LocalTankobunStyle.current.sizes.iconAction),
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            contentPadding = PaddingValues(horizontal = 10.dp),
+            border = BorderStroke(
+                width = 1.dp,
+                color = LocalTankobunStyle.current.colors.outline.copy(alpha = 0.42f),
+            ),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = mediaDetailForegroundColor(),
+            ),
+        ) {
+            if (selected != null) {
+                Icon(
+                    trackingStatusIcon(selected),
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = mediaDetailAccentColor(),
+                )
+                Spacer(Modifier.width(7.dp))
+            }
+            Text(
+                selected?.displayName() ?: tankobunString(R.string.detail_choose_status),
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Spacer(Modifier.width(6.dp))
+            Icon(
+                Icons.Default.ExpandMore,
+                contentDescription = tankobunString(R.string.detail_category_dropdown_cd),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.widthIn(min = 196.dp),
+        ) {
+            trackingStatuses().forEach { status ->
+                val isSelected = status == selected
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            status.displayName(),
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            trackingStatusIcon(status),
+                            contentDescription = null,
+                            tint = if (isSelected) mediaDetailAccentColor() else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    trailingIcon = if (isSelected) {
+                        {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = mediaDetailAccentColor(),
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                    onClick = {
+                        onSelected(status)
+                        expanded = false
+                    },
+                )
+            }
         }
     }
 }
@@ -1246,7 +1465,11 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
 internal fun AniListStatusSelector(selected: MediaStatus?, onSelected: (MediaStatus) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = !expanded },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        ) {
             if (selected != null) {
                 Icon(
                     trackingStatusIcon(selected),
@@ -1336,7 +1559,11 @@ internal fun AniListCustomListSelector(
         ?: tankobunString(R.string.detail_custom_lists)
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = !expanded },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        ) {
             Text(selectedLabel, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Icon(Icons.Default.ExpandMore, contentDescription = null)
         }

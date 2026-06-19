@@ -2484,6 +2484,64 @@ class MainViewModel(
         }
     }
 
+    fun shareMediaRecommendation(
+        context: Context,
+        media: AnilistMedia,
+        listName: String,
+        messagesByMediaId: Map<Int, String>,
+    ) {
+        val snapshot = _state.value
+        val entry = snapshot.selectedListEntry
+            ?.takeIf { it.mediaId == media.id }
+            ?: AnilistListEntry(
+                id = -media.id,
+                mediaId = media.id,
+                status = snapshot.trackingStatus,
+                progress = snapshot.trackingProgress.toIntOrNull()?.coerceAtLeast(0) ?: 0,
+                score = snapshot.trackingScore.toAniListScore(snapshot.anilistScoreFormat),
+                notes = snapshot.trackingNotes.trim().ifBlank { null },
+                private = snapshot.trackingPrivate,
+                customLists = snapshot.trackingCustomLists.normalizedCustomLists(),
+                updatedAtEpochSeconds = System.currentTimeMillis() / 1000L,
+                hiddenFromStatusLists = false,
+            )
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                recommendationShareDataSource.createShareFile(
+                    selectedItems = listOf(LibraryItem(media, entry)),
+                    suggestedListName = listName,
+                    messagesByMediaId = messagesByMediaId,
+                )
+            }.onSuccess { uri ->
+                val shareTitle = listName.trim().ifBlank { media.title.userPreferred }
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = string(R.string.msg_recommendations_share_ready),
+                    )
+                }
+                val share = Intent(Intent.ACTION_SEND).apply {
+                    type = RECOMMENDATION_SHARE_MIME_TYPE
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_TITLE, shareTitle)
+                    putExtra(Intent.EXTRA_SUBJECT, shareTitle)
+                    clipData = ClipData.newUri(context.contentResolver, shareTitle, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(share, string(R.string.recommendations_share_chooser)))
+            }.onFailure { error ->
+                Log.e(TAG, "Recommendation share failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_recommendations_share_failed)),
+                    )
+                }
+            }
+        }
+    }
+
     fun openRecommendationImport(uri: Uri) {
         val requestId = ++recommendationImportRequestId
         viewModelScope.launch {

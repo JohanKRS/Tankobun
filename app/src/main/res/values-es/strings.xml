@@ -407,7 +407,11 @@
     <string name="detail_readers">Lectores</string>
     <string name="detail_read_more">Leer más</string>
     <string name="detail_show_less">Mostrar menos</string>
-    <string name="detail_track_manga">Seguir manga</string>
+    <string name="detail_add_to_library">Agregar a biblioteca</string>
+    <string name="detail_add_to_library_compact">Agregar</string>
+    <string name="detail_category_dropdown_cd">Elegir categoría de biblioteca</string>
+    <string name="detail_share_manga">Compartir manga</string>
+    <string name="detail_track_manga">Seguir</string>
     <string name="detail_choose_status">Elige un estado</string>
     <string name="detail_save_anilist">Guardar AniList</string>
     <string name="detail_saving">Guardando...</string>
@@ -569,6 +573,9 @@
     <string name="about_changelog_v31_guided_example">El tour ahora abre el primer manga de Más populares en Explorar para mostrar detalles, seguimiento y acciones rápidas con metadatos reales.</string>
     <string name="about_changelog_v31_theme_apply">Los temas elegidos en onboarding ahora se aplican de inmediato, igual que en los ajustes de Apariencia.</string>
     <string name="about_changelog_v31_browse_preload">El contenido de Explorar se precarga durante onboarding para que los usuarios nuevos lleguen con contenido cargando o listo.</string>
+    <string name="about_changelog_v32_detail_cta">Se añadió un CTA rápido de biblioteca en los detalles del manga con guardar, selección de estado y compartir.</string>
+    <string name="about_changelog_v32_share_preview">Compartir desde los detalles ahora abre la vista previa de recomendaciones para añadir una nota antes de compartir.</string>
+    <string name="about_changelog_v32_quick_actions">Las acciones rápidas ahora usan etiquetas de seguimiento más cortas y selectores con esquinas del tema.</string>
     <string name="about_unofficial">Tankobun es un lector de manga no oficial y no está afiliado con AniList.</string>
     <string name="about_anilist_thanks">Gracias a AniList por poner su API a disposición de usuarios y apps de la comunidad.</string>
     <string name="about_anilist_data">AniList es una base de datos y un sitio social de seguimiento de anime y manga. No aloja, sube, comparte, vende ni proporciona manga, capítulos o scanlations. Tankobun accede a metadatos de AniList mediante la API de AniList; la sincronización de cuenta usa autorización del usuario.</string>
@@ -872,8 +879,8 @@
     <string name="app_tour_tracking_title">Guarda el seguimiento</string>
     <string name="app_tour_tracking_body_local">En la página de detalles de un manga, elige un estado como Leyendo o Planeado, añade puntuación, notas o listas personalizadas si quieres, y toca Guardar seguimiento. En modo local, eso crea o actualiza la entrada en este dispositivo.</string>
     <string name="app_tour_tracking_body_anilist">En la página de detalles de un manga, elige un estado como Leyendo o Planeado, añade puntuación, notas o listas personalizadas si quieres, y toca Guardar seguimiento. Con sincronización AniList, esos cambios van a tu cuenta.</string>
-    <string name="app_tour_tracking_panel_local">Este ejemplo abre el primer título de Más populares. Toca Seguir manga, elige un estado y guarda el seguimiento.</string>
-    <string name="app_tour_tracking_panel_anilist">Este ejemplo abre el primer título de Más populares. Toca Seguir manga, elige un estado y guarda el seguimiento.</string>
+    <string name="app_tour_tracking_panel_local">Este ejemplo abre el primer título de Más populares. Toca Seguir, elige un estado y guarda el seguimiento.</string>
+    <string name="app_tour_tracking_panel_anilist">Este ejemplo abre el primer título de Más populares. Toca Seguir, elige un estado y guarda el seguimiento.</string>
     <string name="app_tour_quick_actions_title">Panel de acciones rápidas</string>
     <string name="app_tour_quick_actions_body">El botón de acciones rápidas abre seguimiento y reanudación para el manga que estás viendo. En este tour usa el primer título de Más populares.</string>
     <string name="app_tour_quick_actions_panel">Usa este panel para cambiar estado, puntuación, notas y listas personalizadas rápidamente mientras hay un manga abierto.</string>

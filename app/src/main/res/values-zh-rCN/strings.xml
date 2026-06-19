@@ -411,7 +411,11 @@
     <string name="detail_readers">读者</string>
     <string name="detail_read_more">阅读更多</string>
     <string name="detail_show_less">收起</string>
-    <string name="detail_track_manga">追踪漫画</string>
+    <string name="detail_add_to_library">添加到书架</string>
+    <string name="detail_add_to_library_compact">添加</string>
+    <string name="detail_category_dropdown_cd">选择书架分类</string>
+    <string name="detail_share_manga">分享漫画</string>
+    <string name="detail_track_manga">追踪</string>
     <string name="detail_choose_status">选择状态</string>
     <string name="detail_save_anilist">保存 AniList</string>
     <string name="detail_save_tracking">保存追踪</string>
@@ -577,6 +581,9 @@
     <string name="about_changelog_v31_guided_example">导览现在会打开“最受欢迎”中的第一部漫画，用真实元数据展示详情、追踪和快捷操作。</string>
     <string name="about_changelog_v31_theme_apply">入门流程中选择主题会立即应用，和“外观”设置保持一致。</string>
     <string name="about_changelog_v31_browse_preload">入门流程期间会预加载“浏览”内容，新用户进入后可看到正在加载或已准备好的内容。</string>
+    <string name="about_changelog_v32_detail_cta">漫画详情页新增快捷书架操作，可保存、选择状态并分享。</string>
+    <string name="about_changelog_v32_share_preview">从详情页分享时会先打开推荐预览，方便在分享前添加备注。</string>
+    <string name="about_changelog_v32_quick_actions">快捷操作现使用更短的追踪标签，并让选择器圆角匹配主题。</string>
     <string name="about_unofficial">Tankobun 是非官方漫画阅读器，与 AniList 没有关联。</string>
     <string name="about_anilist_thanks">感谢 AniList 向用户和社区应用开放 API。</string>
     <string name="about_anilist_data">AniList 是动画和漫画数据库、追踪与社交网站。它不托管、上传、分享、销售或提供漫画、章节或扫图。Tankobun 通过 AniList API 访问 AniList 元数据；账号同步使用用户授权。</string>
@@ -676,8 +683,8 @@
     <string name="app_tour_tracking_title">保存追踪</string>
     <string name="app_tour_tracking_body_local">在漫画详情页选择“阅读中”或“计划”等状态，也可添加评分、备注或自定义列表，然后点“保存追踪”。本地模式会在此设备上创建或更新书架条目。</string>
     <string name="app_tour_tracking_body_anilist">在漫画详情页选择“阅读中”或“计划”等状态，也可添加评分、备注或自定义列表，然后点“保存追踪”。AniList 同步模式会把更改同步到你的账号。</string>
-    <string name="app_tour_tracking_panel_local">此示例会打开“最受欢迎”中的第一部作品。点“追踪漫画”，选择状态，然后保存追踪。</string>
-    <string name="app_tour_tracking_panel_anilist">此示例会打开“最受欢迎”中的第一部作品。点“追踪漫画”，选择状态，然后保存追踪。</string>
+    <string name="app_tour_tracking_panel_local">此示例会打开“最受欢迎”中的第一部作品。点“追踪”，选择状态，然后保存追踪。</string>
+    <string name="app_tour_tracking_panel_anilist">此示例会打开“最受欢迎”中的第一部作品。点“追踪”，选择状态，然后保存追踪。</string>
     <string name="app_tour_quick_actions_title">快捷操作抽屉</string>
     <string name="app_tour_quick_actions_body">快捷操作按钮会打开当前漫画的追踪和继续阅读操作。本次导览使用“最受欢迎”中的第一部作品。</string>
     <string name="app_tour_quick_actions_panel">打开漫画时，可在这里快速修改状态、评分、备注和自定义列表。</string>

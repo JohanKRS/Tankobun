@@ -2,38 +2,34 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 31,
-    "versionName": "3.1.0",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.1.0/tankobun-3.1.0.apk",
-    "apkSha256": "19BDFB1E1D2E08F5B907602D77B7F773EF033DD61B8D51B81ECF746CF4BEB543",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.1.0",
-    "publishedAt": "2026-06-18T02:17:11Z",
-    "sizeBytes": 11799080,
+    "versionCode": 32,
+    "versionName": "3.2.0",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.2.0/tankobun-3.2.0.apk",
+    "apkSha256": "AE731100F080221A2A3CB980889217EDD058ECB2836819CC2538C4E2B700A295",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.2.0",
+    "publishedAt": "2026-06-19T15:11:18Z",
+    "sizeBytes": 11824936,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Rebuilt onboarding as a full-screen setup with library mode, theme selection, and a guided app tour.",
-        "The tour now opens the first Popular manga from Browse to show details, tracking, and quick actions with real metadata.",
-        "Theme choices in onboarding now apply immediately, just like Appearance settings.",
-        "Browse content preloads during onboarding so new users arrive with content already loading or ready."
+        "Added a quick library CTA to manga details with save, status selection, and sharing controls.",
+        "Sharing from manga details now opens the recommendation preview so you can add a note before sharing.",
+        "Quick actions now use shorter tracking labels and theme-matched selector corners."
       ],
       "pt-BR": [
-        "Onboarding reconstruído como setup em tela cheia com modo da biblioteca, escolha de tema e tour guiado do app.",
-        "O tour agora abre o primeiro mangá de Mais populares em Explorar para mostrar detalhes, acompanhamento e ações rápidas com metadados reais.",
-        "Temas escolhidos no onboarding agora são aplicados imediatamente, igual nas configurações de Aparência.",
-        "O conteúdo de Explorar é pré-carregado durante o onboarding para novos usuários chegarem com conteúdo carregando ou pronto."
+        "Adicionado CTA rápido de biblioteca nos detalhes do mangá com salvar, seleção de status e compartilhamento.",
+        "Compartilhar pelos detalhes agora abre o preview de recomendações para adicionar uma nota antes de compartilhar.",
+        "Ações rápidas agora usam rótulos de acompanhamento mais curtos e seletores com cantos do tema."
       ],
       "es": [
-        "Onboarding reconstruido como configuración a pantalla completa con modo de biblioteca, selección de tema y tour guiado de la app.",
-        "El tour ahora abre el primer manga de Más populares en Explorar para mostrar detalles, seguimiento y acciones rápidas con metadatos reales.",
-        "Los temas elegidos en onboarding ahora se aplican de inmediato, igual que en los ajustes de Apariencia.",
-        "El contenido de Explorar se precarga durante onboarding para que los usuarios nuevos lleguen con contenido cargando o listo."
+        "Se añadió un CTA rápido de biblioteca en los detalles del manga con guardar, selección de estado y compartir.",
+        "Compartir desde los detalles ahora abre la vista previa de recomendaciones para añadir una nota antes de compartir.",
+        "Las acciones rápidas ahora usan etiquetas de seguimiento más cortas y selectores con esquinas del tema."
       ],
       "zh-CN": [
-        "入门流程改为全屏设置，包含书架模式、主题选择和应用导览。",
-        "导览现在会打开“最受欢迎”中的第一部漫画，用真实元数据展示详情、追踪和快捷操作。",
-        "入门流程中选择主题会立即应用，和“外观”设置保持一致。",
-        "入门流程期间会预加载“浏览”内容，新用户进入后可看到正在加载或已准备好的内容。"
+        "漫画详情页新增快捷书架操作，可保存、选择状态并分享。",
+        "从详情页分享时会先打开推荐预览，方便在分享前添加备注。",
+        "快捷操作现使用更短的追踪标签，并让选择器圆角匹配主题。"
       ]
     }
   }

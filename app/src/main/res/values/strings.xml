@@ -411,7 +411,11 @@
     <string name="detail_readers">Readers</string>
     <string name="detail_read_more">Read more</string>
     <string name="detail_show_less">Show less</string>
-    <string name="detail_track_manga">Track manga</string>
+    <string name="detail_add_to_library">Add to library</string>
+    <string name="detail_add_to_library_compact">Add</string>
+    <string name="detail_category_dropdown_cd">Choose library category</string>
+    <string name="detail_share_manga">Share manga</string>
+    <string name="detail_track_manga">Track</string>
     <string name="detail_choose_status">Choose status</string>
     <string name="detail_save_anilist">Save AniList</string>
     <string name="detail_save_tracking">Save tracking</string>
@@ -577,6 +581,9 @@
     <string name="about_changelog_v31_guided_example">The tour now opens the first Popular manga from Browse to show details, tracking, and quick actions with real metadata.</string>
     <string name="about_changelog_v31_theme_apply">Theme choices in onboarding now apply immediately, just like Appearance settings.</string>
     <string name="about_changelog_v31_browse_preload">Browse content preloads during onboarding so new users arrive with content already loading or ready.</string>
+    <string name="about_changelog_v32_detail_cta">Added a quick library CTA to manga details with save, status selection, and sharing controls.</string>
+    <string name="about_changelog_v32_share_preview">Sharing from manga details now opens the recommendation preview so you can add a note before sharing.</string>
+    <string name="about_changelog_v32_quick_actions">Quick actions now use shorter tracking labels and theme-matched selector corners.</string>
     <string name="about_unofficial">Tankobun is an unofficial manga reader and is not affiliated with AniList.</string>
     <string name="about_anilist_thanks">Thanks to AniList for making its API available to users and community apps.</string>
     <string name="about_anilist_data">AniList is an anime and manga database, tracking, and social site. It does not host, upload, share, sell, or provide manga, chapters, or scanlations. Tankobun accesses AniList metadata through the AniList API; account sync uses user authorization.</string>
@@ -676,8 +683,8 @@
     <string name="app_tour_tracking_title">Save tracking</string>
     <string name="app_tour_tracking_body_local">On a manga detail page, choose a status like Reading or Planning, add score, notes, or custom lists if you want, then tap Save tracking. In local mode, that creates or updates the library entry on this device.</string>
     <string name="app_tour_tracking_body_anilist">On a manga detail page, choose a status like Reading or Planning, add score, notes, or custom lists if you want, then tap Save tracking. With AniList sync, those changes sync to your account.</string>
-    <string name="app_tour_tracking_panel_local">This example opens the first title from Popular. Choose Track manga, pick a status, then Save tracking.</string>
-    <string name="app_tour_tracking_panel_anilist">This example opens the first title from Popular. Choose Track manga, pick a status, then Save tracking.</string>
+    <string name="app_tour_tracking_panel_local">This example opens the first title from Popular. Choose Track, pick a status, then Save tracking.</string>
+    <string name="app_tour_tracking_panel_anilist">This example opens the first title from Popular. Choose Track, pick a status, then Save tracking.</string>
     <string name="app_tour_quick_actions_title">Quick actions drawer</string>
     <string name="app_tour_quick_actions_body">The quick actions button opens tracking and resume actions for the manga you are viewing. In this tour, it uses the first title from Popular.</string>
     <string name="app_tour_quick_actions_panel">Use this drawer for fast status, score, notes, and custom list changes while a manga is open.</string>
