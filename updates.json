@@ -2,34 +2,34 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 33,
-    "versionName": "3.2.1",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.2.1/tankobun-3.2.1.apk",
-    "apkSha256": "0A7180E3E32FC1B38211AFB4258672497C23F3737F895FB6743CFE30EF035369",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.2.1",
-    "publishedAt": "2026-06-24T01:16:37Z",
-    "sizeBytes": 11826748,
+    "versionCode": 34,
+    "versionName": "3.2.2",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.2.2/tankobun-3.2.2.apk",
+    "apkSha256": "0FD0C961001B154DB13085045F57BF828E30791475296F2074E1A83E02099315",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.2.2",
+    "publishedAt": "2026-06-24T11:55:22Z",
+    "sizeBytes": 11840588,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Fixed reader-completed chapters updating library tracker progress in both local and AniList library modes.",
-        "Handled decimal chapters and unnumbered extras more carefully when deciding tracker progress.",
-        "Centered chapter download progress indicators in the same action slot as the download icons."
+        "Scheduled backups now resync after app updates and run immediately when a due backup was missed.",
+        "Added a maximum scheduled-backup retention option so backup folders do not grow forever.",
+        "Source selections stay bound to manga more reliably while extensions and filters refresh."
       ],
       "pt-BR": [
-        "Corrigida a atualização do progresso do tracker pela leitura de capítulos concluídos, tanto no modo local quanto no modo AniList.",
-        "Capítulos decimais e extras sem número agora são tratados com mais cuidado ao decidir o progresso do tracker.",
-        "Indicadores de progresso de download dos capítulos agora ficam centralizados no mesmo slot dos ícones de download."
+        "Backups agendados agora ressincronizam após atualizações do app e rodam imediatamente quando havia um backup vencido.",
+        "Adicionada opção de limite máximo de backups agendados para a pasta não crescer indefinidamente.",
+        "Seleções de source permanecem vinculadas aos mangás com mais confiabilidade durante refresh de extensões e filtros."
       ],
       "es": [
-        "Se corrigió la actualización del progreso del tracker desde capítulos completados, tanto en modo local como en modo AniList.",
-        "Los capítulos decimales y extras sin número ahora se tratan con más cuidado al decidir el progreso del tracker.",
-        "Los indicadores de progreso de descarga de capítulos ahora están centrados en el mismo espacio que los iconos de descarga."
+        "Las copias programadas ahora se resincronizan tras actualizar la app y se ejecutan de inmediato si había una copia vencida.",
+        "Se añadió una opción de retención máxima para que la carpeta de copias programadas no crezca indefinidamente.",
+        "Las fuentes seleccionadas permanecen vinculadas al manga con más fiabilidad mientras se actualizan extensiones y filtros."
       ],
       "zh-CN": [
-        "修复读完章节后书架追踪进度更新的问题，本地模式和 AniList 模式均适用。",
-        "在决定追踪进度时，更谨慎处理小数章节和无编号番外。",
-        "章节下载进度指示器现在与下载图标使用同一操作槽并居中显示。"
+        "计划备份现在会在应用更新后重新同步，并在错过到期备份时立即运行。",
+        "新增计划备份最大保留数量选项，避免备份文件夹无限增长。",
+        "刷新扩展和筛选时，漫画的来源选择会更可靠地保持绑定。"
       ]
     }
   }

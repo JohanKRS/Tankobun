@@ -520,6 +520,10 @@
     <string name="backup_content_library">Biblioteca</string>
     <string name="backup_content_settings">Ajustes</string>
     <string name="backup_content_both">Biblioteca + ajustes</string>
+    <string name="backup_scheduled_retention">Conservar como máximo</string>
+    <string name="backup_scheduled_retention_desc">El límite se aplica por tipo de copia programada en la carpeta seleccionada.</string>
+    <string name="backup_retention_count">%1$d copias</string>
+    <string name="backup_retention_unlimited">Sin límite</string>
     <string name="backup_content_library_with_count">Biblioteca: %1$s</string>
     <string name="backup_content_settings_with_count">Ajustes: %1$d paquetes de fuentes</string>
     <string name="backup_no_cached_manga">Aún no hay manga en la biblioteca. Agrega manga antes de exportar.</string>
@@ -579,6 +583,9 @@
     <string name="about_changelog_v321_tracker_progress">Se corrigió la actualización del progreso del tracker desde capítulos completados, tanto en modo local como en modo AniList.</string>
     <string name="about_changelog_v321_chapter_number_edges">Los capítulos decimales y extras sin número ahora se tratan con más cuidado al decidir el progreso del tracker.</string>
     <string name="about_changelog_v321_download_alignment">Los indicadores de progreso de descarga de capítulos ahora están centrados en el mismo espacio que los iconos de descarga.</string>
+    <string name="about_changelog_v322_scheduled_backups">Las copias programadas ahora se resincronizan tras actualizar la app y se ejecutan de inmediato si había una copia vencida.</string>
+    <string name="about_changelog_v322_backup_retention">Se añadió una opción de retención máxima para que la carpeta de copias programadas no crezca indefinidamente.</string>
+    <string name="about_changelog_v322_source_bindings">Las fuentes seleccionadas permanecen vinculadas al manga con más fiabilidad mientras se actualizan extensiones y filtros.</string>
     <string name="about_unofficial">Tankobun es un lector de manga no oficial y no está afiliado con AniList.</string>
     <string name="about_anilist_thanks">Gracias a AniList por poner su API a disposición de usuarios y apps de la comunidad.</string>
     <string name="about_anilist_data">AniList es una base de datos y un sitio social de seguimiento de anime y manga. No aloja, sube, comparte, vende ni proporciona manga, capítulos o scanlations. Tankobun accede a metadatos de AniList mediante la API de AniList; la sincronización de cuenta usa autorización del usuario.</string>

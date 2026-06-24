@@ -58,6 +58,21 @@ class SourceSettingsLogicTest {
         assertEquals(english, selected)
     }
 
+    @Test
+    fun preserveSelectedSourceCanAvoidFallbackWhenBindingIsTemporarilyMissing() {
+        val english = source(id = 1, lang = "en", packageName = "pkg.en")
+
+        val selected = preserveSelectedSourceOrFirst(
+            selectedSourceId = 2,
+            selectedSourcePackageName = "pkg.pt",
+            visibleSources = listOf(english),
+            allSources = listOf(english),
+            fallbackToFirst = false,
+        )
+
+        assertEquals(null, selected)
+    }
+
     private fun source(
         id: Long,
         lang: String,

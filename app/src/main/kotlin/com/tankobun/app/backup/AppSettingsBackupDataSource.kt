@@ -116,6 +116,7 @@ internal class AppSettingsBackupDataSource(
             .put("anilistCustomLists", snapshot.anilistCustomLists.toJsonArray())
             .put("backupSchedule", snapshot.backupSchedule.name)
             .put("backupContent", snapshot.backupContent.name)
+            .put("scheduledBackupRetentionCount", snapshot.scheduledBackupRetentionCount)
 
     private fun sourcesJson(snapshot: TankobunUiState): JSONObject =
         JSONObject()
@@ -197,6 +198,7 @@ internal class AppSettingsBackupDataSource(
         settings.optJSONArray("anilistCustomLists")?.stringValues()?.let(store::saveAnilistCustomLists)
         settings.enumOrNull<BackupSchedule>("backupSchedule")?.let(store::saveBackupSchedule)
         settings.enumOrNull<BackupContent>("backupContent")?.let(store::saveBackupContent)
+        settings.optIntOrNull("scheduledBackupRetentionCount")?.let(store::saveScheduledBackupRetentionCount)
     }
 
     private fun currentSettingsSnapshot(): TankobunUiState {
@@ -244,6 +246,7 @@ internal class AppSettingsBackupDataSource(
             backupFolderUri = store.backupFolderUri(),
             backupSchedule = store.backupSchedule(),
             backupContent = store.backupContent(),
+            scheduledBackupRetentionCount = store.scheduledBackupRetentionCount(),
             extensionRepositoryUrl = store.extensionRepositoryUrl(),
             sourceLanguages = store.sourceLanguages(),
             disabledSourceKeys = store.disabledSourceKeys(),

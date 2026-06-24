@@ -229,10 +229,14 @@ class SettingsStore(context: Context) {
         preferences.edit().putString(KEY_BACKUP_FOLDER_URI, uri).apply()
     }
 
-    fun backupSchedule(): BackupSchedule =
-        preferences.getString(KEY_BACKUP_SCHEDULE, null)
-            ?.let { stored -> runCatching { BackupSchedule.valueOf(stored) }.getOrNull() }
-            ?: BackupSchedule.OFF
+    fun backupSchedule(): BackupSchedule {
+        val stored = preferences.getString(KEY_BACKUP_SCHEDULE, null)
+        val schedule = stored?.toBackupScheduleOrNull() ?: BackupSchedule.OFF
+        if (stored != null && stored != schedule.name) {
+            saveBackupSchedule(schedule)
+        }
+        return schedule
+    }
 
     fun saveBackupSchedule(schedule: BackupSchedule) {
         preferences.edit().putString(KEY_BACKUP_SCHEDULE, schedule.name).apply()
@@ -245,6 +249,16 @@ class SettingsStore(context: Context) {
 
     fun saveBackupContent(content: BackupContent) {
         preferences.edit().putString(KEY_BACKUP_CONTENT, content.name).apply()
+    }
+
+    fun scheduledBackupRetentionCount(): Int =
+        preferences.getInt(KEY_BACKUP_RETENTION_COUNT, DEFAULT_SCHEDULED_BACKUP_RETENTION_COUNT)
+            .supportedScheduledBackupRetentionCount()
+
+    fun saveScheduledBackupRetentionCount(count: Int) {
+        preferences.edit()
+            .putInt(KEY_BACKUP_RETENTION_COUNT, count.supportedScheduledBackupRetentionCount())
+            .apply()
     }
 
     fun lastScheduledBackupAtEpochMillis(): Long =
@@ -497,6 +511,7 @@ class SettingsStore(context: Context) {
         const val KEY_BACKUP_FOLDER_URI = "backup.folder.uri"
         const val KEY_BACKUP_SCHEDULE = "backup.schedule"
         const val KEY_BACKUP_CONTENT = "backup.content"
+        const val KEY_BACKUP_RETENTION_COUNT = "backup.retention.count"
         const val KEY_BACKUP_LAST_RUN_AT = "backup.last.run.at"
         const val KEY_ANILIST_TAGS = "anilist.tags"
         const val KEY_ANILIST_TAGS_CACHED_AT = "anilist.tags.cached.at"
@@ -597,6 +612,11 @@ enum class BackupContent {
     BOTH,
 }
 
+const val SCHEDULED_BACKUP_RETENTION_UNLIMITED = 0
+const val DEFAULT_SCHEDULED_BACKUP_RETENTION_COUNT = 10
+private const val MIN_SCHEDULED_BACKUP_RETENTION_COUNT = 1
+private const val MAX_SCHEDULED_BACKUP_RETENTION_COUNT = 100
+
 fun BackupContent.includesLibrary(): Boolean =
     this == BackupContent.LIBRARY || this == BackupContent.BOTH
 
@@ -628,3 +648,23 @@ fun defaultSourceLanguages(): Set<String> =
     }
 
 const val UNIVERSAL_SOURCE_LANGUAGE = "all"
+
+fun Int.supportedScheduledBackupRetentionCount(): Int =
+    if (this == SCHEDULED_BACKUP_RETENTION_UNLIMITED) {
+        SCHEDULED_BACKUP_RETENTION_UNLIMITED
+    } else {
+        coerceIn(MIN_SCHEDULED_BACKUP_RETENTION_COUNT, MAX_SCHEDULED_BACKUP_RETENTION_COUNT)
+    }
+
+private fun String.toBackupScheduleOrNull(): BackupSchedule? {
+    val normalized = trim()
+        .lowercase(Locale.ROOT)
+        .replace(Regex("[_\\s-]+"), "")
+    return when (normalized) {
+        "off", "none", "disabled", "disable", "desativado", "desativada", "desligado", "desligada" -> BackupSchedule.OFF
+        "daily", "day", "dia", "diario", "diaria", "diariamente" -> BackupSchedule.DAILY
+        "weekly", "week", "semana", "semanal" -> BackupSchedule.WEEKLY
+        "monthly", "month", "mes", "mensal" -> BackupSchedule.MONTHLY
+        else -> runCatching { BackupSchedule.valueOf(trim().uppercase(Locale.ROOT)) }.getOrNull()
+    }
+}

@@ -4,15 +4,21 @@ import android.content.Context
 import android.net.Uri
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.tankobun.app.backup.AppSettingsBackupDataSource
 import com.tankobun.app.backup.BackupDataSource
+import com.tankobun.app.backup.isDue
 import com.tankobun.app.backup.buildMyAnimeListBackupXml
 import com.tankobun.app.backup.createDocumentInTree
+import com.tankobun.app.backup.pruneScheduledBackups
+import com.tankobun.app.backup.scheduledBackupFileKinds
 import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.core.database.toModel
@@ -34,7 +40,13 @@ class ScheduledBackupWorker(
             val schedule = settings.backupSchedule()
             val content = settings.backupContent()
             val folderUri = settings.backupFolderUri()?.let(Uri::parse)
+            val now = System.currentTimeMillis()
             if (schedule == BackupSchedule.OFF || folderUri == null) {
+                Result.success()
+            } else if (
+                inputData.getBoolean(ScheduledBackupWork.INPUT_RUN_ONLY_IF_DUE, false) &&
+                !schedule.isDue(lastRunAt = settings.lastScheduledBackupAtEpochMillis(), now = now)
+            ) {
                 Result.success()
             } else {
                 val libraryWritten = if (content.includesLibrary()) {
@@ -69,7 +81,17 @@ class ScheduledBackupWorker(
                 if (!libraryWritten && !settingsWritten) {
                     Result.success()
                 } else {
-                    settings.saveLastScheduledBackupAtEpochMillis(System.currentTimeMillis())
+                    settings.saveLastScheduledBackupAtEpochMillis(now)
+                    runCatching {
+                        pruneScheduledBackups(
+                            contentResolver = container.application.contentResolver,
+                            treeUri = folderUri,
+                            retentionCount = settings.scheduledBackupRetentionCount(),
+                            kinds = content.scheduledBackupFileKinds(settings.libraryMode()),
+                        )
+                    }.onFailure { error ->
+                        android.util.Log.w("ScheduledBackupWorker", "Scheduled backup retention cleanup failed", error)
+                    }
                     Result.success()
                 }
             }
@@ -82,13 +104,17 @@ class ScheduledBackupWorker(
 
 object ScheduledBackupWork {
     private const val UNIQUE_NAME = "tankobun-scheduled-anilist-backup"
+    private const val DUE_UNIQUE_NAME = "tankobun-scheduled-backup-due-now"
+    internal const val INPUT_RUN_ONLY_IF_DUE = "runOnlyIfDue"
 
     fun sync(context: Context, schedule: BackupSchedule) {
         if (schedule == BackupSchedule.OFF) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NAME)
+            WorkManager.getInstance(context).cancelUniqueWork(DUE_UNIQUE_NAME)
             return
         }
         enqueue(context, schedule, ExistingPeriodicWorkPolicy.KEEP)
+        runIfDue(context, schedule)
     }
 
     fun update(context: Context, schedule: BackupSchedule) {
@@ -99,23 +125,37 @@ object ScheduledBackupWork {
         enqueue(context, schedule, ExistingPeriodicWorkPolicy.UPDATE)
     }
 
+    fun runIfDue(context: Context, schedule: BackupSchedule) {
+        if (schedule == BackupSchedule.OFF) {
+            WorkManager.getInstance(context).cancelUniqueWork(DUE_UNIQUE_NAME)
+            return
+        }
+        val request = OneTimeWorkRequestBuilder<ScheduledBackupWorker>()
+            .setInputData(workDataOf(INPUT_RUN_ONLY_IF_DUE to true))
+            .setConstraints(backupConstraints())
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(DUE_UNIQUE_NAME, ExistingWorkPolicy.REPLACE, request)
+    }
+
     private fun enqueue(
         context: Context,
         schedule: BackupSchedule,
         policy: ExistingPeriodicWorkPolicy,
     ) {
         val intervalMillis = schedule.intervalMillis()
-        val constraints = Constraints.Builder()
+        val request = PeriodicWorkRequestBuilder<ScheduledBackupWorker>(intervalMillis, TimeUnit.MILLISECONDS)
+            .setInitialDelay(intervalMillis, TimeUnit.MILLISECONDS)
+            .setConstraints(backupConstraints())
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(UNIQUE_NAME, policy, request)
+    }
+
+    private fun backupConstraints(): Constraints =
+        Constraints.Builder()
             .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
             .setRequiresBatteryNotLow(true)
             .setRequiresStorageNotLow(true)
             .build()
-        val request = PeriodicWorkRequestBuilder<ScheduledBackupWorker>(intervalMillis, TimeUnit.MILLISECONDS)
-            .setInitialDelay(intervalMillis, TimeUnit.MILLISECONDS)
-            .setConstraints(constraints)
-            .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(UNIQUE_NAME, policy, request)
-    }
 }
 
 private suspend fun backupLibraryItems(container: AppContainer): List<LibraryItem> {

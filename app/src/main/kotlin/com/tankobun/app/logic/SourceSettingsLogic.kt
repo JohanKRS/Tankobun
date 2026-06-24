@@ -31,12 +31,13 @@ internal fun preserveSelectedSourceOrFirst(
     selectedSourcePackageName: String?,
     visibleSources: List<SourceDescriptor>,
     allSources: List<SourceDescriptor> = visibleSources,
+    fallbackToFirst: Boolean = true,
 ): SourceDescriptor? =
     selectedSourceId?.let { sourceId ->
         allSources.matchingSelectedSource(sourceId, selectedSourcePackageName)
             ?: visibleSources.matchingSelectedSource(sourceId, selectedSourcePackageName)
-            ?: visibleSources.firstOrNull()
-    } ?: visibleSources.firstOrNull()
+            ?: visibleSources.firstOrNull().takeIf { fallbackToFirst }
+    } ?: visibleSources.firstOrNull().takeIf { fallbackToFirst }
 
 internal fun SourceDescriptor.languageSortPriority(preferredLanguages: Set<String>): Int =
     when (normalizedLanguage()) {

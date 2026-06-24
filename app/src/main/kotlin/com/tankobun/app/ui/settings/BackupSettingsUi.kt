@@ -134,6 +134,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -446,6 +447,16 @@ internal fun BackupsSettingsScreen(
                     selected = state.backupSchedule,
                     onSelect = viewModel::setBackupSchedule,
                 )
+                Text(tankobunString(R.string.backup_scheduled_retention), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                ScheduledBackupRetentionPicker(
+                    selected = state.scheduledBackupRetentionCount,
+                    onSelect = viewModel::setScheduledBackupRetentionCount,
+                )
+                Text(
+                    tankobunString(R.string.backup_scheduled_retention_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -688,6 +699,45 @@ internal fun BackupSchedulePicker(
         }
     }
 }
+
+@Composable
+internal fun ScheduledBackupRetentionPicker(
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
+    val options = (listOf(3, 5, 10, 20, SCHEDULED_BACKUP_RETENTION_UNLIMITED) + selected)
+        .distinct()
+        .sortedWith(compareBy<Int> { if (it == SCHEDULED_BACKUP_RETENTION_UNLIMITED) Int.MAX_VALUE else it })
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.chunked(3).forEach { rowOptions ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                rowOptions.forEach { count ->
+                    TankobunChip(
+                        selected = selected == count,
+                        onClick = { onSelect(count) },
+                        label = { Text(count.backupRetentionLabel()) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                repeat(3 - rowOptions.size) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@ReadOnlyComposable
+private fun Int.backupRetentionLabel(): String =
+    if (this == SCHEDULED_BACKUP_RETENTION_UNLIMITED) {
+        tankobunString(R.string.backup_retention_unlimited)
+    } else {
+        tankobunString(R.string.backup_retention_count, this)
+    }
 
 private fun backupFolderDisplayLabel(context: Context, uriString: String?): String? {
     val uri = uriString

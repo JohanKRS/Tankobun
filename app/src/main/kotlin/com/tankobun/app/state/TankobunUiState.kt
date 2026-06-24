@@ -59,6 +59,7 @@ data class TankobunUiState(
     val backupFolderUri: String? = null,
     val backupSchedule: BackupSchedule = BackupSchedule.OFF,
     val backupContent: BackupContent = BackupContent.BOTH,
+    val scheduledBackupRetentionCount: Int = 10,
     val lastScheduledBackupAtEpochMillis: Long = 0L,
     val libraryViewMode: MediaViewMode = MediaViewMode.COVER_WITH_INFO,
     val libraryCoverColumns: Int = DEFAULT_MEDIA_COVER_COLUMNS,

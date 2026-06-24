@@ -41,6 +41,8 @@ internal data class LoadedSourceChapters(
 internal data class CachedSourceState(
     val sourceMatches: List<SourceSearchResult>,
     val sourceMatchChapterCounts: Map<String, Int>,
+    val boundSourceId: Long?,
+    val boundSourcePackageName: String?,
     val boundSource: SourceDescriptor?,
     val boundManga: SourceManga?,
     val sourceChapters: List<SourceChapter>,
@@ -142,6 +144,8 @@ internal class SourceDataSource(
         return CachedSourceState(
             sourceMatches = visibleMatches,
             sourceMatchChapterCounts = chapterCounts,
+            boundSourceId = binding?.sourceId,
+            boundSourcePackageName = binding?.sourcePackageName,
             boundSource = boundSource,
             boundManga = boundManga,
             sourceChapters = chapters,

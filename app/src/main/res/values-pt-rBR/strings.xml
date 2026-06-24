@@ -520,6 +520,10 @@
     <string name="backup_content_library">Biblioteca</string>
     <string name="backup_content_settings">Configurações</string>
     <string name="backup_content_both">Biblioteca + configurações</string>
+    <string name="backup_scheduled_retention">Manter no máximo</string>
+    <string name="backup_scheduled_retention_desc">O limite é aplicado por tipo de backup agendado na pasta selecionada.</string>
+    <string name="backup_retention_count">%1$d backups</string>
+    <string name="backup_retention_unlimited">Sem limite</string>
     <string name="backup_content_library_with_count">Biblioteca: %1$s</string>
     <string name="backup_content_settings_with_count">Configurações: %1$d pacotes de sources</string>
     <string name="backup_no_cached_manga">Ainda não há mangás na biblioteca. Adicione mangás antes de exportar.</string>
@@ -579,6 +583,9 @@
     <string name="about_changelog_v321_tracker_progress">Corrigida a atualização do progresso do tracker pela leitura de capítulos concluídos, tanto no modo local quanto no modo AniList.</string>
     <string name="about_changelog_v321_chapter_number_edges">Capítulos decimais e extras sem número agora são tratados com mais cuidado ao decidir o progresso do tracker.</string>
     <string name="about_changelog_v321_download_alignment">Indicadores de progresso de download dos capítulos agora ficam centralizados no mesmo slot dos ícones de download.</string>
+    <string name="about_changelog_v322_scheduled_backups">Backups agendados agora ressincronizam após atualizações do app e rodam imediatamente quando havia um backup vencido.</string>
+    <string name="about_changelog_v322_backup_retention">Adicionada opção de limite máximo de backups agendados para a pasta não crescer indefinidamente.</string>
+    <string name="about_changelog_v322_source_bindings">Seleções de source permanecem vinculadas aos mangás com mais confiabilidade durante refresh de extensões e filtros.</string>
     <string name="about_unofficial">Tankobun é um leitor de mangás não oficial e não é afiliado ao AniList.</string>
     <string name="about_anilist_thanks">Agradecemos ao AniList por disponibilizar sua API para usuários e apps da comunidade.</string>
     <string name="about_anilist_data">O AniList é uma base de dados, acompanhamento e site social de animes e mangás. Ele não hospeda, envia, compartilha, vende nem fornece mangás, capítulos ou scanlations. O Tankobun acessa metadados do AniList pela API do AniList; a sincronização da conta usa autorização do usuário.</string>

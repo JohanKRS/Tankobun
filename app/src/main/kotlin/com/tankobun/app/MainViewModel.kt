@@ -3,6 +3,8 @@ package com.tankobun.app
 import com.tankobun.app.backup.BackupDataSource
 import com.tankobun.app.backup.AppSettingsBackupDataSource
 import com.tankobun.app.backup.isDue
+import com.tankobun.app.backup.pruneScheduledBackups as pruneScheduledBackupFiles
+import com.tankobun.app.backup.scheduledBackupFileKinds
 import com.tankobun.app.anilist.AniListDataSource
 import com.tankobun.app.anilist.LibraryBatchMutationData
 import com.tankobun.app.browse.BrowseDataSource
@@ -133,6 +135,7 @@ import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceSearchResult
 import com.tankobun.core.model.withTitleLanguage
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -140,6 +143,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.Locale
@@ -228,6 +232,7 @@ class MainViewModel(
             backupFolderUri = container.settingsStore.backupFolderUri(),
             backupSchedule = container.settingsStore.backupSchedule(),
             backupContent = container.settingsStore.backupContent(),
+            scheduledBackupRetentionCount = container.settingsStore.scheduledBackupRetentionCount(),
             lastScheduledBackupAtEpochMillis = container.settingsStore.lastScheduledBackupAtEpochMillis(),
             libraryViewMode = container.settingsStore.libraryViewMode(),
             libraryCoverColumns = container.settingsStore.libraryCoverColumns(),
@@ -521,17 +526,20 @@ class MainViewModel(
             val selectedSourceId = _state.value.selectedSourceId
             val selectedSourcePackageName = _state.value.selectedSourcePackageName
             _state.update {
+                val keepMissingBoundSource = it.selectedSourceManga != null
                 val selectedSource = preserveSelectedSourceOrFirst(
                     selectedSourceId = selectedSourceId,
                     selectedSourcePackageName = selectedSourcePackageName,
                     visibleSources = sourceState.preferredSources,
                     allSources = sourceState.allSources,
+                    fallbackToFirst = !keepMissingBoundSource,
                 )
                 it.copy(
                     allInstalledSources = sourceState.allSources,
                     installedSources = sourceState.preferredSources,
-                    selectedSourceId = selectedSource?.id,
-                    selectedSourcePackageName = selectedSource?.packageName,
+                    selectedSourceId = selectedSource?.id ?: selectedSourceId.takeIf { keepMissingBoundSource },
+                    selectedSourcePackageName = selectedSource?.packageName
+                        ?: selectedSourcePackageName.takeIf { keepMissingBoundSource },
                 )
             }
         }
@@ -647,17 +655,20 @@ class MainViewModel(
         container.settingsStore.saveSourceLanguages(next)
         _state.update {
             val sources = it.allInstalledSources.preferredVisibleSources(next, it.disabledSourceKeys)
+            val keepMissingBoundSource = it.selectedSourceManga != null
             val selectedSource = preserveSelectedSourceOrFirst(
                 selectedSourceId = it.selectedSourceId,
                 selectedSourcePackageName = it.selectedSourcePackageName,
                 visibleSources = sources,
                 allSources = it.allInstalledSources,
+                fallbackToFirst = !keepMissingBoundSource,
             )
             it.copy(
                 sourceLanguages = next,
                 installedSources = sources,
-                selectedSourceId = selectedSource?.id,
-                selectedSourcePackageName = selectedSource?.packageName,
+                selectedSourceId = selectedSource?.id ?: it.selectedSourceId.takeIf { keepMissingBoundSource },
+                selectedSourcePackageName = selectedSource?.packageName
+                    ?: it.selectedSourcePackageName.takeIf { keepMissingBoundSource },
             )
         }
     }
@@ -686,18 +697,21 @@ class MainViewModel(
         container.settingsStore.saveDisabledSourceKeys(nextDisabledKeys)
         _state.update { current ->
             val visibleSources = current.allInstalledSources.preferredVisibleSources(nextLanguages, nextDisabledKeys)
+            val keepMissingBoundSource = current.selectedSourceManga != null
             val selectedSource = preserveSelectedSourceOrFirst(
                 selectedSourceId = current.selectedSourceId,
                 selectedSourcePackageName = current.selectedSourcePackageName,
                 visibleSources = visibleSources,
                 allSources = current.allInstalledSources,
+                fallbackToFirst = !keepMissingBoundSource,
             )
             current.copy(
                 sourceLanguages = nextLanguages,
                 disabledSourceKeys = nextDisabledKeys,
                 installedSources = visibleSources,
-                selectedSourceId = selectedSource?.id,
-                selectedSourcePackageName = selectedSource?.packageName,
+                selectedSourceId = selectedSource?.id ?: current.selectedSourceId.takeIf { keepMissingBoundSource },
+                selectedSourcePackageName = selectedSource?.packageName
+                    ?: current.selectedSourcePackageName.takeIf { keepMissingBoundSource },
             )
         }
     }
@@ -1198,11 +1212,13 @@ class MainViewModel(
         val disabledSourceKeys = store.disabledSourceKeys()
         _state.update { current ->
             val visibleSources = current.allInstalledSources.preferredVisibleSources(sourceLanguages, disabledSourceKeys)
+            val keepMissingBoundSource = current.selectedSourceManga != null
             val selectedSource = preserveSelectedSourceOrFirst(
                 selectedSourceId = current.selectedSourceId,
                 selectedSourcePackageName = current.selectedSourcePackageName,
                 visibleSources = visibleSources,
                 allSources = current.allInstalledSources,
+                fallbackToFirst = !keepMissingBoundSource,
             )
             current.copy(
                 themeMode = store.themeMode(),
@@ -1234,12 +1250,14 @@ class MainViewModel(
                 anilistCustomLists = store.anilistCustomLists(),
                 backupSchedule = store.backupSchedule(),
                 backupContent = store.backupContent(),
+                scheduledBackupRetentionCount = store.scheduledBackupRetentionCount(),
                 extensionRepositoryUrl = store.extensionRepositoryUrl(),
                 sourceLanguages = sourceLanguages,
                 disabledSourceKeys = disabledSourceKeys,
                 installedSources = visibleSources,
-                selectedSourceId = selectedSource?.id,
-                selectedSourcePackageName = selectedSource?.packageName,
+                selectedSourceId = selectedSource?.id ?: current.selectedSourceId.takeIf { keepMissingBoundSource },
+                selectedSourcePackageName = selectedSource?.packageName
+                    ?: current.selectedSourcePackageName.takeIf { keepMissingBoundSource },
                 backupMissingSources = missingSources,
                 busy = false,
                 message = message,
@@ -1293,6 +1311,13 @@ class MainViewModel(
         container.settingsStore.saveBackupContent(content)
         _state.update { it.copy(backupContent = content) }
         runScheduledAniListBackupIfDue(force = true, reportResult = _state.value.backupSchedule != BackupSchedule.OFF)
+    }
+
+    fun setScheduledBackupRetentionCount(count: Int) {
+        val supported = count.supportedScheduledBackupRetentionCount()
+        container.settingsStore.saveScheduledBackupRetentionCount(supported)
+        _state.update { it.copy(scheduledBackupRetentionCount = supported) }
+        pruneScheduledBackups()
     }
 
     fun runScheduledAniListBackupNow() {
@@ -1365,6 +1390,7 @@ class MainViewModel(
                 )
             }.onSuccess { result ->
                 container.settingsStore.saveLastScheduledBackupAtEpochMillis(now)
+                pruneScheduledBackupsFor(snapshot, folderUri)
                 _state.update {
                     it.copy(
                         lastScheduledBackupAtEpochMillis = now,
@@ -1389,6 +1415,30 @@ class MainViewModel(
                     )
                 }
             }
+        }
+    }
+
+    private fun pruneScheduledBackups() {
+        val snapshot = _state.value
+        val folderUri = snapshot.backupFolderUri?.let(Uri::parse) ?: return
+        if (snapshot.scheduledBackupRetentionCount == SCHEDULED_BACKUP_RETENTION_UNLIMITED) return
+        viewModelScope.launch {
+            pruneScheduledBackupsFor(snapshot, folderUri)
+        }
+    }
+
+    private suspend fun pruneScheduledBackupsFor(snapshot: TankobunUiState, folderUri: Uri) {
+        runCatching {
+            withContext(Dispatchers.IO) {
+                pruneScheduledBackupFiles(
+                    contentResolver = container.application.contentResolver,
+                    treeUri = folderUri,
+                    retentionCount = snapshot.scheduledBackupRetentionCount,
+                    kinds = snapshot.backupContent.scheduledBackupFileKinds(snapshot.libraryMode),
+                )
+            }
+        }.onFailure { error ->
+            Log.w(TAG, "Scheduled backup retention cleanup failed", error)
         }
     }
 
@@ -3162,8 +3212,10 @@ class MainViewModel(
                     it.copy(
                         sourceMatches = cached.sourceMatches,
                         sourceMatchChapterCounts = cached.sourceMatchChapterCounts,
-                        selectedSourceId = cached.boundSource?.id ?: it.selectedSourceId,
-                        selectedSourcePackageName = cached.boundSource?.packageName ?: it.selectedSourcePackageName,
+                        selectedSourceId = cached.boundSource?.id ?: cached.boundSourceId ?: it.selectedSourceId,
+                        selectedSourcePackageName = cached.boundSource?.packageName
+                            ?: cached.boundSourcePackageName
+                            ?: it.selectedSourcePackageName,
                         selectedSourceManga = cached.boundManga,
                         sourceChapters = cached.sourceChapters,
                         latestProgress = cached.latestProgress,
