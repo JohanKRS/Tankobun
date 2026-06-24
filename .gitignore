@@ -7,6 +7,7 @@ captures/
 .tmp-apks/
 .tmp-*.png
 dist/
+docs/product-audit-*/
 local.properties
 .env
 .env.local
