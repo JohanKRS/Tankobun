@@ -584,6 +584,9 @@
     <string name="about_changelog_v32_detail_cta">漫画详情页新增快捷书架操作，可保存、选择状态并分享。</string>
     <string name="about_changelog_v32_share_preview">从详情页分享时会先打开推荐预览，方便在分享前添加备注。</string>
     <string name="about_changelog_v32_quick_actions">快捷操作现使用更短的追踪标签，并让选择器圆角匹配主题。</string>
+    <string name="about_changelog_v321_tracker_progress">修复读完章节后书架追踪进度更新的问题，本地模式和 AniList 模式均适用。</string>
+    <string name="about_changelog_v321_chapter_number_edges">在决定追踪进度时，更谨慎处理小数章节和无编号番外。</string>
+    <string name="about_changelog_v321_download_alignment">章节下载进度指示器现在与下载图标使用同一操作槽并居中显示。</string>
     <string name="about_unofficial">Tankobun 是非官方漫画阅读器，与 AniList 没有关联。</string>
     <string name="about_anilist_thanks">感谢 AniList 向用户和社区应用开放 API。</string>
     <string name="about_anilist_data">AniList 是动画和漫画数据库、追踪与社交网站。它不托管、上传、分享、销售或提供漫画、章节或扫图。Tankobun 通过 AniList API 访问 AniList 元数据；账号同步使用用户授权。</string>

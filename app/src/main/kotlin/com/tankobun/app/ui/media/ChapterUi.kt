@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -550,23 +551,29 @@ internal fun ChapterDownloadIndicator(
     onResume: () -> Unit,
     onRetry: () -> Unit,
 ) {
+    val actionSize = LocalTankobunStyle.current.sizes.iconAction
     when {
-        download == null -> IconButton(onClick = onDownload) {
+        download == null -> IconButton(onClick = onDownload, modifier = Modifier.size(actionSize)) {
             Icon(Icons.Default.Download, contentDescription = tankobunString(R.string.common_download))
         }
 
-        download.state == DownloadState.COMPLETE -> Surface(
-            modifier = Modifier.size(40.dp),
-            shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-            contentColor = MaterialTheme.colorScheme.primary,
+        download.state == DownloadState.COMPLETE -> Box(
+            modifier = Modifier.size(actionSize),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = tankobunString(R.string.common_downloaded),
-                    modifier = Modifier.size(20.dp),
-                )
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = RoundedCornerShape(999.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                contentColor = MaterialTheme.colorScheme.primary,
+            ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = tankobunString(R.string.common_downloaded),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
 
@@ -579,7 +586,7 @@ internal fun ChapterDownloadIndicator(
                 }
             }
             Box(
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(actionSize),
                 contentAlignment = Alignment.Center,
             ) {
                 if (progress == null) {
@@ -601,11 +608,11 @@ internal fun ChapterDownloadIndicator(
             }
         }
 
-        download.state == DownloadState.PAUSED -> IconButton(onClick = onResume) {
+        download.state == DownloadState.PAUSED -> IconButton(onClick = onResume, modifier = Modifier.size(actionSize)) {
             Icon(Icons.Default.PlayArrow, contentDescription = tankobunString(R.string.downloads_resume_download))
         }
 
-        download.state == DownloadState.FAILED -> IconButton(onClick = onRetry) {
+        download.state == DownloadState.FAILED -> IconButton(onClick = onRetry, modifier = Modifier.size(actionSize)) {
             Icon(Icons.Default.Replay, contentDescription = tankobunString(R.string.downloads_retry_download))
         }
     }

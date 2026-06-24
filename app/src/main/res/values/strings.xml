@@ -584,6 +584,9 @@
     <string name="about_changelog_v32_detail_cta">Added a quick library CTA to manga details with save, status selection, and sharing controls.</string>
     <string name="about_changelog_v32_share_preview">Sharing from manga details now opens the recommendation preview so you can add a note before sharing.</string>
     <string name="about_changelog_v32_quick_actions">Quick actions now use shorter tracking labels and theme-matched selector corners.</string>
+    <string name="about_changelog_v321_tracker_progress">Fixed reader-completed chapters updating library tracker progress in both local and AniList library modes.</string>
+    <string name="about_changelog_v321_chapter_number_edges">Handled decimal chapters and unnumbered extras more carefully when deciding tracker progress.</string>
+    <string name="about_changelog_v321_download_alignment">Centered chapter download progress indicators in the same action slot as the download icons.</string>
     <string name="about_unofficial">Tankobun is an unofficial manga reader and is not affiliated with AniList.</string>
     <string name="about_anilist_thanks">Thanks to AniList for making its API available to users and community apps.</string>
     <string name="about_anilist_data">AniList is an anime and manga database, tracking, and social site. It does not host, upload, share, sell, or provide manga, chapters, or scanlations. Tankobun accesses AniList metadata through the AniList API; account sync uses user authorization.</string>

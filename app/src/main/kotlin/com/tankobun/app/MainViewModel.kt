@@ -81,6 +81,7 @@ import com.tankobun.app.logic.withSourceChaptersLoaded
 import com.tankobun.app.logic.withSourceChaptersLoadFailed
 import com.tankobun.app.logic.withSourceChaptersLoading
 import com.tankobun.app.logic.withSyncedListEntry
+import com.tankobun.app.logic.trackerProgressForChapter
 import com.tankobun.app.logic.withRecomputedTrackingDirty
 import com.tankobun.app.logic.withTrackingCustomListSelected
 import com.tankobun.app.logic.withTrackingCustomListSaveResult
@@ -3866,6 +3867,7 @@ class MainViewModel(
                 nowMillis = System.currentTimeMillis(),
             )
             val syncProgress = result.syncProgress
+                ?: chapter.takeIf { read }?.let { _state.value.sourceChapters.trackerProgressForChapter(it) }
             if (syncProgress != null) {
                 val trackedProgress = _state.value.trackedProgressFor(media.id)
                 if (syncProgress > trackedProgress) {
@@ -4296,8 +4298,11 @@ class MainViewModel(
                 ensureNextTenDownloads()
             }
             val snapshot = _state.value
-            val completedChapterNumber = chapter.chapterNumber.toInt()
-            val syncProgress = completedChapterNumber.takeIf { progress.completed && it > 0 }
+            val syncProgress = if (progress.completed) {
+                snapshot.sourceChapters.trackerProgressForChapter(chapter)
+            } else {
+                null
+            }
             val status = automaticStatusForReaderPosition(
                 pageIndex = progress.pageIndex,
                 totalPages = progress.totalPages,

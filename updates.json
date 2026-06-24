@@ -2,34 +2,34 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 32,
-    "versionName": "3.2.0",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.2.0/tankobun-3.2.0.apk",
-    "apkSha256": "AE731100F080221A2A3CB980889217EDD058ECB2836819CC2538C4E2B700A295",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.2.0",
-    "publishedAt": "2026-06-19T15:11:18Z",
-    "sizeBytes": 11824936,
+    "versionCode": 33,
+    "versionName": "3.2.1",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.2.1/tankobun-3.2.1.apk",
+    "apkSha256": "0A7180E3E32FC1B38211AFB4258672497C23F3737F895FB6743CFE30EF035369",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.2.1",
+    "publishedAt": "2026-06-24T01:16:37Z",
+    "sizeBytes": 11826748,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Added a quick library CTA to manga details with save, status selection, and sharing controls.",
-        "Sharing from manga details now opens the recommendation preview so you can add a note before sharing.",
-        "Quick actions now use shorter tracking labels and theme-matched selector corners."
+        "Fixed reader-completed chapters updating library tracker progress in both local and AniList library modes.",
+        "Handled decimal chapters and unnumbered extras more carefully when deciding tracker progress.",
+        "Centered chapter download progress indicators in the same action slot as the download icons."
       ],
       "pt-BR": [
-        "Adicionado CTA rápido de biblioteca nos detalhes do mangá com salvar, seleção de status e compartilhamento.",
-        "Compartilhar pelos detalhes agora abre o preview de recomendações para adicionar uma nota antes de compartilhar.",
-        "Ações rápidas agora usam rótulos de acompanhamento mais curtos e seletores com cantos do tema."
+        "Corrigida a atualização do progresso do tracker pela leitura de capítulos concluídos, tanto no modo local quanto no modo AniList.",
+        "Capítulos decimais e extras sem número agora são tratados com mais cuidado ao decidir o progresso do tracker.",
+        "Indicadores de progresso de download dos capítulos agora ficam centralizados no mesmo slot dos ícones de download."
       ],
       "es": [
-        "Se añadió un CTA rápido de biblioteca en los detalles del manga con guardar, selección de estado y compartir.",
-        "Compartir desde los detalles ahora abre la vista previa de recomendaciones para añadir una nota antes de compartir.",
-        "Las acciones rápidas ahora usan etiquetas de seguimiento más cortas y selectores con esquinas del tema."
+        "Se corrigió la actualización del progreso del tracker desde capítulos completados, tanto en modo local como en modo AniList.",
+        "Los capítulos decimales y extras sin número ahora se tratan con más cuidado al decidir el progreso del tracker.",
+        "Los indicadores de progreso de descarga de capítulos ahora están centrados en el mismo espacio que los iconos de descarga."
       ],
       "zh-CN": [
-        "漫画详情页新增快捷书架操作，可保存、选择状态并分享。",
-        "从详情页分享时会先打开推荐预览，方便在分享前添加备注。",
-        "快捷操作现使用更短的追踪标签，并让选择器圆角匹配主题。"
+        "修复读完章节后书架追踪进度更新的问题，本地模式和 AniList 模式均适用。",
+        "在决定追踪进度时，更谨慎处理小数章节和无编号番外。",
+        "章节下载进度指示器现在与下载图标使用同一操作槽并居中显示。"
       ]
     }
   }

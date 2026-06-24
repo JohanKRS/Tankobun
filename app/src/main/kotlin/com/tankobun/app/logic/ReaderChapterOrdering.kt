@@ -48,6 +48,15 @@ internal fun nextTenDownloadCandidates(state: TankobunUiState): List<SourceChapt
         .take(NEXT_DOWNLOAD_WINDOW_SIZE)
 }
 
+internal fun List<SourceChapter>.trackerProgressForChapter(chapter: SourceChapter): Int? {
+    chapter.chapterNumber.toInt().takeIf { it > 0 }?.let { return it }
+    if (any { it.chapterNumber > 0f }) return null
+    val readingIndex = readingOrder().indexOfFirst { item ->
+        item.sourceId == chapter.sourceId && item.url == chapter.url
+    }
+    return (readingIndex + 1).takeIf { readingIndex >= 0 }
+}
+
 internal fun List<SourceChapter>.readingOrder(): List<SourceChapter> =
     if (any { it.chapterNumber > 0f }) {
         sortedWith(compareBy<SourceChapter> { it.chapterNumber.takeIf { number -> number > 0f } ?: Float.MAX_VALUE }
