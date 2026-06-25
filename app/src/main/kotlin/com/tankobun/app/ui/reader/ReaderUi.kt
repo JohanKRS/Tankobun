@@ -90,6 +90,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.FormatLineSpacing
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -97,12 +98,17 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Splitscreen
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.StayCurrentLandscape
+import androidx.compose.material.icons.filled.StayCurrentPortrait
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.ViewStream
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -153,6 +159,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -237,12 +244,16 @@ private const val ReaderNextTapZoneStartFraction =
 @Composable
 internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) {
     val chapter = state.activeChapter ?: return
+    val ignoreDisplayCutout = effectiveIgnoreDisplayCutout(state.ignoreDisplayCutout)
+    val cutoutStartPadding = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout)
+    val cutoutEndPadding = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout)
     if (state.readerPages.isEmpty()) {
         ReaderLoadingScreen(
             chapter = chapter,
             error = state.readerError,
             onRetry = viewModel::retryReaderChapter,
             onClose = viewModel::closeReader,
+            ignoreDisplayCutout = ignoreDisplayCutout,
         )
         return
     }
@@ -492,6 +503,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .padding(start = cutoutStartPadding, end = cutoutEndPadding)
             .pointerInput(transformKey, controlsVisible, readerScale, currentPagedPageAspectRatio, pagedPagePaddingPx) {
                 detectTapGestures(
                     onDoubleTap = { tapOffset ->
@@ -601,21 +613,33 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     webtoonPageItems,
                     key = { _, item -> "${item.chapter.url}:${item.page.index}:${item.page.imageUrl}" },
                     contentType = { _, _ -> "reader-page" },
-                ) { _, item ->
+                ) { index, item ->
                     val aspectKey = "${item.chapter.url}:${item.page.index}:${item.page.imageUrl}"
-                    ReaderPageImage(
-                        model = { retryAttempt -> readerImageRequest(state, item.chapter, item.page, retryAttempt) },
-                        contentDescription = item.chapter.name,
+                    val previousItem = webtoonPageItems.getOrNull(index - 1)
+                    val showChapterDivider = state.showWebtoonChapterDividers &&
+                        previousItem != null &&
+                        previousItem.chapter.url != item.chapter.url
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        contentScale = ContentScale.FillWidth,
-                        stabilizeAspectRatio = true,
-                        placeholderAspectRatio = webtoonPageAspectRatios[aspectKey]
-                            ?: item.page.readerPageAspectRatio()
-                            ?: DEFAULT_WEBTOON_READER_PAGE_ASPECT_RATIO,
-                        onImageAspectRatio = { aspectRatio ->
-                            webtoonPageAspectRatios[aspectKey] = aspectRatio
-                        },
-                    )
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        if (showChapterDivider) {
+                            WebtoonChapterDivider(chapterName = item.chapter.name)
+                        }
+                        ReaderPageImage(
+                            model = { retryAttempt -> readerImageRequest(state, item.chapter, item.page, retryAttempt) },
+                            contentDescription = item.chapter.name,
+                            modifier = Modifier.fillMaxWidth(),
+                            contentScale = ContentScale.FillWidth,
+                            stabilizeAspectRatio = true,
+                            placeholderAspectRatio = webtoonPageAspectRatios[aspectKey]
+                                ?: item.page.readerPageAspectRatio()
+                                ?: DEFAULT_WEBTOON_READER_PAGE_ASPECT_RATIO,
+                            onImageAspectRatio = { aspectRatio ->
+                                webtoonPageAspectRatios[aspectKey] = aspectRatio
+                            },
+                        )
+                    }
                 }
                 if (nextChapter != null && state.readerNextSegment == null) {
                     item(
@@ -736,7 +760,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(WindowInsets.safeDrawing.asPaddingValues()),
+                    .readerSafeDrawingPadding(ignoreDisplayCutout = ignoreDisplayCutout),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Surface(
@@ -892,13 +916,24 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
+                                val pagedReaderLabel = ReaderMode.PAGED.readerModeLabel()
+                                val webtoonReaderLabel = ReaderMode.WEBTOON.readerModeLabel()
+                                val readerGapChipLabel = readerGapLabel(state.readerPageGapLevel)
+                                val readerOrientationChipLabel = state.readerScreenOrientation.readerOrientationLabel()
+                                val chapterDividersChipLabel =
+                                    tankobunString(R.string.settings_webtoon_chapter_dividers_short)
+                                val resetZoomLabel = tankobunString(R.string.reader_reset_zoom)
+
                                 TankobunChip(
                                     selected = state.readerMode == ReaderMode.PAGED,
                                     onClick = {
                                         resetZoom()
                                         viewModel.setReaderMode(ReaderMode.PAGED)
                                     },
-                                    label = { Text(ReaderMode.PAGED.readerModeLabel()) },
+                                    label = { Text(pagedReaderLabel) },
+                                    leadingIcon = {
+                                        ReaderChipIcon(Icons.AutoMirrored.Filled.MenuBook, pagedReaderLabel)
+                                    },
                                 )
                                 TankobunChip(
                                     selected = state.readerMode == ReaderMode.WEBTOON,
@@ -906,17 +941,53 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                         resetZoom()
                                         viewModel.setReaderMode(ReaderMode.WEBTOON)
                                     },
-                                    label = { Text(ReaderMode.WEBTOON.readerModeLabel()) },
+                                    label = { Text(webtoonReaderLabel) },
+                                    leadingIcon = {
+                                        ReaderChipIcon(Icons.Default.ViewStream, webtoonReaderLabel)
+                                    },
                                 )
                                 TankobunChip(
                                     selected = state.readerPageGapLevel > 0,
                                     onClick = { viewModel.setReaderPageGapLevel((state.readerPageGapLevel + 1) % 4) },
-                                    label = { Text(readerGapLabel(state.readerPageGapLevel)) },
+                                    label = { Text(readerGapChipLabel) },
+                                    leadingIcon = {
+                                        ReaderChipIcon(Icons.Default.FormatLineSpacing, readerGapChipLabel)
+                                    },
                                 )
+                                TankobunChip(
+                                    selected = state.readerScreenOrientation != ReaderScreenOrientation.SYSTEM,
+                                    onClick = {
+                                        viewModel.setReaderScreenOrientation(
+                                            state.readerScreenOrientation.nextReaderOrientation(),
+                                        )
+                                    },
+                                    label = { Text(readerOrientationChipLabel) },
+                                    leadingIcon = {
+                                        ReaderChipIcon(
+                                            state.readerScreenOrientation.readerOrientationIcon(),
+                                            readerOrientationChipLabel,
+                                        )
+                                    },
+                                )
+                                if (state.readerMode == ReaderMode.WEBTOON) {
+                                    TankobunChip(
+                                        selected = state.showWebtoonChapterDividers,
+                                        onClick = {
+                                            viewModel.setShowWebtoonChapterDividers(!state.showWebtoonChapterDividers)
+                                        },
+                                        label = { Text(chapterDividersChipLabel) },
+                                        leadingIcon = {
+                                            ReaderChipIcon(Icons.Default.Splitscreen, chapterDividersChipLabel)
+                                        },
+                                    )
+                                }
                                 TankobunChip(
                                     selected = readerScale > 1.05f,
                                     onClick = { resetZoom() },
-                                    label = { Text(tankobunString(R.string.reader_reset_zoom)) },
+                                    label = { Text(resetZoomLabel) },
+                                    leadingIcon = {
+                                        ReaderChipIcon(Icons.Default.Replay, resetZoomLabel)
+                                    },
                                 )
                             }
                             Text(
@@ -935,6 +1006,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
             BackHandler { viewModel.dismissReaderTutorial() }
             ReaderTutorialOverlay(
                 readerMode = state.readerMode,
+                ignoreDisplayCutout = ignoreDisplayCutout,
                 onDismiss = viewModel::dismissReaderTutorial,
             )
         }
@@ -942,12 +1014,16 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
 }
 
 @Composable
-internal fun ReaderTutorialOverlay(readerMode: ReaderMode, onDismiss: () -> Unit) {
+internal fun ReaderTutorialOverlay(
+    readerMode: ReaderMode,
+    ignoreDisplayCutout: Boolean,
+    onDismiss: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.62f))
-            .padding(WindowInsets.safeDrawing.asPaddingValues()),
+            .readerSafeDrawingPadding(ignoreDisplayCutout = ignoreDisplayCutout),
     ) {
         Box(
             modifier = Modifier
@@ -1065,12 +1141,13 @@ internal fun ReaderLoadingScreen(
     error: ReaderLoadError?,
     onRetry: () -> Unit,
     onClose: () -> Unit,
+    ignoreDisplayCutout: Boolean,
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .padding(WindowInsets.safeDrawing.asPaddingValues()),
+            .readerSafeDrawingPadding(ignoreDisplayCutout = ignoreDisplayCutout),
     ) {
         IconButton(
             onClick = onClose,
@@ -1338,11 +1415,80 @@ internal fun WebtoonNextChapterFooter(
     }
 }
 
+@Composable
+internal fun WebtoonChapterDivider(chapterName: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(Color.White.copy(alpha = 0.18f)),
+        )
+        Text(
+            chapterName,
+            modifier = Modifier.widthIn(max = 260.dp),
+            color = Color.White.copy(alpha = 0.58f),
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(Color.White.copy(alpha = 0.18f)),
+        )
+    }
+}
+
 internal fun readerPageGap(level: Int): Dp = when (level) {
     1 -> 8.dp
     2 -> 16.dp
     3 -> 24.dp
     else -> 0.dp
+}
+
+private fun ReaderScreenOrientation.nextReaderOrientation(): ReaderScreenOrientation =
+    when (this) {
+        ReaderScreenOrientation.SYSTEM -> ReaderScreenOrientation.PORTRAIT
+        ReaderScreenOrientation.PORTRAIT -> ReaderScreenOrientation.LANDSCAPE
+        ReaderScreenOrientation.LANDSCAPE -> ReaderScreenOrientation.SYSTEM
+    }
+
+@Composable
+private fun ReaderChipIcon(
+    icon: ImageVector,
+    contentDescription: String,
+) {
+    Icon(
+        icon,
+        contentDescription = contentDescription,
+        modifier = Modifier.size(16.dp),
+    )
+}
+
+private fun ReaderScreenOrientation.readerOrientationIcon(): ImageVector =
+    when (this) {
+        ReaderScreenOrientation.SYSTEM -> Icons.Default.ScreenRotation
+        ReaderScreenOrientation.PORTRAIT -> Icons.Default.StayCurrentPortrait
+        ReaderScreenOrientation.LANDSCAPE -> Icons.Default.StayCurrentLandscape
+    }
+
+@Composable
+private fun Modifier.readerSafeDrawingPadding(ignoreDisplayCutout: Boolean): Modifier {
+    val safeDrawingPadding = WindowInsets.safeDrawing.asPaddingValues()
+    return padding(
+        start = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout),
+        top = safeDrawingPadding.calculateTopPadding(),
+        end = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout),
+        bottom = safeDrawingPadding.calculateBottomPadding(),
+    )
 }
 
 internal const val DEFAULT_WEBTOON_READER_PAGE_ASPECT_RATIO = 0.68f

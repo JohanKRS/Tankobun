@@ -86,6 +86,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Check
@@ -106,6 +107,8 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.ViewAgenda
+import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -158,6 +161,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -254,11 +258,20 @@ internal fun MediaViewModeRow(
             TankobunChip(
                 selected = selectedMode == mode,
                 onClick = { onSelect(mode) },
+                leadingIcon = { TankobunChipIcon(mode.mediaViewIcon()) },
                 label = { Text(mode.mediaViewLabel()) },
             )
         }
     }
 }
+
+private fun MediaViewMode.mediaViewIcon(): ImageVector =
+    when (this) {
+        MediaViewMode.COVER_GRID -> Icons.Default.ViewModule
+        MediaViewMode.COVER_WITH_INFO -> Icons.Default.ViewAgenda
+        MediaViewMode.LIST -> Icons.AutoMirrored.Filled.ViewList
+        else -> Icons.Default.ViewModule
+    }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

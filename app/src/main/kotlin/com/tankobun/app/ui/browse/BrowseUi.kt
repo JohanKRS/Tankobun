@@ -28,8 +28,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -82,27 +84,40 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.FitScreen
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -156,6 +171,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -309,6 +325,7 @@ internal fun BrowseScreen(
     viewModel: MainViewModel,
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
+    val context = LocalContext.current
     LaunchedEffect(Unit) {
         viewModel.loadBrowseLanding()
         viewModel.loadBrowseTags()
@@ -320,6 +337,16 @@ internal fun BrowseScreen(
     var advancedOpen by remember { mutableStateOf(false) }
     val controlsActive = state.browseControlsActive()
     val trackedStatuses = remember(state.libraryItems) { state.libraryItems.trackedMediaStatuses() }
+    val selectedLibraryItems = remember(state.libraryItems, state.selectedLibraryMediaIds, state.selectedLibraryBatchMedia) {
+        state.selectedLibraryBatchItems()
+    }
+    val selectedCount = state.selectedLibraryMediaIds.size
+    val chromeInsets = LocalTankobunChromeInsets.current
+
+    BackHandler(enabled = selectedCount > 0) {
+        viewModel.clearLibraryBatchSelection()
+    }
+
     val browseHeader: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             BrowseFilterBar(
@@ -349,6 +376,10 @@ internal fun BrowseScreen(
                     viewModel = viewModel,
                     onSelectMedia = onSelectMedia,
                     trackedStatuses = trackedStatuses,
+                    selectedMediaIds = state.selectedLibraryMediaIds,
+                    selectionMode = selectedCount > 0,
+                    onToggleMediaSelection = viewModel::toggleLibraryBatchSelection,
+                    onLongPressMedia = viewModel::startLibraryBatchSelection,
                     modifier = Modifier.fillMaxSize(),
                     header = browseHeader,
                 )
@@ -359,8 +390,34 @@ internal fun BrowseScreen(
                 viewModel = viewModel,
                 onSelectMedia = onSelectMedia,
                 trackedStatuses = trackedStatuses,
+                selectedMediaIds = state.selectedLibraryMediaIds,
+                selectionMode = selectedCount > 0,
+                onToggleMediaSelection = viewModel::toggleLibraryBatchSelection,
+                onLongPressMedia = viewModel::startLibraryBatchSelection,
                 modifier = Modifier.fillMaxSize(),
                 header = browseHeader,
+            )
+        }
+
+        AnimatedVisibility(
+            visible = selectedCount > 0,
+            modifier = Modifier
+                .align(state.dockAlignment.browseBatchBarAlignment())
+                .padding(horizontal = 14.dp)
+                .padding(bottom = chromeInsets.bottom + 8.dp),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            LibraryBatchActionBar(
+                selectedCount = selectedCount,
+                canRemoveCustomList = selectedLibraryItems.any { item -> item.entry.customLists.isNotEmpty() },
+                onShare = viewModel::showLibraryShareDialog,
+                onChangeStatus = viewModel::showLibraryBatchStatusDialog,
+                onAddCustomList = viewModel::showLibraryBatchAddCustomListDialog,
+                onRemoveCustomList = viewModel::showLibraryBatchRemoveCustomListDialog,
+                onDelete = viewModel::showLibraryBatchDeleteDialog,
+                onClose = viewModel::clearLibraryBatchSelection,
+                modifier = Modifier.widthIn(max = 560.dp),
             )
         }
 
@@ -421,6 +478,47 @@ internal fun BrowseScreen(
                 onDismiss = { advancedOpen = false },
             )
         }
+
+        if (state.libraryShareDialogVisible) {
+            LibraryShareDialog(
+                selectedItems = selectedLibraryItems,
+                onShare = { name, messagesByMediaId ->
+                    viewModel.shareSelectedRecommendations(context, name, messagesByMediaId)
+                },
+                onDismiss = viewModel::dismissLibraryBatchDialogs,
+            )
+        }
+
+        if (state.libraryBatchStatusDialogVisible) {
+            LibraryBatchStatusDialog(
+                selectedCount = selectedCount,
+                onSelectStatus = viewModel::applyLibraryBatchStatus,
+                onDismiss = viewModel::dismissLibraryBatchDialogs,
+            )
+        }
+
+        if (state.libraryBatchCustomListDialogVisible) {
+            val removableLists = selectedLibraryItems
+                .flatMap { item -> item.entry.customLists }
+                .distinctBy { it.lowercase(Locale.ROOT) }
+                .sortedWith(String.CASE_INSENSITIVE_ORDER)
+            LibraryBatchCustomListDialog(
+                selectedCount = selectedCount,
+                remove = state.libraryBatchRemoveCustomList,
+                availableLists = if (state.libraryBatchRemoveCustomList) removableLists else state.anilistCustomLists,
+                onConfirm = { name -> viewModel.applyLibraryBatchCustomList(name, state.libraryBatchRemoveCustomList) },
+                onDismiss = viewModel::dismissLibraryBatchDialogs,
+            )
+        }
+
+        if (state.libraryBatchDeleteDialogVisible) {
+            LibraryBatchDeleteDialog(
+                selectedCount = selectedCount,
+                onDeleteLibraryOnly = { viewModel.deleteSelectedLibraryEntries(deleteLocalData = false) },
+                onDeleteWithLocalData = { viewModel.deleteSelectedLibraryEntries(deleteLocalData = true) },
+                onDismiss = viewModel::dismissLibraryBatchDialogs,
+            )
+        }
     }
 }
 
@@ -449,36 +547,42 @@ internal fun BrowseFilterBar(
                 label = tankobunString(R.string.common_genres),
                 value = if (state.browseGenres.isEmpty()) tankobunString(R.string.common_any) else state.browseGenres.size.toString(),
                 selected = state.browseGenres.isNotEmpty(),
+                icon = Icons.Default.Category,
                 onClick = onOpenGenres,
             )
             BrowseFilterPill(
                 label = tankobunString(R.string.common_tags),
                 value = if (state.browseTags.isEmpty()) tankobunString(R.string.common_any) else state.browseTags.size.toString(),
                 selected = state.browseTags.isNotEmpty(),
+                icon = Icons.Default.LocalOffer,
                 onClick = onOpenTags,
             )
             BrowseFilterPill(
                 label = tankobunString(R.string.common_format),
                 value = BrowseFormatOptions.labelFor(state.browseFormat),
                 selected = state.browseFormat != null,
+                icon = Icons.AutoMirrored.Filled.MenuBook,
                 onClick = { onOpenPicker(BrowsePicker.FORMAT) },
             )
             BrowseFilterPill(
                 label = tankobunString(R.string.common_status),
                 value = BrowseStatusOptions.labelFor(state.browsePublishingStatus),
                 selected = state.browsePublishingStatus != null,
+                icon = Icons.Default.Flag,
                 onClick = { onOpenPicker(BrowsePicker.STATUS) },
             )
             BrowseFilterPill(
                 label = tankobunString(R.string.common_country),
                 value = BrowseCountryOptions.labelFor(state.browseCountryOfOrigin),
                 selected = state.browseCountryOfOrigin != null,
+                icon = Icons.Default.Public,
                 onClick = { onOpenPicker(BrowsePicker.COUNTRY) },
             )
             BrowseFilterPill(
                 label = tankobunString(R.string.common_year),
                 value = state.browseYear?.toString() ?: tankobunString(R.string.common_any),
                 selected = state.browseYear != null,
+                icon = Icons.Default.CalendarMonth,
                 onClick = { onOpenPicker(BrowsePicker.YEAR) },
             )
             BrowseIconFilterPill(
@@ -497,11 +601,13 @@ internal fun BrowseFilterPill(
     label: String,
     value: String,
     selected: Boolean,
+    icon: ImageVector,
     onClick: () -> Unit,
 ) {
     TankobunChip(
         selected = selected,
         onClick = onClick,
+        leadingIcon = { TankobunChipIcon(icon) },
         label = {
             Text(
                 if (selected) "$label: $value" else label,
@@ -537,6 +643,10 @@ internal fun BrowseLanding(
     viewModel: MainViewModel,
     onSelectMedia: (AnilistMedia) -> Unit,
     trackedStatuses: Map<Int, MediaStatus>,
+    selectedMediaIds: Set<Int>,
+    selectionMode: Boolean,
+    onToggleMediaSelection: (AnilistMedia) -> Unit,
+    onLongPressMedia: (AnilistMedia) -> Unit,
     modifier: Modifier,
     header: @Composable () -> Unit,
 ) {
@@ -559,8 +669,12 @@ internal fun BrowseLanding(
                 title = tankobunString(R.string.browse_trending_now),
                 media = state.browseTrending,
                 trackedStatuses = trackedStatuses,
+                selectedMediaIds = selectedMediaIds,
+                selectionMode = selectionMode,
                 onViewAll = { viewModel.viewAllBrowseSection("TRENDING_DESC") },
                 onSelectMedia = onSelectMedia,
+                onToggleMediaSelection = onToggleMediaSelection,
+                onLongPressMedia = onLongPressMedia,
             )
         }
         item {
@@ -568,8 +682,12 @@ internal fun BrowseLanding(
                 title = tankobunString(R.string.browse_all_time_popular),
                 media = state.browsePopular,
                 trackedStatuses = trackedStatuses,
+                selectedMediaIds = selectedMediaIds,
+                selectionMode = selectionMode,
                 onViewAll = { viewModel.viewAllBrowseSection("POPULARITY_DESC") },
                 onSelectMedia = onSelectMedia,
+                onToggleMediaSelection = onToggleMediaSelection,
+                onLongPressMedia = onLongPressMedia,
             )
         }
         item {
@@ -577,8 +695,12 @@ internal fun BrowseLanding(
                 title = tankobunString(R.string.browse_popular_manhwa),
                 media = state.browsePopularManhwa,
                 trackedStatuses = trackedStatuses,
+                selectedMediaIds = selectedMediaIds,
+                selectionMode = selectionMode,
                 onViewAll = viewModel::viewAllPopularManhwa,
                 onSelectMedia = onSelectMedia,
+                onToggleMediaSelection = onToggleMediaSelection,
+                onLongPressMedia = onLongPressMedia,
             )
         }
         item {
@@ -586,8 +708,12 @@ internal fun BrowseLanding(
                 title = tankobunString(R.string.browse_top_100_manga),
                 media = state.browseTopManga,
                 trackedStatuses = trackedStatuses,
+                selectedMediaIds = selectedMediaIds,
+                selectionMode = selectionMode,
                 onViewAll = { viewModel.viewAllBrowseSection("SCORE_DESC") },
                 onSelectMedia = onSelectMedia,
+                onToggleMediaSelection = onToggleMediaSelection,
+                onLongPressMedia = onLongPressMedia,
             )
         }
     }
@@ -598,13 +724,24 @@ private val BrowseHeaderTextGap = 24.dp
 private val BrowseShelfTitleHeight = 62.dp
 private val BrowseShelfItemGap = 12.dp
 
+private fun DockAlignment.browseBatchBarAlignment(): Alignment =
+    when (this) {
+        DockAlignment.LEFT -> Alignment.BottomStart
+        DockAlignment.RIGHT -> Alignment.BottomEnd
+        DockAlignment.CENTER -> Alignment.BottomCenter
+    }
+
 @Composable
 internal fun BrowseMangaShelf(
     title: String,
     media: List<AnilistMedia>,
     trackedStatuses: Map<Int, MediaStatus>,
+    selectedMediaIds: Set<Int>,
+    selectionMode: Boolean,
     onViewAll: () -> Unit,
     onSelectMedia: (AnilistMedia) -> Unit,
+    onToggleMediaSelection: (AnilistMedia) -> Unit,
+    onLongPressMedia: (AnilistMedia) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         TankobunSectionHeader(
@@ -636,7 +773,16 @@ internal fun BrowseMangaShelf(
                         BrowseShelfTile(
                             media = item,
                             trackedStatus = trackedStatuses[item.id],
-                            onClick = { onSelectMedia(item) },
+                            selected = item.id in selectedMediaIds,
+                            selectionMode = selectionMode,
+                            onClick = {
+                                if (selectionMode) {
+                                    onToggleMediaSelection(item)
+                                } else {
+                                    onSelectMedia(item)
+                                }
+                            },
+                            onLongClick = { onLongPressMedia(item) },
                         )
                     }
                 }
@@ -645,27 +791,52 @@ internal fun BrowseMangaShelf(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun BrowseShelfTile(media: AnilistMedia, trackedStatus: MediaStatus?, onClick: () -> Unit) {
+internal fun BrowseShelfTile(
+    media: AnilistMedia,
+    trackedStatus: MediaStatus?,
+    selected: Boolean,
+    selectionMode: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .width(190.dp)
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Surface(
-            shape = RoundedCornerShape(8.dp),
-            tonalElevation = 1.dp,
-            shadowElevation = 2.dp,
-        ) {
-            TrackedCoverImage(
-                url = media.coverImage,
-                title = media.title.userPreferred,
-                trackedStatus = trackedStatus,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f),
-            )
+        Box {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                tonalElevation = 1.dp,
+                shadowElevation = 2.dp,
+                border = if (selected) BorderStroke(2.dp, LocalTankobunStyle.current.colors.accent) else null,
+            ) {
+                TrackedCoverImage(
+                    url = media.coverImage,
+                    title = media.title.userPreferred,
+                    trackedStatus = trackedStatus,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(2f / 3f),
+                )
+            }
+            if (selectionMode) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = null,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp),
+                )
+            }
         }
         Column(
             modifier = Modifier.height(BrowseShelfTitleHeight),
@@ -690,6 +861,10 @@ internal fun BrowseResults(
     viewModel: MainViewModel,
     onSelectMedia: (AnilistMedia) -> Unit,
     trackedStatuses: Map<Int, MediaStatus>,
+    selectedMediaIds: Set<Int>,
+    selectionMode: Boolean,
+    onToggleMediaSelection: (AnilistMedia) -> Unit,
+    onLongPressMedia: (AnilistMedia) -> Unit,
     modifier: Modifier,
     header: @Composable () -> Unit,
 ) {
@@ -732,6 +907,10 @@ internal fun BrowseResults(
             bottom = chromeInsets.bottom + 18.dp,
         ),
         onSelectMedia = onSelectMedia,
+        selectedMediaIds = selectedMediaIds,
+        selectionMode = selectionMode,
+        onToggleMediaSelection = onToggleMediaSelection,
+        onLongPressMedia = onLongPressMedia,
         isLoadingMore = state.browseResultsLoadingMore,
         onNearEnd = if (state.browseResultsHasMore) viewModel::loadMoreBrowseResults else null,
         emptyMessage = if (state.busy) {
@@ -761,6 +940,7 @@ internal fun BrowseGenreDialog(
                     TankobunChip(
                         selected = genre in state.browseGenres,
                         onClick = { viewModel.setBrowseGenre(genre, genre !in state.browseGenres) },
+                        leadingIcon = { TankobunChipIcon(Icons.Default.Category) },
                         label = {
                                     Text(browseGenreLabel(genre), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         },
@@ -833,6 +1013,7 @@ internal fun BrowseTagDialog(
                         TankobunChip(
                             selected = tag.name in state.browseTags,
                             onClick = { viewModel.setBrowseTag(tag.name, tag.name !in state.browseTags) },
+                            leadingIcon = { TankobunChipIcon(Icons.Default.LocalOffer) },
                             label = {
                                 Text(
                                     tag.name,
@@ -914,6 +1095,7 @@ internal fun LibraryOptionsDialog(
                 TankobunChip(
                     selected = sort == option.value,
                     onClick = { onSortChange(option.value) },
+                    leadingIcon = { TankobunChipIcon(option.librarySortIcon()) },
                     label = { Text(option.labelText()) },
                 )
             }
@@ -957,6 +1139,7 @@ internal fun BrowseAdvancedDialog(
                 TankobunChip(
                     selected = state.browseSort == option.value,
                     onClick = { option.value?.let(viewModel::setBrowseSort) },
+                    leadingIcon = { TankobunChipIcon(option.browseSortIcon()) },
                     label = { Text(option.labelText()) },
                 )
             }
@@ -1006,6 +1189,7 @@ internal fun CoverColumnsRow(
             TankobunChip(
                 selected = selectedColumns == count,
                 onClick = { onSelect(count) },
+                leadingIcon = { TankobunChipIcon(Icons.Default.GridView) },
                 label = { Text(count.toString()) },
                 modifier = modifier,
             )
@@ -1022,15 +1206,40 @@ internal fun CoverFramingRow(
         TankobunChip(
             selected = !showWholeCover,
             onClick = { onShowWholeCoverChange(false) },
+            leadingIcon = { TankobunChipIcon(Icons.Default.Crop) },
             label = { Text(tankobunString(R.string.cover_framing_fill)) },
         )
         TankobunChip(
             selected = showWholeCover,
             onClick = { onShowWholeCoverChange(true) },
+            leadingIcon = { TankobunChipIcon(Icons.Default.FitScreen) },
             label = { Text(tankobunString(R.string.cover_framing_whole)) },
         )
     }
 }
+
+private fun BrowseOption.librarySortIcon(): ImageVector =
+    when (value) {
+        LIBRARY_SORT_LIST_ORDER -> Icons.AutoMirrored.Filled.Label
+        LIBRARY_SORT_TITLE -> Icons.Default.SortByAlpha
+        LIBRARY_SORT_UPDATED -> Icons.Default.Refresh
+        LIBRARY_SORT_PROGRESS -> Icons.Default.PlayArrow
+        LIBRARY_SORT_SCORE -> Icons.Default.Star
+        else -> Icons.AutoMirrored.Filled.Sort
+    }
+
+private fun BrowseOption.browseSortIcon(): ImageVector =
+    when (value) {
+        BROWSE_SORT_SEARCH_MATCH_UI -> Icons.Default.Search
+        "TRENDING_DESC" -> Icons.AutoMirrored.Filled.TrendingUp
+        "POPULARITY_DESC" -> Icons.Default.Whatshot
+        "FAVOURITES_DESC" -> Icons.Default.Star
+        "SCORE_DESC" -> Icons.Default.Check
+        "UPDATED_AT_DESC" -> Icons.Default.Refresh
+        "START_DATE_DESC" -> Icons.Default.CalendarMonth
+        "TITLE_ROMAJI" -> Icons.Default.SortByAlpha
+        else -> Icons.AutoMirrored.Filled.Sort
+    }
 
 @Composable
 internal fun BrowseOption.labelText(): String =

@@ -80,6 +80,19 @@ internal fun ReaderMode.readerModeLabel(): String =
     tankobunString(labelRes())
 
 @StringRes
+internal fun ReaderScreenOrientation.labelRes(): Int =
+    when (this) {
+        ReaderScreenOrientation.SYSTEM -> R.string.reader_orientation_system
+        ReaderScreenOrientation.PORTRAIT -> R.string.reader_orientation_portrait
+        ReaderScreenOrientation.LANDSCAPE -> R.string.reader_orientation_landscape
+    }
+
+@Composable
+@ReadOnlyComposable
+internal fun ReaderScreenOrientation.readerOrientationLabel(): String =
+    tankobunString(labelRes())
+
+@StringRes
 internal fun BackupSchedule.labelRes(): Int =
     when (this) {
         BackupSchedule.OFF -> R.string.backup_schedule_off

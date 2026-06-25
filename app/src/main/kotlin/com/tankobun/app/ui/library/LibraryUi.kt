@@ -87,16 +87,21 @@ import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistRemove
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
@@ -270,8 +275,8 @@ internal fun LibraryScreen(
     val statusOptions = remember(sections) { libraryStatusOptions(sections) }
     val countryOptions = remember(sections) { libraryCountryOptions(sections) }
     val yearOptions = remember(sections) { libraryYearOptions(sections) }
-    val selectedLibraryItems = remember(state.libraryItems, state.selectedLibraryMediaIds) {
-        state.libraryItems.filter { item -> item.media.id in state.selectedLibraryMediaIds }
+    val selectedLibraryItems = remember(state.libraryItems, state.selectedLibraryMediaIds, state.selectedLibraryBatchMedia) {
+        state.selectedLibraryBatchItems()
     }
     val selectedCount = state.selectedLibraryMediaIds.size
     val resetLibraryControls = {
@@ -349,8 +354,8 @@ internal fun LibraryScreen(
             onSelectMedia = onSelectMedia,
             selectedMediaIds = state.selectedLibraryMediaIds,
             selectionMode = selectedCount > 0,
-            onToggleMediaSelection = { media -> viewModel.toggleLibraryBatchSelection(media.id) },
-            onLongPressMedia = { media -> viewModel.startLibraryBatchSelection(media.id) },
+            onToggleMediaSelection = viewModel::toggleLibraryBatchSelection,
+            onLongPressMedia = viewModel::startLibraryBatchSelection,
         )
         AnimatedVisibility(
             visible = selectedCount > 0,
@@ -529,36 +534,42 @@ internal fun LibraryFilterBar(
                 label = tankobunString(R.string.common_genres),
                 value = if (genres.isEmpty()) tankobunString(R.string.common_any) else genres.size.toString(),
                 selected = genres.isNotEmpty(),
+                icon = Icons.Default.Category,
                 onClick = onOpenGenres,
             )
             BrowseFilterPill(
                 label = tankobunString(R.string.common_tags),
                 value = if (tags.isEmpty()) tankobunString(R.string.common_any) else tags.size.toString(),
                 selected = tags.isNotEmpty(),
+                icon = Icons.Default.LocalOffer,
                 onClick = onOpenTags,
             )
             BrowseFilterPill(
                 label = tankobunString(R.string.common_format),
                 value = formatOptions.labelFor(format),
                 selected = format != null,
+                icon = Icons.AutoMirrored.Filled.MenuBook,
                 onClick = { onOpenPicker(LibraryPicker.FORMAT) },
             )
             BrowseFilterPill(
                 label = tankobunString(R.string.common_status),
                 value = statusOptions.labelFor(publishingStatus),
                 selected = publishingStatus != null,
+                icon = Icons.Default.Flag,
                 onClick = { onOpenPicker(LibraryPicker.STATUS) },
             )
             BrowseFilterPill(
                 label = tankobunString(R.string.common_country),
                 value = countryOptions.labelFor(countryOfOrigin),
                 selected = countryOfOrigin != null,
+                icon = Icons.Default.Public,
                 onClick = { onOpenPicker(LibraryPicker.COUNTRY) },
             )
             BrowseFilterPill(
                 label = tankobunString(R.string.common_year),
                 value = yearOptions.labelFor(year),
                 selected = year != null,
+                icon = Icons.Default.CalendarMonth,
                 onClick = { onOpenPicker(LibraryPicker.YEAR) },
             )
             BrowseIconFilterPill(
@@ -1272,6 +1283,11 @@ internal fun LibraryBatchCustomListDialog(
                     TankobunChip(
                         selected = customList.equals(listName, ignoreCase = true),
                         onClick = { listName = customList },
+                        leadingIcon = {
+                            TankobunChipIcon(
+                                if (remove) Icons.Default.PlaylistRemove else Icons.AutoMirrored.Filled.PlaylistAdd,
+                            )
+                        },
                         label = { Text(customList, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     )
                 }
@@ -1546,6 +1562,7 @@ internal fun LibraryGenreDialog(
                         TankobunChip(
                             selected = genre in selectedGenres,
                             onClick = { onGenreSelected(genre, genre !in selectedGenres) },
+                            leadingIcon = { TankobunChipIcon(Icons.Default.Category) },
                             label = {
                                 Text(browseGenreLabel(genre), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             },
@@ -1606,6 +1623,7 @@ internal fun LibraryTagDialog(
                             TankobunChip(
                                 selected = tag.name in selectedTags,
                                 onClick = { onTagSelected(tag.name, tag.name !in selectedTags) },
+                                leadingIcon = { TankobunChipIcon(Icons.Default.LocalOffer) },
                                 label = {
                                     Text(
                                         tag.name,

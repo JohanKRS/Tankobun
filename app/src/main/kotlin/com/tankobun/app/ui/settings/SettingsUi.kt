@@ -436,7 +436,7 @@ internal fun SettingsDetailContent(
     route: SettingsRoute,
     modifier: Modifier = Modifier,
 ) {
-    val deviceHasDisplayCutout = hasDisplayCutout()
+    val deviceHasDisplayCutout = hasTabletDisplayCutout()
     when (route) {
         SettingsRoute.MAIN,
         SettingsRoute.PROFILE,
@@ -542,6 +542,22 @@ internal fun SettingsDetailContent(
                     )
                 }
             }
+            Text(tankobunString(R.string.settings_screen_orientation), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            FlowRowCompat {
+                ReaderScreenOrientation.entries.forEach { orientation ->
+                    TankobunChip(
+                        selected = state.readerScreenOrientation == orientation,
+                        onClick = { viewModel.setReaderScreenOrientation(orientation) },
+                        label = { Text(orientation.readerOrientationLabel()) },
+                    )
+                }
+            }
+            SettingsToggleRow(
+                title = tankobunString(R.string.settings_webtoon_chapter_dividers),
+                subtitle = tankobunString(R.string.settings_webtoon_chapter_dividers_desc),
+                checked = state.showWebtoonChapterDividers,
+                onCheckedChange = viewModel::setShowWebtoonChapterDividers,
+            )
         }
         SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(state, viewModel, modifier)
         SettingsRoute.CUSTOM_LISTS -> CustomListsSettingsScreen(state, viewModel, modifier)

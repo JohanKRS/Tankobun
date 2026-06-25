@@ -107,6 +107,7 @@ import com.tankobun.app.state.ReaderChapterSegment
 import com.tankobun.app.state.ReaderLoadError
 import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
+import com.tankobun.app.state.selectedLibraryBatchItems
 
 import android.content.ClipData
 import android.content.Context
@@ -155,6 +156,11 @@ private data class ReaderPagePosition(
     val pageScrollOffset: Int,
 )
 
+private data class ReaderAdjacentLoadJob(
+    val job: Job,
+    val startedAtEpochMillis: Long,
+)
+
 private data class ScheduledBackupRunResult(
     val libraryItems: Int? = null,
     val sourcePackages: Int? = null,
@@ -186,6 +192,7 @@ private data class BrowseCriteria(
 private const val BROWSE_TRENDING_SORT = "TRENDING_DESC"
 private const val BROWSE_BACK_STACK_LIMIT = 24
 private const val READER_ADJACENT_SEGMENT_LOAD_TIMEOUT_MILLIS = 12_000L
+private const val READER_ADJACENT_SEGMENT_STALE_MILLIS = 20_000L
 
 class MainViewModel(
     private val container: AppContainer,
@@ -204,8 +211,8 @@ class MainViewModel(
     private var pendingAniListSyncJob: Job? = null
     private var scheduledBackupJob: Job? = null
     private var browseLandingJob: Job? = null
-    private var readerPreviousAdjacentLoadJob: Job? = null
-    private var readerNextAdjacentLoadJob: Job? = null
+    private var readerPreviousAdjacentLoadJob: ReaderAdjacentLoadJob? = null
+    private var readerNextAdjacentLoadJob: ReaderAdjacentLoadJob? = null
     private var sourcePickerJob: Job? = null
     private var sourcePickerRequestId: Long = 0L
     private var recommendationImportRequestId: Long = 0L
@@ -256,6 +263,8 @@ class MainViewModel(
             readerTutorialVisible = !container.settingsStore.readerTutorialCompleted(),
             readerMode = container.settingsStore.readerMode(),
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
+            showWebtoonChapterDividers = container.settingsStore.showWebtoonChapterDividers(),
+            readerScreenOrientation = container.settingsStore.readerScreenOrientation(),
             chapterListStartsAtFirst = container.settingsStore.chapterListStartsAtFirst(),
             keepNextTenDownloads = container.settingsStore.keepNextTenDownloads(),
             newChapterChecksEnabled = container.settingsStore.newChapterChecksEnabled(),
@@ -1238,6 +1247,8 @@ class MainViewModel(
                 browseShowWholeCovers = store.browseShowWholeCovers(),
                 readerMode = store.readerMode(),
                 readerPageGapLevel = store.readerPageGapLevel(),
+                showWebtoonChapterDividers = store.showWebtoonChapterDividers(),
+                readerScreenOrientation = store.readerScreenOrientation(),
                 chapterListStartsAtFirst = store.chapterListStartsAtFirst(),
                 keepNextTenDownloads = store.keepNextTenDownloads(),
                 newChapterChecksEnabled = store.newChapterChecksEnabled(),
@@ -2054,6 +2065,16 @@ class MainViewModel(
         _state.update { it.copy(readerPageGapLevel = normalized) }
     }
 
+    fun setShowWebtoonChapterDividers(enabled: Boolean) {
+        container.settingsStore.saveShowWebtoonChapterDividers(enabled)
+        _state.update { it.copy(showWebtoonChapterDividers = enabled) }
+    }
+
+    fun setReaderScreenOrientation(orientation: ReaderScreenOrientation) {
+        container.settingsStore.saveReaderScreenOrientation(orientation)
+        _state.update { it.copy(readerScreenOrientation = orientation) }
+    }
+
     fun toggleChapterListOrder() {
         val nextValue = !_state.value.chapterListStartsAtFirst
         container.settingsStore.saveChapterListStartsAtFirst(nextValue)
@@ -2419,9 +2440,21 @@ class MainViewModel(
     }
 
     fun startLibraryBatchSelection(mediaId: Int) {
+        _state.update { current ->
+            val media = current.batchSelectionMedia(mediaId)
+            current.copy(
+                selectedLibraryMediaIds = setOf(mediaId),
+                selectedLibraryBatchMedia = media?.let { listOf(it) }.orEmpty(),
+                message = null,
+            )
+        }
+    }
+
+    fun startLibraryBatchSelection(media: AnilistMedia) {
         _state.update {
             it.copy(
-                selectedLibraryMediaIds = setOf(mediaId),
+                selectedLibraryMediaIds = setOf(media.id),
+                selectedLibraryBatchMedia = listOf(media),
                 message = null,
             )
         }
@@ -2434,7 +2467,25 @@ class MainViewModel(
             } else {
                 current.selectedLibraryMediaIds + mediaId
             }
-            current.copy(selectedLibraryMediaIds = selected)
+            val media = current.batchSelectionMedia(mediaId)
+            current.copy(
+                selectedLibraryMediaIds = selected,
+                selectedLibraryBatchMedia = current.selectedLibraryBatchMedia.withSelectedBatchMedia(media, selected),
+            )
+        }
+    }
+
+    fun toggleLibraryBatchSelection(media: AnilistMedia) {
+        _state.update { current ->
+            val selected = if (media.id in current.selectedLibraryMediaIds) {
+                current.selectedLibraryMediaIds - media.id
+            } else {
+                current.selectedLibraryMediaIds + media.id
+            }
+            current.copy(
+                selectedLibraryMediaIds = selected,
+                selectedLibraryBatchMedia = current.selectedLibraryBatchMedia.withSelectedBatchMedia(media, selected),
+            )
         }
     }
 
@@ -2442,6 +2493,7 @@ class MainViewModel(
         _state.update {
             it.copy(
                 selectedLibraryMediaIds = emptySet(),
+                selectedLibraryBatchMedia = emptyList(),
                 libraryShareDialogVisible = false,
                 libraryBatchStatusDialogVisible = false,
                 libraryBatchCustomListDialogVisible = false,
@@ -2511,6 +2563,7 @@ class MainViewModel(
                     it.copy(
                         busy = false,
                         selectedLibraryMediaIds = emptySet(),
+                        selectedLibraryBatchMedia = emptyList(),
                         libraryShareDialogVisible = false,
                         libraryBatchRemoveCustomList = false,
                         message = string(R.string.msg_recommendations_share_ready),
@@ -3600,8 +3653,13 @@ class MainViewModel(
         val snapshot = _state.value
         if (snapshot.activeChapter?.url != activeChapter.url) return
         if (snapshot.hasReaderAdjacentSegment(adjacentChapter, direction)) return
-        val existingJob = adjacentReaderLoadJob(direction)
-        if (existingJob?.isActive == true) return
+        val existingLoad = adjacentReaderLoadJob(direction)
+        if (existingLoad?.job?.isActive == true) {
+            val elapsedMillis = System.currentTimeMillis() - existingLoad.startedAtEpochMillis
+            if (elapsedMillis < READER_ADJACENT_SEGMENT_STALE_MILLIS) return
+            existingLoad.job.cancel()
+            setAdjacentReaderLoadJob(direction, null)
+        }
 
         val job = viewModelScope.launch {
             val source = _state.value.readerSourceForChapter(adjacentChapter)
@@ -3623,7 +3681,10 @@ class MainViewModel(
             )
             _state.update { it.withReaderAdjacentSegment(activeChapter, segment, direction) }
         }
-        setAdjacentReaderLoadJob(direction, job)
+        setAdjacentReaderLoadJob(
+            direction = direction,
+            loadJob = ReaderAdjacentLoadJob(job = job, startedAtEpochMillis = System.currentTimeMillis()),
+        )
         job.invokeOnCompletion { clearAdjacentReaderLoadJob(direction, job) }
     }
 
@@ -3656,29 +3717,29 @@ class MainViewModel(
             ReaderSegmentDirection.NEXT -> readerNextSegment
         }?.let { it.chapter.url == chapter.url && it.pages.isNotEmpty() } == true
 
-    private fun adjacentReaderLoadJob(direction: ReaderSegmentDirection): Job? =
+    private fun adjacentReaderLoadJob(direction: ReaderSegmentDirection): ReaderAdjacentLoadJob? =
         when (direction) {
             ReaderSegmentDirection.PREVIOUS -> readerPreviousAdjacentLoadJob
             ReaderSegmentDirection.NEXT -> readerNextAdjacentLoadJob
         }
 
-    private fun setAdjacentReaderLoadJob(direction: ReaderSegmentDirection, job: Job?) {
+    private fun setAdjacentReaderLoadJob(direction: ReaderSegmentDirection, loadJob: ReaderAdjacentLoadJob?) {
         when (direction) {
-            ReaderSegmentDirection.PREVIOUS -> readerPreviousAdjacentLoadJob = job
-            ReaderSegmentDirection.NEXT -> readerNextAdjacentLoadJob = job
+            ReaderSegmentDirection.PREVIOUS -> readerPreviousAdjacentLoadJob = loadJob
+            ReaderSegmentDirection.NEXT -> readerNextAdjacentLoadJob = loadJob
         }
     }
 
     private fun clearAdjacentReaderLoadJob(direction: ReaderSegmentDirection, job: Job) {
-        if (adjacentReaderLoadJob(direction) == job) {
+        if (adjacentReaderLoadJob(direction)?.job == job) {
             setAdjacentReaderLoadJob(direction, null)
         }
     }
 
     private fun cancelReaderAdjacentLoadJobs() {
-        readerPreviousAdjacentLoadJob?.cancel()
+        readerPreviousAdjacentLoadJob?.job?.cancel()
         readerPreviousAdjacentLoadJob = null
-        readerNextAdjacentLoadJob?.cancel()
+        readerNextAdjacentLoadJob?.job?.cancel()
         readerNextAdjacentLoadJob = null
     }
 
@@ -4466,7 +4527,25 @@ class MainViewModel(
     }
 
     private fun TankobunUiState.selectedLibraryItems(): List<LibraryItem> =
-        libraryItems.filter { item -> item.media.id in selectedLibraryMediaIds }
+        selectedLibraryBatchItems()
+
+    private fun TankobunUiState.batchSelectionMedia(mediaId: Int): AnilistMedia? =
+        libraryItems.firstOrNull { item -> item.media.id == mediaId }?.media
+            ?: selectedLibraryBatchMedia.firstOrNull { media -> media.id == mediaId }
+            ?: searchResults.firstOrNull { media -> media.id == mediaId }
+            ?: browseTrending.firstOrNull { media -> media.id == mediaId }
+            ?: browsePopular.firstOrNull { media -> media.id == mediaId }
+            ?: browsePopularManhwa.firstOrNull { media -> media.id == mediaId }
+            ?: browseTopManga.firstOrNull { media -> media.id == mediaId }
+
+    private fun List<AnilistMedia>.withSelectedBatchMedia(
+        media: AnilistMedia?,
+        selectedIds: Set<Int>,
+    ): List<AnilistMedia> {
+        val retained = filter { item -> item.id in selectedIds && item.id != media?.id }
+        val next = if (media != null && media.id in selectedIds) retained + media else retained
+        return next.distinctBy { item -> item.id }
+    }
 
     private fun TankobunUiState.withLibraryBatchMutationResult(
         result: LibraryBatchMutationData,
@@ -4507,6 +4586,7 @@ class MainViewModel(
             trackingPrivate = if (nextSelectedEntry != null && !preserveTrackingForm) nextSelectedEntry.private else trackingPrivate,
             trackingCustomLists = if (nextSelectedEntry != null && !preserveTrackingForm) nextSelectedEntry.customLists.toSet() else trackingCustomLists,
             selectedLibraryMediaIds = emptySet(),
+            selectedLibraryBatchMedia = emptyList(),
             libraryShareDialogVisible = false,
             libraryBatchStatusDialogVisible = false,
             libraryBatchCustomListDialogVisible = false,

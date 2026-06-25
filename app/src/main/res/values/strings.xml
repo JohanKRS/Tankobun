@@ -124,6 +124,13 @@
     <string name="settings_cover_framing">Cover framing</string>
     <string name="settings_reading_mode">Reading mode</string>
     <string name="settings_page_gaps">Page gaps</string>
+    <string name="settings_screen_orientation">Screen orientation</string>
+    <string name="settings_webtoon_chapter_dividers">Webtoon chapter dividers</string>
+    <string name="settings_webtoon_chapter_dividers_desc">Show a subtle divider between chapters while scrolling in webtoon mode.</string>
+    <string name="settings_webtoon_chapter_dividers_short">Chapter dividers</string>
+    <string name="reader_orientation_system">System</string>
+    <string name="reader_orientation_portrait">Portrait</string>
+    <string name="reader_orientation_landscape">Landscape</string>
     <string name="settings_connection">Connection</string>
     <string name="settings_library_mode">Library mode</string>
     <string name="library_mode_local">Local library</string>

@@ -404,6 +404,7 @@ internal class AniListDataSource(
                 hiddenFromStatusLists = false,
                 updatedAtEpochSeconds = now / 1000L,
             )
+            container.database.mediaDao().upsertMedia(item.media.toEntity(now))
             container.database.listEntryDao().upsertEntry(entry.toEntity(now))
             val syncedEntry = syncOrQueueListEntry(
                 token = token.takeIf { syncRemote },
@@ -449,6 +450,7 @@ internal class AniListDataSource(
                 customLists = (item.entry.customLists + requestedList).normalizedCustomLists(),
                 updatedAtEpochSeconds = now / 1000L,
             )
+            container.database.mediaDao().upsertMedia(item.media.toEntity(now))
             container.database.listEntryDao().upsertEntry(entry.toEntity(now))
             val syncedEntry = syncOrQueueListEntry(
                 token = token.takeIf { syncRemote },

@@ -32,7 +32,7 @@ class SettingsStore(context: Context) {
     }
 
     fun ignoreDisplayCutout(): Boolean =
-        preferences.getBoolean(KEY_IGNORE_DISPLAY_CUTOUT, false)
+        preferences.getBoolean(KEY_IGNORE_DISPLAY_CUTOUT, true)
 
     fun saveIgnoreDisplayCutout(enabled: Boolean) {
         preferences.edit().putBoolean(KEY_IGNORE_DISPLAY_CUTOUT, enabled).apply()
@@ -164,6 +164,22 @@ class SettingsStore(context: Context) {
 
     fun saveReaderPageGapLevel(level: Int) {
         preferences.edit().putInt(KEY_READER_PAGE_GAP_LEVEL, level.coerceIn(0, 3)).apply()
+    }
+
+    fun showWebtoonChapterDividers(): Boolean =
+        preferences.getBoolean(KEY_READER_WEBTOON_CHAPTER_DIVIDERS, false)
+
+    fun saveShowWebtoonChapterDividers(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_READER_WEBTOON_CHAPTER_DIVIDERS, enabled).apply()
+    }
+
+    fun readerScreenOrientation(): ReaderScreenOrientation =
+        preferences.getString(KEY_READER_SCREEN_ORIENTATION, null)
+            ?.let { stored -> runCatching { ReaderScreenOrientation.valueOf(stored) }.getOrNull() }
+            ?: ReaderScreenOrientation.SYSTEM
+
+    fun saveReaderScreenOrientation(orientation: ReaderScreenOrientation) {
+        preferences.edit().putString(KEY_READER_SCREEN_ORIENTATION, orientation.name).apply()
     }
 
     fun chapterListStartsAtFirst(): Boolean =
@@ -498,6 +514,8 @@ class SettingsStore(context: Context) {
         const val KEY_BROWSE_SHOW_WHOLE_COVERS = "browse.show.whole.covers"
         const val KEY_READER_MODE = "reader.mode"
         const val KEY_READER_PAGE_GAP_LEVEL = "reader.page.gap.level"
+        const val KEY_READER_WEBTOON_CHAPTER_DIVIDERS = "reader.webtoon.chapter.dividers"
+        const val KEY_READER_SCREEN_ORIENTATION = "reader.screen.orientation"
         const val KEY_CHAPTER_LIST_STARTS_AT_FIRST = "chapters.list.starts.at.first"
         const val KEY_KEEP_NEXT_TEN_DOWNLOADS = "downloads.keep.next.ten"
         const val KEY_NEW_CHAPTER_CHECKS_ENABLED = "library.new.chapter.checks.enabled"
@@ -597,6 +615,12 @@ enum class DockIndicatorAnimation {
     RUBBER_BAND,
     POP,
     COMET,
+}
+
+enum class ReaderScreenOrientation {
+    SYSTEM,
+    PORTRAIT,
+    LANDSCAPE,
 }
 
 enum class BackupSchedule {

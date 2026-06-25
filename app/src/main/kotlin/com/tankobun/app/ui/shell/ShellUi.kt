@@ -1,8 +1,10 @@
 package com.tankobun.app.ui.shell
 
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.app.Activity
+import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
@@ -542,6 +544,10 @@ private fun TankobunAppRootContent(
     }
 
     StatusBarVisibilityEffect(visible = appStatusBarVisible, useDarkIcons = useDarkStatusBarIcons)
+    ReaderOrientationEffect(
+        active = readerOpen,
+        orientation = state.readerScreenOrientation,
+    )
 
     BackHandler(enabled = readerOpen) {
         handleReaderBack()
@@ -552,7 +558,8 @@ private fun TankobunAppRootContent(
     }
 
     TankobunTheme(themeMode = state.themeMode) {
-        val cutoutEndPadding = displayCutoutEndPadding(ignoreDisplayCutout = state.ignoreDisplayCutout)
+        val effectiveIgnoreDisplayCutout = effectiveIgnoreDisplayCutout(state.ignoreDisplayCutout)
+        val cutoutEndPadding = displayCutoutEndPadding(ignoreDisplayCutout = effectiveIgnoreDisplayCutout)
         Box(
             Modifier
                 .fillMaxSize()
@@ -591,6 +598,7 @@ private fun TankobunAppRootContent(
                 },
                 quickDrawerMode = quickDrawerMode,
                 showStatusBar = state.showAppStatusBar,
+                ignoreDisplayCutout = effectiveIgnoreDisplayCutout,
                 showQuickActionsButton = !readerOpen,
                 onOpenQuickDrawer = { quickDrawerMode = QuickDrawerMode.OVERLAY },
                 onCloseQuickDrawer = { quickDrawerMode = QuickDrawerMode.CLOSED },
@@ -727,6 +735,48 @@ internal fun StatusBarVisibilityEffect(visible: Boolean, useDarkIcons: Boolean) 
     }
 }
 
+@Composable
+internal fun ReaderOrientationEffect(
+    active: Boolean,
+    orientation: ReaderScreenOrientation,
+) {
+    val context = LocalContext.current
+    val view = LocalView.current
+    val activity = remember(context, view) {
+        context.findActivity() ?: view.context.findActivity()
+    }
+    val requestedOrientation = if (active) {
+        orientation.requestedOrientation()
+    } else {
+        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
+
+    SideEffect {
+        activity?.requestedOrientation = requestedOrientation
+    }
+
+    DisposableEffect(activity) {
+        val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        onDispose {
+            activity?.requestedOrientation = originalOrientation
+        }
+    }
+}
+
+private fun ReaderScreenOrientation.requestedOrientation(): Int =
+    when (this) {
+        ReaderScreenOrientation.SYSTEM -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        ReaderScreenOrientation.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        ReaderScreenOrientation.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+    }
+
+private tailrec fun Context.findActivity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }
+
 internal fun TankobunThemeMode.useDarkStatusBarIcons(systemDark: Boolean): Boolean =
     when (this) {
         TankobunThemeMode.SYSTEM -> !systemDark
@@ -765,11 +815,11 @@ internal fun TankobunScaffold(
     onOpenRecentProgress: (RecentReadingProgress) -> Unit,
     quickDrawerMode: QuickDrawerMode,
     showStatusBar: Boolean,
+    ignoreDisplayCutout: Boolean,
     showQuickActionsButton: Boolean,
     onOpenQuickDrawer: () -> Unit,
     onCloseQuickDrawer: () -> Unit,
 ) {
-    val ignoreDisplayCutout = state.ignoreDisplayCutout
     val cutoutStartPadding = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout)
     val cutoutEndPadding = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout)
     val density = LocalDensity.current
@@ -1080,7 +1130,18 @@ internal fun quickDrawerElasticOvershoot(overshootPx: Float, elasticLimitPx: Flo
     }
 
 @Composable
-internal fun hasDisplayCutout(): Boolean {
+internal fun hasTabletDisplayCutout(): Boolean {
+    val configuration = LocalConfiguration.current
+    if (configuration.smallestScreenWidthDp in 1 until 600) return false
+    return hasDisplayCutout()
+}
+
+@Composable
+internal fun effectiveIgnoreDisplayCutout(ignoreDisplayCutout: Boolean): Boolean =
+    ignoreDisplayCutout || !hasTabletDisplayCutout()
+
+@Composable
+private fun hasDisplayCutout(): Boolean {
     val layoutDirection = LocalLayoutDirection.current
     val density = LocalDensity.current
     val cutoutInsets = WindowInsets.displayCutout

@@ -8,6 +8,7 @@ import com.tankobun.app.BackupSchedule
 import com.tankobun.app.DockAlignment
 import com.tankobun.app.DockIndicatorAnimation
 import com.tankobun.app.MediaViewMode
+import com.tankobun.app.ReaderScreenOrientation
 import com.tankobun.app.TankobunThemeMode
 import com.tankobun.app.defaultSourceLanguages
 import com.tankobun.app.logic.sourceSettingsKey
@@ -103,6 +104,8 @@ internal class AppSettingsBackupDataSource(
             .put("browseShowWholeCovers", snapshot.browseShowWholeCovers)
             .put("readerMode", snapshot.readerMode.name)
             .put("readerPageGapLevel", snapshot.readerPageGapLevel)
+            .put("showWebtoonChapterDividers", snapshot.showWebtoonChapterDividers)
+            .put("readerScreenOrientation", snapshot.readerScreenOrientation.name)
             .put("chapterListStartsAtFirst", snapshot.chapterListStartsAtFirst)
             .put("keepNextTenDownloads", snapshot.keepNextTenDownloads)
             .put("newChapterChecksEnabled", snapshot.newChapterChecksEnabled)
@@ -185,6 +188,8 @@ internal class AppSettingsBackupDataSource(
         settings.optBooleanOrNull("browseShowWholeCovers")?.let(store::saveBrowseShowWholeCovers)
         settings.enumOrNull<ReaderMode>("readerMode")?.let(store::saveReaderMode)
         settings.optIntOrNull("readerPageGapLevel")?.let(store::saveReaderPageGapLevel)
+        settings.optBooleanOrNull("showWebtoonChapterDividers")?.let(store::saveShowWebtoonChapterDividers)
+        settings.enumOrNull<ReaderScreenOrientation>("readerScreenOrientation")?.let(store::saveReaderScreenOrientation)
         settings.optBooleanOrNull("chapterListStartsAtFirst")?.let(store::saveChapterListStartsAtFirst)
         settings.optBooleanOrNull("keepNextTenDownloads")?.let(store::saveKeepNextTenDownloads)
         settings.optBooleanOrNull("newChapterChecksEnabled")?.let(store::saveNewChapterChecksEnabled)
@@ -231,6 +236,8 @@ internal class AppSettingsBackupDataSource(
             browseShowWholeCovers = store.browseShowWholeCovers(),
             readerMode = store.readerMode(),
             readerPageGapLevel = store.readerPageGapLevel(),
+            showWebtoonChapterDividers = store.showWebtoonChapterDividers(),
+            readerScreenOrientation = store.readerScreenOrientation(),
             chapterListStartsAtFirst = store.chapterListStartsAtFirst(),
             keepNextTenDownloads = store.keepNextTenDownloads(),
             newChapterChecksEnabled = store.newChapterChecksEnabled(),

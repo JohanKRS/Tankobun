@@ -124,6 +124,13 @@
     <string name="settings_cover_framing">封面裁切</string>
     <string name="settings_reading_mode">阅读模式</string>
     <string name="settings_page_gaps">页面间距</string>
+    <string name="settings_screen_orientation">屏幕方向</string>
+    <string name="settings_webtoon_chapter_dividers">Webtoon 章节分隔线</string>
+    <string name="settings_webtoon_chapter_dividers_desc">在 webtoon 模式滚动时，在章节之间显示细微分隔线。</string>
+    <string name="settings_webtoon_chapter_dividers_short">章节分隔线</string>
+    <string name="reader_orientation_system">跟随系统</string>
+    <string name="reader_orientation_portrait">竖屏</string>
+    <string name="reader_orientation_landscape">横屏</string>
     <string name="settings_connection">连接</string>
     <string name="settings_library_mode">书架模式</string>
     <string name="library_mode_local">本地书架</string>

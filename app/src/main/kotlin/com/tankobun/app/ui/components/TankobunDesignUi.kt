@@ -398,6 +398,15 @@ internal fun TankobunChip(
 }
 
 @Composable
+internal fun TankobunChipIcon(icon: ImageVector) {
+    Icon(
+        icon,
+        contentDescription = null,
+        modifier = Modifier.size(16.dp),
+    )
+}
+
+@Composable
 internal fun TankobunClearFiltersChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -414,8 +423,14 @@ internal fun TankobunClearFiltersChip(
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             CompositionLocalProvider(LocalTextStyle provides MaterialTheme.typography.labelMedium) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
                 Text(tankobunString(R.string.common_clear_filters))
             }
         }

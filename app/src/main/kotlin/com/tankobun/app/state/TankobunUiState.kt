@@ -8,6 +8,7 @@ import com.tankobun.app.DockIndicatorAnimation
 import com.tankobun.app.LibraryMode
 import com.tankobun.app.MediaViewMode
 import com.tankobun.app.AppLanguage
+import com.tankobun.app.ReaderScreenOrientation
 import com.tankobun.app.TankobunThemeMode
 import com.tankobun.app.defaultSourceLanguages
 import com.tankobun.app.logic.BROWSE_SORT_SEARCH_MATCH
@@ -36,7 +37,7 @@ data class TankobunUiState(
     val clientConfigured: Boolean = false,
     val themeMode: TankobunThemeMode = TankobunThemeMode.SYSTEM,
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
-    val ignoreDisplayCutout: Boolean = false,
+    val ignoreDisplayCutout: Boolean = true,
     val showAppStatusBar: Boolean = true,
     val dockAlignment: DockAlignment = DockAlignment.CENTER,
     val dockIndicatorAnimation: DockIndicatorAnimation = DockIndicatorAnimation.POP,
@@ -117,6 +118,7 @@ data class TankobunUiState(
     val appUpdateLastCheckedAtEpochMillis: Long = 0L,
     val appUpdateMessage: String? = null,
     val selectedLibraryMediaIds: Set<Int> = emptySet(),
+    val selectedLibraryBatchMedia: List<AnilistMedia> = emptyList(),
     val libraryShareDialogVisible: Boolean = false,
     val libraryBatchStatusDialogVisible: Boolean = false,
     val libraryBatchCustomListDialogVisible: Boolean = false,
@@ -163,6 +165,8 @@ data class TankobunUiState(
     val selectedSourcePackageName: String? = null,
     val readerMode: ReaderMode = ReaderMode.PAGED,
     val readerPageGapLevel: Int = 0,
+    val showWebtoonChapterDividers: Boolean = false,
+    val readerScreenOrientation: ReaderScreenOrientation = ReaderScreenOrientation.SYSTEM,
     val busy: Boolean = false,
     val message: String? = null,
 ) {
@@ -178,6 +182,31 @@ data class TankobunUiState(
     val librarySections: List<LibrarySection>
         get() = libraryItems.toLibrarySections()
 }
+
+internal fun TankobunUiState.selectedLibraryBatchItems(): List<LibraryItem> {
+    val libraryItemsById = libraryItems.associateBy { item -> item.media.id }
+    val selectedMediaById = selectedLibraryBatchMedia.associateBy { media -> media.id }
+    return selectedLibraryMediaIds.mapNotNull { mediaId ->
+        libraryItemsById[mediaId] ?: selectedMediaById[mediaId]?.toHiddenLibraryItem()
+    }
+}
+
+private fun AnilistMedia.toHiddenLibraryItem(): LibraryItem =
+    LibraryItem(
+        media = this,
+        entry = AnilistListEntry(
+            id = -id,
+            mediaId = id,
+            status = MediaStatus.PLANNING,
+            progress = 0,
+            score = null,
+            notes = null,
+            private = false,
+            customLists = emptyList(),
+            updatedAtEpochSeconds = 0L,
+            hiddenFromStatusLists = true,
+        ),
+    )
 
 private fun SourceDescriptor.matchesSelectedSource(sourceId: Long, packageName: String?): Boolean =
     id == sourceId && (packageName == null || this.packageName == packageName)

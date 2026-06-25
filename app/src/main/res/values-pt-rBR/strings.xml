@@ -123,6 +123,13 @@
     <string name="settings_cover_framing">Enquadramento das capas</string>
     <string name="settings_reading_mode">Modo de leitura</string>
     <string name="settings_page_gaps">Espaços entre páginas</string>
+    <string name="settings_screen_orientation">Orientação da tela</string>
+    <string name="settings_webtoon_chapter_dividers">Divisores de capítulos no webtoon</string>
+    <string name="settings_webtoon_chapter_dividers_desc">Mostra um divisor discreto entre capítulos durante a rolagem no modo webtoon.</string>
+    <string name="settings_webtoon_chapter_dividers_short">Divisores</string>
+    <string name="reader_orientation_system">Sistema</string>
+    <string name="reader_orientation_portrait">Retrato</string>
+    <string name="reader_orientation_landscape">Paisagem</string>
     <string name="settings_connection">Conexão</string>
     <string name="settings_anilist_preferences">Preferências do AniList</string>
     <string name="settings_library_preferences">Preferências da biblioteca</string>
