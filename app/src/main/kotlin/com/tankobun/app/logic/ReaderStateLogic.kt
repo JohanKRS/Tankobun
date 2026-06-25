@@ -66,16 +66,16 @@ internal fun TankobunUiState.withReaderPagesLoaded(
         this
     }
 
-internal fun TankobunUiState.withAdjacentReaderSegments(
+internal fun TankobunUiState.withReaderAdjacentSegment(
     chapter: SourceChapter,
-    previousSegment: ReaderChapterSegment?,
-    nextSegment: ReaderChapterSegment?,
+    segment: ReaderChapterSegment,
+    direction: ReaderSegmentDirection,
 ): TankobunUiState =
     if (activeChapter?.url == chapter.url) {
-        copy(
-            readerPreviousSegment = previousSegment,
-            readerNextSegment = nextSegment,
-        )
+        when (direction) {
+            ReaderSegmentDirection.PREVIOUS -> copy(readerPreviousSegment = segment)
+            ReaderSegmentDirection.NEXT -> copy(readerNextSegment = segment)
+        }
     } else {
         this
     }

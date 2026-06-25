@@ -470,6 +470,24 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         }
     }
 
+    LaunchedEffect(
+        chapter.url,
+        nextChapter?.url,
+        state.readerNextSegment?.chapter?.url,
+        state.readerNextSegment?.pages?.size,
+        state.readerMode,
+    ) {
+        if (state.readerMode == ReaderMode.WEBTOON &&
+            nextChapter != null &&
+            state.readerNextSegment?.chapter?.url != nextChapter.url
+        ) {
+            while (true) {
+                viewModel.ensureNextReaderSegmentLoaded()
+                delay(WEBTOON_NEXT_SEGMENT_RETRY_DELAY_MILLIS)
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1331,6 +1349,7 @@ internal const val DEFAULT_WEBTOON_READER_PAGE_ASPECT_RATIO = 0.68f
 internal const val WEBTOON_READER_CACHE_AHEAD_DP = 1800
 internal const val WEBTOON_READER_CACHE_BEHIND_DP = 1000
 internal const val WEBTOON_READER_POSITION_ANCHOR_FRACTION = 0.38f
+internal const val WEBTOON_NEXT_SEGMENT_RETRY_DELAY_MILLIS = 6_000L
 internal const val PAGED_READER_SWIPE_DISTANCE_FRACTION = 0.14f
 internal const val PAGED_READER_SWIPE_VELOCITY_THRESHOLD = 760f
 internal const val PAGED_READER_SWIPE_AXIS_RATIO = 1.25f

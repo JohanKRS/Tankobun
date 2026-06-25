@@ -86,6 +86,25 @@ class ReaderStateLogicTest {
     }
 
     @Test
+    fun adjacentSegmentUpdateKeepsOppositeSide() {
+        val activeChapter = chapter("active")
+        val previousSegment = ReaderChapterSegment(chapter("previous"), listOf(page(0)))
+        val nextSegment = ReaderChapterSegment(chapter("next"), listOf(page(0), page(1)))
+
+        val next = TankobunUiState(
+            activeChapter = activeChapter,
+            readerPreviousSegment = previousSegment,
+        ).withReaderAdjacentSegment(
+            chapter = activeChapter,
+            segment = nextSegment,
+            direction = ReaderSegmentDirection.NEXT,
+        )
+
+        assertEquals(previousSegment, next.readerPreviousSegment)
+        assertEquals(nextSegment, next.readerNextSegment)
+    }
+
+    @Test
     fun recentProgressOpenedResetsReaderAndUsesExistingEntry() {
         val media = media(42, "Manga")
         val entry = entry(mediaId = 42, progress = 12, customLists = listOf("Favorites"))

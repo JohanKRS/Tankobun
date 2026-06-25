@@ -53,12 +53,12 @@ import com.tankobun.app.logic.visibleSources
 import com.tankobun.app.logic.withDeletedAniListCustomList
 import com.tankobun.app.logic.withAddedTrackingCustomList
 import com.tankobun.app.logic.withActivatedReaderSegment
-import com.tankobun.app.logic.withAdjacentReaderSegments
 import com.tankobun.app.logic.withAniListTitleLanguage
 import com.tankobun.app.logic.withRenamedAniListCustomList
 import com.tankobun.app.logic.withReaderClosed
 import com.tankobun.app.logic.withReaderLoadError
 import com.tankobun.app.logic.withReaderLoading
+import com.tankobun.app.logic.withReaderAdjacentSegment
 import com.tankobun.app.logic.withReaderPagePosition
 import com.tankobun.app.logic.withReaderPagesLoaded
 import com.tankobun.app.logic.withRecentProgressOpened
@@ -137,13 +137,13 @@ import com.tankobun.core.model.withTitleLanguage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.Locale
@@ -185,6 +185,7 @@ private data class BrowseCriteria(
 
 private const val BROWSE_TRENDING_SORT = "TRENDING_DESC"
 private const val BROWSE_BACK_STACK_LIMIT = 24
+private const val READER_ADJACENT_SEGMENT_LOAD_TIMEOUT_MILLIS = 12_000L
 
 class MainViewModel(
     private val container: AppContainer,
@@ -203,7 +204,8 @@ class MainViewModel(
     private var pendingAniListSyncJob: Job? = null
     private var scheduledBackupJob: Job? = null
     private var browseLandingJob: Job? = null
-    private var readerAdjacentLoadJob: Job? = null
+    private var readerPreviousAdjacentLoadJob: Job? = null
+    private var readerNextAdjacentLoadJob: Job? = null
     private var sourcePickerJob: Job? = null
     private var sourcePickerRequestId: Long = 0L
     private var recommendationImportRequestId: Long = 0L
@@ -3471,7 +3473,7 @@ class MainViewModel(
         val media = state.selectedMedia ?: return
         val source = state.readerSourceForChapter(chapter)
         viewModelScope.launch {
-            readerAdjacentLoadJob?.cancel()
+            cancelReaderAdjacentLoadJobs()
             cancelReaderPageCacheJobs()
             latestReaderPosition = null
             _state.update { it.withReaderLoading(chapter) }
@@ -3545,61 +3547,139 @@ class MainViewModel(
         openChapter(chapter)
     }
 
+    fun ensureNextReaderSegmentLoaded() {
+        val snapshot = _state.value
+        if (snapshot.readerMode != ReaderMode.WEBTOON) return
+        val media = snapshot.selectedMedia ?: return
+        val activeChapter = snapshot.activeChapter ?: return
+        val nextChapter = snapshot.sourceChapters.nextInReadingOrderAfter(activeChapter) ?: return
+        val currentNextSegment = snapshot.readerNextSegment
+        if (currentNextSegment?.chapter?.url == nextChapter.url &&
+            currentNextSegment.pages.isNotEmpty()
+        ) {
+            return
+        }
+        startAdjacentReaderSegmentLoad(
+            mediaId = media.id,
+            activeChapter = activeChapter,
+            adjacentChapter = nextChapter,
+            direction = ReaderSegmentDirection.NEXT,
+        )
+    }
+
     private fun loadAdjacentReaderSegments(mediaId: Int, chapter: SourceChapter) {
         val snapshot = _state.value
         val previousChapter = snapshot.sourceChapters.previousInReadingOrderBefore(chapter)
         val nextChapter = snapshot.sourceChapters.nextInReadingOrderAfter(chapter)
+        cancelReaderAdjacentLoadJobs()
         if (previousChapter == null && nextChapter == null) return
-        readerAdjacentLoadJob?.cancel()
-        readerAdjacentLoadJob = viewModelScope.launch {
-            val previousSource = previousChapter?.let { _state.value.readerSourceForChapter(it) }
-            val nextSource = nextChapter?.let { _state.value.readerSourceForChapter(it) }
-            val previousDeferred = previousChapter?.let { adjacentChapter ->
-                async {
-                    runCatching {
-                        readerDataSource.loadPagesForChapter(mediaId, adjacentChapter, previousSource)
-                    }.getOrDefault(emptyList())
-                }
-            }
-            val nextDeferred = nextChapter?.let { adjacentChapter ->
-                async {
-                    runCatching {
-                        readerDataSource.loadPagesForChapter(mediaId, adjacentChapter, nextSource)
-                    }.getOrDefault(emptyList())
-                }
-            }
-            val previousSegment = previousChapter?.let { adjacentChapter ->
-                previousDeferred?.await()
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { pages -> ReaderChapterSegment(adjacentChapter, pages) }
-            }
-            val nextSegment = nextChapter?.let { adjacentChapter ->
-                nextDeferred?.await()
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { pages -> ReaderChapterSegment(adjacentChapter, pages) }
-            }
-            previousSegment?.let { segment ->
-                startReaderPageCache(
-                    source = previousSource,
-                    mediaId = mediaId,
-                    chapter = segment.chapter,
-                    pages = readerDataSource.adjacentTailPages(segment.pages),
-                    cacheKeySuffix = "tail",
-                    initialDelayMillis = ReaderDataSource.ADJACENT_CACHE_INITIAL_DELAY_MILLIS,
-                )
-            }
-            nextSegment?.let { segment ->
-                startReaderPageCache(
-                    source = nextSource,
-                    mediaId = mediaId,
-                    chapter = segment.chapter,
-                    pages = readerDataSource.adjacentHeadPages(segment.pages),
-                    cacheKeySuffix = "head",
-                    initialDelayMillis = ReaderDataSource.ADJACENT_CACHE_INITIAL_DELAY_MILLIS,
-                )
-            }
-            _state.update { it.withAdjacentReaderSegments(chapter, previousSegment, nextSegment) }
+        previousChapter?.let { adjacentChapter ->
+            startAdjacentReaderSegmentLoad(
+                mediaId = mediaId,
+                activeChapter = chapter,
+                adjacentChapter = adjacentChapter,
+                direction = ReaderSegmentDirection.PREVIOUS,
+            )
         }
+        nextChapter?.let { adjacentChapter ->
+            startAdjacentReaderSegmentLoad(
+                mediaId = mediaId,
+                activeChapter = chapter,
+                adjacentChapter = adjacentChapter,
+                direction = ReaderSegmentDirection.NEXT,
+            )
+        }
+    }
+
+    private fun startAdjacentReaderSegmentLoad(
+        mediaId: Int,
+        activeChapter: SourceChapter,
+        adjacentChapter: SourceChapter,
+        direction: ReaderSegmentDirection,
+    ) {
+        val snapshot = _state.value
+        if (snapshot.activeChapter?.url != activeChapter.url) return
+        if (snapshot.hasReaderAdjacentSegment(adjacentChapter, direction)) return
+        val existingJob = adjacentReaderLoadJob(direction)
+        if (existingJob?.isActive == true) return
+
+        val job = viewModelScope.launch {
+            val source = _state.value.readerSourceForChapter(adjacentChapter)
+            val segment = loadAdjacentReaderSegment(mediaId, adjacentChapter, source) ?: return@launch
+            if (_state.value.activeChapter?.url != activeChapter.url) return@launch
+            startReaderPageCache(
+                source = source,
+                mediaId = mediaId,
+                chapter = segment.chapter,
+                pages = when (direction) {
+                    ReaderSegmentDirection.PREVIOUS -> readerDataSource.adjacentTailPages(segment.pages)
+                    ReaderSegmentDirection.NEXT -> readerDataSource.adjacentHeadPages(segment.pages)
+                },
+                cacheKeySuffix = when (direction) {
+                    ReaderSegmentDirection.PREVIOUS -> "tail"
+                    ReaderSegmentDirection.NEXT -> "head"
+                },
+                initialDelayMillis = ReaderDataSource.ADJACENT_CACHE_INITIAL_DELAY_MILLIS,
+            )
+            _state.update { it.withReaderAdjacentSegment(activeChapter, segment, direction) }
+        }
+        setAdjacentReaderLoadJob(direction, job)
+        job.invokeOnCompletion { clearAdjacentReaderLoadJob(direction, job) }
+    }
+
+    private suspend fun loadAdjacentReaderSegment(
+        mediaId: Int,
+        chapter: SourceChapter,
+        source: SourceDescriptor?,
+    ): ReaderChapterSegment? {
+        val pages = try {
+            withTimeoutOrNull(READER_ADJACENT_SEGMENT_LOAD_TIMEOUT_MILLIS) {
+                readerDataSource.loadPagesForChapter(mediaId, chapter, source)
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Log.w(TAG, "Adjacent page load failed", error)
+            null
+        }
+        return pages
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { ReaderChapterSegment(chapter, it) }
+    }
+
+    private fun TankobunUiState.hasReaderAdjacentSegment(
+        chapter: SourceChapter,
+        direction: ReaderSegmentDirection,
+    ): Boolean =
+        when (direction) {
+            ReaderSegmentDirection.PREVIOUS -> readerPreviousSegment
+            ReaderSegmentDirection.NEXT -> readerNextSegment
+        }?.let { it.chapter.url == chapter.url && it.pages.isNotEmpty() } == true
+
+    private fun adjacentReaderLoadJob(direction: ReaderSegmentDirection): Job? =
+        when (direction) {
+            ReaderSegmentDirection.PREVIOUS -> readerPreviousAdjacentLoadJob
+            ReaderSegmentDirection.NEXT -> readerNextAdjacentLoadJob
+        }
+
+    private fun setAdjacentReaderLoadJob(direction: ReaderSegmentDirection, job: Job?) {
+        when (direction) {
+            ReaderSegmentDirection.PREVIOUS -> readerPreviousAdjacentLoadJob = job
+            ReaderSegmentDirection.NEXT -> readerNextAdjacentLoadJob = job
+        }
+    }
+
+    private fun clearAdjacentReaderLoadJob(direction: ReaderSegmentDirection, job: Job) {
+        if (adjacentReaderLoadJob(direction) == job) {
+            setAdjacentReaderLoadJob(direction, null)
+        }
+    }
+
+    private fun cancelReaderAdjacentLoadJobs() {
+        readerPreviousAdjacentLoadJob?.cancel()
+        readerPreviousAdjacentLoadJob = null
+        readerNextAdjacentLoadJob?.cancel()
+        readerNextAdjacentLoadJob = null
     }
 
     fun openRecentProgress(item: RecentReadingProgress) {
@@ -3619,8 +3699,7 @@ class MainViewModel(
 
     fun closeReader() {
         saveReaderProgress()
-        readerAdjacentLoadJob?.cancel()
-        readerAdjacentLoadJob = null
+        cancelReaderAdjacentLoadJobs()
         cancelReaderPageCacheJobs()
         _state.update { it.withReaderClosed() }
         latestReaderPosition = null
