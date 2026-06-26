@@ -601,6 +601,8 @@
     <string name="about_changelog_v322_scheduled_backups">计划备份现在会在应用更新后重新同步，并在错过到期备份时立即运行。</string>
     <string name="about_changelog_v322_backup_retention">新增计划备份最大保留数量选项，避免备份文件夹无限增长。</string>
     <string name="about_changelog_v322_source_bindings">刷新扩展和筛选时，漫画的来源选择会更可靠地保持绑定。</string>
+    <string name="about_changelog_v331_filter_chips">Browse 和书库筛选标签现在可横向滚动，并与漫画书架一样延伸到屏幕边缘。</string>
+    <string name="about_changelog_v331_detail_dates">漫画详情页的出版年份在手机上更紧凑，避免连载中和年份范围日期被截断。</string>
     <string name="about_unofficial">Tankobun 是非官方漫画阅读器，与 AniList 没有关联。</string>
     <string name="about_anilist_thanks">感谢 AniList 向用户和社区应用开放 API。</string>
     <string name="about_anilist_data">AniList 是动画和漫画数据库、追踪与社交网站。它不托管、上传、分享、销售或提供漫画、章节或扫图。Tankobun 通过 AniList API 访问 AniList 元数据；账号同步使用用户授权。</string>

@@ -2,34 +2,30 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 35,
-    "versionName": "3.3.0",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.3.0/tankobun-3.3.0.apk",
-    "apkSha256": "06961F149403FD4697DF60A8E066C0D0903CF3BA4D180ED9883B75EA66D09C3F",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.3.0",
-    "publishedAt": "2026-06-25T15:17:51Z",
-    "sizeBytes": 11882988,
+    "versionCode": 36,
+    "versionName": "3.3.1",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.3.1/tankobun-3.3.1.apk",
+    "apkSha256": "95718A558B241012954CABD971EF0D5177B36892E4B817A6DB26AEB2D9E31433",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.3.1",
+    "publishedAt": "2026-06-26T13:13:08Z",
+    "sizeBytes": 11889584,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Added reader orientation controls, optional webtoon chapter dividers, and clearer icon chips in the reader.",
-        "Improved webtoon adjacent chapter loading reliability and progress tracking updates.",
-        "Added long-press batch actions in Browse, icon chips across Browse and Library, and improved tablet orientation/cutout handling."
+        "Browse and Library filter chips now scroll horizontally with the same edge-to-edge rail behavior as manga shelves.",
+        "Manga detail publication years are more compact on mobile, preventing ongoing and ranged dates from being clipped."
       ],
       "pt-BR": [
-        "Adicionados controles de orientação do leitor, divisores opcionais no modo webtoon e chips com ícones mais claros no leitor.",
-        "Melhorada a confiabilidade do carregamento automático entre capítulos no webtoon e das atualizações de progresso.",
-        "Adicionadas ações em lote por toque longo no Browse, chips com ícones no Browse e na Biblioteca, e melhor suporte a orientação/notch em tablets."
+        "Chips de filtro no Browse e na Biblioteca agora rolam horizontalmente com o mesmo comportamento de trilho até a borda das listas de mangá.",
+        "Anos de publicação nos detalhes do mangá ficam mais compactos no mobile, evitando cortes em datas de obras em lançamento e intervalos."
       ],
       "es": [
-        "Se añadieron controles de orientación del lector, divisores opcionales en modo webtoon y chips con iconos más claros en el lector.",
-        "Se mejoró la fiabilidad de la carga automática entre capítulos en webtoon y de las actualizaciones de progreso.",
-        "Se añadieron acciones por pulsación larga en Browse, chips con iconos en Browse y Biblioteca, y mejor soporte de orientación/notch en tablets."
+        "Los chips de filtro en Browse y Biblioteca ahora se desplazan horizontalmente con el mismo comportamiento de borde a borde que las listas de manga.",
+        "Los años de publicación en detalles del manga son más compactos en móvil, evitando cortes en fechas de obras en emisión e intervalos."
       ],
       "zh-CN": [
-        "新增阅读器方向控制、可选的 webtoon 章节分隔线，以及更清晰的阅读器图标标签。",
-        "提升 webtoon 章节自动衔接加载和阅读进度更新的可靠性。",
-        "Browse 支持长按批量操作，Browse 与书库筛选标签加入图标，并改进平板方向锁定和刘海屏处理。"
+        "Browse 和书库筛选标签现在可横向滚动，并与漫画书架一样延伸到屏幕边缘。",
+        "漫画详情页的出版年份在手机上更紧凑，避免连载中和年份范围日期被截断。"
       ]
     }
   }

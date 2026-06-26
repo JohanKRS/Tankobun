@@ -593,6 +593,8 @@
     <string name="about_changelog_v322_scheduled_backups">Backups agendados agora ressincronizam após atualizações do app e rodam imediatamente quando havia um backup vencido.</string>
     <string name="about_changelog_v322_backup_retention">Adicionada opção de limite máximo de backups agendados para a pasta não crescer indefinidamente.</string>
     <string name="about_changelog_v322_source_bindings">Seleções de source permanecem vinculadas aos mangás com mais confiabilidade durante refresh de extensões e filtros.</string>
+    <string name="about_changelog_v331_filter_chips">Chips de filtro no Browse e na Biblioteca agora rolam horizontalmente com o mesmo comportamento de trilho até a borda das listas de mangá.</string>
+    <string name="about_changelog_v331_detail_dates">Anos de publicação nos detalhes do mangá ficam mais compactos no mobile, evitando cortes em datas de obras em lançamento e intervalos.</string>
     <string name="about_unofficial">Tankobun é um leitor de mangás não oficial e não é afiliado ao AniList.</string>
     <string name="about_anilist_thanks">Agradecemos ao AniList por disponibilizar sua API para usuários e apps da comunidade.</string>
     <string name="about_anilist_data">O AniList é uma base de dados, acompanhamento e site social de animes e mangás. Ele não hospeda, envia, compartilha, vende nem fornece mangás, capítulos ou scanlations. O Tankobun acessa metadados do AniList pela API do AniList; a sincronização da conta usa autorização do usuário.</string>

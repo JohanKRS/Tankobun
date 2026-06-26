@@ -1363,7 +1363,7 @@ internal fun AnilistMedia.publishingYearLabel(compact: Boolean): String {
             }
             "$startYear-$compactEnd"
         }
-        startYear != null && status == "RELEASING" -> tankobunString(R.string.media_year_since, startYear)
+        startYear != null && status == "RELEASING" -> "$startYear-"
         startYear != null -> startYear.toString()
         else -> tankobunString(R.string.common_unknown)
     }

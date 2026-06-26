@@ -593,6 +593,8 @@
     <string name="about_changelog_v322_scheduled_backups">Las copias programadas ahora se resincronizan tras actualizar la app y se ejecutan de inmediato si había una copia vencida.</string>
     <string name="about_changelog_v322_backup_retention">Se añadió una opción de retención máxima para que la carpeta de copias programadas no crezca indefinidamente.</string>
     <string name="about_changelog_v322_source_bindings">Las fuentes seleccionadas permanecen vinculadas al manga con más fiabilidad mientras se actualizan extensiones y filtros.</string>
+    <string name="about_changelog_v331_filter_chips">Los chips de filtro en Browse y Biblioteca ahora se desplazan horizontalmente con el mismo comportamiento de borde a borde que las listas de manga.</string>
+    <string name="about_changelog_v331_detail_dates">Los años de publicación en detalles del manga son más compactos en móvil, evitando cortes en fechas de obras en emisión e intervalos.</string>
     <string name="about_unofficial">Tankobun es un lector de manga no oficial y no está afiliado con AniList.</string>
     <string name="about_anilist_thanks">Gracias a AniList por poner su API a disposición de usuarios y apps de la comunidad.</string>
     <string name="about_anilist_data">AniList es una base de datos y un sitio social de seguimiento de anime y manga. No aloja, sube, comparte, vende ni proporciona manga, capítulos o scanlations. Tankobun accede a metadatos de AniList mediante la API de AniList; la sincronización de cuenta usa autorización del usuario.</string>

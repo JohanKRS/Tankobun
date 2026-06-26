@@ -347,11 +347,12 @@ internal fun BrowseScreen(
         viewModel.clearLibraryBatchSelection()
     }
 
-    val browseHeader: @Composable () -> Unit = {
+    val browseHeader: @Composable (Dp) -> Unit = { horizontalPadding ->
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             BrowseFilterBar(
                 state = state,
                 viewModel = viewModel,
+                horizontalPadding = horizontalPadding,
                 onOpenGenres = { genresOpen = true },
                 onOpenTags = { tagsOpen = true },
                 onOpenPicker = { picker = it },
@@ -359,7 +360,9 @@ internal fun BrowseScreen(
             )
 
             state.message?.let {
-                TankobunMessageBanner(it)
+                Box(Modifier.padding(horizontal = horizontalPadding)) {
+                    TankobunMessageBanner(it)
+                }
             }
         }
     }
@@ -381,7 +384,7 @@ internal fun BrowseScreen(
                     onToggleMediaSelection = viewModel::toggleLibraryBatchSelection,
                     onLongPressMedia = viewModel::startLibraryBatchSelection,
                     modifier = Modifier.fillMaxSize(),
-                    header = browseHeader,
+                    header = { browseHeader(0.dp) },
                 )
             }
         } else {
@@ -395,7 +398,7 @@ internal fun BrowseScreen(
                 onToggleMediaSelection = viewModel::toggleLibraryBatchSelection,
                 onLongPressMedia = viewModel::startLibraryBatchSelection,
                 modifier = Modifier.fillMaxSize(),
-                header = browseHeader,
+                header = { browseHeader(BrowseLandingContentPadding) },
             )
         }
 
@@ -526,6 +529,7 @@ internal fun BrowseScreen(
 internal fun BrowseFilterBar(
     state: TankobunUiState,
     viewModel: MainViewModel,
+    horizontalPadding: Dp = BrowseLandingContentPadding,
     onOpenGenres: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenPicker: (BrowsePicker) -> Unit,
@@ -535,62 +539,80 @@ internal fun BrowseFilterBar(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        TankobunSearchField(
-            value = state.searchQuery,
-            onValueChange = viewModel::setSearchQuery,
-            placeholder = tankobunString(R.string.browse_search_placeholder),
-            onSearch = viewModel::searchAniList,
-            showSearchAction = false,
-        )
-        TankobunFilterRow {
-            BrowseFilterPill(
-                label = tankobunString(R.string.common_genres),
-                value = if (state.browseGenres.isEmpty()) tankobunString(R.string.common_any) else state.browseGenres.size.toString(),
-                selected = state.browseGenres.isNotEmpty(),
-                icon = Icons.Default.Category,
-                onClick = onOpenGenres,
+        Box(Modifier.padding(horizontal = horizontalPadding)) {
+            TankobunSearchField(
+                value = state.searchQuery,
+                onValueChange = viewModel::setSearchQuery,
+                placeholder = tankobunString(R.string.browse_search_placeholder),
+                onSearch = viewModel::searchAniList,
+                showSearchAction = false,
             )
-            BrowseFilterPill(
-                label = tankobunString(R.string.common_tags),
-                value = if (state.browseTags.isEmpty()) tankobunString(R.string.common_any) else state.browseTags.size.toString(),
-                selected = state.browseTags.isNotEmpty(),
-                icon = Icons.Default.LocalOffer,
-                onClick = onOpenTags,
-            )
-            BrowseFilterPill(
-                label = tankobunString(R.string.common_format),
-                value = BrowseFormatOptions.labelFor(state.browseFormat),
-                selected = state.browseFormat != null,
-                icon = Icons.AutoMirrored.Filled.MenuBook,
-                onClick = { onOpenPicker(BrowsePicker.FORMAT) },
-            )
-            BrowseFilterPill(
-                label = tankobunString(R.string.common_status),
-                value = BrowseStatusOptions.labelFor(state.browsePublishingStatus),
-                selected = state.browsePublishingStatus != null,
-                icon = Icons.Default.Flag,
-                onClick = { onOpenPicker(BrowsePicker.STATUS) },
-            )
-            BrowseFilterPill(
-                label = tankobunString(R.string.common_country),
-                value = BrowseCountryOptions.labelFor(state.browseCountryOfOrigin),
-                selected = state.browseCountryOfOrigin != null,
-                icon = Icons.Default.Public,
-                onClick = { onOpenPicker(BrowsePicker.COUNTRY) },
-            )
-            BrowseFilterPill(
-                label = tankobunString(R.string.common_year),
-                value = state.browseYear?.toString() ?: tankobunString(R.string.common_any),
-                selected = state.browseYear != null,
-                icon = Icons.Default.CalendarMonth,
-                onClick = { onOpenPicker(BrowsePicker.YEAR) },
-            )
-            BrowseIconFilterPill(
-                contentDescription = tankobunString(R.string.browse_options),
-                onClick = onOpenAdvanced,
-            )
+        }
+        TankobunHorizontalFilterRow(contentPadding = PaddingValues(horizontal = horizontalPadding)) {
+            item {
+                BrowseFilterPill(
+                    label = tankobunString(R.string.common_genres),
+                    value = if (state.browseGenres.isEmpty()) tankobunString(R.string.common_any) else state.browseGenres.size.toString(),
+                    selected = state.browseGenres.isNotEmpty(),
+                    icon = Icons.Default.Category,
+                    onClick = onOpenGenres,
+                )
+            }
+            item {
+                BrowseFilterPill(
+                    label = tankobunString(R.string.common_tags),
+                    value = if (state.browseTags.isEmpty()) tankobunString(R.string.common_any) else state.browseTags.size.toString(),
+                    selected = state.browseTags.isNotEmpty(),
+                    icon = Icons.Default.LocalOffer,
+                    onClick = onOpenTags,
+                )
+            }
+            item {
+                BrowseFilterPill(
+                    label = tankobunString(R.string.common_format),
+                    value = BrowseFormatOptions.labelFor(state.browseFormat),
+                    selected = state.browseFormat != null,
+                    icon = Icons.AutoMirrored.Filled.MenuBook,
+                    onClick = { onOpenPicker(BrowsePicker.FORMAT) },
+                )
+            }
+            item {
+                BrowseFilterPill(
+                    label = tankobunString(R.string.common_status),
+                    value = BrowseStatusOptions.labelFor(state.browsePublishingStatus),
+                    selected = state.browsePublishingStatus != null,
+                    icon = Icons.Default.Flag,
+                    onClick = { onOpenPicker(BrowsePicker.STATUS) },
+                )
+            }
+            item {
+                BrowseFilterPill(
+                    label = tankobunString(R.string.common_country),
+                    value = BrowseCountryOptions.labelFor(state.browseCountryOfOrigin),
+                    selected = state.browseCountryOfOrigin != null,
+                    icon = Icons.Default.Public,
+                    onClick = { onOpenPicker(BrowsePicker.COUNTRY) },
+                )
+            }
+            item {
+                BrowseFilterPill(
+                    label = tankobunString(R.string.common_year),
+                    value = state.browseYear?.toString() ?: tankobunString(R.string.common_any),
+                    selected = state.browseYear != null,
+                    icon = Icons.Default.CalendarMonth,
+                    onClick = { onOpenPicker(BrowsePicker.YEAR) },
+                )
+            }
+            item {
+                BrowseIconFilterPill(
+                    contentDescription = tankobunString(R.string.browse_options),
+                    onClick = onOpenAdvanced,
+                )
+            }
             if (state.hasBrowseQueryOrFilters() || state.browseSearched) {
-                TankobunClearFiltersChip(onClick = viewModel::resetBrowseFilters)
+                item {
+                    TankobunClearFiltersChip(onClick = viewModel::resetBrowseFilters)
+                }
             }
         }
     }
@@ -660,9 +682,7 @@ internal fun BrowseLanding(
         verticalArrangement = Arrangement.spacedBy(BrowseHeaderTextGap),
     ) {
         item(key = "browse-header") {
-            Box(Modifier.padding(horizontal = BrowseLandingContentPadding)) {
-                header()
-            }
+            header()
         }
         item {
             BrowseMangaShelf(

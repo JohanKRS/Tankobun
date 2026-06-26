@@ -318,18 +318,22 @@ internal fun LibraryScreen(
             )
 
             state.message?.let {
-                TankobunMessageBanner(it)
+                Box(Modifier.padding(horizontal = LibraryContentPadding)) {
+                    TankobunMessageBanner(it)
+                }
             }
 
             if (state.libraryMode == LibraryMode.ANILIST && !state.loggedIn) {
-                LibraryConnectPrompt(
-                    clientConfigured = state.clientConfigured,
-                    onConnect = {
-                        viewModel.loginUrl()?.let { url ->
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                        }
-                    },
-                )
+                Box(Modifier.padding(horizontal = LibraryContentPadding)) {
+                    LibraryConnectPrompt(
+                        clientConfigured = state.clientConfigured,
+                        onConnect = {
+                            viewModel.loginUrl()?.let { url ->
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            }
+                        },
+                    )
+                }
             }
         }
     }
@@ -523,61 +527,79 @@ internal fun LibraryFilterBar(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        TankobunSearchField(
-            value = query,
-            onValueChange = onQueryChange,
-            placeholder = tankobunString(R.string.library_search_placeholder),
-            showSearchAction = false,
-        )
-        TankobunFilterRow {
-            BrowseFilterPill(
-                label = tankobunString(R.string.common_genres),
-                value = if (genres.isEmpty()) tankobunString(R.string.common_any) else genres.size.toString(),
-                selected = genres.isNotEmpty(),
-                icon = Icons.Default.Category,
-                onClick = onOpenGenres,
+        Box(Modifier.padding(horizontal = LibraryContentPadding)) {
+            TankobunSearchField(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = tankobunString(R.string.library_search_placeholder),
+                showSearchAction = false,
             )
-            BrowseFilterPill(
-                label = tankobunString(R.string.common_tags),
-                value = if (tags.isEmpty()) tankobunString(R.string.common_any) else tags.size.toString(),
-                selected = tags.isNotEmpty(),
-                icon = Icons.Default.LocalOffer,
-                onClick = onOpenTags,
-            )
-            BrowseFilterPill(
-                label = tankobunString(R.string.common_format),
-                value = formatOptions.labelFor(format),
-                selected = format != null,
-                icon = Icons.AutoMirrored.Filled.MenuBook,
-                onClick = { onOpenPicker(LibraryPicker.FORMAT) },
-            )
-            BrowseFilterPill(
-                label = tankobunString(R.string.common_status),
-                value = statusOptions.labelFor(publishingStatus),
-                selected = publishingStatus != null,
-                icon = Icons.Default.Flag,
-                onClick = { onOpenPicker(LibraryPicker.STATUS) },
-            )
-            BrowseFilterPill(
-                label = tankobunString(R.string.common_country),
-                value = countryOptions.labelFor(countryOfOrigin),
-                selected = countryOfOrigin != null,
-                icon = Icons.Default.Public,
-                onClick = { onOpenPicker(LibraryPicker.COUNTRY) },
-            )
-            BrowseFilterPill(
-                label = tankobunString(R.string.common_year),
-                value = yearOptions.labelFor(year),
-                selected = year != null,
-                icon = Icons.Default.CalendarMonth,
-                onClick = { onOpenPicker(LibraryPicker.YEAR) },
-            )
-            BrowseIconFilterPill(
-                contentDescription = tankobunString(R.string.library_options),
-                onClick = onOpenOptions,
-            )
+        }
+        TankobunHorizontalFilterRow(contentPadding = PaddingValues(horizontal = LibraryContentPadding)) {
+            item {
+                BrowseFilterPill(
+                    label = tankobunString(R.string.common_genres),
+                    value = if (genres.isEmpty()) tankobunString(R.string.common_any) else genres.size.toString(),
+                    selected = genres.isNotEmpty(),
+                    icon = Icons.Default.Category,
+                    onClick = onOpenGenres,
+                )
+            }
+            item {
+                BrowseFilterPill(
+                    label = tankobunString(R.string.common_tags),
+                    value = if (tags.isEmpty()) tankobunString(R.string.common_any) else tags.size.toString(),
+                    selected = tags.isNotEmpty(),
+                    icon = Icons.Default.LocalOffer,
+                    onClick = onOpenTags,
+                )
+            }
+            item {
+                BrowseFilterPill(
+                    label = tankobunString(R.string.common_format),
+                    value = formatOptions.labelFor(format),
+                    selected = format != null,
+                    icon = Icons.AutoMirrored.Filled.MenuBook,
+                    onClick = { onOpenPicker(LibraryPicker.FORMAT) },
+                )
+            }
+            item {
+                BrowseFilterPill(
+                    label = tankobunString(R.string.common_status),
+                    value = statusOptions.labelFor(publishingStatus),
+                    selected = publishingStatus != null,
+                    icon = Icons.Default.Flag,
+                    onClick = { onOpenPicker(LibraryPicker.STATUS) },
+                )
+            }
+            item {
+                BrowseFilterPill(
+                    label = tankobunString(R.string.common_country),
+                    value = countryOptions.labelFor(countryOfOrigin),
+                    selected = countryOfOrigin != null,
+                    icon = Icons.Default.Public,
+                    onClick = { onOpenPicker(LibraryPicker.COUNTRY) },
+                )
+            }
+            item {
+                BrowseFilterPill(
+                    label = tankobunString(R.string.common_year),
+                    value = yearOptions.labelFor(year),
+                    selected = year != null,
+                    icon = Icons.Default.CalendarMonth,
+                    onClick = { onOpenPicker(LibraryPicker.YEAR) },
+                )
+            }
+            item {
+                BrowseIconFilterPill(
+                    contentDescription = tankobunString(R.string.library_options),
+                    onClick = onOpenOptions,
+                )
+            }
             if (filtersOrSortActive) {
-                TankobunClearFiltersChip(onClick = onReset)
+                item {
+                    TankobunClearFiltersChip(onClick = onReset)
+                }
             }
         }
     }
@@ -654,9 +676,7 @@ internal fun LibraryPager(
         LazyColumn(
             modifier = modifier.fillMaxWidth(),
             contentPadding = PaddingValues(
-                start = LibraryContentPadding,
                 top = chromeInsets.top + LibraryContentPadding,
-                end = LibraryContentPadding,
                 bottom = chromeInsets.bottom + LibraryContentPadding,
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -665,7 +685,9 @@ internal fun LibraryPager(
                 header()
             }
             item(key = "library-empty") {
-                TankobunEmptyState(title = tankobunString(R.string.library_empty))
+                Box(Modifier.padding(horizontal = LibraryContentPadding)) {
+                    TankobunEmptyState(title = tankobunString(R.string.library_empty))
+                }
             }
         }
         return
@@ -853,9 +875,7 @@ internal fun LibraryPager(
                 modifier = Modifier.onSizeChanged { searchHeaderHeightPx = it.height },
             ) {
                 Spacer(Modifier.height(LibraryContentPadding))
-                Box(Modifier.padding(horizontal = LibraryContentPadding)) {
-                    header()
-                }
+                header()
                 Spacer(Modifier.height(14.dp))
             }
             Column(
