@@ -196,10 +196,10 @@
       }
 
       .phone-main {
-        width: min(30vw, 370px);
-        aspect-ratio: 9 / 19.5;
-        right: 18vw;
-        top: 70px;
+        width: min(34vw, 440px);
+        aspect-ratio: 3 / 4;
+        right: 22vw;
+        top: 34px;
         z-index: 3;
         --pose: rotate(2deg);
         --float-x: 8px;
@@ -207,10 +207,10 @@
       }
 
       .phone-side {
-        width: min(24vw, 300px);
-        aspect-ratio: 9 / 19.5;
-        right: 3vw;
-        top: 210px;
+        width: min(27vw, 350px);
+        aspect-ratio: 3 / 4;
+        right: 10vw;
+        top: 180px;
         z-index: 2;
         opacity: 0.88;
         --pose: rotate(8deg);
@@ -221,10 +221,10 @@
       }
 
       .phone-low {
-        width: min(22vw, 275px);
-        aspect-ratio: 9 / 19.5;
-        right: 34vw;
-        top: 250px;
+        width: min(26vw, 340px);
+        aspect-ratio: 3 / 4;
+        right: 38vw;
+        top: 220px;
         z-index: 1;
         opacity: 0.75;
         --pose: rotate(-7deg);
@@ -232,34 +232,6 @@
         --float-y: -9px;
         animation-duration: 11s;
         animation-delay: -4.2s;
-      }
-
-      .tablet-hero {
-        width: min(58vw, 760px);
-        aspect-ratio: 1120 / 720;
-        right: 0;
-        bottom: 55px;
-        z-index: 0;
-        opacity: 0.72;
-        --pose: rotate(-2deg);
-        --float-x: -12px;
-        --float-y: -12px;
-        animation-duration: 14s;
-        animation-delay: -1.3s;
-      }
-
-      .tablet-portrait-hero {
-        width: min(24vw, 320px);
-        aspect-ratio: 10 / 16;
-        right: 35vw;
-        top: 112px;
-        z-index: 2;
-        opacity: 0.82;
-        --pose: rotate(-5deg);
-        --float-x: 7px;
-        --float-y: -16px;
-        animation-duration: 13s;
-        animation-delay: -3.1s;
       }
 
       .hero-content {
@@ -578,13 +550,6 @@
         gap: 26px;
       }
 
-      .screen-duo {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(260px, 0.42fr);
-        gap: 26px;
-        align-items: start;
-      }
-
       .screen-shot {
         margin: 0;
         width: 100%;
@@ -611,24 +576,19 @@
         transform: scale(1.018);
       }
 
-      .tablet-feature .screen-frame,
-      .tablet-browse .screen-frame {
-        aspect-ratio: 1120 / 720;
-      }
-
-      .tablet-portrait .screen-frame {
-        aspect-ratio: 10 / 16;
-      }
-
       .phone-strip {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 250px));
+        grid-template-columns: repeat(3, minmax(0, 300px));
         justify-content: center;
         gap: 22px;
       }
 
       .phone-strip .screen-frame {
-        aspect-ratio: 9 / 20;
+        aspect-ratio: 3 / 4;
+      }
+
+      .phone-strip .screen-shot img {
+        object-fit: contain;
       }
 
       .screen-shot figcaption {
@@ -782,10 +742,6 @@
           grid-template-columns: 1fr;
         }
 
-        .screen-duo {
-          grid-template-columns: 1fr;
-        }
-
         .feature-list {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -846,20 +802,6 @@
           top: 126px;
         }
 
-        .tablet-portrait-hero {
-          width: 230px;
-          right: 110px;
-          top: 92px;
-          opacity: 0.62;
-        }
-
-        .tablet-hero {
-          width: 500px;
-          right: -100px;
-          bottom: 42px;
-          opacity: 0.52;
-        }
-
         .hero-content {
           min-height: 860px;
           justify-content: flex-end;
@@ -915,10 +857,6 @@
           gap: 20px;
         }
 
-        .screen-duo {
-          gap: 20px;
-        }
-
         .phone-strip {
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 10px;
@@ -959,20 +897,14 @@
 
     <header class="hero">
       <div class="hero-stage" aria-hidden="true">
-        <span class="device tablet-hero">
-          <img src="mockups/web/tablet-browse.webp" alt="">
-        </span>
-        <span class="device tablet-portrait-hero">
-          <img src="mockups/web/tablet-portrait-browse.webp" alt="">
-        </span>
         <span class="device phone-low">
-          <img src="mockups/web/phone-library.webp" alt="">
+          <img src="mockups/site/phone-library-tilt.png" alt="">
         </span>
         <span class="device phone-main">
-          <img src="mockups/web/phone-detail.webp" alt="">
+          <img src="mockups/site/phone-detail-eclipse.png" alt="">
         </span>
         <span class="device phone-side">
-          <img src="mockups/web/phone-browse.webp" alt="">
+          <img src="mockups/site/phone-browse-dark.png" alt="">
         </span>
       </div>
 
@@ -1045,7 +977,7 @@
                   lists on this device without signing in.
                 </p>
               </div>
-              <img src="mockups/web/phone-library.webp" alt="Tankobun local library screen with generated preview entries">
+              <img src="mockups/site/phone-library-light.png" alt="Tankobun local library screen with generated preview entries">
             </article>
 
             <article class="mode-panel sync">
@@ -1056,7 +988,7 @@
                   list import, and remote tracking updates.
                 </p>
               </div>
-              <img src="mockups/web/phone-detail.webp" alt="Tankobun manga detail and tracking screen with generated preview entry">
+              <img src="mockups/site/phone-detail-celestial.png" alt="Tankobun manga detail and tracking screen with generated preview entry">
             </article>
           </div>
         </div>
@@ -1109,42 +1041,10 @@
           </div>
 
           <div class="screen-gallery">
-            <figure class="screen-shot tablet-feature">
-              <div class="screen-frame">
-                <img src="mockups/web/tablet-library.webp" alt="Tankobun landscape tablet library screen with generated preview entries">
-              </div>
-              <figcaption>
-                <span>Library</span>
-                <span>Tablet landscape</span>
-              </figcaption>
-            </figure>
-
-            <div class="screen-duo">
-              <figure class="screen-shot tablet-browse">
-                <div class="screen-frame">
-                  <img src="mockups/web/tablet-browse.webp" alt="Tankobun landscape tablet browse screen with generated preview entries">
-                </div>
-                <figcaption>
-                  <span>Browse</span>
-                  <span>Tablet landscape</span>
-                </figcaption>
-              </figure>
-
-              <figure class="screen-shot tablet-portrait">
-                <div class="screen-frame">
-                  <img src="mockups/web/tablet-portrait-browse.webp" alt="Tankobun portrait tablet browse screen with generated preview entries">
-                </div>
-                <figcaption>
-                  <span>Browse</span>
-                  <span>Tablet portrait</span>
-                </figcaption>
-              </figure>
-            </div>
-
             <div class="phone-strip">
               <figure class="screen-shot">
                 <div class="screen-frame">
-                  <img src="mockups/web/phone-library.webp" alt="Tankobun phone library screen with generated preview entries and cover art">
+                  <img src="mockups/site/phone-library-tilt.png" alt="Tankobun phone library screen with generated preview entries and cover art">
                 </div>
                 <figcaption>
                   <span>Library</span>
@@ -1153,7 +1053,7 @@
               </figure>
               <figure class="screen-shot">
                 <div class="screen-frame">
-                  <img src="mockups/web/phone-browse.webp" alt="Tankobun phone browse screen with generated preview entries and cover art">
+                  <img src="mockups/site/phone-browse-dark.png" alt="Tankobun phone browse screen with generated preview entries and cover art">
                 </div>
                 <figcaption>
                   <span>Browse</span>
@@ -1162,7 +1062,34 @@
               </figure>
               <figure class="screen-shot">
                 <div class="screen-frame">
-                  <img src="mockups/web/phone-detail.webp" alt="Tankobun phone manga detail screen with generated preview entry and cover art">
+                  <img src="mockups/site/phone-detail-eclipse.png" alt="Tankobun phone manga detail screen with generated preview entry and cover art">
+                </div>
+                <figcaption>
+                  <span>Tracking</span>
+                  <span>Phone</span>
+                </figcaption>
+              </figure>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/site/phone-library-fantasy.png" alt="Tankobun phone library screen with generated preview entries and cover art">
+                </div>
+                <figcaption>
+                  <span>Library</span>
+                  <span>Phone</span>
+                </figcaption>
+              </figure>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/site/phone-library-light.png" alt="Tankobun phone local library screen with generated preview entries and cover art">
+                </div>
+                <figcaption>
+                  <span>Local</span>
+                  <span>Phone</span>
+                </figcaption>
+              </figure>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/site/phone-detail-celestial.png" alt="Tankobun phone manga detail screen with generated preview entry and cover art">
                 </div>
                 <figcaption>
                   <span>Tracking</span>

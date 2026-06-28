@@ -13,9 +13,9 @@
 </p>
 
 <p align="center">
-  <img src="docs/mockups/web/phone-detail.webp" width="31%" alt="Tankobun manga detail screen with generated preview content">
-  <img src="docs/mockups/web/phone-library.webp" width="31%" alt="Tankobun local library screen with generated preview content">
-  <img src="docs/mockups/web/phone-browse.webp" width="31%" alt="Tankobun browse screen with generated preview content">
+  <img src="docs/mockups/readme/phone-detail.png" width="31%" alt="Tankobun manga detail screen with generated preview content">
+  <img src="docs/mockups/readme/phone-library.png" width="31%" alt="Tankobun local library screen with generated preview content">
+  <img src="docs/mockups/readme/phone-browse.png" width="31%" alt="Tankobun browse screen with generated preview content">
 </p>
 
 ## What Tankobun Is
