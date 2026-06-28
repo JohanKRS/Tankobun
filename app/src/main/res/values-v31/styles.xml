@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.Tankobun" parent="@style/TankobunBaseTheme">
+        <item name="android:windowSplashScreenBackground">#FFFFFFFF</item>
+    </style>
+</resources>
