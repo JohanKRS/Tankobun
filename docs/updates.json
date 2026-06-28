@@ -2,30 +2,34 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 36,
-    "versionName": "3.3.1",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.3.1/tankobun-3.3.1.apk",
-    "apkSha256": "95718A558B241012954CABD971EF0D5177B36892E4B817A6DB26AEB2D9E31433",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.3.1",
-    "publishedAt": "2026-06-26T13:16:48Z",
-    "sizeBytes": 11889584,
+    "versionCode": 37,
+    "versionName": "3.3.2",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v3.3.2/tankobun-3.3.2.apk",
+    "apkSha256": "455C9BBD01BC6E3CEB1B814B0F00261AB71DA7D1097019A7F99976FF8EA0C9D0",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v3.3.2",
+    "publishedAt": "2026-06-28T21:51:01Z",
+    "sizeBytes": 11894692,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Browse and Library filter chips now scroll horizontally with the same edge-to-edge rail behavior as manga shelves.",
-        "Manga detail publication years are more compact on mobile, preventing ongoing and ranged dates from being clipped."
+        "The Android launch screen now follows dark mode, avoiding a white flash before the app renders.",
+        "Tablet Settings now lets the detail panel reach the screen edge when camera cutout ignoring is enabled.",
+        "README and site screenshots were refreshed with the current phone mockups."
       ],
       "pt-BR": [
-        "Chips de filtro no Browse e na Biblioteca agora rolam horizontalmente com o mesmo comportamento de trilho até a borda das listas de mangá.",
-        "Anos de publicação nos detalhes do mangá ficam mais compactos no mobile, evitando cortes em datas de obras em lançamento e intervalos."
+        "A tela inicial do Android agora respeita o modo escuro, evitando o flash branco antes do app renderizar.",
+        "Em tablets, Configurações agora permite que o painel de detalhes encoste na borda quando ignorar o recorte da câmera está ativo.",
+        "README e site receberam screenshots atualizados com os mockups atuais para celular."
       ],
       "es": [
-        "Los chips de filtro en Browse y Biblioteca ahora se desplazan horizontalmente con el mismo comportamiento de borde a borde que las listas de manga.",
-        "Los años de publicación en detalles del manga son más compactos en móvil, evitando cortes en fechas de obras en emisión e intervalos."
+        "La pantalla inicial de Android ahora respeta el modo oscuro, evitando el flash blanco antes de que se renderice la app.",
+        "En tablets, Ajustes ahora permite que el panel de detalles llegue al borde de la pantalla cuando se ignora el recorte de cámara.",
+        "README y sitio recibieron capturas actualizadas con los mockups actuales para móvil."
       ],
       "zh-CN": [
-        "Browse 和书库筛选标签现在可横向滚动，并与漫画书架一样延伸到屏幕边缘。",
-        "漫画详情页的出版年份在手机上更紧凑，避免连载中和年份范围日期被截断。"
+        "Android 启动页现在会跟随深色模式，避免应用渲染前出现白屏闪烁。",
+        "在平板上，启用忽略摄像头挖孔后，设置详情面板现在可以延伸到屏幕边缘。",
+        "README 和网站截图已更新为当前的手机 mockup。"
       ]
     }
   }

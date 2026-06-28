@@ -48,8 +48,8 @@ android {
         applicationId = "com.tankobun.app"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 36
-        versionName = "3.3.1"
+        versionCode = 37
+        versionName = "3.3.2"
 
         val clientId = localProperties.getProperty("anilistClientId", "")
         buildConfigField("String", "ANILIST_CLIENT_ID", "\"$clientId\"")

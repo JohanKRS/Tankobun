@@ -256,7 +256,7 @@ internal fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp),
+                    .padding(start = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 SettingsIndexPane(
