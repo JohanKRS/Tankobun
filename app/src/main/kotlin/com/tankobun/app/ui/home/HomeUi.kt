@@ -15,13 +15,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -58,6 +57,7 @@ import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.app.tankobunString
 import com.tankobun.app.ui.shell.LocalTankobunChromeInsets
+import com.tankobun.app.ui.media.AutoResizingMangaTitle
 import com.tankobun.core.model.AnilistGenreHighlight
 import com.tankobun.core.model.AnilistMedia
 import kotlinx.coroutines.delay
@@ -73,7 +73,8 @@ internal fun HomeScreen(
     onOpenBrowse: () -> Unit,
 ) {
     val chromeInsets = LocalTankobunChromeInsets.current
-    val horizontalPadding = if (androidx.compose.ui.platform.LocalConfiguration.current.smallestScreenWidthDp >= 600) {
+    val expanded = androidx.compose.ui.platform.LocalConfiguration.current.smallestScreenWidthDp >= 600
+    val horizontalPadding = if (expanded) {
         28.dp
     } else {
         12.dp
@@ -92,15 +93,21 @@ internal fun HomeScreen(
                 title = tankobunString(R.string.home_trending),
                 icon = TankobunIcons.Whatshot,
                 onViewAll = onOpenBrowse,
-                modifier = Modifier.padding(horizontal = horizontalPadding),
+                headerModifier = Modifier.padding(horizontal = horizontalPadding),
             ) {
                 when {
                     state.homeTrending.isNotEmpty() -> TrendingHeroCarousel(
                         media = state.homeTrending,
+                        expanded = expanded,
+                        horizontalPadding = horizontalPadding,
                         onSelectMedia = onSelectMedia,
                     )
-                    !state.homeLoaded -> HomeLoadingPanel(Modifier.height(338.dp))
-                    else -> HomeEmptyPanel(tankobunString(R.string.home_trending_empty))
+                    !state.homeLoaded -> Box(Modifier.padding(horizontal = horizontalPadding)) {
+                        HomeLoadingPanel(Modifier.height(if (expanded) 410.dp else 338.dp))
+                    }
+                    else -> Box(Modifier.padding(horizontal = horizontalPadding)) {
+                        HomeEmptyPanel(tankobunString(R.string.home_trending_empty))
+                    }
                 }
             }
         }
@@ -111,6 +118,7 @@ internal fun HomeScreen(
                     title = tankobunString(R.string.home_continue_reading),
                     icon = TankobunIcons.MenuBook,
                     onViewAll = onOpenLibrary,
+                    headerModifier = Modifier.padding(horizontal = horizontalPadding),
                 ) {
                     ContinueReadingRow(
                         items = state.recentReadingProgress,
@@ -126,15 +134,18 @@ internal fun HomeScreen(
                 title = tankobunString(R.string.home_trending_by_genre),
                 icon = TankobunIcons.TrendingUp,
                 onViewAll = onOpenBrowse,
-                modifier = Modifier.padding(horizontal = horizontalPadding),
+                headerModifier = Modifier.padding(horizontal = horizontalPadding),
             ) {
-                when {
-                    state.homeGenreHighlights.isNotEmpty() -> GenreHighlightList(
-                        highlights = state.homeGenreHighlights,
-                        onSelectMedia = onSelectMedia,
-                    )
-                    !state.homeLoaded -> HomeLoadingPanel(Modifier.height(220.dp))
-                    else -> HomeEmptyPanel(tankobunString(R.string.home_genres_empty))
+                Box(Modifier.padding(horizontal = horizontalPadding)) {
+                    when {
+                        state.homeGenreHighlights.isNotEmpty() -> GenreHighlightList(
+                            highlights = state.homeGenreHighlights,
+                            expanded = expanded,
+                            onSelectMedia = onSelectMedia,
+                        )
+                        !state.homeLoaded -> HomeLoadingPanel(Modifier.height(220.dp))
+                        else -> HomeEmptyPanel(tankobunString(R.string.home_genres_empty))
+                    }
                 }
             }
         }
@@ -147,11 +158,12 @@ private fun HomeSection(
     icon: ImageVector,
     onViewAll: () -> Unit,
     modifier: Modifier = Modifier,
+    headerModifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = headerModifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -201,6 +213,8 @@ private fun HomeSection(
 @Composable
 private fun TrendingHeroCarousel(
     media: List<AnilistMedia>,
+    expanded: Boolean,
+    horizontalPadding: androidx.compose.ui.unit.Dp,
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
     val pagerState = rememberPagerState(pageCount = { media.size })
@@ -212,16 +226,18 @@ private fun TrendingHeroCarousel(
         }
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val heroHeight = if (maxWidth >= 600.dp) 410.dp else 338.dp
+        Box(Modifier.fillMaxWidth()) {
+            val heroHeight = if (expanded) 410.dp else 338.dp
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = horizontalPadding),
                 pageSpacing = 10.dp,
             ) { page ->
                 TrendingHero(
                     media = media[page],
                     rank = page + 1,
+                    expanded = expanded,
                     onClick = { onSelectMedia(media[page]) },
                     modifier = Modifier.height(heroHeight),
                 )
@@ -249,12 +265,17 @@ private fun TrendingHeroCarousel(
 private fun TrendingHero(
     media: AnilistMedia,
     rank: Int,
+    expanded: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val style = LocalTankobunStyle.current
     val backdrop = style.colors.panel
-    val image = media.mainCharacterImage ?: media.coverImage ?: media.bannerImage
+    val image = if (expanded) {
+        media.bannerImage ?: media.coverImage ?: media.mainCharacterImage
+    } else {
+        media.mainCharacterImage ?: media.coverImage ?: media.bannerImage
+    }
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -267,26 +288,44 @@ private fun TrendingHero(
     ) {
         Box(Modifier.fillMaxSize()) {
             image?.let { url ->
-                AsyncImage(
-                    model = url,
-                    contentDescription = media.title.userPreferred,
-                    contentScale = ContentScale.FillHeight,
-                    alignment = Alignment.CenterEnd,
+                Box(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .fillMaxSize()
-                        .widthIn(min = 220.dp),
-                )
+                        .fillMaxHeight()
+                        .fillMaxWidth(if (expanded) 0.72f else 1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AsyncImage(
+                        model = url,
+                        contentDescription = media.title.userPreferred,
+                        contentScale = if (expanded) ContentScale.Crop else ContentScale.FillHeight,
+                        alignment = if (expanded) Alignment.Center else Alignment.CenterEnd,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
             Box(
                 Modifier
                     .fillMaxSize()
                     .background(
                         Brush.horizontalGradient(
-                            0.0f to backdrop,
-                            0.38f to backdrop.copy(alpha = 0.98f),
-                            0.70f to backdrop.copy(alpha = 0.55f),
-                            1.0f to Color.Transparent,
+                            colorStops = if (expanded) {
+                                arrayOf(
+                                    0.0f to backdrop,
+                                    0.26f to backdrop,
+                                    0.42f to backdrop.copy(alpha = 0.88f),
+                                    0.62f to backdrop.copy(alpha = 0.28f),
+                                    0.76f to backdrop.copy(alpha = 0.06f),
+                                    1.0f to Color.Transparent,
+                                )
+                            } else {
+                                arrayOf(
+                                    0.0f to backdrop,
+                                    0.38f to backdrop.copy(alpha = 0.98f),
+                                    0.70f to backdrop.copy(alpha = 0.55f),
+                                    1.0f to Color.Transparent,
+                                )
+                            },
                         ),
                     ),
             )
@@ -320,17 +359,18 @@ private fun TrendingHero(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                     )
                 }
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = media.title.userPreferred.uppercase(),
-                    fontFamily = TankobunDisplayFontFamily,
-                    fontSize = 42.sp,
-                    lineHeight = 40.sp,
-                    letterSpacing = 0.6.sp,
+                if (expanded) {
+                    Spacer(Modifier.height(18.dp))
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                AutoResizingMangaTitle(
+                    title = media.title.userPreferred,
+                    compact = true,
                     color = style.colors.panelContent,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(0.68f),
+                    modifier = Modifier
+                        .fillMaxWidth(if (expanded) 0.42f else 0.68f)
+                        .height(if (expanded) 116.dp else 92.dp),
                 )
                 media.staff.firstOrNull()?.let { author ->
                     Text(
@@ -340,7 +380,7 @@ private fun TrendingHero(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
-                            .fillMaxWidth(0.66f)
+                            .fillMaxWidth(if (expanded) 0.40f else 0.66f)
                             .padding(top = 4.dp),
                     )
                 }
@@ -353,11 +393,15 @@ private fun TrendingHero(
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
-                            .fillMaxWidth(0.62f)
+                            .fillMaxWidth(if (expanded) 0.42f else 0.62f)
                             .padding(top = 8.dp),
                     )
                 }
-                Spacer(Modifier.height(12.dp))
+                if (expanded) {
+                    Spacer(Modifier.weight(1f))
+                } else {
+                    Spacer(Modifier.height(12.dp))
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Bottom,
@@ -500,11 +544,36 @@ private fun ContinueReadingCard(
 @Composable
 private fun GenreHighlightList(
     highlights: List<AnilistGenreHighlight>,
+    expanded: Boolean,
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        highlights.forEach { highlight ->
-            GenreHighlightCard(highlight = highlight, onClick = { onSelectMedia(highlight.media) })
+    if (expanded) {
+        val splitIndex = (highlights.size + 1) / 2
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            listOf(highlights.take(splitIndex), highlights.drop(splitIndex)).forEach { columnItems ->
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    columnItems.forEach { highlight ->
+                        GenreHighlightCard(
+                            highlight = highlight,
+                            expanded = true,
+                            onClick = { onSelectMedia(highlight.media) },
+                        )
+                    }
+                }
+            }
+        }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            highlights.forEach { highlight ->
+                GenreHighlightCard(
+                    highlight = highlight,
+                    expanded = false,
+                    onClick = { onSelectMedia(highlight.media) },
+                )
+            }
         }
     }
 }
@@ -512,6 +581,7 @@ private fun GenreHighlightList(
 @Composable
 private fun GenreHighlightCard(
     highlight: AnilistGenreHighlight,
+    expanded: Boolean,
     onClick: () -> Unit,
 ) {
     val media = highlight.media
@@ -520,7 +590,7 @@ private fun GenreHighlightCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
+            .height(if (expanded) 58.dp else 64.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(9.dp),
         color = style.colors.panel,
@@ -530,8 +600,8 @@ private fun GenreHighlightCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .width(170.dp)
-                    .height(56.dp),
+                    .width(if (expanded) 148.dp else 170.dp)
+                    .fillMaxHeight(),
             ) {
                 AsyncImage(
                     model = image,

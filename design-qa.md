@@ -1,54 +1,39 @@
-# Home design QA
+# Home responsive design QA
 
-- Source visual truth: `/var/folders/37/xbnjjyy16rzcnffjlyv6lwym0000gn/T/codex-clipboard-220e31de-aee3-4298-a66d-5b27114f4d34.png`
-- Implementation screenshot: `/tmp/tankobun-home-final-tabler-1080x2160.png`
-- Full-view comparison: `/tmp/tankobun-home-final-tabler-comparison.png`
-- Focused hero comparison: `/tmp/tankobun-home-final-tabler-hero-comparison.png`
-- Focused genre comparison: `/tmp/tankobun-home-final-tabler-genre-comparison.png`
-- Viewport: 1080 × 2160 implementation, normalized to the source's 864 × 1728 frame for comparison
-- State: Charcoal Gold dark theme, Home root, loaded AniList feed, carousel page 5, fresh emulator library with no saved reader progress
+- Annotated tablet source: `/Users/johan/Documents/tablet.png`
+- Annotated phone source: `/var/folders/37/xbnjjyy16rzcnffjlyv6lwym0000gn/T/codex-clipboard-6bdc3ccd-b54b-4af3-9bbe-fb9eed4e0a35.png`
+- Tablet implementation: `/tmp/tankobun-home-tablet-final-portrait.png`
+- Tablet normalized comparison frame: `/tmp/tankobun-home-tablet-final-924.png`
+- Phone implementation: `/tmp/tankobun-home-phone-final.png`
+- Tablet viewport: Pixel Tablet, portrait, 1600 x 2560 (implementation normalized to 924 x 1467 for comparison)
+- Phone viewport: Pixel 9, portrait, 1080 x 2424
+- State: live AniList Home feed; active Charcoal Gold theme on phone and the emulator default light theme on tablet
 
 ## Findings
 
 No actionable P0, P1, or P2 findings remain.
 
-- Fonts and typography: Bebas Neue is used for display headings and manga titles, with the existing app body typography for metadata. Hierarchy, line height, wrapping, and truncation are stable with long live AniList titles.
-- Spacing and layout rhythm: header, hero, pager, and section proportions track the source. The genre rows were compacted and their icons overlaid on the image area to match the source composition. No horizontal overflow or clipped primary action is visible.
-- Colors and visual tokens: all surfaces, text, borders, action colors, chips, gradients, and icon tints resolve through the active Tankobun theme. The screenshot uses Charcoal Gold instead of copying the mock's purple palette, as explicitly required.
-- Image quality and asset fidelity: live AniList images replace mock artwork. Hero images follow `main character -> cover -> banner`, use fill-height scaling so no vertical content is cropped, align to the right, and fade into the panel. Genre images follow `banner -> main character -> cover`. Continue Reading always uses the cover.
-- Copy and content: section labels and CTA text are localized. Manga titles, staff, descriptions, genres, popularity, chapter, and progress are data-driven.
-- Icons: all generic interface icons use the Tabler family through `TankobunIcons`; the Material icon pack is no longer used. Product identity assets (launcher and notification mark) remain unchanged.
-- Accessibility and behavior: dock icons retain content descriptions, media images expose titles, buttons remain semantic click targets, and core tap targets are at least 40 dp. The carousel auto-advances and remains swipeable.
+- Tablet hero: AniList banner is the primary visual. It occupies 72% of the card width, is center-cropped, and fades left beneath the 42%-wide content column. The fallback order is banner, cover, then main character; fallback covers use the same crop and placement as banners.
+- Phone hero: image priority and vertical fit remain unchanged. Only the title renderer changed, now sharing the detail page's measured auto-resizing and line-breaking implementation.
+- Carousel: the pager owns its horizontal content padding, so cards align with the section grid at rest while adjacent cards can reach and peek through the screen edges during horizontal scrolling.
+- Continue Reading: header and card strip now use the same responsive horizontal padding as the other Home sections. Covers and progress data behavior are unchanged.
+- Genre highlights: tablet renders two balanced columns. Rows have a fixed responsive height and their banner-first images fill the complete vertical image slot on both phone and tablet.
+- Theme and icons: all colors still resolve through the active Tankobun theme and all generic interface/category icons remain Tabler icons.
+- Accessibility and stability: titles remain readable for long live AniList names, primary actions stay inside their cards, and the UI hierarchy exposes section and media labels without horizontal overflow.
 
 ## Expected differences
 
-- Continue Reading is conditional and is absent in the implementation capture because the fresh QA emulator has no saved reading progress. Its production component is implemented and preserves the source's four-card horizontal rhythm when data exists.
-- The dock is not visually cloned from the mock because the original scope explicitly excluded dock redesign. It was only expanded to expose Home and migrated to Tabler icons.
-- Live AniList content differs from the fictional/static manga content in the mock.
+- The annotated tablet screenshot contains saved Continue Reading data, while the clean QA emulator has no reading history. The section is conditional and therefore absent from the implementation capture; its padding was verified in code against the same edge-to-edge `LazyRow` pattern used by Browse recommendations.
+- The source uses a dark theme and red annotation overlays; the normalized tablet capture uses the emulator's light theme to confirm that the implementation follows theme tokens rather than hard-coded mock colors.
+- Live AniList trending results and images can differ between captures.
 
 ## Interaction verification
 
-- Hero tap opened the selected manga detail.
-- Android back returned to the same Home carousel.
-- Hero and section “View all” navigation opened Browse.
-- Home, Library, Browse, Downloads, and Settings dock destinations opened successfully.
-- Carousel auto-advance and horizontal paging were observed.
-- Library empty state, Browse landing, Downloads empty state, and Settings index rendered with Tabler icons.
-- Android crash buffer and app logcat were checked after the final build; no crash, GraphQL, or home-feed errors remained.
-
-## Comparison history
-
-1. Initial pass — blocked.
-   - P1: the single home GraphQL request exceeded AniList's complexity limit and rendered empty panels.
-   - P2: genre rows were substantially taller than the source and placed the category icon outside the image.
-   - P2: hero character art used crop scaling and removed too much of the head/body vertically.
-   - Fixes: split the home feed into bounded requests; added main-genre candidate selection; compacted genre rows and overlaid the icon; switched hero art to fill-height; migrated icons to Tabler.
-2. Final pass — passed.
-   - Evidence: `/tmp/tankobun-home-final-tabler-comparison.png` plus focused hero and genre comparisons.
-   - The earlier P1/P2 findings are visibly resolved and no new actionable P0/P1/P2 issue was found.
-
-## Follow-up polish
-
-- P3: capture a populated Continue Reading state later for an additional evidence screenshot; the current absence is data-dependent rather than an implementation defect.
+- Hero pager auto-advance and adb swipe both changed pages.
+- A banner-backed item (One Piece) filled the tablet image region and faded into the content column.
+- A no-banner item used its cover as the tablet fallback and filled the same region instead of leaving isolated character art.
+- Phone retained the full-height character composition and single-column genre layout.
+- Tablet used the two-column genre layout in both portrait and landscape widths.
+- Android UI trees were inspected on Pixel 9 and Pixel Tablet; no Tankobun crash was present in logcat.
 
 final result: passed

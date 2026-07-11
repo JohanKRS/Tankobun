@@ -880,6 +880,7 @@ internal fun AutoResizingMangaTitle(
     title: String,
     compact: Boolean,
     modifier: Modifier = Modifier,
+    color: Color? = null,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val density = LocalDensity.current
@@ -907,7 +908,7 @@ internal fun AutoResizingMangaTitle(
             layout.lines.joinToString("\n"),
             modifier = Modifier.fillMaxSize(),
             style = style,
-            color = mediaDetailForegroundColor(),
+            color = color ?: mediaDetailForegroundColor(),
             maxLines = layout.lines.size,
             softWrap = false,
             overflow = TextOverflow.Clip,
@@ -1949,4 +1950,3 @@ internal fun CoverImage(
         }
     }
 }
-
