@@ -1,6 +1,12 @@
 package com.tankobun.core.anilist
 
 object AnilistQueries {
+    const val MediaGenres = """
+        query MediaGenres {
+          GenreCollection
+        }
+    """
+
     const val HomeTrending = """
         query HomeTrending(${'$'}isAdult: Boolean) {
           trending: Page(page: 1, perPage: 5) {
@@ -40,22 +46,24 @@ object AnilistQueries {
         }
     """
 
-    fun homeGenreCandidates(genres: List<String>, perPage: Int): String {
-        val genrePages = genres.mapIndexed { index, genre ->
+    fun homeGenreCandidates(genres: List<String>, pages: IntRange, perPage: Int): String {
+        val genrePages = genres.flatMapIndexed { index, genre ->
             val safeGenre = genre.replace("\\", "\\\\").replace("\"", "\\\"")
-            """
-              genre$index: Page(page: 1, perPage: $perPage) {
-                media(type: MANGA, genre: "$safeGenre", isAdult: ${'$'}isAdult, sort: POPULARITY_DESC) {
-                  id
-                  title { romaji english native userPreferred }
-                  coverImage { extraLarge large color }
-                  bannerImage
-                  popularity
-                  genres
-                  isAdult
-                }
-              }
-            """.trimIndent()
+            pages.map { page ->
+                """
+                  genre${index}Page$page: Page(page: $page, perPage: $perPage) {
+                    media(type: MANGA, genre: "$safeGenre", isAdult: ${'$'}isAdult, sort: POPULARITY_DESC) {
+                      id
+                      title { romaji english native userPreferred }
+                      coverImage { extraLarge large color }
+                      bannerImage
+                      popularity
+                      genres
+                      isAdult
+                    }
+                  }
+                """.trimIndent()
+            }
         }.joinToString("\n")
         return """
             query HomeGenreCandidates(${'$'}isAdult: Boolean) {

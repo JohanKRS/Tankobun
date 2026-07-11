@@ -91,7 +91,7 @@
     <string name="settings_nsfw_visible">NSFW visível</string>
     <string name="settings_nsfw_hidden">NSFW oculto</string>
     <string name="settings_show_nsfw_content">Mostrar conteúdo NSFW</string>
-    <string name="settings_show_nsfw_content_desc">Permite que mangás adultos do AniList e tags adultas apareçam em exploração, busca e filtros.</string>
+    <string name="settings_show_nsfw_content_desc">Permite que mangás adultos do AniList e tags adultas apareçam na Home, em exploração, busca e filtros.</string>
     <string name="settings_appearance_subtitle">Escolha um tema e o comportamento do layout para sua leitura.</string>
     <string name="settings_library_subtitle">Escolha o layout padrão das suas listas da biblioteca.</string>
     <string name="settings_browse_subtitle">Escolha o layout padrão para busca e descoberta no AniList.</string>

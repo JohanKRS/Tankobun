@@ -273,6 +273,8 @@ data class CachePolicy(
     val mediaDetailsTtlMillis: Long = 7 * 24 * 60 * 60 * 1000L,
     val anilistSearchTtlMillis: Long = 24 * 60 * 60 * 1000L,
     val browseLandingTtlMillis: Long = 15 * 60 * 1000L,
+    val homeFeedTtlMillis: Long = 4 * 60 * 60 * 1000L,
+    val anilistTaxonomyTtlMillis: Long = 7 * 24 * 60 * 60 * 1000L,
     val anilistTagsTtlMillis: Long = 7 * 24 * 60 * 60 * 1000L,
     val sourceSearchTtlMillis: Long = 7 * 24 * 60 * 60 * 1000L,
     val sourceChapterTtlMillis: Long = 24 * 60 * 60 * 1000L,

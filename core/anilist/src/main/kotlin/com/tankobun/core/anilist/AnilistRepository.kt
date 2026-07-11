@@ -32,6 +32,14 @@ import kotlinx.serialization.json.put
 class AnilistRepository(
     private val graphQlClient: AnilistGraphQlClient,
 ) {
+    suspend fun mediaGenres(): List<String> {
+        val data = graphQlClient.execute(query = AnilistQueries.MediaGenres)
+        return data["GenreCollection"]
+            ?.jsonArray
+            .orEmpty()
+            .mapNotNull { genre -> genre.jsonPrimitive.content.takeIf { it.isNotBlank() } }
+    }
+
     suspend fun homeFeed(
         genres: List<String>,
         accessToken: String? = null,
@@ -52,26 +60,71 @@ class AnilistRepository(
             ?.jsonArray
             .orEmpty()
             .map(AnilistJsonMapper::media)
-        val genreHighlights = buildList {
-            genres.chunked(6).forEach { chunk ->
+        val candidatesByGenre = linkedMapOf<String, MutableList<AnilistMedia>>()
+
+        suspend fun loadGenreCandidates(
+            targetGenres: List<String>,
+            pages: IntRange,
+        ) {
+            targetGenres.chunked(6).forEach { chunk ->
                 val data = graphQlClient.execute(
-                    query = AnilistQueries.homeGenreCandidates(chunk, perPage = 50),
+                    query = AnilistQueries.homeGenreCandidates(chunk, pages = pages, perPage = 25),
                     variables = variables,
                     accessToken = accessToken,
                 )
                 chunk.forEachIndexed { index, genre ->
-                    val media = data["genre$index"]
-                        ?.takeUnless { it is JsonNull }
-                        ?.jsonObject
-                        ?.get("media")
-                        ?.jsonArray
-                        .orEmpty()
+                    val candidates = pages.flatMap { page ->
+                        data["genre${index}Page$page"]
+                            ?.takeUnless { it is JsonNull }
+                            ?.jsonObject
+                            ?.get("media")
+                            ?.jsonArray
+                            .orEmpty()
+                    }
                         .map(AnilistJsonMapper::media)
-                        .firstOrNull { candidate -> candidate.genres.firstOrNull().equals(genre, ignoreCase = true) }
-                        ?: return@forEachIndexed
-                    add(AnilistGenreHighlight(genre = genre, media = media))
+                    val existingIds = candidatesByGenre[genre].orEmpty().mapTo(mutableSetOf(), AnilistMedia::id)
+                    candidatesByGenre.getOrPut(genre, ::mutableListOf)
+                        .addAll(candidates.filterNot { candidate -> candidate.id in existingIds })
                 }
             }
+        }
+
+        loadGenreCandidates(targetGenres = genres, pages = 1..1)
+        val selectedByGenre = linkedMapOf<String, AnilistMedia>()
+        val usedMediaIds = mutableSetOf<Int>()
+        genres.forEach { genre ->
+            candidatesByGenre[genre]
+                ?.firstOrNull { candidate ->
+                    candidate.id !in usedMediaIds &&
+                        candidate.genres.firstOrNull().equals(genre, ignoreCase = true)
+                }
+                ?.let { media ->
+                    selectedByGenre[genre] = media
+                    usedMediaIds += media.id
+                }
+        }
+        genres.filterNot(selectedByGenre::containsKey).forEach { genre ->
+            candidatesByGenre[genre]
+                ?.firstOrNull { candidate -> candidate.id !in usedMediaIds }
+                ?.let { media ->
+                    selectedByGenre[genre] = media
+                    usedMediaIds += media.id
+                }
+        }
+        val missingGenres = genres.filterNot(selectedByGenre::containsKey)
+        if (missingGenres.isNotEmpty()) {
+            loadGenreCandidates(targetGenres = missingGenres, pages = 2..2)
+            missingGenres.forEach { genre ->
+                candidatesByGenre[genre]
+                    ?.firstOrNull { candidate -> candidate.id !in usedMediaIds }
+                    ?.let { media ->
+                        selectedByGenre[genre] = media
+                        usedMediaIds += media.id
+                    }
+            }
+        }
+        val genreHighlights = genres.mapNotNull { genre ->
+            selectedByGenre[genre]?.let { media -> AnilistGenreHighlight(genre = genre, media = media) }
         }
         val missingCharacterIds = genreHighlights
             .map { it.media }

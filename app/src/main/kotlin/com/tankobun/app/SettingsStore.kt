@@ -298,6 +298,38 @@ class SettingsStore(context: Context) {
         preferences.edit().putLong(KEY_APP_UPDATE_LAST_CHECK_AT, value).apply()
     }
 
+    fun anilistGenres(): List<String> =
+        preferences.getString(KEY_ANILIST_GENRES, "").orEmpty()
+            .lineSequence()
+            .mapNotNull { encoded -> runCatching { decodePart(encoded) }.getOrNull() }
+            .filter { it.isNotBlank() }
+            .toList()
+
+    fun anilistGenresCachedAtEpochMillis(): Long =
+        preferences.getLong(KEY_ANILIST_GENRES_CACHED_AT, 0L)
+
+    fun saveAnilistGenres(genres: List<String>, cachedAtEpochMillis: Long) {
+        preferences.edit()
+            .putString(KEY_ANILIST_GENRES, genres.joinToString("\n", transform = ::encodePart))
+            .putLong(KEY_ANILIST_GENRES_CACHED_AT, cachedAtEpochMillis)
+            .apply()
+    }
+
+    fun homeFeedCachedAtEpochMillis(includeAdult: Boolean): Long =
+        preferences.getLong(
+            if (includeAdult) KEY_HOME_FEED_NSFW_CACHED_AT else KEY_HOME_FEED_SAFE_CACHED_AT,
+            0L,
+        )
+
+    fun saveHomeFeedCachedAtEpochMillis(includeAdult: Boolean, cachedAtEpochMillis: Long) {
+        preferences.edit()
+            .putLong(
+                if (includeAdult) KEY_HOME_FEED_NSFW_CACHED_AT else KEY_HOME_FEED_SAFE_CACHED_AT,
+                cachedAtEpochMillis,
+            )
+            .apply()
+    }
+
     fun anilistTags(): List<AnilistMediaTag> =
         preferences.getString(KEY_ANILIST_TAGS, "").orEmpty()
             .lineSequence()
@@ -521,6 +553,10 @@ class SettingsStore(context: Context) {
         const val KEY_NEW_CHAPTER_CHECKS_ENABLED = "library.new.chapter.checks.enabled"
         const val KEY_NEW_CHAPTER_CHECK_LAST_RUN_AT = "library.new.chapter.check.last.run.at"
         const val KEY_APP_UPDATE_LAST_CHECK_AT = "app.update.last.check.at"
+        const val KEY_ANILIST_GENRES = "anilist.genres"
+        const val KEY_ANILIST_GENRES_CACHED_AT = "anilist.genres.cached.at"
+        const val KEY_HOME_FEED_SAFE_CACHED_AT = "home.feed.safe.cached.at"
+        const val KEY_HOME_FEED_NSFW_CACHED_AT = "home.feed.nsfw.cached.at"
         const val KEY_ANILIST_AUTO_SAVE_TRACKING_CHANGES = "anilist.auto.save.tracking.changes"
         const val KEY_ANILIST_AUTO_SYNC_READER_PROGRESS = "anilist.auto.sync.reader.progress"
         const val KEY_ANILIST_SYNC_MANUAL_READ_PROGRESS = "anilist.sync.manual.read.progress"

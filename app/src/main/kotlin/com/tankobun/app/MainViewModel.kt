@@ -22,6 +22,7 @@ import com.tankobun.app.logic.BROWSE_TRENDING_CACHE_KEY
 import com.tankobun.app.logic.BulkDownloadResult
 import com.tankobun.app.logic.BrowseLandingData
 import com.tankobun.app.logic.browseCacheKey
+import com.tankobun.app.home.HomeDataSource
 import com.tankobun.app.logic.browseLandingCacheKey
 import com.tankobun.app.logic.downloadSourceName
 import com.tankobun.app.logic.filteredScoreInput
@@ -191,13 +192,14 @@ private data class BrowseCriteria(
 
 private const val BROWSE_TRENDING_SORT = "TRENDING_DESC"
 private const val BROWSE_BACK_STACK_LIMIT = 24
-private val HOME_GENRES = listOf(
+private val FALLBACK_HOME_GENRES = listOf(
     "Action",
     "Adventure",
     "Comedy",
     "Drama",
     "Ecchi",
     "Fantasy",
+    "Hentai",
     "Horror",
     "Mahou Shoujo",
     "Mecha",
@@ -311,6 +313,7 @@ class MainViewModel(
         localizedContext().resources.getQuantityString(id, quantity, *args)
 
     private val browseDataSource = BrowseDataSource(container, cachePolicy) { _state.value.anilistTitleLanguage }
+    private val homeDataSource = HomeDataSource(container, cachePolicy) { _state.value.anilistTitleLanguage }
     private val sourceDataSource = SourceDataSource(container, cachePolicy)
     val state: StateFlow<TankobunUiState> = _state
 
@@ -1897,29 +1900,87 @@ class MainViewModel(
     }
 
     fun loadHomeFeed(force: Boolean = false) {
-        if (!force && (homeFeedJob?.isActive == true || _state.value.homeLoaded)) return
+        if (homeFeedJob?.isActive == true) return
         homeFeedJob = viewModelScope.launch {
-            runCatching {
-                container.anilistRepository.homeFeed(
-                    genres = HOME_GENRES,
-                    accessToken = container.tokenStore.accessToken(),
-                    includeAdult = _state.value.showNsfwContent,
+            val includeAdult = _state.value.showNsfwContent
+            val genres = loadHomeGenres(force = force, includeAdult = includeAdult)
+            val freshCache = if (force) {
+                null
+            } else {
+                homeDataSource.cachedHomeFeed(
+                    genres = genres,
+                    includeAdult = includeAdult,
+                    freshOnly = true,
                 )
-            }.onSuccess { feed ->
-                _state.update {
-                    it.copy(
-                        homeTrending = feed.trending.map { media -> media.withTitleLanguage(it.anilistTitleLanguage) },
-                        homeGenreHighlights = feed.genreHighlights.map { highlight ->
-                            highlight.copy(media = highlight.media.withTitleLanguage(it.anilistTitleLanguage))
-                        },
-                        homeLoaded = true,
-                    )
+            }
+            if (freshCache != null) {
+                if (_state.value.showNsfwContent == includeAdult) {
+                    applyHomeFeed(freshCache)
                 }
-            }.onFailure { error ->
+                return@launch
+            }
+
+            val staleCache = homeDataSource.cachedHomeFeed(
+                genres = genres,
+                includeAdult = includeAdult,
+                freshOnly = false,
+            )
+            if (_state.value.showNsfwContent == includeAdult) {
+                staleCache?.let(::applyHomeFeed)
+            }
+
+            try {
+                val feed = container.anilistRepository.homeFeed(
+                    genres = genres,
+                    accessToken = container.tokenStore.accessToken(),
+                    includeAdult = includeAdult,
+                )
+                homeDataSource.saveHomeFeed(feed, includeAdult = includeAdult)
+                if (_state.value.showNsfwContent == includeAdult) {
+                    applyHomeFeed(feed)
+                }
+            } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 Log.e(TAG, "AniList home feed failed", error)
-                _state.update { it.copy(homeLoaded = true) }
+                if (staleCache == null) {
+                    _state.update { it.copy(homeLoaded = true) }
+                }
             }
+        }
+    }
+
+    private suspend fun loadHomeGenres(force: Boolean, includeAdult: Boolean): List<String> {
+        val cached = container.settingsStore.anilistGenres()
+        val cachedAt = container.settingsStore.anilistGenresCachedAtEpochMillis()
+        val cacheFresh = cached.isNotEmpty() &&
+            System.currentTimeMillis() - cachedAt <= cachePolicy.anilistTaxonomyTtlMillis
+        val genres = if (!force && cacheFresh) {
+            cached
+        } else {
+            runCatching { container.anilistRepository.mediaGenres() }
+                .onSuccess { result ->
+                    if (result.isNotEmpty()) {
+                        container.settingsStore.saveAnilistGenres(result, System.currentTimeMillis())
+                    }
+                }
+                .getOrElse { error ->
+                    Log.w(TAG, "AniList genre collection failed", error)
+                    cached.ifEmpty { FALLBACK_HOME_GENRES }
+                }
+                .ifEmpty { cached.ifEmpty { FALLBACK_HOME_GENRES } }
+        }
+        return genres.filter { genre -> includeAdult || !genre.equals("Hentai", ignoreCase = true) }
+    }
+
+    private fun applyHomeFeed(feed: com.tankobun.core.model.AnilistHomeFeed) {
+        _state.update {
+            it.copy(
+                homeTrending = feed.trending.map { media -> media.withTitleLanguage(it.anilistTitleLanguage) },
+                homeGenreHighlights = feed.genreHighlights.map { highlight ->
+                    highlight.copy(media = highlight.media.withTitleLanguage(it.anilistTitleLanguage))
+                },
+                homeLoaded = true,
+            )
         }
     }
 
@@ -2153,10 +2214,15 @@ class MainViewModel(
     }
 
     fun setShowNsfwContent(enabled: Boolean) {
+        homeFeedJob?.cancel()
+        homeFeedJob = null
         container.settingsStore.saveShowNsfwContent(enabled)
         _state.update {
             it.copy(
                 showNsfwContent = enabled,
+                homeTrending = emptyList(),
+                homeGenreHighlights = emptyList(),
+                homeLoaded = false,
                 browseLandingLoaded = false,
                 searchResults = emptyList(),
                 browseSearched = false,
@@ -2174,6 +2240,7 @@ class MainViewModel(
                 },
             )
         }
+        loadHomeFeed()
     }
 
     private fun scheduledBackupSavedMessage(result: ScheduledBackupRunResult): String {

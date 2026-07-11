@@ -409,6 +409,9 @@ private fun TankobunAppRootContent(
             normalized.media == null -> viewModel.clearSelectedMedia()
             currentMedia?.id != normalized.media.id -> viewModel.selectMedia(normalized.media)
         }
+        if (normalized.tab == 0 && normalized.media == null) {
+            viewModel.loadHomeFeed()
+        }
         resetBackPressWindows()
     }
 
@@ -424,6 +427,9 @@ private fun TankobunAppRootContent(
     }
 
     fun navigateToRootTab(tab: Int) {
+        if (tab == 0) {
+            viewModel.loadHomeFeed()
+        }
         val normalized = TankobunRoute(tab = tab).normalized()
         val routeNow = latestCurrentRoute.value
         routeHistory = emptyList()

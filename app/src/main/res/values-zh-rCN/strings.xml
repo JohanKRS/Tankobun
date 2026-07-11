@@ -92,7 +92,7 @@
     <string name="settings_nsfw_visible">显示 NSFW</string>
     <string name="settings_nsfw_hidden">隐藏 NSFW</string>
     <string name="settings_show_nsfw_content">显示 NSFW 内容</string>
-    <string name="settings_show_nsfw_content_desc">允许成人向 AniList 漫画和成人标签出现在浏览、搜索和筛选中。</string>
+    <string name="settings_show_nsfw_content_desc">允许成人向 AniList 漫画和成人标签出现在首页、浏览、搜索和筛选中。</string>
     <string name="settings_appearance_subtitle">为你的阅读方式选择主题和布局行为。</string>
     <string name="settings_library_subtitle">选择可滑动书架列表的默认布局。</string>
     <string name="settings_browse_subtitle">选择 AniList 搜索和发现页面的默认布局。</string>

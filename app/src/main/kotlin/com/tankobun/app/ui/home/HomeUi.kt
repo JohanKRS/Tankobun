@@ -743,6 +743,7 @@ private fun String.genreIcon(): ImageVector = when (this) {
     "Drama" -> TankobunIcons.GenreDrama
     "Ecchi" -> TankobunIcons.GenreEcchi
     "Fantasy" -> TankobunIcons.GenreFantasy
+    "Hentai" -> TankobunIcons.GenreHentai
     "Horror" -> TankobunIcons.GenreHorror
     "Mahou Shoujo" -> TankobunIcons.GenreMahouShoujo
     "Mecha" -> TankobunIcons.GenreMecha

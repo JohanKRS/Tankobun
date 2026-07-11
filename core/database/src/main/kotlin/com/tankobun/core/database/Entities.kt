@@ -19,6 +19,7 @@ data class AnilistMediaEntity(
     val description: String?,
     val coverImage: String?,
     val bannerImage: String?,
+    val mainCharacterImage: String?,
     val chapters: Int?,
     val volumes: Int?,
     val format: String?,

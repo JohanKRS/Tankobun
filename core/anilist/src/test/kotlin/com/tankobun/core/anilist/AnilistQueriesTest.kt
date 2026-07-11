@@ -32,4 +32,24 @@ class AnilistQueriesTest {
         assertTrue(AnilistQueries.DeleteMediaListEntry.contains("DeleteMediaListEntry(id: \$id)"))
         assertTrue(AnilistQueries.DeleteMediaListEntry.contains("deleted"))
     }
+
+    @Test
+    fun homeGenreCandidatesBatchGenresAcrossRequestedPages() {
+        val query = AnilistQueries.homeGenreCandidates(
+            genres = listOf("Fantasy", "Slice of Life"),
+            pages = 1..3,
+            perPage = 50,
+        )
+
+        assertTrue(query.contains("genre0Page1: Page(page: 1, perPage: 50)"))
+        assertTrue(query.contains("genre0Page3: Page(page: 3, perPage: 50)"))
+        assertTrue(query.contains("genre1Page2: Page(page: 2, perPage: 50)"))
+        assertTrue(query.contains("genre: \"Slice of Life\""))
+        assertFalse(query.contains("Page4"))
+    }
+
+    @Test
+    fun mediaGenresUsesAniListGenreCollection() {
+        assertTrue(AnilistQueries.MediaGenres.contains("GenreCollection"))
+    }
 }

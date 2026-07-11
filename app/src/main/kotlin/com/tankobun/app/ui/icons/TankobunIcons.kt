@@ -87,6 +87,7 @@ internal object TankobunIcons {
     val GenreDrama: ImageVector = TablerIcons.Mask
     val GenreEcchi: ImageVector = TablerIcons.Heart
     val GenreFantasy: ImageVector = TablerIcons.Wand
+    val GenreHentai: ImageVector = TablerIcons.Venus
     val GenreHorror: ImageVector = TablerIcons.Ghost
     val GenreMahouShoujo: ImageVector = TablerIcons.Stars
     val GenreMecha: ImageVector = TablerIcons.SettingsAutomation
