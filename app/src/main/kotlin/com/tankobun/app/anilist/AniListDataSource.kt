@@ -10,7 +10,9 @@ import com.tankobun.app.logic.nullableStringList
 import com.tankobun.app.logic.normalizedCustomLists
 import com.tankobun.app.logic.RECOMMENDATIONS_PAGE_SIZE
 import com.tankobun.app.logic.recommendationPageCount
+import com.tankobun.app.logic.recentReadingMetrics
 import com.tankobun.app.logic.renamedCustomList
+import com.tankobun.app.logic.shouldShowInContinueReading
 import com.tankobun.app.logic.withoutCustomList
 import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.state.RecentReadingProgress
@@ -760,17 +762,43 @@ internal class AniListDataSource(
         titleLanguage: AnilistTitleLanguage,
         limit: Int,
     ): List<RecentReadingProgress> {
-        val latestProgress = container.database.progressDao().latestReadingProgress(limit)
+        val latestProgress = container.database.progressDao().latestReadingProgress()
             .map { it.toModel() }
         if (latestProgress.isEmpty()) return emptyList()
         val mediaById = container.database.mediaDao().cachedMedia().associateBy { it.id }
-        return latestProgress.mapNotNull { progress ->
-            val media = mediaById[progress.mediaId]?.toModel(titleLanguage) ?: return@mapNotNull null
-            RecentReadingProgress(
-                media = media,
-                progress = progress,
-                chapter = container.database.chapterDao().cachedChapterByUrl(progress.chapterUrl)?.toModel(),
-            )
+        val chapterDao = container.database.chapterDao()
+        val bindingDao = container.database.sourceBindingDao()
+        return buildList {
+            for (progress in latestProgress) {
+                val media = mediaById[progress.mediaId]?.toModel(titleLanguage) ?: continue
+                val binding = bindingDao.bindingForMedia(progress.mediaId)
+                val boundChapters = binding?.let { selected ->
+                    chapterDao.cachedChapters(selected.sourceId, selected.mangaUrl).map { it.toModel() }
+                }.orEmpty()
+                val boundChapter = boundChapters.firstOrNull { it.url == progress.chapterUrl }
+                val cachedChapter = boundChapter
+                    ?: chapterDao.cachedChapterByUrl(progress.chapterUrl)?.toModel()
+                val availableChapters = when {
+                    boundChapter != null -> boundChapters
+                    cachedChapter != null -> chapterDao
+                        .cachedChapters(cachedChapter.sourceId, cachedChapter.mangaUrl)
+                        .map { it.toModel() }
+                    else -> boundChapters
+                }
+                val metrics = recentReadingMetrics(progress, cachedChapter, availableChapters)
+                if (!media.shouldShowInContinueReading(progress, metrics)) continue
+                add(
+                    RecentReadingProgress(
+                        media = media,
+                        progress = progress,
+                        chapter = cachedChapter,
+                        currentChapterNumber = metrics.currentChapterNumber,
+                        lastAvailableChapterNumber = metrics.lastAvailableChapterNumber,
+                        overallProgress = metrics.overallProgress,
+                    ),
+                )
+                if (size >= limit) break
+            }
         }
     }
 

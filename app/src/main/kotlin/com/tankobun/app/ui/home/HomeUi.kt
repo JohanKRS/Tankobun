@@ -74,17 +74,13 @@ internal fun HomeScreen(
 ) {
     val chromeInsets = LocalTankobunChromeInsets.current
     val expanded = androidx.compose.ui.platform.LocalConfiguration.current.smallestScreenWidthDp >= 600
-    val horizontalPadding = if (expanded) {
-        28.dp
-    } else {
-        12.dp
-    }
+    val horizontalPadding = 18.dp
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            top = chromeInsets.top + 14.dp,
-            bottom = chromeInsets.bottom + 20.dp,
+            top = chromeInsets.top + 18.dp,
+            bottom = chromeInsets.bottom + 18.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
@@ -472,13 +468,7 @@ private fun ContinueReadingCard(
     width: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit,
 ) {
-    val progress = if (item.progress.totalPages > 0) {
-        ((item.progress.pageIndex + 1).toFloat() / item.progress.totalPages).coerceIn(0f, 1f)
-    } else if (item.progress.completed) {
-        1f
-    } else {
-        0f
-    }
+    val progress = item.overallProgress ?: 0f
     Column(
         modifier = Modifier
             .width(width)
@@ -503,7 +493,10 @@ private fun ContinueReadingCard(
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            text = tankobunString(R.string.home_chapter, item.progress.chapterNumber.compactNumber()),
+            text = item.currentChapterNumber
+                ?.let { chapterNumber -> tankobunString(R.string.home_chapter, chapterNumber.compactNumber()) }
+                ?: item.chapter?.name
+                ?: tankobunString(R.string.reader_saved_chapter),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -525,7 +518,7 @@ private fun ContinueReadingCard(
                 )
             }
             Text(
-                text = "${(progress * 100).roundToInt()}%",
+                text = item.overallProgress?.let { "${(it * 100).roundToInt()}%" } ?: "—",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -592,7 +585,7 @@ private fun GenreHighlightCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .width(if (expanded) 120.dp else 132.dp)
+                    .width(if (expanded) 148.dp else 170.dp)
                     .fillMaxHeight(),
             ) {
                 AsyncImage(
@@ -627,24 +620,6 @@ private fun GenreHighlightCard(
                     lineHeight = 19.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Row(
-                modifier = Modifier.padding(end = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Icon(
-                    imageVector = TankobunIcons.LocalFireDepartment,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(12.dp),
-                )
-                Text(
-                    text = media.popularity.compactPopularity(),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                    color = style.colors.mutedContent,
-                    maxLines = 1,
                 )
             }
         }
@@ -693,12 +668,3 @@ private fun AnilistMedia.cleanDescription(): String? = description
 
 private fun Float.compactNumber(): String =
     if (this % 1f == 0f) toInt().toString() else toString().trimEnd('0').trimEnd('.')
-
-private fun Int?.compactPopularity(): String {
-    val value = this ?: return "—"
-    return when {
-        value >= 1_000_000 -> "${"%.1f".format(value / 1_000_000f)}M"
-        value >= 1_000 -> "${"%.1f".format(value / 1_000f)}K"
-        else -> value.toString()
-    }
-}

@@ -832,7 +832,6 @@ internal fun TankobunScaffold(
     val drawerScrimAlpha = QuickDrawerScrimAlpha * quickDrawerBackdropRevealFraction
     val drawerBackdropBlur = (QuickDrawerBackdropBlurDp * quickDrawerBackdropRevealFraction).dp
     val mediaDetailActive = selectedMedia != null
-    val homeRootActive = selectedTab == 0 && !mediaDetailActive
     val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
     val routeBackdropColor = LocalTankobunTokens.current.appBackdrop
     val routeContentColor = MaterialTheme.colorScheme.onSurface
@@ -841,7 +840,7 @@ internal fun TankobunScaffold(
     } else {
         0.dp
     }
-    val topChromeInset = statusBarInset + if (homeRootActive) 0.dp else if (compactLayout) 48.dp else 72.dp
+    val topChromeInset = statusBarInset + if (compactLayout) 48.dp else 72.dp
     val bottomChromeInset = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() +
         FrostedDockBottomMargin +
         FrostedDockHeight +
@@ -890,31 +889,30 @@ internal fun TankobunScaffold(
             containerColor = routeBackdropColor,
             contentWindowInsets = WindowInsets(0.dp),
             topBar = {
-                if (!homeRootActive) {
-                    TankobunTopBar(
-                        title = selectedMedia?.title?.userPreferred
-                            ?: when (selectedTab) {
-                                1 -> tankobunString(R.string.common_library)
-                                2 -> tankobunString(R.string.common_browse)
-                                3 -> tankobunString(R.string.common_downloads)
-                                4 -> settingsRoute.settingsTitle()
-                                else -> tankobunString(R.string.app_name)
-                            },
-                        pageIcon = when (selectedTab) {
-                            1 -> TankobunIcons.LibraryBooks
-                            2 -> TankobunIcons.Explore
-                            3 -> TankobunIcons.Download
-                            4 -> TankobunIcons.Settings
-                            else -> TankobunIcons.Home
+                TankobunTopBar(
+                    title = selectedMedia?.title?.userPreferred
+                        ?: when (selectedTab) {
+                            0 -> tankobunString(R.string.nav_home)
+                            1 -> tankobunString(R.string.common_library)
+                            2 -> tankobunString(R.string.common_browse)
+                            3 -> tankobunString(R.string.common_downloads)
+                            4 -> settingsRoute.settingsTitle()
+                            else -> tankobunString(R.string.app_name)
                         },
-                        hazeState = chromeHazeState,
-                        showBack = canNavigateBack,
-                        ignoreDisplayCutout = ignoreDisplayCutout,
-                        showStatusBar = showStatusBar,
-                        mediaDetailActive = mediaDetailActive,
-                        onBack = onNavigateBack,
-                    )
-                }
+                    pageIcon = when (selectedTab) {
+                        1 -> TankobunIcons.LibraryBooks
+                        2 -> TankobunIcons.Explore
+                        3 -> TankobunIcons.Download
+                        4 -> TankobunIcons.Settings
+                        else -> TankobunIcons.Home
+                    },
+                    hazeState = chromeHazeState,
+                    showBack = canNavigateBack,
+                    ignoreDisplayCutout = ignoreDisplayCutout,
+                    showStatusBar = showStatusBar,
+                    mediaDetailActive = mediaDetailActive,
+                    onBack = onNavigateBack,
+                )
             },
             bottomBar = {
                 Box(

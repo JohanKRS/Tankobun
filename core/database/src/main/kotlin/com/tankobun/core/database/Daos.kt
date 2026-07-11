@@ -237,10 +237,9 @@ interface ProgressDao {
             LIMIT 1
         )
         ORDER BY progress.updatedAtEpochMillis DESC, progress.chapterNumber DESC, progress.pageIndex DESC
-        LIMIT :limit
         """,
     )
-    suspend fun latestReadingProgress(limit: Int): List<ReadingProgressEntity>
+    suspend fun latestReadingProgress(): List<ReadingProgressEntity>
 
     @Query("SELECT * FROM reader_progress WHERE mediaId = :mediaId AND chapterUrl = :chapterUrl")
     suspend fun progressForChapter(mediaId: Int, chapterUrl: String): ReadingProgressEntity?

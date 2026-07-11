@@ -31,6 +31,9 @@ data class RecentReadingProgress(
     val media: AnilistMedia,
     val progress: ReadingProgress,
     val chapter: SourceChapter?,
+    val currentChapterNumber: Float? = null,
+    val lastAvailableChapterNumber: Float? = null,
+    val overallProgress: Float? = null,
 )
 
 data class ReaderChapterSegment(
