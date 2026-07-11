@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.media
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import android.content.Context
 import android.content.Intent
 import android.app.Activity
@@ -88,37 +90,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -407,7 +378,7 @@ internal fun MangaDetailScreen(
                             DetailSectionTitle(tankobunString(R.string.common_chapters))
                             if (state.selectedSourceManga == null) {
                                 DetailPlaceholderCard(
-                                    icon = Icons.AutoMirrored.Filled.MenuBook,
+                                    icon = TankobunIcons.MenuBook,
                                     title = tankobunString(R.string.detail_chapters_empty_title),
                                     subtitle = tankobunString(R.string.detail_chapters_empty_select_source),
                                 )
@@ -463,7 +434,7 @@ internal fun MangaDetailScreen(
                     item {
                         Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
                             DetailPlaceholderCard(
-                                icon = Icons.AutoMirrored.Filled.MenuBook,
+                                icon = TankobunIcons.MenuBook,
                                 title = tankobunString(R.string.detail_chapters_empty_title),
                                 subtitle = tankobunString(R.string.detail_chapters_empty_load),
                             )
@@ -737,10 +708,10 @@ internal fun MediaDetailQuickActions(
         else -> tankobunString(R.string.common_saved)
     }
     val actionIcon = when {
-        state.trackingSaveInProgress || state.trackingSaveFailed -> Icons.Default.Refresh
-        state.selectedListEntry == null -> Icons.Default.Add
-        !state.trackingDirty -> Icons.Default.Check
-        else -> Icons.AutoMirrored.Filled.LibraryBooks
+        state.trackingSaveInProgress || state.trackingSaveFailed -> TankobunIcons.Refresh
+        state.selectedListEntry == null -> TankobunIcons.Add
+        !state.trackingDirty -> TankobunIcons.Check
+        else -> TankobunIcons.LibraryBooks
     }
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -771,7 +742,7 @@ internal fun MediaDetailQuickActions(
         )
         if (compact) {
             TankobunIconActionButton(
-                icon = Icons.Default.Share,
+                icon = TankobunIcons.Share,
                 contentDescription = tankobunString(R.string.detail_share_manga),
                 onClick = onShareMedia,
                 enabled = !state.busy,
@@ -779,7 +750,7 @@ internal fun MediaDetailQuickActions(
         } else {
             TankobunActionButton(
                 label = tankobunString(R.string.library_batch_share),
-                icon = Icons.Default.Share,
+                icon = TankobunIcons.Share,
                 onClick = onShareMedia,
                 enabled = !state.busy,
                 filled = false,
@@ -829,7 +800,7 @@ private fun MediaDetailStatusDropdown(
             )
             Spacer(Modifier.width(6.dp))
             Icon(
-                Icons.Default.ExpandMore,
+                TankobunIcons.ExpandMore,
                 contentDescription = tankobunString(R.string.detail_category_dropdown_cd),
                 modifier = Modifier.size(18.dp),
             )
@@ -858,7 +829,7 @@ private fun MediaDetailStatusDropdown(
                     trailingIcon = if (isSelected) {
                         {
                             Icon(
-                                Icons.Default.Check,
+                                TankobunIcons.Check,
                                 contentDescription = null,
                                 tint = mediaDetailAccentColor(),
                             )
@@ -1213,17 +1184,17 @@ internal fun MangaInfoRow(media: AnilistMedia, compact: Boolean, onAuthorClick: 
     val authorName = media.staff.firstOrNull()
     val infoItems = listOfNotNull(
         MangaInfoItem(
-            icon = Icons.Default.Person,
+            icon = TankobunIcons.Person,
             label = tankobunString(R.string.detail_author),
             value = media.staff.authorLabel(),
             onClick = authorName?.let { { onAuthorClick(it) } },
         ),
         MangaInfoItem(
-            Icons.Default.CalendarMonth,
+            TankobunIcons.CalendarMonth,
             if (compact) tankobunString(R.string.detail_years) else tankobunString(R.string.detail_published),
             media.publishingYearLabel(compact),
         ),
-        media.popularity?.let { MangaInfoItem(Icons.Default.Groups, tankobunString(R.string.detail_readers), it.formatCompact()) },
+        media.popularity?.let { MangaInfoItem(TankobunIcons.Groups, tankobunString(R.string.detail_readers), it.formatCompact()) },
     )
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1431,8 +1402,8 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
                 else -> tankobunString(R.string.common_saved)
             }
             val actionIcon = when {
-                state.trackingSaveInProgress || state.trackingSaveFailed -> Icons.Default.Refresh
-                else -> Icons.Default.Check
+                state.trackingSaveInProgress || state.trackingSaveFailed -> TankobunIcons.Refresh
+                else -> TankobunIcons.Check
             }
             TankobunActionButton(
                 label = actionLabel,
@@ -1482,7 +1453,7 @@ internal fun AniListStatusSelector(selected: MediaStatus?, onSelected: (MediaSta
                 selected?.displayName() ?: tankobunString(R.string.detail_choose_status),
                 modifier = Modifier.weight(1f),
             )
-            Icon(Icons.Default.ExpandMore, contentDescription = null)
+            Icon(TankobunIcons.ExpandMore, contentDescription = null)
         }
         AnimatedVisibility(visible = expanded) {
             Surface(
@@ -1529,7 +1500,7 @@ internal fun AniListStatusSelector(selected: MediaStatus?, onSelected: (MediaSta
                             )
                             if (status == selected) {
                                 Icon(
-                                    Icons.Default.Check,
+                                    TankobunIcons.Check,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
                                     tint = MaterialTheme.colorScheme.primary,
@@ -1565,7 +1536,7 @@ internal fun AniListCustomListSelector(
             shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
         ) {
             Text(selectedLabel, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Icon(Icons.Default.ExpandMore, contentDescription = null)
+            Icon(TankobunIcons.ExpandMore, contentDescription = null)
         }
         AnimatedVisibility(visible = expanded) {
             Surface(
@@ -1688,7 +1659,7 @@ internal fun StarScoreInput(value: String, onValueChange: (String) -> Unit, modi
                     modifier = Modifier.size(34.dp),
                 ) {
                     Icon(
-                        if (star <= selected) Icons.Default.Star else Icons.Default.StarBorder,
+                        if (star <= selected) TankobunIcons.Star else TankobunIcons.StarBorder,
                         contentDescription = tankobunString(R.string.detail_star_score_cd, star),
                         tint = MaterialTheme.colorScheme.primary,
                     )
@@ -1855,7 +1826,7 @@ internal fun LoadMoreRecommendationsTile(
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 Text(tankobunString(R.string.common_loading), style = MaterialTheme.typography.labelMedium)
             } else {
-                Icon(Icons.Default.Refresh, contentDescription = null)
+                Icon(TankobunIcons.Refresh, contentDescription = null)
                 Text(
                     tankobunString(R.string.detail_load_more),
                     style = MaterialTheme.typography.labelMedium,
@@ -1923,13 +1894,13 @@ internal fun CoverZoomOverlay(media: AnilistMedia, onDismiss: () -> Unit) {
 }
 
 internal fun trackingStatusIcon(status: MediaStatus): ImageVector = when (status) {
-    MediaStatus.CURRENT -> Icons.Default.PlayArrow
-    MediaStatus.PLANNING -> Icons.Default.StarBorder
-    MediaStatus.COMPLETED -> Icons.Default.Check
-    MediaStatus.PAUSED -> Icons.Default.Pause
-    MediaStatus.DROPPED -> Icons.Default.Close
-    MediaStatus.REPEATING -> Icons.Default.Replay
-    MediaStatus.UNKNOWN -> Icons.Default.Check
+    MediaStatus.CURRENT -> TankobunIcons.PlayArrow
+    MediaStatus.PLANNING -> TankobunIcons.StarBorder
+    MediaStatus.COMPLETED -> TankobunIcons.Check
+    MediaStatus.PAUSED -> TankobunIcons.Pause
+    MediaStatus.DROPPED -> TankobunIcons.Close
+    MediaStatus.REPEATING -> TankobunIcons.Replay
+    MediaStatus.UNKNOWN -> TankobunIcons.Check
 }
 
 internal fun trackingStatuses(): List<MediaStatus> = listOf(

@@ -191,6 +191,26 @@ private data class BrowseCriteria(
 
 private const val BROWSE_TRENDING_SORT = "TRENDING_DESC"
 private const val BROWSE_BACK_STACK_LIMIT = 24
+private val HOME_GENRES = listOf(
+    "Action",
+    "Adventure",
+    "Comedy",
+    "Drama",
+    "Ecchi",
+    "Fantasy",
+    "Horror",
+    "Mahou Shoujo",
+    "Mecha",
+    "Music",
+    "Mystery",
+    "Psychological",
+    "Romance",
+    "Sci-Fi",
+    "Slice of Life",
+    "Sports",
+    "Supernatural",
+    "Thriller",
+)
 private const val READER_ADJACENT_SEGMENT_LOAD_TIMEOUT_MILLIS = 12_000L
 private const val READER_ADJACENT_SEGMENT_STALE_MILLIS = 20_000L
 
@@ -211,6 +231,7 @@ class MainViewModel(
     private var pendingAniListSyncJob: Job? = null
     private var scheduledBackupJob: Job? = null
     private var browseLandingJob: Job? = null
+    private var homeFeedJob: Job? = null
     private var readerPreviousAdjacentLoadJob: ReaderAdjacentLoadJob? = null
     private var readerNextAdjacentLoadJob: ReaderAdjacentLoadJob? = null
     private var sourcePickerJob: Job? = null
@@ -313,6 +334,7 @@ class MainViewModel(
             refreshExtensionIndex(silent = true)
         }
         refreshCacheStorageSummary()
+        loadHomeFeed()
         if (_state.value.libraryMode == LibraryMode.LOCAL || _state.value.loggedIn) {
             loadCachedLibrary(syncIfEmpty = _state.value.libraryMode == LibraryMode.ANILIST && _state.value.loggedIn)
         }
@@ -1870,6 +1892,33 @@ class MainViewModel(
                         },
                     )
                 }
+            }
+        }
+    }
+
+    fun loadHomeFeed(force: Boolean = false) {
+        if (!force && (homeFeedJob?.isActive == true || _state.value.homeLoaded)) return
+        homeFeedJob = viewModelScope.launch {
+            runCatching {
+                container.anilistRepository.homeFeed(
+                    genres = HOME_GENRES,
+                    accessToken = container.tokenStore.accessToken(),
+                    includeAdult = _state.value.showNsfwContent,
+                )
+            }.onSuccess { feed ->
+                _state.update {
+                    it.copy(
+                        homeTrending = feed.trending.map { media -> media.withTitleLanguage(it.anilistTitleLanguage) },
+                        homeGenreHighlights = feed.genreHighlights.map { highlight ->
+                            highlight.copy(media = highlight.media.withTitleLanguage(it.anilistTitleLanguage))
+                        },
+                        homeLoaded = true,
+                    )
+                }
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                Log.e(TAG, "AniList home feed failed", error)
+                _state.update { it.copy(homeLoaded = true) }
             }
         }
     }

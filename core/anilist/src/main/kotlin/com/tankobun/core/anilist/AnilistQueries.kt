@@ -1,6 +1,87 @@
 package com.tankobun.core.anilist
 
 object AnilistQueries {
+    const val HomeTrending = """
+        query HomeTrending(${'$'}isAdult: Boolean) {
+          trending: Page(page: 1, perPage: 5) {
+            media(type: MANGA, isAdult: ${'$'}isAdult, sort: TRENDING_DESC) {
+              ...HomeTrendingMedia
+            }
+          }
+        }
+
+        fragment HomeTrendingMedia on Media {
+          id
+          idMal
+          title { romaji english native userPreferred }
+          description(asHtml: false)
+          coverImage { extraLarge large color }
+          bannerImage
+          characters(role: MAIN, sort: [FAVOURITES_DESC], page: 1, perPage: 1) {
+            nodes { image { large } }
+          }
+          staff(page: 1, perPage: 8) {
+            edges { role node { name { userPreferred } } }
+          }
+          chapters
+          volumes
+          format
+          countryOfOrigin
+          status
+          averageScore
+          popularity
+          startDate { year }
+          endDate { year }
+          siteUrl
+          genres
+          synonyms
+          isAdult
+          updatedAt
+        }
+    """
+
+    fun homeGenreCandidates(genres: List<String>, perPage: Int): String {
+        val genrePages = genres.mapIndexed { index, genre ->
+            val safeGenre = genre.replace("\\", "\\\\").replace("\"", "\\\"")
+            """
+              genre$index: Page(page: 1, perPage: $perPage) {
+                media(type: MANGA, genre: "$safeGenre", isAdult: ${'$'}isAdult, sort: POPULARITY_DESC) {
+                  id
+                  title { romaji english native userPreferred }
+                  coverImage { extraLarge large color }
+                  bannerImage
+                  popularity
+                  genres
+                  isAdult
+                }
+              }
+            """.trimIndent()
+        }.joinToString("\n")
+        return """
+            query HomeGenreCandidates(${'$'}isAdult: Boolean) {
+              $genrePages
+            }
+        """.trimIndent()
+    }
+
+    fun homeMainCharacters(mediaIds: List<Int>): String {
+        val mediaFields = mediaIds.mapIndexed { index, mediaId ->
+            """
+              media$index: Media(id: $mediaId, type: MANGA) {
+              id
+              characters(role: MAIN, sort: [FAVOURITES_DESC], page: 1, perPage: 1) {
+                nodes { image { large } }
+              }
+              }
+            """.trimIndent()
+        }.joinToString("\n")
+        return """
+            query HomeMainCharacters {
+              $mediaFields
+            }
+        """.trimIndent()
+    }
+
     const val Viewer = """
         query Viewer {
           Viewer {

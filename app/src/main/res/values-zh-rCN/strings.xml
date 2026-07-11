@@ -1009,4 +1009,14 @@
         <item quantity="one">%1$d 个来源</item>
         <item quantity="other">%1$d 个来源</item>
     </plurals>
+    <string name="nav_home">主页</string>
+    <string name="home_trending">热门趋势</string>
+    <string name="home_continue_reading">继续阅读</string>
+    <string name="home_trending_by_genre">分类热门</string>
+    <string name="home_view_all">查看全部</string>
+    <string name="home_by_author">作者：%1$s</string>
+    <string name="home_check_it_out">查看详情</string>
+    <string name="home_chapter">第 %1$s 话</string>
+    <string name="home_trending_empty">暂时无法加载热门漫画。</string>
+    <string name="home_genres_empty">暂时无法加载分类热门。</string>
 </resources>

@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.settings
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import android.content.Context
 import android.content.Intent
 import android.app.Activity
@@ -78,30 +80,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -165,7 +143,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
@@ -293,21 +270,21 @@ private fun AboutIdentityContent(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 TankobunActionButton(
                     label = tankobunString(R.string.about_github),
-                    iconPainter = painterResource(R.drawable.ic_github),
+                    icon = TankobunIcons.BrandGithub,
                     onClick = onOpenGitHub,
                     modifier = Modifier.fillMaxWidth(),
                     filled = false,
                 )
                 TankobunActionButton(
                     label = tankobunString(R.string.about_anilist_website),
-                    icon = Icons.Default.Link,
+                    icon = TankobunIcons.Link,
                     onClick = onOpenAniList,
                     modifier = Modifier.fillMaxWidth(),
                     filled = false,
                 )
                 TankobunActionButton(
                     label = tankobunString(R.string.about_replay_tutorial),
-                    icon = Icons.Default.Replay,
+                    icon = TankobunIcons.Replay,
                     onClick = onReplayOnboarding,
                     modifier = Modifier.fillMaxWidth(),
                     filled = false,
@@ -410,7 +387,7 @@ private fun AppUpdatesContent(
             } else {
                 tankobunString(R.string.about_check_updates)
             },
-            icon = Icons.Default.Refresh,
+            icon = TankobunIcons.Refresh,
             onClick = viewModel::checkForAppUpdate,
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.appUpdateCheckInProgress && !state.appUpdateDownloadInProgress,
@@ -423,7 +400,7 @@ private fun AppUpdatesContent(
                 } else {
                     tankobunString(R.string.about_download_update)
                 },
-                icon = Icons.Default.Download,
+                icon = TankobunIcons.Download,
                 onClick = { requestAppUpdateDownload(context, viewModel) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !state.appUpdateCheckInProgress && !state.appUpdateDownloadInProgress,
@@ -431,7 +408,7 @@ private fun AppUpdatesContent(
             availableUpdate.releaseUrl?.takeIf { it.isNotBlank() }?.let { releaseUrl ->
                 TankobunActionButton(
                     label = tankobunString(R.string.about_open_release),
-                    icon = Icons.Default.Link,
+                    icon = TankobunIcons.Link,
                     onClick = { onOpenRelease(releaseUrl) },
                     modifier = Modifier.fillMaxWidth(),
                     filled = false,

@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.library
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import android.content.Context
 import android.content.Intent
 import android.app.Activity
@@ -81,39 +83,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Label
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Flag
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.LocalOffer
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PlaylistRemove
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -541,7 +510,7 @@ internal fun LibraryFilterBar(
                     label = tankobunString(R.string.common_genres),
                     value = if (genres.isEmpty()) tankobunString(R.string.common_any) else genres.size.toString(),
                     selected = genres.isNotEmpty(),
-                    icon = Icons.Default.Category,
+                    icon = TankobunIcons.Category,
                     onClick = onOpenGenres,
                 )
             }
@@ -550,7 +519,7 @@ internal fun LibraryFilterBar(
                     label = tankobunString(R.string.common_tags),
                     value = if (tags.isEmpty()) tankobunString(R.string.common_any) else tags.size.toString(),
                     selected = tags.isNotEmpty(),
-                    icon = Icons.Default.LocalOffer,
+                    icon = TankobunIcons.LocalOffer,
                     onClick = onOpenTags,
                 )
             }
@@ -559,7 +528,7 @@ internal fun LibraryFilterBar(
                     label = tankobunString(R.string.common_format),
                     value = formatOptions.labelFor(format),
                     selected = format != null,
-                    icon = Icons.AutoMirrored.Filled.MenuBook,
+                    icon = TankobunIcons.MenuBook,
                     onClick = { onOpenPicker(LibraryPicker.FORMAT) },
                 )
             }
@@ -568,7 +537,7 @@ internal fun LibraryFilterBar(
                     label = tankobunString(R.string.common_status),
                     value = statusOptions.labelFor(publishingStatus),
                     selected = publishingStatus != null,
-                    icon = Icons.Default.Flag,
+                    icon = TankobunIcons.Flag,
                     onClick = { onOpenPicker(LibraryPicker.STATUS) },
                 )
             }
@@ -577,7 +546,7 @@ internal fun LibraryFilterBar(
                     label = tankobunString(R.string.common_country),
                     value = countryOptions.labelFor(countryOfOrigin),
                     selected = countryOfOrigin != null,
-                    icon = Icons.Default.Public,
+                    icon = TankobunIcons.Public,
                     onClick = { onOpenPicker(LibraryPicker.COUNTRY) },
                 )
             }
@@ -586,7 +555,7 @@ internal fun LibraryFilterBar(
                     label = tankobunString(R.string.common_year),
                     value = yearOptions.labelFor(year),
                     selected = year != null,
-                    icon = Icons.Default.CalendarMonth,
+                    icon = TankobunIcons.CalendarMonth,
                     onClick = { onOpenPicker(LibraryPicker.YEAR) },
                 )
             }
@@ -620,7 +589,7 @@ internal fun LibraryConnectPrompt(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Default.Link, contentDescription = null)
+            Icon(TankobunIcons.Link, contentDescription = null)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     if (clientConfigured) {
@@ -973,34 +942,34 @@ internal fun LibraryBatchActionBar(
             )
             LibraryBatchSeparator()
             LibraryBatchIconAction(
-                icon = Icons.Default.Share,
+                icon = TankobunIcons.Share,
                 contentDescription = tankobunString(R.string.library_batch_share),
                 onClick = onShare,
             )
             LibraryBatchIconAction(
-                icon = Icons.AutoMirrored.Filled.Label,
+                icon = TankobunIcons.Label,
                 contentDescription = tankobunString(R.string.library_batch_status),
                 onClick = onChangeStatus,
             )
             LibraryBatchIconAction(
-                icon = Icons.AutoMirrored.Filled.PlaylistAdd,
+                icon = TankobunIcons.PlaylistAdd,
                 contentDescription = tankobunString(R.string.library_batch_add_list),
                 onClick = onAddCustomList,
             )
             LibraryBatchIconAction(
-                icon = Icons.Default.PlaylistRemove,
+                icon = TankobunIcons.PlaylistRemove,
                 contentDescription = tankobunString(R.string.library_batch_remove_list),
                 enabled = canRemoveCustomList,
                 onClick = onRemoveCustomList,
             )
             LibraryBatchIconAction(
-                icon = Icons.Default.Delete,
+                icon = TankobunIcons.Delete,
                 contentDescription = tankobunString(R.string.library_batch_delete),
                 onClick = onDelete,
             )
             LibraryBatchSeparator()
             LibraryBatchIconAction(
-                icon = Icons.Default.Close,
+                icon = TankobunIcons.Close,
                 contentDescription = tankobunString(R.string.common_close),
                 onClick = onClose,
             )
@@ -1126,7 +1095,7 @@ internal fun LibraryShareDialog(
             Spacer(Modifier.weight(1f))
             TankobunActionButton(
                 label = tankobunString(R.string.library_batch_share),
-                icon = Icons.Default.Share,
+                icon = TankobunIcons.Share,
                 enabled = listName.trim().isNotBlank() && shareItems.isNotEmpty(),
                 onClick = { onShare(listName, messagesByMediaId) },
             )
@@ -1305,7 +1274,7 @@ internal fun LibraryBatchCustomListDialog(
                         onClick = { listName = customList },
                         leadingIcon = {
                             TankobunChipIcon(
-                                if (remove) Icons.Default.PlaylistRemove else Icons.AutoMirrored.Filled.PlaylistAdd,
+                                if (remove) TankobunIcons.PlaylistRemove else TankobunIcons.PlaylistAdd,
                             )
                         },
                         label = { Text(customList, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -1330,7 +1299,7 @@ internal fun LibraryBatchCustomListDialog(
                 } else {
                     tankobunString(R.string.library_batch_add_list)
                 },
-                icon = if (remove) Icons.Default.PlaylistRemove else Icons.AutoMirrored.Filled.PlaylistAdd,
+                icon = if (remove) TankobunIcons.PlaylistRemove else TankobunIcons.PlaylistAdd,
                 enabled = listName.trim().isNotBlank(),
                 onClick = { onConfirm(listName) },
             )
@@ -1355,14 +1324,14 @@ internal fun LibraryBatchDeleteDialog(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TankobunActionButton(
                 label = tankobunString(R.string.library_batch_delete_library_only),
-                icon = Icons.Default.Delete,
+                icon = TankobunIcons.Delete,
                 filled = false,
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onDeleteLibraryOnly,
             )
             TankobunActionButton(
                 label = tankobunString(R.string.library_batch_delete_with_local_data),
-                icon = Icons.Default.Delete,
+                icon = TankobunIcons.Delete,
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onDeleteWithLocalData,
             )
@@ -1552,7 +1521,7 @@ internal fun RecommendationImportDialog(
             Spacer(Modifier.weight(1f))
             TankobunActionButton(
                 label = tankobunString(R.string.recommendations_import_button),
-                icon = Icons.AutoMirrored.Filled.PlaylistAdd,
+                icon = TankobunIcons.PlaylistAdd,
                 enabled = selectedCount > 0 && state.recommendationImportListName.trim().isNotBlank(),
                 onClick = viewModel::importSelectedRecommendations,
             )
@@ -1582,7 +1551,7 @@ internal fun LibraryGenreDialog(
                         TankobunChip(
                             selected = genre in selectedGenres,
                             onClick = { onGenreSelected(genre, genre !in selectedGenres) },
-                            leadingIcon = { TankobunChipIcon(Icons.Default.Category) },
+                            leadingIcon = { TankobunChipIcon(TankobunIcons.Category) },
                             label = {
                                 Text(browseGenreLabel(genre), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             },
@@ -1643,7 +1612,7 @@ internal fun LibraryTagDialog(
                             TankobunChip(
                                 selected = tag.name in selectedTags,
                                 onClick = { onTagSelected(tag.name, tag.name !in selectedTags) },
-                                leadingIcon = { TankobunChipIcon(Icons.Default.LocalOffer) },
+                                leadingIcon = { TankobunChipIcon(TankobunIcons.LocalOffer) },
                                 label = {
                                     Text(
                                         tag.name,

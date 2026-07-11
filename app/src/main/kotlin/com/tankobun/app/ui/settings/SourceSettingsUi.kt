@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.settings
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -80,29 +82,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -679,7 +658,7 @@ internal fun SourceRepositoryControls(
                         .padding(end = 6.dp)
                         .height(40.dp),
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(17.dp))
+                    Icon(TankobunIcons.Refresh, contentDescription = null, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(tankobunString(R.string.common_load), maxLines = 1)
                 }
@@ -799,14 +778,14 @@ internal fun SourceSettingsRow(
         } == true
         if (extension != null && updateAvailable) {
             SourceSettingsIconActionButton(
-                icon = Icons.Default.Download,
+                icon = TankobunIcons.Download,
                 contentDescription = tankobunString(R.string.sources_update_cd, displayName),
                 enabled = !installing,
                 onClick = { onInstall(extension) },
             )
         }
         SourceSettingsIconActionButton(
-            icon = Icons.Default.Delete,
+            icon = TankobunIcons.Delete,
             contentDescription = tankobunString(R.string.sources_uninstall_cd, displayName),
             onClick = { onUninstall(source.packageName) },
         )
@@ -921,7 +900,7 @@ internal fun ExtensionRepositoryRow(
                             )
                         } else {
                             Icon(
-                                Icons.Default.Download,
+                                TankobunIcons.Download,
                                 contentDescription = if (iconOnlyInstallAction) actionLabel else null,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -934,7 +913,7 @@ internal fun ExtensionRepositoryRow(
                 }
                 if (installed) {
                     SourceSettingsIconActionButton(
-                        icon = Icons.Default.Delete,
+                        icon = TankobunIcons.Delete,
                         contentDescription = tankobunString(R.string.sources_uninstall_cd, displayName),
                         onClick = onUninstall,
                     )

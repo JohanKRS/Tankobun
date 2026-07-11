@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.reader
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import android.content.Context
 import android.content.Intent
 import android.app.Activity
@@ -80,36 +82,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.FormatLineSpacing
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ScreenRotation
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Splitscreen
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.StayCurrentLandscape
-import androidx.compose.material.icons.filled.StayCurrentPortrait
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.ViewStream
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -777,7 +749,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     ) {
                         IconButton(onClick = viewModel::closeReader) {
                             Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
+                                TankobunIcons.ArrowBack,
                                 contentDescription = tankobunString(R.string.reader_close),
                                 tint = Color.White,
                             )
@@ -830,7 +802,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 onClick = { moveReaderPageFromControls(-1) },
                             ) {
                                 Icon(
-                                    Icons.Default.SkipPrevious,
+                                    TankobunIcons.SkipPrevious,
                                     contentDescription = if (state.currentPageIndex <= 0 && previousChapter != null) {
                                         tankobunString(R.string.reader_previous_chapter)
                                     } else {
@@ -894,7 +866,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                 onClick = { moveReaderPageFromControls(1) },
                             ) {
                                 Icon(
-                                    Icons.Default.SkipNext,
+                                    TankobunIcons.SkipNext,
                                     contentDescription = if (state.currentPageIndex >= lastPageIndex && nextChapter != null) {
                                         tankobunString(R.string.reader_next_chapter)
                                     } else {
@@ -932,7 +904,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                     },
                                     label = { Text(pagedReaderLabel) },
                                     leadingIcon = {
-                                        ReaderChipIcon(Icons.AutoMirrored.Filled.MenuBook, pagedReaderLabel)
+                                        ReaderChipIcon(TankobunIcons.MenuBook, pagedReaderLabel)
                                     },
                                 )
                                 TankobunChip(
@@ -943,7 +915,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                     },
                                     label = { Text(webtoonReaderLabel) },
                                     leadingIcon = {
-                                        ReaderChipIcon(Icons.Default.ViewStream, webtoonReaderLabel)
+                                        ReaderChipIcon(TankobunIcons.ViewStream, webtoonReaderLabel)
                                     },
                                 )
                                 TankobunChip(
@@ -951,7 +923,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                     onClick = { viewModel.setReaderPageGapLevel((state.readerPageGapLevel + 1) % 4) },
                                     label = { Text(readerGapChipLabel) },
                                     leadingIcon = {
-                                        ReaderChipIcon(Icons.Default.FormatLineSpacing, readerGapChipLabel)
+                                        ReaderChipIcon(TankobunIcons.FormatLineSpacing, readerGapChipLabel)
                                     },
                                 )
                                 TankobunChip(
@@ -977,7 +949,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                         },
                                         label = { Text(chapterDividersChipLabel) },
                                         leadingIcon = {
-                                            ReaderChipIcon(Icons.Default.Splitscreen, chapterDividersChipLabel)
+                                            ReaderChipIcon(TankobunIcons.Splitscreen, chapterDividersChipLabel)
                                         },
                                     )
                                 }
@@ -986,7 +958,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                     onClick = { resetZoom() },
                                     label = { Text(resetZoomLabel) },
                                     leadingIcon = {
-                                        ReaderChipIcon(Icons.Default.Replay, resetZoomLabel)
+                                        ReaderChipIcon(TankobunIcons.Replay, resetZoomLabel)
                                     },
                                 )
                             }
@@ -1156,7 +1128,7 @@ internal fun ReaderLoadingScreen(
                 .padding(8.dp),
         ) {
             Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
+                TankobunIcons.ArrowBack,
                 contentDescription = tankobunString(R.string.reader_close),
                 tint = Color.White,
             )
@@ -1201,7 +1173,7 @@ internal fun ReaderLoadingScreen(
                     }
                     Button(onClick = onRetry) {
                         Icon(
-                            Icons.Default.Refresh,
+                            TankobunIcons.Refresh,
                             contentDescription = null,
                         )
                         Spacer(Modifier.width(6.dp))
@@ -1325,7 +1297,7 @@ internal fun ReaderImagePlaceholder(
             if (onRetry != null) {
                 TextButton(onClick = onRetry) {
                     Icon(
-                        Icons.Default.Replay,
+                        TankobunIcons.Replay,
                         contentDescription = null,
                         tint = Color.White.copy(alpha = 0.88f),
                     )
@@ -1362,7 +1334,7 @@ internal fun WebtoonPreviousChapterHeader(
         )
         TextButton(onClick = onOpenPreviousChapter) {
             Icon(
-                Icons.Default.PlayArrow,
+                TankobunIcons.PlayArrow,
                 contentDescription = null,
                 tint = Color.White.copy(alpha = 0.88f),
             )
@@ -1402,7 +1374,7 @@ internal fun WebtoonNextChapterFooter(
         )
         TextButton(onClick = onOpenNextChapter) {
             Icon(
-                Icons.Default.PlayArrow,
+                TankobunIcons.PlayArrow,
                 contentDescription = null,
                 tint = Color.White.copy(alpha = 0.88f),
             )
@@ -1475,9 +1447,9 @@ private fun ReaderChipIcon(
 
 private fun ReaderScreenOrientation.readerOrientationIcon(): ImageVector =
     when (this) {
-        ReaderScreenOrientation.SYSTEM -> Icons.Default.ScreenRotation
-        ReaderScreenOrientation.PORTRAIT -> Icons.Default.StayCurrentPortrait
-        ReaderScreenOrientation.LANDSCAPE -> Icons.Default.StayCurrentLandscape
+        ReaderScreenOrientation.SYSTEM -> TankobunIcons.ScreenRotation
+        ReaderScreenOrientation.PORTRAIT -> TankobunIcons.StayCurrentPortrait
+        ReaderScreenOrientation.LANDSCAPE -> TankobunIcons.StayCurrentLandscape
     }
 
 @Composable

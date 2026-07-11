@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.shell
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -88,28 +90,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -163,7 +143,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
@@ -181,8 +160,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
@@ -243,6 +220,7 @@ import com.tankobun.app.state.*
 import com.tankobun.app.ui.browse.*
 import com.tankobun.app.ui.components.*
 import com.tankobun.app.ui.downloads.*
+import com.tankobun.app.ui.home.*
 import com.tankobun.app.ui.library.*
 import com.tankobun.app.ui.media.*
 import com.tankobun.app.ui.reader.*
@@ -313,7 +291,7 @@ private data class TankobunRoute(
     val media: AnilistMedia? = null,
 ) {
     fun normalized(): TankobunRoute =
-        copy(settingsRoute = if (tab == 3 && media == null) settingsRoute else SettingsRoute.MAIN)
+        copy(settingsRoute = if (tab == 4 && media == null) settingsRoute else SettingsRoute.MAIN)
 
     fun sameDestination(other: TankobunRoute): Boolean =
         tab == other.tab &&
@@ -327,8 +305,8 @@ private val FrostedDockHorizontalMargin = 16.dp
 private val FrostedDockTopMargin = 8.dp
 private val FrostedDockBottomMargin = 8.dp
 private val FrostedDockHeight = 56.dp
-private val FrostedDockWidth = 220.dp
-private val FrostedDockWithQuickActionsWidth = 284.dp
+private val FrostedDockWidth = 272.dp
+private val FrostedDockWithQuickActionsWidth = 336.dp
 private val FrostedGlassBlur = 88.dp
 private val FrostedTopBarShape = RoundedCornerShape(0.dp)
 private val FrostedDockShape = RoundedCornerShape(percent = 50)
@@ -402,7 +380,7 @@ private fun TankobunAppRootContent(
     val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
     val selectedMedia = state.selectedMedia
     val readerOpen = state.activeChapter != null
-    val browseCanNavigateBack = selectedTab == 1 &&
+    val browseCanNavigateBack = selectedTab == 2 &&
         selectedMedia == null &&
         (state.hasBrowseQueryOrFilters() || state.browseSearched)
     val appStatusBarVisible = state.showAppStatusBar && !readerOpen
@@ -462,14 +440,14 @@ private fun TankobunAppRootContent(
         routeHistory = emptyList()
         applyRoute(
             when (step) {
-                AppTourStep.LIBRARY -> TankobunRoute(tab = 0)
-                AppTourStep.BROWSE -> TankobunRoute(tab = 1)
+                AppTourStep.LIBRARY -> TankobunRoute(tab = 1)
+                AppTourStep.BROWSE -> TankobunRoute(tab = 2)
                 AppTourStep.TRACKING,
                 AppTourStep.QUICK_ACTIONS,
-                AppTourStep.READER -> TankobunRoute(tab = 1, media = exampleMedia)
-                AppTourStep.SOURCES -> TankobunRoute(tab = 3, settingsRoute = SettingsRoute.SOURCES)
-                AppTourStep.BACKUPS -> TankobunRoute(tab = 3, settingsRoute = SettingsRoute.BACKUPS)
-                AppTourStep.PROFILE -> TankobunRoute(tab = 3, settingsRoute = SettingsRoute.PROFILE)
+                AppTourStep.READER -> TankobunRoute(tab = 2, media = exampleMedia)
+                AppTourStep.SOURCES -> TankobunRoute(tab = 4, settingsRoute = SettingsRoute.SOURCES)
+                AppTourStep.BACKUPS -> TankobunRoute(tab = 4, settingsRoute = SettingsRoute.BACKUPS)
+                AppTourStep.PROFILE -> TankobunRoute(tab = 4, settingsRoute = SettingsRoute.PROFILE)
             },
         )
         quickDrawerMode = if (step == AppTourStep.QUICK_ACTIONS && exampleMedia != null) {
@@ -512,7 +490,7 @@ private fun TankobunAppRootContent(
                 viewModel.clearSelectedMedia()
                 resetBackPressWindows()
             }
-            selectedTab == 3 && settingsRoute != SettingsRoute.MAIN -> {
+            selectedTab == 4 && settingsRoute != SettingsRoute.MAIN -> {
                 settingsRoute = SettingsRoute.MAIN
                 resetBackPressWindows()
             }
@@ -572,19 +550,19 @@ private fun TankobunAppRootContent(
                 onSelectTab = ::navigateToRootTab,
                 canNavigateBack = selectedMedia != null ||
                     browseCanNavigateBack ||
-                    (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN),
+                    (selectedTab == 4 && settingsRoute != SettingsRoute.MAIN),
                 onNavigateBack = { handleAppBack() },
                 onSelectMedia = { media -> navigateTo(TankobunRoute(tab = selectedTab, media = media)) },
                 selectedMedia = selectedMedia,
                 settingsRoute = settingsRoute,
-                onOpenSettingsRoute = { navigateTo(TankobunRoute(tab = 3, settingsRoute = it)) },
+                onOpenSettingsRoute = { navigateTo(TankobunRoute(tab = 4, settingsRoute = it)) },
                 onBrowseTag = { tag ->
                     viewModel.browseByTag(tag)
-                    navigateTo(TankobunRoute(tab = 1))
+                    navigateTo(TankobunRoute(tab = 2))
                 },
                 onBrowseAuthor = { author ->
                     viewModel.browseByAuthor(author)
-                    navigateTo(TankobunRoute(tab = 1))
+                    navigateTo(TankobunRoute(tab = 2))
                 },
                 onOpenRecentProgress = { item ->
                     val recentRoute = TankobunRoute(tab = selectedTab, media = item.media).normalized()
@@ -848,6 +826,7 @@ internal fun TankobunScaffold(
     val drawerScrimAlpha = QuickDrawerScrimAlpha * quickDrawerBackdropRevealFraction
     val drawerBackdropBlur = (QuickDrawerBackdropBlurDp * quickDrawerBackdropRevealFraction).dp
     val mediaDetailActive = selectedMedia != null
+    val homeRootActive = selectedTab == 0 && !mediaDetailActive
     val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
     val routeBackdropColor = LocalTankobunTokens.current.appBackdrop
     val routeContentColor = MaterialTheme.colorScheme.onSurface
@@ -856,7 +835,7 @@ internal fun TankobunScaffold(
     } else {
         0.dp
     }
-    val topChromeInset = statusBarInset + if (compactLayout) 48.dp else 72.dp
+    val topChromeInset = statusBarInset + if (homeRootActive) 0.dp else if (compactLayout) 48.dp else 72.dp
     val bottomChromeInset = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() +
         FrostedDockBottomMargin +
         FrostedDockHeight +
@@ -905,16 +884,18 @@ internal fun TankobunScaffold(
             containerColor = routeBackdropColor,
             contentWindowInsets = WindowInsets(0.dp),
             topBar = {
-                TankobunTopBar(
-                    title = selectedMedia?.title?.userPreferred
-                        ?: if (selectedTab == 3 && settingsRoute != SettingsRoute.MAIN) settingsRoute.settingsTitle() else tankobunString(R.string.app_name),
-                    hazeState = chromeHazeState,
-                    showBack = canNavigateBack,
-                    ignoreDisplayCutout = ignoreDisplayCutout,
-                    showStatusBar = showStatusBar,
-                    mediaDetailActive = mediaDetailActive,
-                    onBack = onNavigateBack,
-                )
+                if (!homeRootActive) {
+                    TankobunTopBar(
+                        title = selectedMedia?.title?.userPreferred
+                            ?: if (selectedTab == 4 && settingsRoute != SettingsRoute.MAIN) settingsRoute.settingsTitle() else tankobunString(R.string.app_name),
+                        hazeState = chromeHazeState,
+                        showBack = canNavigateBack,
+                        ignoreDisplayCutout = ignoreDisplayCutout,
+                        showStatusBar = showStatusBar,
+                        mediaDetailActive = mediaDetailActive,
+                        onBack = onNavigateBack,
+                    )
+                }
             },
             bottomBar = {
                 Box(
@@ -978,14 +959,21 @@ internal fun TankobunScaffold(
                     Row(Modifier.fillMaxSize()) {
                         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                             when (selectedTab) {
-                                0 -> LibraryScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                                1 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                                2 -> DownloadsScreen(
+                                0 -> HomeScreen(
+                                    state = state,
+                                    onSelectMedia = onSelectMedia,
+                                    onOpenRecentProgress = onOpenRecentProgress,
+                                    onOpenLibrary = { onSelectTab(1) },
+                                    onOpenBrowse = { onSelectTab(2) },
+                                )
+                                1 -> LibraryScreen(state, viewModel, onSelectMedia = onSelectMedia)
+                                2 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
+                                3 -> DownloadsScreen(
                                     state = state,
                                     viewModel = viewModel,
                                     onOpenStorageManager = { onOpenSettingsRoute(SettingsRoute.DOWNLOADS) },
                                 )
-                                3 -> SettingsScreen(
+                                4 -> SettingsScreen(
                                     state = state,
                                     viewModel = viewModel,
                                     route = settingsRoute,
@@ -1225,7 +1213,7 @@ internal fun TankobunTopBar(
                 if (showBack) {
                     IconButton(onClick = onBack, modifier = Modifier.size(if (compact) 36.dp else 48.dp)) {
                         Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
+                            TankobunIcons.ArrowBack,
                             contentDescription = tankobunString(R.string.common_back),
                             modifier = Modifier.size(iconSize),
                         )
@@ -1345,54 +1333,12 @@ internal fun AnimatedHamburgerCloseIcon(
     modifier: Modifier = Modifier,
     iconColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
-    val progress by animateFloatAsState(
-        targetValue = if (close) 1f else 0f,
-        animationSpec = tween(durationMillis = 180),
-        label = "Quick actions menu icon",
+    Icon(
+        imageVector = if (close) TankobunIcons.Close else TankobunIcons.Menu,
+        contentDescription = contentDescription,
+        tint = iconColor,
+        modifier = modifier,
     )
-    Canvas(
-        modifier = modifier.semantics {
-            this.contentDescription = contentDescription
-        },
-    ) {
-        val strokeWidth = 2.dp.toPx()
-        val center = this.center
-        val half = size.minDimension * 0.36f
-        val gap = size.minDimension * 0.22f * (1f - progress)
-        val diagonal = size.minDimension * 0.32f
-        val middleAlpha = 1f - progress
-
-        fun point(x: Float, y: Float): Offset = Offset(center.x + x, center.y + y)
-        fun lerp(start: Offset, end: Offset): Offset =
-            Offset(
-                x = start.x + (end.x - start.x) * progress,
-                y = start.y + (end.y - start.y) * progress,
-            )
-
-        drawLine(
-            color = iconColor,
-            start = lerp(point(-half, -gap), point(-diagonal, -diagonal)),
-            end = lerp(point(half, -gap), point(diagonal, diagonal)),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round,
-        )
-        if (middleAlpha > 0.01f) {
-            drawLine(
-                color = iconColor.copy(alpha = middleAlpha),
-                start = point(-half, 0f),
-                end = point(half, 0f),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round,
-            )
-        }
-        drawLine(
-            color = iconColor,
-            start = lerp(point(-half, gap), point(-diagonal, diagonal)),
-            end = lerp(point(half, gap), point(diagonal, -diagonal)),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round,
-        )
-    }
 }
 
 @Composable
@@ -1407,10 +1353,11 @@ internal fun TankobunBottomNavigationBar(
 ) {
     val styleColors = LocalTankobunStyle.current.colors
     val items = listOf(
-        Triple(tankobunString(R.string.nav_library), Icons.AutoMirrored.Filled.LibraryBooks, 0),
-        Triple(tankobunString(R.string.nav_browse), Icons.Default.Explore, 1),
-        Triple(tankobunString(R.string.nav_downloads), Icons.Default.Download, 2),
-        Triple(tankobunString(R.string.nav_settings), Icons.Default.Settings, 3),
+        Triple(tankobunString(R.string.nav_home), TankobunIcons.Home, 0),
+        Triple(tankobunString(R.string.nav_library), TankobunIcons.LibraryBooks, 1),
+        Triple(tankobunString(R.string.nav_browse), TankobunIcons.Explore, 2),
+        Triple(tankobunString(R.string.nav_downloads), TankobunIcons.Download, 3),
+        Triple(tankobunString(R.string.nav_settings), TankobunIcons.Settings, 4),
     )
     val selectedIndex = selectedTab.coerceIn(0, items.lastIndex)
     val itemSize = 44.dp
@@ -1911,7 +1858,7 @@ internal fun QuickDrawer(
                             } else {
                                 state.downloads.take(4).forEach { job ->
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Icon(TankobunIcons.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(job.chapterName, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             Text(
@@ -1967,7 +1914,7 @@ internal fun RecentReadingAction(item: RecentReadingProgress, onClick: () -> Uni
         )
         TankobunActionButton(
             label = if (item.chapter == null) tankobunString(R.string.reader_open_manga) else tankobunString(R.string.chapter_resume),
-            icon = Icons.AutoMirrored.Filled.MenuBook,
+            icon = TankobunIcons.MenuBook,
             onClick = onClick,
             modifier = Modifier.fillMaxWidth(),
             filled = false,

@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.settings
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -23,19 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Backup
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tag
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -134,7 +123,7 @@ internal fun OnboardingDialog(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     OnboardingHeroIcon(
-                        icon = if (pageIndex == 0) Icons.AutoMirrored.Filled.LibraryBooks else Icons.Default.Palette,
+                        icon = if (pageIndex == 0) TankobunIcons.LibraryBooks else TankobunIcons.Palette,
                     )
                     when (pageIndex) {
                         0 -> OnboardingLibraryModeStep(
@@ -261,7 +250,7 @@ private fun OnboardingTopBar(
             )
         }
         IconButton(onClick = onClose) {
-            Icon(Icons.Default.Close, contentDescription = tankobunString(R.string.onboarding_close_tutorial))
+            Icon(TankobunIcons.Close, contentDescription = tankobunString(R.string.onboarding_close_tutorial))
         }
     }
 }
@@ -298,14 +287,14 @@ private fun OnboardingLibraryModeStep(
             selected = selected == LibraryMode.LOCAL,
             title = tankobunString(R.string.onboarding_library_mode_local),
             body = tankobunString(R.string.onboarding_library_mode_local_desc),
-            icon = Icons.AutoMirrored.Filled.LibraryBooks,
+            icon = TankobunIcons.LibraryBooks,
             onClick = { onSelected(LibraryMode.LOCAL) },
         )
         OnboardingChoiceButton(
             selected = selected == LibraryMode.ANILIST,
             title = tankobunString(R.string.onboarding_library_mode_anilist),
             body = tankobunString(R.string.onboarding_library_mode_anilist_desc),
-            icon = Icons.Default.Link,
+            icon = TankobunIcons.Link,
             onClick = { onSelected(LibraryMode.ANILIST) },
         )
     }
@@ -433,7 +422,7 @@ private fun OnboardingThemeChoiceButton(
                 Text(choice.description, style = MaterialTheme.typography.bodySmall, color = descriptionColor)
             }
             if (selected) {
-                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(TankobunIcons.Check, contentDescription = null, modifier = Modifier.size(20.dp))
             }
         }
     }
@@ -569,14 +558,14 @@ private fun TourCoachCard(
 
 private fun AppTourStep.icon(): ImageVector =
     when (this) {
-        AppTourStep.LIBRARY -> Icons.AutoMirrored.Filled.LibraryBooks
-        AppTourStep.BROWSE -> Icons.Default.Search
-        AppTourStep.TRACKING -> Icons.Default.Tag
-        AppTourStep.QUICK_ACTIONS -> Icons.Default.Tune
-        AppTourStep.SOURCES -> Icons.Default.Extension
-        AppTourStep.READER -> Icons.AutoMirrored.Filled.MenuBook
-        AppTourStep.BACKUPS -> Icons.Default.Backup
-        AppTourStep.PROFILE -> Icons.Default.AccountCircle
+        AppTourStep.LIBRARY -> TankobunIcons.LibraryBooks
+        AppTourStep.BROWSE -> TankobunIcons.Search
+        AppTourStep.TRACKING -> TankobunIcons.Tag
+        AppTourStep.QUICK_ACTIONS -> TankobunIcons.Tune
+        AppTourStep.SOURCES -> TankobunIcons.Extension
+        AppTourStep.READER -> TankobunIcons.MenuBook
+        AppTourStep.BACKUPS -> TankobunIcons.Backup
+        AppTourStep.PROFILE -> TankobunIcons.AccountCircle
     }
 
 @StringRes

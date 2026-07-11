@@ -1,6 +1,8 @@
 package com.tankobun.core.anilist
 
 import com.tankobun.core.model.AnilistListEntry
+import com.tankobun.core.model.AnilistGenreHighlight
+import com.tankobun.core.model.AnilistHomeFeed
 import com.tankobun.core.model.AnilistMangaStats
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaDetails
@@ -22,6 +24,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -29,6 +32,92 @@ import kotlinx.serialization.json.put
 class AnilistRepository(
     private val graphQlClient: AnilistGraphQlClient,
 ) {
+    suspend fun homeFeed(
+        genres: List<String>,
+        accessToken: String? = null,
+        includeAdult: Boolean = false,
+    ): AnilistHomeFeed {
+        val variables = buildJsonObject {
+            if (!includeAdult) put("isAdult", false)
+        }
+        val trendingData = graphQlClient.execute(
+            query = AnilistQueries.HomeTrending,
+            variables = variables,
+            accessToken = accessToken,
+        )
+        val trending = trendingData["trending"]
+            ?.takeUnless { it is JsonNull }
+            ?.jsonObject
+            ?.get("media")
+            ?.jsonArray
+            .orEmpty()
+            .map(AnilistJsonMapper::media)
+        val genreHighlights = buildList {
+            genres.chunked(6).forEach { chunk ->
+                val data = graphQlClient.execute(
+                    query = AnilistQueries.homeGenreCandidates(chunk, perPage = 50),
+                    variables = variables,
+                    accessToken = accessToken,
+                )
+                chunk.forEachIndexed { index, genre ->
+                    val media = data["genre$index"]
+                        ?.takeUnless { it is JsonNull }
+                        ?.jsonObject
+                        ?.get("media")
+                        ?.jsonArray
+                        .orEmpty()
+                        .map(AnilistJsonMapper::media)
+                        .firstOrNull { candidate -> candidate.genres.firstOrNull().equals(genre, ignoreCase = true) }
+                        ?: return@forEachIndexed
+                    add(AnilistGenreHighlight(genre = genre, media = media))
+                }
+            }
+        }
+        val missingCharacterIds = genreHighlights
+            .map { it.media }
+            .filter { it.bannerImage.isNullOrBlank() }
+            .map { it.id }
+            .distinct()
+        val characterImages = if (missingCharacterIds.isEmpty()) {
+            emptyMap()
+        } else {
+            val data = graphQlClient.execute(
+                query = AnilistQueries.homeMainCharacters(missingCharacterIds),
+                accessToken = accessToken,
+            )
+            missingCharacterIds.mapIndexedNotNull { index, mediaId ->
+                val image = data["media$index"]
+                    ?.takeUnless { it is JsonNull }
+                    ?.jsonObject
+                    ?.get("characters")
+                    ?.takeUnless { it is JsonNull }
+                    ?.jsonObject
+                    ?.get("nodes")
+                    ?.jsonArray
+                    ?.firstOrNull()
+                    ?.jsonObject
+                    ?.get("image")
+                    ?.takeUnless { it is JsonNull }
+                    ?.jsonObject
+                    ?.get("large")
+                    ?.jsonPrimitive
+                    ?.content
+                    ?: return@mapIndexedNotNull null
+                mediaId to image
+            }.toMap()
+        }
+        return AnilistHomeFeed(
+            trending = trending,
+            genreHighlights = genreHighlights.map { highlight ->
+                highlight.copy(
+                    media = highlight.media.copy(
+                        mainCharacterImage = characterImages[highlight.media.id],
+                    ),
+                )
+            },
+        )
+    }
+
     suspend fun viewer(accessToken: String): AnilistViewer {
         val data = graphQlClient.execute(
             query = AnilistQueries.Viewer,

@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.media
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -22,13 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -97,7 +92,7 @@ internal fun ChapterActionsBar(
             if (readingActionChapter != null) {
                 if (tight) {
                     TankobunIconActionButton(
-                        icon = Icons.Default.PlayArrow,
+                        icon = TankobunIcons.PlayArrow,
                         contentDescription = if (hasProgress) {
                             tankobunString(R.string.chapter_resume_reading)
                         } else {
@@ -110,7 +105,7 @@ internal fun ChapterActionsBar(
                 } else {
                     TankobunActionButton(
                         label = if (hasProgress) tankobunString(R.string.chapter_resume) else tankobunString(R.string.common_start),
-                        icon = Icons.Default.PlayArrow,
+                        icon = TankobunIcons.PlayArrow,
                         onClick = { onOpenChapter(readingActionChapter) },
                         modifier = modifier,
                     )
@@ -119,7 +114,7 @@ internal fun ChapterActionsBar(
         }
         val refreshButton: @Composable (Modifier) -> Unit = { modifier ->
             TankobunIconActionButton(
-                icon = Icons.Default.Refresh,
+                icon = TankobunIcons.Refresh,
                 contentDescription = if (hasChapters) {
                     tankobunString(R.string.chapter_refresh_chapters)
                 } else {
@@ -136,7 +131,7 @@ internal fun ChapterActionsBar(
         }
         val orderButton: @Composable (Modifier) -> Unit = { modifier ->
             TankobunIconActionButton(
-                icon = Icons.Default.SwapVert,
+                icon = TankobunIcons.SwapVert,
                 contentDescription = orderButtonDescription,
                 onClick = onToggleChapterListOrder,
                 enabled = hasChapters,
@@ -146,7 +141,7 @@ internal fun ChapterActionsBar(
         val downloadButton: @Composable (Modifier) -> Unit = { modifier ->
             if (tight) {
                 TankobunIconActionButton(
-                    icon = Icons.Default.Download,
+                    icon = TankobunIcons.Download,
                     contentDescription = tankobunString(R.string.chapter_download_chapters),
                     onClick = onOpenDownloadActions,
                     enabled = hasChapters,
@@ -155,7 +150,7 @@ internal fun ChapterActionsBar(
             } else {
                 TankobunActionButton(
                     label = tankobunString(R.string.common_download),
-                    icon = Icons.Default.Download,
+                    icon = TankobunIcons.Download,
                     onClick = onOpenDownloadActions,
                     enabled = hasChapters,
                     filled = false,
@@ -213,7 +208,7 @@ internal fun ChapterManualDownloadBar(
                 enabled = selectedCount > 0,
                 shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
             ) {
-                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(TankobunIcons.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(tankobunString(R.string.common_download))
             }
@@ -304,7 +299,7 @@ internal fun ChapterDownloadActionRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(TankobunIcons.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(
@@ -378,7 +373,7 @@ internal fun ChapterRow(
         } else {
             tankobunString(R.string.chapter_mark_read)
         }
-        val swipeActionIcon = if (swipeActionRead) Icons.Default.Replay else Icons.Default.Check
+        val swipeActionIcon = if (swipeActionRead) TankobunIcons.Replay else TankobunIcons.Check
         val swipeActionColor = LocalTankobunStyle.current.colors.accent
         val density = LocalDensity.current
         val maxRevealPx = with(density) { 132.dp.toPx() }
@@ -554,7 +549,7 @@ internal fun ChapterDownloadIndicator(
     val actionSize = LocalTankobunStyle.current.sizes.iconAction
     when {
         download == null -> IconButton(onClick = onDownload, modifier = Modifier.size(actionSize)) {
-            Icon(Icons.Default.Download, contentDescription = tankobunString(R.string.common_download))
+            Icon(TankobunIcons.Download, contentDescription = tankobunString(R.string.common_download))
         }
 
         download.state == DownloadState.COMPLETE -> Box(
@@ -569,7 +564,7 @@ internal fun ChapterDownloadIndicator(
             ) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(
-                        Icons.Default.Check,
+                        TankobunIcons.Check,
                         contentDescription = tankobunString(R.string.common_downloaded),
                         modifier = Modifier.size(20.dp),
                     )
@@ -609,11 +604,11 @@ internal fun ChapterDownloadIndicator(
         }
 
         download.state == DownloadState.PAUSED -> IconButton(onClick = onResume, modifier = Modifier.size(actionSize)) {
-            Icon(Icons.Default.PlayArrow, contentDescription = tankobunString(R.string.downloads_resume_download))
+            Icon(TankobunIcons.PlayArrow, contentDescription = tankobunString(R.string.downloads_resume_download))
         }
 
         download.state == DownloadState.FAILED -> IconButton(onClick = onRetry, modifier = Modifier.size(actionSize)) {
-            Icon(Icons.Default.Replay, contentDescription = tankobunString(R.string.downloads_retry_download))
+            Icon(TankobunIcons.Replay, contentDescription = tankobunString(R.string.downloads_retry_download))
         }
     }
 }

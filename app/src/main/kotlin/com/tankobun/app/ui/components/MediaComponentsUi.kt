@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.components
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import android.content.Context
 import android.content.Intent
 import android.app.Activity
@@ -83,33 +85,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.ViewList
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.ViewAgenda
-import androidx.compose.material.icons.filled.ViewModule
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -267,10 +242,10 @@ internal fun MediaViewModeRow(
 
 private fun MediaViewMode.mediaViewIcon(): ImageVector =
     when (this) {
-        MediaViewMode.COVER_GRID -> Icons.Default.ViewModule
-        MediaViewMode.COVER_WITH_INFO -> Icons.Default.ViewAgenda
-        MediaViewMode.LIST -> Icons.AutoMirrored.Filled.ViewList
-        else -> Icons.Default.ViewModule
+        MediaViewMode.COVER_GRID -> TankobunIcons.ViewModule
+        MediaViewMode.COVER_WITH_INFO -> TankobunIcons.ViewAgenda
+        MediaViewMode.LIST -> TankobunIcons.ViewList
+        else -> TankobunIcons.ViewModule
     }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -783,13 +758,13 @@ internal fun TrackedMediaStatusBadge(
         MediaStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     val icon = when (status) {
-        MediaStatus.CURRENT -> Icons.Default.PlayArrow
-        MediaStatus.PLANNING -> Icons.Default.StarBorder
-        MediaStatus.COMPLETED -> Icons.Default.Check
-        MediaStatus.PAUSED -> Icons.Default.Pause
-        MediaStatus.DROPPED -> Icons.Default.Close
-        MediaStatus.REPEATING -> Icons.Default.Replay
-        MediaStatus.UNKNOWN -> Icons.Default.Check
+        MediaStatus.CURRENT -> TankobunIcons.PlayArrow
+        MediaStatus.PLANNING -> TankobunIcons.StarBorder
+        MediaStatus.COMPLETED -> TankobunIcons.Check
+        MediaStatus.PAUSED -> TankobunIcons.Pause
+        MediaStatus.DROPPED -> TankobunIcons.Close
+        MediaStatus.REPEATING -> TankobunIcons.Replay
+        MediaStatus.UNKNOWN -> TankobunIcons.Check
     }
     Surface(
         modifier = modifier.size(24.dp),

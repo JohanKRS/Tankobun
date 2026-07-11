@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.settings
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import android.content.Context
 import android.content.Intent
 import android.app.Activity
@@ -78,30 +80,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -302,7 +280,7 @@ internal fun DownloadsSettingsScreen(
                     },
                     shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(TankobunIcons.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(tankobunString(R.string.downloads_delete_all))
                 }
@@ -411,7 +389,7 @@ internal fun CacheStoragePanel(
             ) {
                 TankobunActionButton(
                     label = tankobunString(R.string.cache_clear_all),
-                    icon = Icons.Default.Delete,
+                    icon = TankobunIcons.Delete,
                     onClick = onClearAll,
                     enabled = summary.totalBytes > 0L,
                     filled = false,
@@ -481,7 +459,7 @@ internal fun DeleteDownloadsDialog(
             }
             TankobunActionButton(
                 label = tankobunString(R.string.common_delete),
-                icon = Icons.Default.Delete,
+                icon = TankobunIcons.Delete,
                 onClick = onConfirm,
             )
         }
@@ -537,7 +515,7 @@ internal fun DownloadStorageRow(
             )
             IconButton(onClick = onDelete) {
                 Icon(
-                    Icons.Default.Delete,
+                    TankobunIcons.Delete,
                     contentDescription = tankobunString(R.string.downloads_delete_cd, title, sourceLabel),
                 )
             }

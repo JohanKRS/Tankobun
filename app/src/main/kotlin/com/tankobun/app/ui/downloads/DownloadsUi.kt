@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.downloads
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import android.content.Context
 import android.content.Intent
 import android.app.Activity
@@ -79,28 +81,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -263,7 +243,7 @@ internal fun DownloadsScreen(
                     )
                     TankobunActionButton(
                         label = tankobunString(R.string.downloads_storage_manager),
-                        icon = Icons.Default.Settings,
+                        icon = TankobunIcons.Settings,
                         onClick = onOpenStorageManager,
                         modifier = Modifier.widthIn(max = 190.dp),
                         filled = false,
@@ -285,7 +265,7 @@ internal fun DownloadsScreen(
                 if (hasActiveDownloads) {
                     TankobunActionButton(
                         label = tankobunString(R.string.downloads_pause_active),
-                        icon = Icons.Default.Pause,
+                        icon = TankobunIcons.Pause,
                         onClick = viewModel::pauseActiveDownloads,
                         filled = false,
                     )
@@ -293,14 +273,14 @@ internal fun DownloadsScreen(
                 if (hasPausedDownloads) {
                     TankobunActionButton(
                         label = tankobunString(R.string.downloads_resume_paused),
-                        icon = Icons.Default.PlayArrow,
+                        icon = TankobunIcons.PlayArrow,
                         onClick = viewModel::resumePausedDownloads,
                     )
                 }
                 if (hasFailedDownloads) {
                     TankobunActionButton(
                         label = tankobunString(R.string.downloads_retry_failed),
-                        icon = Icons.Default.Replay,
+                        icon = TankobunIcons.Replay,
                         onClick = viewModel::retryFailedDownloads,
                     )
                 }
@@ -356,21 +336,21 @@ internal fun DownloadJobRow(
                         when (job.state) {
                             DownloadState.QUEUED,
                             DownloadState.RUNNING -> IconButton(onClick = onPause) {
-                                Icon(Icons.Default.Pause, contentDescription = tankobunString(R.string.downloads_pause_download))
+                                Icon(TankobunIcons.Pause, contentDescription = tankobunString(R.string.downloads_pause_download))
                             }
 
                             DownloadState.PAUSED -> IconButton(onClick = onResume) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = tankobunString(R.string.downloads_resume_download))
+                                Icon(TankobunIcons.PlayArrow, contentDescription = tankobunString(R.string.downloads_resume_download))
                             }
 
                             DownloadState.FAILED -> IconButton(onClick = onRetry) {
-                                Icon(Icons.Default.Replay, contentDescription = tankobunString(R.string.downloads_retry_download))
+                                Icon(TankobunIcons.Replay, contentDescription = tankobunString(R.string.downloads_retry_download))
                             }
 
                             DownloadState.COMPLETE -> Unit
                         }
                         IconButton(onClick = onRemove) {
-                            Icon(Icons.Default.Delete, contentDescription = tankobunString(R.string.downloads_remove_download))
+                            Icon(TankobunIcons.Delete, contentDescription = tankobunString(R.string.downloads_remove_download))
                         }
                     }
                 },

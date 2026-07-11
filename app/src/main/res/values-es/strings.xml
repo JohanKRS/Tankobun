@@ -1010,4 +1010,14 @@
         <item quantity="one">%1$d fuente</item>
         <item quantity="other">%1$d fuentes</item>
     </plurals>
+    <string name="nav_home">Inicio</string>
+    <string name="home_trending">Tendencias</string>
+    <string name="home_continue_reading">Seguir leyendo</string>
+    <string name="home_trending_by_genre">Tendencias por género</string>
+    <string name="home_view_all">Ver todo</string>
+    <string name="home_by_author">Por %1$s</string>
+    <string name="home_check_it_out">Ver manga</string>
+    <string name="home_chapter">Cap. %1$s</string>
+    <string name="home_trending_empty">Las tendencias no están disponibles ahora.</string>
+    <string name="home_genres_empty">Los destacados por género no están disponibles ahora.</string>
 </resources>

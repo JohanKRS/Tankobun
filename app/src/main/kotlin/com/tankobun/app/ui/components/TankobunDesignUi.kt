@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.components
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -25,9 +27,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
@@ -47,7 +46,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
@@ -216,7 +214,6 @@ internal fun TankobunActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
-    iconPainter: Painter? = null,
     enabled: Boolean = true,
     filled: Boolean = true,
     containerColor: Color? = null,
@@ -231,10 +228,6 @@ internal fun TankobunActionButton(
         when {
             icon != null -> {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(7.dp))
-            }
-            iconPainter != null -> {
-                Icon(iconPainter, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(7.dp))
             }
         }
@@ -319,17 +312,17 @@ internal fun TankobunSearchField(
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
         singleLine = true,
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        leadingIcon = { Icon(TankobunIcons.Search, contentDescription = null) },
         trailingIcon = {
             Row {
                 if (value.isNotBlank()) {
                     IconButton(onClick = { onValueChange("") }) {
-                        Icon(Icons.Default.Close, contentDescription = tankobunString(R.string.common_clear))
+                        Icon(TankobunIcons.Close, contentDescription = tankobunString(R.string.common_clear))
                     }
                 }
                 if (showSearchAction) {
                     IconButton(onClick = onSearch) {
-                        Icon(Icons.Default.Search, contentDescription = tankobunString(R.string.common_search))
+                        Icon(TankobunIcons.Search, contentDescription = tankobunString(R.string.common_search))
                     }
                 }
             }
@@ -444,7 +437,7 @@ internal fun TankobunClearFiltersChip(
         ) {
             CompositionLocalProvider(LocalTextStyle provides MaterialTheme.typography.labelMedium) {
                 Icon(
-                    Icons.Default.Close,
+                    TankobunIcons.Close,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
                 )
@@ -564,7 +557,7 @@ internal fun TankobunDialogHeader(title: String, onDismiss: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
         )
         IconButton(onClick = onDismiss) {
-            Icon(Icons.Default.Close, contentDescription = tankobunString(R.string.common_close))
+            Icon(TankobunIcons.Close, contentDescription = tankobunString(R.string.common_close))
         }
     }
 }

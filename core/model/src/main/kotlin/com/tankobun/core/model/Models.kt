@@ -94,6 +94,17 @@ data class AnilistMedia(
     val staff: List<String> = emptyList(),
     val tags: List<String> = emptyList(),
     val countryOfOrigin: String? = null,
+    val mainCharacterImage: String? = null,
+)
+
+data class AnilistGenreHighlight(
+    val genre: String,
+    val media: AnilistMedia,
+)
+
+data class AnilistHomeFeed(
+    val trending: List<AnilistMedia>,
+    val genreHighlights: List<AnilistGenreHighlight>,
 )
 
 data class AnilistMediaPage(

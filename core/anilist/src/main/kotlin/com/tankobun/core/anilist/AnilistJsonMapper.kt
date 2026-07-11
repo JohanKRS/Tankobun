@@ -59,6 +59,17 @@ object AnilistJsonMapper {
             staff = obj.staffNames(),
             tags = obj.mediaTagNames(),
             countryOfOrigin = obj.stringOrNull("countryOfOrigin"),
+            mainCharacterImage = obj["characters"]
+                ?.takeUnless { it is JsonNull }
+                ?.jsonObject
+                ?.get("nodes")
+                ?.jsonArray
+                ?.firstOrNull()
+                ?.jsonObject
+                ?.get("image")
+                ?.takeUnless { it is JsonNull }
+                ?.jsonObject
+                ?.stringOrNull("large"),
         )
     }
 

@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.media
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
@@ -24,11 +26,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -132,10 +129,10 @@ internal fun SourceActionCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            DetailIconBadge(icon = Icons.Default.Link)
+            DetailIconBadge(icon = TankobunIcons.Link)
             SourceActionText(title = title, subtitle = subtitle, modifier = Modifier.weight(1f))
             TankobunIconActionButton(
-                icon = Icons.Default.Search,
+                icon = TankobunIcons.Search,
                 contentDescription = tankobunString(R.string.source_find_source),
                 onClick = onFindSource,
             )
@@ -203,7 +200,7 @@ internal fun SelectedSourceCard(
                     )
                 }
                 TankobunIconActionButton(
-                    icon = Icons.Default.SwapHoriz,
+                    icon = TankobunIcons.SwapHoriz,
                     contentDescription = tankobunString(R.string.source_change_source),
                     onClick = onChange,
                 )
@@ -440,7 +437,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                     enabled = availableSources.isNotEmpty(),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(Icons.Default.Tune, contentDescription = null)
+                    Icon(TankobunIcons.Tune, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
                     Text(tankobunString(R.string.source_edit_search_title))
                 }
@@ -494,7 +491,7 @@ internal fun SourcePickerSearchTitleEditor(
                         enabled = enabled && title.trim().length >= 2,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Icon(Icons.Default.Search, contentDescription = null)
+                        Icon(TankobunIcons.Search, contentDescription = null)
                         Spacer(Modifier.size(8.dp))
                         Text(tankobunString(R.string.common_search))
                     }
@@ -515,7 +512,7 @@ internal fun SourcePickerSearchTitleEditor(
                         onClick = onSearch,
                         enabled = enabled && title.trim().length >= 2,
                     ) {
-                        Icon(Icons.Default.Search, contentDescription = null)
+                        Icon(TankobunIcons.Search, contentDescription = null)
                         Spacer(Modifier.size(8.dp))
                         Text(tankobunString(R.string.common_search))
                     }

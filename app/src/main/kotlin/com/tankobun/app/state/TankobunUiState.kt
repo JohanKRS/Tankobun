@@ -16,6 +16,7 @@ import com.tankobun.app.updates.AppUpdateInfo
 import com.tankobun.app.sharing.RecommendationImportPreview
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistListEntry
+import com.tankobun.core.model.AnilistGenreHighlight
 import com.tankobun.core.model.AnilistMangaStats
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaTag
@@ -88,6 +89,9 @@ data class TankobunUiState(
     val browsePopularManhwa: List<AnilistMedia> = emptyList(),
     val browseTopManga: List<AnilistMedia> = emptyList(),
     val browseLandingLoaded: Boolean = false,
+    val homeTrending: List<AnilistMedia> = emptyList(),
+    val homeGenreHighlights: List<AnilistGenreHighlight> = emptyList(),
+    val homeLoaded: Boolean = false,
     val selectedMedia: AnilistMedia? = null,
     val selectedListEntry: AnilistListEntry? = null,
     val selectedRecommendations: List<AnilistRecommendation> = emptyList(),

@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.browse
 
+import com.tankobun.app.ui.icons.TankobunIcons
+
 import android.content.Context
 import android.content.Intent
 import android.app.Activity
@@ -82,43 +84,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Label
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Crop
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.FitScreen
-import androidx.compose.material.icons.filled.Flag
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.LocalOffer
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.SortByAlpha
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Whatshot
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -554,7 +519,7 @@ internal fun BrowseFilterBar(
                     label = tankobunString(R.string.common_genres),
                     value = if (state.browseGenres.isEmpty()) tankobunString(R.string.common_any) else state.browseGenres.size.toString(),
                     selected = state.browseGenres.isNotEmpty(),
-                    icon = Icons.Default.Category,
+                    icon = TankobunIcons.Category,
                     onClick = onOpenGenres,
                 )
             }
@@ -563,7 +528,7 @@ internal fun BrowseFilterBar(
                     label = tankobunString(R.string.common_tags),
                     value = if (state.browseTags.isEmpty()) tankobunString(R.string.common_any) else state.browseTags.size.toString(),
                     selected = state.browseTags.isNotEmpty(),
-                    icon = Icons.Default.LocalOffer,
+                    icon = TankobunIcons.LocalOffer,
                     onClick = onOpenTags,
                 )
             }
@@ -572,7 +537,7 @@ internal fun BrowseFilterBar(
                     label = tankobunString(R.string.common_format),
                     value = BrowseFormatOptions.labelFor(state.browseFormat),
                     selected = state.browseFormat != null,
-                    icon = Icons.AutoMirrored.Filled.MenuBook,
+                    icon = TankobunIcons.MenuBook,
                     onClick = { onOpenPicker(BrowsePicker.FORMAT) },
                 )
             }
@@ -581,7 +546,7 @@ internal fun BrowseFilterBar(
                     label = tankobunString(R.string.common_status),
                     value = BrowseStatusOptions.labelFor(state.browsePublishingStatus),
                     selected = state.browsePublishingStatus != null,
-                    icon = Icons.Default.Flag,
+                    icon = TankobunIcons.Flag,
                     onClick = { onOpenPicker(BrowsePicker.STATUS) },
                 )
             }
@@ -590,7 +555,7 @@ internal fun BrowseFilterBar(
                     label = tankobunString(R.string.common_country),
                     value = BrowseCountryOptions.labelFor(state.browseCountryOfOrigin),
                     selected = state.browseCountryOfOrigin != null,
-                    icon = Icons.Default.Public,
+                    icon = TankobunIcons.Public,
                     onClick = { onOpenPicker(BrowsePicker.COUNTRY) },
                 )
             }
@@ -599,7 +564,7 @@ internal fun BrowseFilterBar(
                     label = tankobunString(R.string.common_year),
                     value = state.browseYear?.toString() ?: tankobunString(R.string.common_any),
                     selected = state.browseYear != null,
-                    icon = Icons.Default.CalendarMonth,
+                    icon = TankobunIcons.CalendarMonth,
                     onClick = { onOpenPicker(BrowsePicker.YEAR) },
                 )
             }
@@ -651,7 +616,7 @@ internal fun BrowseIconFilterPill(
         onClick = onClick,
         label = {
             Icon(
-                Icons.Default.Tune,
+                TankobunIcons.Tune,
                 contentDescription = contentDescription,
                 modifier = Modifier.size(18.dp),
             )
@@ -960,7 +925,7 @@ internal fun BrowseGenreDialog(
                     TankobunChip(
                         selected = genre in state.browseGenres,
                         onClick = { viewModel.setBrowseGenre(genre, genre !in state.browseGenres) },
-                        leadingIcon = { TankobunChipIcon(Icons.Default.Category) },
+                        leadingIcon = { TankobunChipIcon(TankobunIcons.Category) },
                         label = {
                                     Text(browseGenreLabel(genre), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         },
@@ -1033,7 +998,7 @@ internal fun BrowseTagDialog(
                         TankobunChip(
                             selected = tag.name in state.browseTags,
                             onClick = { viewModel.setBrowseTag(tag.name, tag.name !in state.browseTags) },
-                            leadingIcon = { TankobunChipIcon(Icons.Default.LocalOffer) },
+                            leadingIcon = { TankobunChipIcon(TankobunIcons.LocalOffer) },
                             label = {
                                 Text(
                                     tag.name,
@@ -1209,7 +1174,7 @@ internal fun CoverColumnsRow(
             TankobunChip(
                 selected = selectedColumns == count,
                 onClick = { onSelect(count) },
-                leadingIcon = { TankobunChipIcon(Icons.Default.GridView) },
+                leadingIcon = { TankobunChipIcon(TankobunIcons.GridView) },
                 label = { Text(count.toString()) },
                 modifier = modifier,
             )
@@ -1226,13 +1191,13 @@ internal fun CoverFramingRow(
         TankobunChip(
             selected = !showWholeCover,
             onClick = { onShowWholeCoverChange(false) },
-            leadingIcon = { TankobunChipIcon(Icons.Default.Crop) },
+            leadingIcon = { TankobunChipIcon(TankobunIcons.Crop) },
             label = { Text(tankobunString(R.string.cover_framing_fill)) },
         )
         TankobunChip(
             selected = showWholeCover,
             onClick = { onShowWholeCoverChange(true) },
-            leadingIcon = { TankobunChipIcon(Icons.Default.FitScreen) },
+            leadingIcon = { TankobunChipIcon(TankobunIcons.FitScreen) },
             label = { Text(tankobunString(R.string.cover_framing_whole)) },
         )
     }
@@ -1240,25 +1205,25 @@ internal fun CoverFramingRow(
 
 private fun BrowseOption.librarySortIcon(): ImageVector =
     when (value) {
-        LIBRARY_SORT_LIST_ORDER -> Icons.AutoMirrored.Filled.Label
-        LIBRARY_SORT_TITLE -> Icons.Default.SortByAlpha
-        LIBRARY_SORT_UPDATED -> Icons.Default.Refresh
-        LIBRARY_SORT_PROGRESS -> Icons.Default.PlayArrow
-        LIBRARY_SORT_SCORE -> Icons.Default.Star
-        else -> Icons.AutoMirrored.Filled.Sort
+        LIBRARY_SORT_LIST_ORDER -> TankobunIcons.Label
+        LIBRARY_SORT_TITLE -> TankobunIcons.SortByAlpha
+        LIBRARY_SORT_UPDATED -> TankobunIcons.Refresh
+        LIBRARY_SORT_PROGRESS -> TankobunIcons.PlayArrow
+        LIBRARY_SORT_SCORE -> TankobunIcons.Star
+        else -> TankobunIcons.Sort
     }
 
 private fun BrowseOption.browseSortIcon(): ImageVector =
     when (value) {
-        BROWSE_SORT_SEARCH_MATCH_UI -> Icons.Default.Search
-        "TRENDING_DESC" -> Icons.AutoMirrored.Filled.TrendingUp
-        "POPULARITY_DESC" -> Icons.Default.Whatshot
-        "FAVOURITES_DESC" -> Icons.Default.Star
-        "SCORE_DESC" -> Icons.Default.Check
-        "UPDATED_AT_DESC" -> Icons.Default.Refresh
-        "START_DATE_DESC" -> Icons.Default.CalendarMonth
-        "TITLE_ROMAJI" -> Icons.Default.SortByAlpha
-        else -> Icons.AutoMirrored.Filled.Sort
+        BROWSE_SORT_SEARCH_MATCH_UI -> TankobunIcons.Search
+        "TRENDING_DESC" -> TankobunIcons.TrendingUp
+        "POPULARITY_DESC" -> TankobunIcons.Whatshot
+        "FAVOURITES_DESC" -> TankobunIcons.Star
+        "SCORE_DESC" -> TankobunIcons.Check
+        "UPDATED_AT_DESC" -> TankobunIcons.Refresh
+        "START_DATE_DESC" -> TankobunIcons.CalendarMonth
+        "TITLE_ROMAJI" -> TankobunIcons.SortByAlpha
+        else -> TankobunIcons.Sort
     }
 
 @Composable

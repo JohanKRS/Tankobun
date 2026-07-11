@@ -1009,4 +1009,14 @@
         <item quantity="one">%1$d source</item>
         <item quantity="other">%1$d sources</item>
     </plurals>
+    <string name="nav_home">Home</string>
+    <string name="home_trending">Trending</string>
+    <string name="home_continue_reading">Continue reading</string>
+    <string name="home_trending_by_genre">Trending by genre</string>
+    <string name="home_view_all">View all</string>
+    <string name="home_by_author">By %1$s</string>
+    <string name="home_check_it_out">Check it out</string>
+    <string name="home_chapter">Ch. %1$s</string>
+    <string name="home_trending_empty">Trending manga are unavailable right now.</string>
+    <string name="home_genres_empty">Genre highlights are unavailable right now.</string>
 </resources>
