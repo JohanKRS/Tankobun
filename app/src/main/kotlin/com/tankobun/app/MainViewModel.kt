@@ -136,6 +136,7 @@ import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceSearchResult
 import com.tankobun.core.model.withTitleLanguage
+import com.tankobun.core.model.withFallbackDetails
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -1934,10 +1935,33 @@ class MainViewModel(
                     genres = genres,
                     accessToken = container.tokenStore.accessToken(),
                     includeAdult = includeAdult,
+                    onTrendingLoaded = { trending ->
+                        if (_state.value.showNsfwContent == includeAdult && trending.isNotEmpty()) {
+                            val existingById = _state.value.homeTrending.associateBy(AnilistMedia::id)
+                            applyHomeTrending(
+                                trending.map { media -> media.withFallbackDetails(existingById[media.id]) },
+                            )
+                        }
+                    },
                 )
-                homeDataSource.saveHomeFeed(feed, includeAdult = includeAdult)
+                val visibleFeed = _state.value
+                val existingMediaById = buildList {
+                    addAll(staleCache?.trending.orEmpty())
+                    addAll(staleCache?.genreHighlights.orEmpty().map { it.media })
+                    addAll(visibleFeed.homeTrending)
+                    addAll(visibleFeed.homeGenreHighlights.map { it.media })
+                }.associateBy(AnilistMedia::id)
+                val stableFeed = feed.copy(
+                    trending = feed.trending.map { media ->
+                        media.withFallbackDetails(existingMediaById[media.id])
+                    },
+                    genreHighlights = feed.genreHighlights.map { highlight ->
+                        highlight.copy(media = highlight.media.withFallbackDetails(existingMediaById[highlight.media.id]))
+                    },
+                )
+                homeDataSource.saveHomeFeed(stableFeed, includeAdult = includeAdult)
                 if (_state.value.showNsfwContent == includeAdult) {
-                    applyHomeFeed(feed)
+                    applyHomeFeed(stableFeed)
                 }
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
@@ -1980,6 +2004,14 @@ class MainViewModel(
                     highlight.copy(media = highlight.media.withTitleLanguage(it.anilistTitleLanguage))
                 },
                 homeLoaded = true,
+            )
+        }
+    }
+
+    private fun applyHomeTrending(trending: List<AnilistMedia>) {
+        _state.update { state ->
+            state.copy(
+                homeTrending = trending.map { media -> media.withTitleLanguage(state.anilistTitleLanguage) },
             )
         }
     }

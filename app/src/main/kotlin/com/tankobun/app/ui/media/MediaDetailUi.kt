@@ -1185,7 +1185,7 @@ internal fun MangaInfoRow(media: AnilistMedia, compact: Boolean, onAuthorClick: 
     val authorName = media.staff.firstOrNull()
     val infoItems = listOfNotNull(
         MangaInfoItem(
-            icon = TankobunIcons.Person,
+            icon = TankobunIcons.Pencil,
             label = tankobunString(R.string.detail_author),
             value = media.staff.authorLabel(),
             onClick = authorName?.let { { onAuthorClick(it) } },

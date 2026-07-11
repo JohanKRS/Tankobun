@@ -582,7 +582,7 @@ private fun GenreHighlightCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (expanded) 58.dp else 64.dp)
+            .height(if (expanded) 70.dp else 74.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(9.dp),
         color = style.colors.panel,
@@ -592,7 +592,7 @@ private fun GenreHighlightCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .width(if (expanded) 148.dp else 170.dp)
+                    .width(if (expanded) 120.dp else 132.dp)
                     .fillMaxHeight(),
             ) {
                 AsyncImage(
@@ -616,45 +616,35 @@ private fun GenreHighlightCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
-                verticalArrangement = Arrangement.spacedBy(1.dp),
+                    .padding(start = 10.dp, top = 6.dp, end = 6.dp, bottom = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Icon(
-                        imageVector = highlight.genre.genreIcon(),
-                        contentDescription = null,
-                        tint = style.colors.accent.copy(alpha = 0.78f),
-                        modifier = Modifier.size(13.dp),
-                    )
-                    TankobunMediaStatusLabel(text = highlight.genre)
-                }
+                TankobunMediaStatusLabel(text = highlight.genre)
                 Text(
                     text = media.title.userPreferred,
                     fontFamily = TankobunDisplayFontFamily,
-                    fontSize = 18.sp,
-                    lineHeight = 18.sp,
+                    fontSize = 20.sp,
+                    lineHeight = 19.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
             Row(
-                modifier = Modifier.padding(end = 13.dp),
+                modifier = Modifier.padding(end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Icon(
                     imageVector = TankobunIcons.LocalFireDepartment,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(17.dp),
+                    modifier = Modifier.size(12.dp),
                 )
                 Text(
                     text = media.popularity.compactPopularity(),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                     color = style.colors.mutedContent,
+                    maxLines = 1,
                 )
             }
         }
@@ -711,27 +701,4 @@ private fun Int?.compactPopularity(): String {
         value >= 1_000 -> "${"%.1f".format(value / 1_000f)}K"
         else -> value.toString()
     }
-}
-
-private fun String.genreIcon(): ImageVector = when (this) {
-    "Action" -> TankobunIcons.GenreAction
-    "Adventure" -> TankobunIcons.GenreAdventure
-    "Comedy" -> TankobunIcons.GenreComedy
-    "Drama" -> TankobunIcons.GenreDrama
-    "Ecchi" -> TankobunIcons.GenreEcchi
-    "Fantasy" -> TankobunIcons.GenreFantasy
-    "Hentai" -> TankobunIcons.GenreHentai
-    "Horror" -> TankobunIcons.GenreHorror
-    "Mahou Shoujo" -> TankobunIcons.GenreMahouShoujo
-    "Mecha" -> TankobunIcons.GenreMecha
-    "Music" -> TankobunIcons.GenreMusic
-    "Mystery" -> TankobunIcons.GenreMystery
-    "Psychological" -> TankobunIcons.GenrePsychological
-    "Romance" -> TankobunIcons.GenreRomance
-    "Sci-Fi" -> TankobunIcons.GenreSciFi
-    "Slice of Life" -> TankobunIcons.GenreSliceOfLife
-    "Sports" -> TankobunIcons.GenreSports
-    "Supernatural" -> TankobunIcons.GenreSupernatural
-    "Thriller" -> TankobunIcons.GenreThriller
-    else -> TankobunIcons.Category
 }

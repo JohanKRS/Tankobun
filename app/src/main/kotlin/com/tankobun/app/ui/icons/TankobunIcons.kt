@@ -50,6 +50,7 @@ internal object TankobunIcons {
     val LocalOffer: ImageVector = TablerIcons.Tag
     val Palette: ImageVector = TablerIcons.Palette
     val Pause: ImageVector = TablerIcons.PlayerPause
+    val Pencil: ImageVector = TablerIcons.Pencil
     val Person: ImageVector = TablerIcons.User
     val PlayArrow: ImageVector = TablerIcons.PlayerPlay
     val PlaylistRemove: ImageVector = TablerIcons.List

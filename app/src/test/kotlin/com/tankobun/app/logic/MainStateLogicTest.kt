@@ -114,6 +114,27 @@ class MainStateLogicTest {
     }
 
     @Test
+    fun selectedAniListDetailsDoNotDowngradeEnrichedAuthorAndHeroImage() {
+        val enriched = media(42, "Initial").copy(
+            staff = listOf("Creator Name"),
+            mainCharacterImage = "https://example.com/character.jpg",
+        )
+
+        val next = TankobunUiState(selectedMedia = enriched).withSelectedAniListDetails(
+            mediaId = 42,
+            media = media(42, "Updated"),
+            entry = null,
+            recommendations = emptyList(),
+            recommendationsPage = 0,
+            recommendationsHasMore = false,
+        )
+
+        assertEquals("Updated", next.selectedMedia?.title?.userPreferred)
+        assertEquals(listOf("Creator Name"), next.selectedMedia?.staff)
+        assertEquals("https://example.com/character.jpg", next.selectedMedia?.mainCharacterImage)
+    }
+
+    @Test
     fun syncedListEntryMergesLibraryAndKeepsHigherLocalProgress() {
         val media = media(42, "Manga")
         val entry = entry(mediaId = 42, progress = 4)

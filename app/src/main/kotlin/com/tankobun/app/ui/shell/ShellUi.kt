@@ -34,7 +34,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -143,6 +142,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
@@ -159,7 +159,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
@@ -167,6 +166,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -900,6 +900,13 @@ internal fun TankobunScaffold(
                                 4 -> settingsRoute.settingsTitle()
                                 else -> tankobunString(R.string.app_name)
                             },
+                        pageIcon = when (selectedTab) {
+                            1 -> TankobunIcons.LibraryBooks
+                            2 -> TankobunIcons.Explore
+                            3 -> TankobunIcons.Download
+                            4 -> TankobunIcons.Settings
+                            else -> TankobunIcons.Home
+                        },
                         hazeState = chromeHazeState,
                         showBack = canNavigateBack,
                         ignoreDisplayCutout = ignoreDisplayCutout,
@@ -1174,6 +1181,7 @@ internal fun displayCutoutEndPadding(ignoreDisplayCutout: Boolean): Dp {
 @Composable
 internal fun TankobunTopBar(
     title: String,
+    pageIcon: ImageVector,
     hazeState: HazeState,
     showBack: Boolean,
     ignoreDisplayCutout: Boolean,
@@ -1193,7 +1201,6 @@ internal fun TankobunTopBar(
     val barHeight = if (compact) 48.dp else 72.dp
     val horizontalPadding = if (compact) 10.dp else 18.dp
     val iconSize = if (compact) 18.dp else 24.dp
-    val logoSize = if (compact) 36.dp else 56.dp
     val spacing = if (compact) 7.dp else 12.dp
     val contentColor = LocalTankobunStyle.current.colors.panelContent
     TankobunGlassChrome(
@@ -1232,23 +1239,28 @@ internal fun TankobunTopBar(
                     }
                 }
                 if (!showBack) {
-                    Image(
-                        painter = painterResource(R.drawable.ic_launcher_foreground),
+                    Icon(
+                        imageVector = pageIcon,
                         contentDescription = null,
-                        modifier = Modifier.size(logoSize),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(27.dp),
                     )
                 }
                 Text(
-                    title,
+                    text = if (mediaDetailActive) title else title.uppercase(Locale.ROOT),
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    fontWeight = FontWeight.Bold,
                     style = when {
                         mediaDetailActive && compact -> MaterialTheme.typography.titleMedium
                         mediaDetailActive -> MaterialTheme.typography.titleLarge
-                        compact -> MaterialTheme.typography.titleSmall
-                        else -> MaterialTheme.typography.titleLarge
+                        else -> MaterialTheme.typography.headlineSmall.copy(
+                            fontFamily = TankobunDisplayFontFamily,
+                            fontSize = 25.sp,
+                            lineHeight = 26.sp,
+                            fontWeight = FontWeight.Normal,
+                            letterSpacing = 1.2.sp,
+                        )
                     },
                 )
             }

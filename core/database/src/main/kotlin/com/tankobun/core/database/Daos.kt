@@ -3,6 +3,7 @@ package com.tankobun.core.database
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -20,11 +21,53 @@ interface MediaDao {
     @Query("SELECT * FROM anilist_media ORDER BY titleUserPreferred COLLATE NOCASE")
     suspend fun cachedMedia(): List<AnilistMediaEntity>
 
-    @Upsert
-    suspend fun upsertMedia(media: List<AnilistMediaEntity>)
+    @Query("SELECT * FROM anilist_media WHERE id IN (:mediaIds)")
+    suspend fun cachedMedia(mediaIds: List<Int>): List<AnilistMediaEntity>
 
     @Upsert
-    suspend fun upsertMedia(media: AnilistMediaEntity)
+    suspend fun upsertMediaEntities(media: List<AnilistMediaEntity>)
+
+    @Transaction
+    suspend fun upsertMedia(media: List<AnilistMediaEntity>) {
+        if (media.isEmpty()) return
+        val existingById = cachedMedia(media.map(AnilistMediaEntity::id)).associateBy(AnilistMediaEntity::id)
+        upsertMediaEntities(media.map { incoming -> incoming.withFallbackDetails(existingById[incoming.id]) })
+    }
+
+    @Transaction
+    suspend fun upsertMedia(media: AnilistMediaEntity) {
+        upsertMedia(listOf(media))
+    }
+}
+
+private fun AnilistMediaEntity.withFallbackDetails(fallback: AnilistMediaEntity?): AnilistMediaEntity {
+    if (fallback == null) return this
+    return copy(
+        idMal = idMal ?: fallback.idMal,
+        titleRomaji = titleRomaji ?: fallback.titleRomaji,
+        titleEnglish = titleEnglish ?: fallback.titleEnglish,
+        titleNative = titleNative ?: fallback.titleNative,
+        titleUserPreferred = titleUserPreferred.ifBlank { fallback.titleUserPreferred },
+        description = description ?: fallback.description,
+        coverImage = coverImage ?: fallback.coverImage,
+        bannerImage = bannerImage ?: fallback.bannerImage,
+        mainCharacterImage = mainCharacterImage ?: fallback.mainCharacterImage,
+        chapters = chapters ?: fallback.chapters,
+        volumes = volumes ?: fallback.volumes,
+        format = format ?: fallback.format,
+        countryOfOrigin = countryOfOrigin ?: fallback.countryOfOrigin,
+        status = status ?: fallback.status,
+        averageScore = averageScore ?: fallback.averageScore,
+        popularity = popularity ?: fallback.popularity,
+        startDateYear = startDateYear ?: fallback.startDateYear,
+        endDateYear = endDateYear ?: fallback.endDateYear,
+        siteUrl = siteUrl ?: fallback.siteUrl,
+        genres = genres.ifEmpty { fallback.genres },
+        synonyms = synonyms.ifEmpty { fallback.synonyms },
+        staff = staff.ifEmpty { fallback.staff },
+        tags = tags.ifEmpty { fallback.tags },
+        updatedAtEpochSeconds = updatedAtEpochSeconds ?: fallback.updatedAtEpochSeconds,
+    )
 }
 
 @Dao

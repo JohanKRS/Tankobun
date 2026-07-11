@@ -44,6 +44,7 @@ class AnilistRepository(
         genres: List<String>,
         accessToken: String? = null,
         includeAdult: Boolean = false,
+        onTrendingLoaded: (List<AnilistMedia>) -> Unit = {},
     ): AnilistHomeFeed {
         val variables = buildJsonObject {
             if (!includeAdult) put("isAdult", false)
@@ -60,6 +61,7 @@ class AnilistRepository(
             ?.jsonArray
             .orEmpty()
             .map(AnilistJsonMapper::media)
+        onTrendingLoaded(trending)
         val candidatesByGenre = linkedMapOf<String, MutableList<AnilistMedia>>()
 
         suspend fun loadGenreCandidates(

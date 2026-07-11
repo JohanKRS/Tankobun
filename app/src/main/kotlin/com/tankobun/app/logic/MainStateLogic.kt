@@ -10,6 +10,7 @@ import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.withTitleLanguage
+import com.tankobun.core.model.withFallbackDetails
 import java.util.Locale
 
 internal fun TankobunUiState.readerSourceForChapter(chapter: SourceChapter): SourceDescriptor? =
@@ -149,7 +150,7 @@ internal fun TankobunUiState.withSelectedAniListDetails(
 ): TankobunUiState {
     if (selectedMedia?.id != mediaId) return this
 
-    val effectiveMedia = media ?: selectedMedia
+    val effectiveMedia = media?.withFallbackDetails(selectedMedia) ?: selectedMedia
     val preserveTrackingForm = trackingDirty || trackingSaveInProgress || trackingSaveFailed
     val nextItems = if (entry == null) {
         libraryItems

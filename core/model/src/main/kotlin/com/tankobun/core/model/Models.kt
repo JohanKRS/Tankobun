@@ -97,6 +97,38 @@ data class AnilistMedia(
     val mainCharacterImage: String? = null,
 )
 
+fun AnilistMedia.withFallbackDetails(fallback: AnilistMedia?): AnilistMedia {
+    if (fallback == null || fallback.id != id) return this
+    return copy(
+        idMal = idMal ?: fallback.idMal,
+        title = title.copy(
+            romaji = title.romaji ?: fallback.title.romaji,
+            english = title.english ?: fallback.title.english,
+            native = title.native ?: fallback.title.native,
+            userPreferred = title.userPreferred.ifBlank { fallback.title.userPreferred },
+        ),
+        description = description ?: fallback.description,
+        coverImage = coverImage ?: fallback.coverImage,
+        bannerImage = bannerImage ?: fallback.bannerImage,
+        chapters = chapters ?: fallback.chapters,
+        volumes = volumes ?: fallback.volumes,
+        format = format ?: fallback.format,
+        status = status ?: fallback.status,
+        averageScore = averageScore ?: fallback.averageScore,
+        popularity = popularity ?: fallback.popularity,
+        startDateYear = startDateYear ?: fallback.startDateYear,
+        endDateYear = endDateYear ?: fallback.endDateYear,
+        siteUrl = siteUrl ?: fallback.siteUrl,
+        genres = genres.ifEmpty { fallback.genres },
+        synonyms = synonyms.ifEmpty { fallback.synonyms },
+        updatedAtEpochSeconds = updatedAtEpochSeconds ?: fallback.updatedAtEpochSeconds,
+        staff = staff.ifEmpty { fallback.staff },
+        tags = tags.ifEmpty { fallback.tags },
+        countryOfOrigin = countryOfOrigin ?: fallback.countryOfOrigin,
+        mainCharacterImage = mainCharacterImage ?: fallback.mainCharacterImage,
+    )
+}
+
 data class AnilistGenreHighlight(
     val genre: String,
     val media: AnilistMedia,
