@@ -893,7 +893,13 @@ internal fun TankobunScaffold(
                 if (!homeRootActive) {
                     TankobunTopBar(
                         title = selectedMedia?.title?.userPreferred
-                            ?: if (selectedTab == 4 && settingsRoute != SettingsRoute.MAIN) settingsRoute.settingsTitle() else tankobunString(R.string.app_name),
+                            ?: when (selectedTab) {
+                                1 -> tankobunString(R.string.common_library)
+                                2 -> tankobunString(R.string.common_browse)
+                                3 -> tankobunString(R.string.common_downloads)
+                                4 -> settingsRoute.settingsTitle()
+                                else -> tankobunString(R.string.app_name)
+                            },
                         hazeState = chromeHazeState,
                         showBack = canNavigateBack,
                         ignoreDisplayCutout = ignoreDisplayCutout,

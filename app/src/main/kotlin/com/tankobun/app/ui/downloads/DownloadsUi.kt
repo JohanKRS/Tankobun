@@ -236,11 +236,18 @@ internal fun DownloadsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    TankobunSectionHeader(
-                        title = tankobunString(R.string.common_downloads),
-                        trailing = if (compactLayout) null else downloadSummary,
-                        modifier = Modifier.weight(1f),
-                    )
+                    if (compactLayout) {
+                        Spacer(Modifier.weight(1f))
+                    } else {
+                        Text(
+                            downloadSummary,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = LocalTankobunStyle.current.colors.mutedContent,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     TankobunActionButton(
                         label = tankobunString(R.string.downloads_storage_manager),
                         icon = TankobunIcons.Settings,
@@ -389,4 +396,3 @@ internal fun TankobunUiState.downloadSummaryLabel(): String {
         complete.takeIf { it > 0 }?.let { tankobunString(R.string.downloads_complete_count, it) },
     ).joinToString(" / ")
 }
-

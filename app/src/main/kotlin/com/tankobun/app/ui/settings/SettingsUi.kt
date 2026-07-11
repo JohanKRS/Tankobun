@@ -287,18 +287,11 @@ internal fun SettingsIndexPane(
             .padding(top = chromeInsets.top + 18.dp, bottom = chromeInsets.bottom + 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                tankobunString(R.string.common_settings),
-                style = LocalTankobunStyle.current.typography.sectionLabel,
-                color = LocalTankobunStyle.current.colors.accent,
-            )
-            Text(
-                tankobunString(R.string.settings_index_intro),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            tankobunString(R.string.settings_index_intro),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             SettingsDetailRoutes.forEach { settingsRoute ->
                 SettingsRouteRow(
