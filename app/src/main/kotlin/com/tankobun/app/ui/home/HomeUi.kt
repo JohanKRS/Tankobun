@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -56,6 +55,7 @@ import com.tankobun.app.TankobunDisplayFontFamily
 import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.app.tankobunString
+import com.tankobun.app.ui.components.TankobunMediaStatusLabel
 import com.tankobun.app.ui.shell.LocalTankobunChromeInsets
 import com.tankobun.app.ui.media.AutoResizingMangaTitle
 import com.tankobun.core.model.AnilistGenreHighlight
@@ -373,12 +373,8 @@ private fun TrendingHero(
                         .height(if (expanded) 116.dp else 92.dp),
                 )
                 media.staff.firstOrNull()?.let { author ->
-                    Text(
+                    TankobunMediaStatusLabel(
                         text = tankobunString(R.string.home_by_author, author),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = style.colors.mutedContent,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxWidth(if (expanded) 0.40f else 0.66f)
                             .padding(top = 4.dp),
@@ -460,16 +456,12 @@ private fun ContinueReadingRow(
     horizontalPadding: androidx.compose.ui.unit.Dp,
     onOpen: (RecentReadingProgress) -> Unit,
 ) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val available = maxWidth - horizontalPadding * 2
-        val cardWidth = ((available - 30.dp) / 4).coerceIn(92.dp, 150.dp)
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = horizontalPadding),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(items, key = { it.media.id }) { item ->
-                ContinueReadingCard(item = item, width = cardWidth, onClick = { onOpen(item) })
-            }
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = horizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items(items, key = { it.media.id }) { item ->
+            ContinueReadingCard(item = item, width = 190.dp, onClick = { onOpen(item) })
         }
     }
 }
@@ -500,7 +492,7 @@ private fun ContinueReadingCard(
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(0.72f)
+                .aspectRatio(2f / 3f)
                 .clip(RoundedCornerShape(8.dp)),
         )
         Text(
@@ -620,24 +612,6 @@ private fun GenreHighlightCard(
                             ),
                         ),
                 )
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 8.dp)
-                        .size(40.dp),
-                    shape = RoundedCornerShape(7.dp),
-                    color = style.colors.chip.copy(alpha = 0.88f),
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    border = BorderStroke(1.dp, style.colors.outline.copy(alpha = 0.52f)),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = highlight.genre.genreIcon(),
-                            contentDescription = highlight.genre,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                }
             }
             Column(
                 modifier = Modifier
@@ -645,15 +619,18 @@ private fun GenreHighlightCard(
                     .padding(horizontal = 10.dp, vertical = 5.dp),
                 verticalArrangement = Arrangement.spacedBy(1.dp),
             ) {
-                Text(
-                    text = highlight.genre.uppercase(),
-                    fontFamily = TankobunDisplayFontFamily,
-                    fontSize = 11.sp,
-                    lineHeight = 11.sp,
-                    letterSpacing = 0.8.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        imageVector = highlight.genre.genreIcon(),
+                        contentDescription = null,
+                        tint = style.colors.accent.copy(alpha = 0.78f),
+                        modifier = Modifier.size(13.dp),
+                    )
+                    TankobunMediaStatusLabel(text = highlight.genre)
+                }
                 Text(
                     text = media.title.userPreferred,
                     fontFamily = TankobunDisplayFontFamily,
