@@ -8,15 +8,15 @@ import org.junit.Test
 
 class HomeHeroLogicTest {
     @Test
-    fun mobilePlacesMainCharacterOnTheRight() {
+    fun mobileUsesOnlyTheMainCharacter() {
         val images = media(characterCount = 4).mobileHeroCharacterImages()
 
-        assertEquals(listOf("character-2", "character-1"), images)
+        assertEquals(listOf("character-1"), images)
     }
 
     @Test
-    fun mobileKeepsSingleCharacterFallback() {
-        assertTrue(media(characterCount = 1).mobileHeroCharacterImages().isEmpty())
+    fun mobileUsesSingleAvailableCharacter() {
+        assertEquals(listOf("character-1"), media(characterCount = 1).mobileHeroCharacterImages())
     }
 
     @Test

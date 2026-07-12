@@ -1253,7 +1253,9 @@ internal fun TankobunTopBar(
                     imageVector = pageIcon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(27.dp),
+                    modifier = Modifier
+                        .offset(y = (-1).dp)
+                        .size(27.dp),
                 )
                 Text(
                     text = if (mediaDetailActive) title else title.uppercase(Locale.ROOT),
@@ -2011,7 +2013,9 @@ internal fun QuickDrawerSection(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier
+                    .offset(y = (-1).dp)
+                    .size(18.dp),
                 tint = LocalTankobunStyle.current.colors.accent,
             )
             Text(

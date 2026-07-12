@@ -3,11 +3,10 @@ package com.tankobun.app.logic
 import com.tankobun.core.model.AnilistMedia
 
 internal fun AnilistMedia.mobileHeroCharacterImages(): List<String> {
-    val images = (listOfNotNull(mainCharacterImage) + characterImages)
+    return (listOfNotNull(mainCharacterImage) + characterImages)
         .filter(String::isNotBlank)
         .distinct()
-        .take(2)
-    return if (images.size == 2) listOf(images[1], images[0]) else emptyList()
+        .take(1)
 }
 
 internal fun AnilistMedia.tabletHeroCharacterImages(
