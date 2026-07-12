@@ -1860,7 +1860,7 @@ internal fun QuickDrawer(
                                 end = 18.dp,
                                 bottom = 18.dp + chromeInsets.bottom,
                         ),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
                     ) {
                         QuickDrawerSection(
                             title = tankobunString(R.string.detail_track_manga),
@@ -2001,7 +2001,7 @@ internal fun QuickDrawerSection(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),

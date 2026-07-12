@@ -1079,11 +1079,20 @@ class MainViewModel(
             val items = cached.items
             if (items.isNotEmpty()) {
                 _state.update {
-                    it.copy(
+                    val updated = it.copy(
                         library = items.map { item -> item.media },
                         libraryItems = items,
                         librarySyncedAtEpochMillis = cached.syncedAtEpochMillis,
                     )
+                    val selectedId = updated.selectedMedia?.id
+                    if (selectedId == null) {
+                        updated
+                    } else {
+                        updated.withRefreshedTrackingEntry(
+                            mediaId = selectedId,
+                            entry = items.firstOrNull { item -> item.media.id == selectedId }?.entry,
+                        )
+                    }
                 }
                 loadRecentReadingProgress()
                 runScheduledAniListBackupIfDue()
@@ -1123,7 +1132,7 @@ class MainViewModel(
                 val viewer = synced.viewer
                 val items = synced.items
                 _state.update {
-                    it.copy(
+                    val updated = it.copy(
                         viewerName = viewer.name,
                         viewerAvatarUrl = viewer.avatarUrl,
                         viewerBannerImageUrl = viewer.bannerImageUrl,
@@ -1137,6 +1146,15 @@ class MainViewModel(
                         busy = false,
                         message = string(R.string.msg_library_synced),
                     )
+                    val selectedId = updated.selectedMedia?.id
+                    if (selectedId == null) {
+                        updated
+                    } else {
+                        updated.withRefreshedTrackingEntry(
+                            mediaId = selectedId,
+                            entry = items.firstOrNull { item -> item.media.id == selectedId }?.entry,
+                        )
+                    }
                 }
                 loadRecentReadingProgress()
                 processPendingAniListSync()

@@ -93,7 +93,7 @@ internal fun ProfileScreen(
             top = chromeInsets.top + 16.dp,
             bottom = chromeInsets.bottom + 20.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         item {
             ProfileHeaderCard(
@@ -168,14 +168,14 @@ private fun ProfileStatisticsDashboard(
         ),
     )
 
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val columns = when {
                 maxWidth >= 720.dp -> 5
                 maxWidth >= 430.dp -> 3
                 else -> 2
             }
-            val gap = 10.dp
+            val gap = 12.dp
             Column(verticalArrangement = Arrangement.spacedBy(gap)) {
                 metrics.chunked(columns).forEach { rowMetrics ->
                     Row(
@@ -202,7 +202,7 @@ private fun ProfileStatisticsDashboard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(270.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
                     ProfileStatusPanel(
@@ -219,7 +219,7 @@ private fun ProfileStatisticsDashboard(
                     )
                 }
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     ProfileStatusPanel(statuses = stats.statuses)
                     ProfileGenrePanel(genres = stats.genres)
                 }
@@ -237,9 +237,9 @@ private fun ProfileMetricTile(
 ) {
     val accent = LocalTankobunStyle.current.colors.accent
     val background = if (metric.emphasized) {
-        accent.copy(alpha = 0.18f)
+        accent.copy(alpha = 0.13f)
     } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f)
     }
     Surface(
         modifier = modifier.height(82.dp),
@@ -521,7 +521,7 @@ private fun ProfileLocalActivitySections(activity: LocalReadingActivity) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(390.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 ProfileActivityPanel(
                     activity = activity,
@@ -537,7 +537,7 @@ private fun ProfileLocalActivitySections(activity: LocalReadingActivity) {
                 )
             }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 ProfileActivityPanel(activity = activity)
                 ProfileAchievementsPanel(activity = activity)
             }
@@ -630,36 +630,35 @@ private fun ProfileActivityPanel(
 
 @Composable
 private fun ActivityMetricTile(metric: ActivityMetricSpec, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.height(68.dp),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
+    Column(
+        modifier = modifier
+            .height(68.dp)
+            .padding(horizontal = 6.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(
-                    imageVector = metric.icon,
-                    contentDescription = null,
-                    tint = LocalTankobunStyle.current.colors.accent,
-                    modifier = Modifier.size(15.dp),
-                )
-                Text(
-                    text = metric.value,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+            Icon(
+                imageVector = metric.icon,
+                contentDescription = null,
+                tint = LocalTankobunStyle.current.colors.accent,
+                modifier = Modifier.size(16.dp),
+            )
             Text(
-                text = metric.label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                text = metric.value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
             )
         }
+        Text(
+            text = metric.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -714,14 +713,13 @@ private fun ActivityStreakTile(
     icon: ImageVector,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+    Column(
+        modifier = modifier.padding(horizontal = 6.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(9.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(
                 imageVector = icon,
@@ -735,14 +733,14 @@ private fun ActivityStreakTile(
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
             )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -793,39 +791,29 @@ private fun AchievementTile(
     achievement: AchievementSpec,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
-        color = if (achievement.unlocked) {
-            LocalTankobunStyle.current.colors.accent.copy(alpha = 0.16f)
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
-        },
-        contentColor = if (achievement.unlocked) {
-            MaterialTheme.colorScheme.onSurface
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
-        },
+    Row(
+        modifier = modifier.padding(horizontal = 4.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(
-                imageVector = if (achievement.unlocked) TankobunIcons.Award else TankobunIcons.Lock,
-                contentDescription = null,
-                tint = if (achievement.unlocked) LocalTankobunStyle.current.colors.accent else LocalTankobunStyle.current.colors.mutedContent,
-                modifier = Modifier.size(17.dp),
-            )
-            Text(
-                text = achievement.label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (achievement.unlocked) FontWeight.Bold else FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        Icon(
+            imageVector = if (achievement.unlocked) TankobunIcons.Award else TankobunIcons.Lock,
+            contentDescription = null,
+            tint = if (achievement.unlocked) LocalTankobunStyle.current.colors.accent else LocalTankobunStyle.current.colors.mutedContent,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = achievement.label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (achievement.unlocked) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f)
+            },
+            fontWeight = if (achievement.unlocked) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -866,38 +854,32 @@ private fun ProfileTagsPanel(tags: List<AnilistStatItem>) {
 
 @Composable
 private fun ProfileTagTile(item: AnilistStatItem, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
+    Row(
+        modifier = modifier.padding(horizontal = 4.dp, vertical = 9.dp),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = TankobunIcons.Tag,
-                contentDescription = null,
-                tint = LocalTankobunStyle.current.colors.accent,
-                modifier = Modifier.size(15.dp),
+        Icon(
+            imageVector = TankobunIcons.Tag,
+            contentDescription = null,
+            tint = LocalTankobunStyle.current.colors.accent,
+            modifier = Modifier.size(16.dp),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = item.name,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = item.name,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = tankobunString(R.string.profile_stat_detail, item.count, item.chaptersRead),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            Text(
+                text = tankobunString(R.string.profile_stat_detail, item.count, item.chaptersRead),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -909,12 +891,12 @@ private fun ProfileSectionPanel(
 ) {
     TankobunPanel(
         modifier = modifier.fillMaxWidth(),
-        color = LocalTankobunStyle.current.colors.panel,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
         contentColor = LocalTankobunStyle.current.colors.panelContent,
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             content()
         }

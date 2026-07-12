@@ -159,6 +159,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
@@ -1652,20 +1654,53 @@ internal fun AniListScoreInput(
 
 @Composable
 internal fun StarScoreInput(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    val selected = value.toDoubleOrNull()?.roundToInt() ?: 0
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(tankobunString(R.string.common_score), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val selectedScore = value.toDoubleOrNull()?.roundToInt()?.coerceIn(0, 5) ?: 0
+    val accent = LocalTankobunStyle.current.colors.accent
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                tankobunString(R.string.common_score),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = if (selectedScore > 0) "$selectedScore / 5" else "— / 5",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (selectedScore > 0) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             (1..5).forEach { star ->
-                IconButton(
-                    onClick = { onValueChange(if (selected == star) "" else star.toString()) },
-                    modifier = Modifier.size(34.dp),
+                val starSelected = star <= selectedScore
+                Surface(
+                    onClick = { onValueChange(if (selectedScore == star) "" else star.toString()) },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .semantics { selected = starSelected },
+                    shape = RoundedCornerShape(99.dp),
+                    color = if (starSelected) accent else Color.Transparent,
+                    contentColor = if (starSelected) {
+                        LocalTankobunStyle.current.colors.selectedChipContent
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    border = if (starSelected) null else BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                    ),
                 ) {
-                    Icon(
-                        if (star <= selected) TankobunIcons.Star else TankobunIcons.StarBorder,
-                        contentDescription = tankobunString(R.string.detail_star_score_cd, star),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            TankobunIcons.Star,
+                            contentDescription = tankobunString(R.string.detail_star_score_cd, star),
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
                 }
             }
         }
