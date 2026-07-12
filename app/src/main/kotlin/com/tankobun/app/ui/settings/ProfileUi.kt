@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -117,8 +116,12 @@ internal fun ProfileScreen(
                 )
             }
         }
-        item { ProfileStatisticsDashboard(stats = stats) }
-        item { ProfileLocalActivitySections(activity = state.localReadingActivity) }
+        item {
+            ProfileStatisticsDashboard(
+                stats = stats,
+                activity = state.localReadingActivity,
+            )
+        }
     }
 }
 
@@ -131,7 +134,10 @@ private data class ProfileMetricSpec(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ProfileStatisticsDashboard(stats: AnilistMangaStats) {
+private fun ProfileStatisticsDashboard(
+    stats: AnilistMangaStats,
+    activity: LocalReadingActivity,
+) {
     val chaptersPerManga = if (stats.count > 0) stats.chaptersRead.toDouble() / stats.count else 0.0
     val metrics = listOf(
         ProfileMetricSpec(
@@ -188,12 +194,14 @@ private fun ProfileStatisticsDashboard(stats: AnilistMangaStats) {
             }
         }
 
+        ProfileLocalActivitySections(activity = activity)
+
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             if (maxWidth >= 700.dp) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(IntrinsicSize.Max),
+                        .height(270.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
@@ -512,7 +520,7 @@ private fun ProfileLocalActivitySections(activity: LocalReadingActivity) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(IntrinsicSize.Max),
+                    .height(390.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 ProfileActivityPanel(
