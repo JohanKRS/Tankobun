@@ -23,8 +23,8 @@ object AnilistQueries {
           description(asHtml: false)
           coverImage { extraLarge large color }
           bannerImage
-          characters(role: MAIN, sort: [FAVOURITES_DESC], page: 1, perPage: 1) {
-            nodes { image { large } }
+          characters(sort: [FAVOURITES_DESC], page: 1, perPage: 12) {
+            edges { role node { image { large } } }
           }
           staff(page: 1, perPage: 8) {
             edges { role node { name { userPreferred } } }

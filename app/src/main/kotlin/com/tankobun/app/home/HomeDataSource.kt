@@ -67,10 +67,10 @@ internal class HomeDataSource(
     }
 
     private fun trendingKey(includeAdult: Boolean): String =
-        "home:v2:${adultCacheSegment(includeAdult)}:trending"
+        "home:v4:${adultCacheSegment(includeAdult)}:trending"
 
     private fun genreKey(genre: String, includeAdult: Boolean): String =
-        "home:v2:${adultCacheSegment(includeAdult)}:genre:$genre"
+        "home:v4:${adultCacheSegment(includeAdult)}:genre:$genre"
 
     private fun adultCacheSegment(includeAdult: Boolean): String = if (includeAdult) "nsfw" else "safe"
 }

@@ -22,6 +22,7 @@ object DatabaseFactory {
                 MIGRATION_7_8,
                 MIGRATION_8_9,
                 MIGRATION_9_10,
+                MIGRATION_10_11,
             )
             .build()
     }
@@ -171,6 +172,13 @@ object DatabaseFactory {
     private val MIGRATION_9_10 = object : Migration(9, 10) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `mainCharacterImage` TEXT")
+        }
+    }
+
+    private val MIGRATION_10_11 = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `anilist_media` ADD COLUMN `characterImages` TEXT NOT NULL DEFAULT ''")
+            db.execSQL("UPDATE `anilist_media` SET `characterImages` = `mainCharacterImage` WHERE `mainCharacterImage` IS NOT NULL")
         }
     }
 }

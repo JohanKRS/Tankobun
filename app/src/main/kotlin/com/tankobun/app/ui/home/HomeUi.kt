@@ -2,12 +2,14 @@ package com.tankobun.app.ui.home
 
 import com.tankobun.app.ui.icons.TankobunIcons
 
+import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,13 +42,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.tankobun.app.LocalTankobunStyle
@@ -55,6 +65,9 @@ import com.tankobun.app.TankobunDisplayFontFamily
 import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.app.tankobunString
+import com.tankobun.app.logic.tabletHeroCharacterImages
+import com.tankobun.app.logic.mobileHeroCharacterImages
+import com.tankobun.app.ui.browse.browseGenreLabel
 import com.tankobun.app.ui.components.TankobunMediaStatusLabel
 import com.tankobun.app.ui.shell.LocalTankobunChromeInsets
 import com.tankobun.app.ui.media.AutoResizingMangaTitle
@@ -82,7 +95,7 @@ internal fun HomeScreen(
             top = chromeInsets.top + 18.dp,
             bottom = chromeInsets.bottom + 18.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         item {
             HomeSection(
@@ -267,10 +280,21 @@ private fun TrendingHero(
 ) {
     val style = LocalTankobunStyle.current
     val backdrop = style.colors.panel
-    val image = if (expanded) {
-        media.bannerImage ?: media.coverImage ?: media.mainCharacterImage
+    val configuration = LocalConfiguration.current
+    val landscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val mosaicImages = if (expanded) {
+        media.tabletHeroCharacterImages(
+            landscape = landscape,
+            screenWidthDp = configuration.screenWidthDp,
+        )
     } else {
-        media.mainCharacterImage ?: media.coverImage ?: media.bannerImage
+        media.mobileHeroCharacterImages()
+    }
+    val showCharacterMosaic = mosaicImages.isNotEmpty()
+    val image = if (expanded) {
+        media.bannerImage ?: if (showCharacterMosaic) null else media.coverImage ?: media.mainCharacterImage
+    } else {
+        if (showCharacterMosaic) null else media.mainCharacterImage ?: media.coverImage ?: media.bannerImage
     }
     Surface(
         modifier = modifier
@@ -283,21 +307,32 @@ private fun TrendingHero(
         border = BorderStroke(1.dp, style.colors.outline.copy(alpha = 0.78f)),
     ) {
         Box(Modifier.fillMaxSize()) {
-            image?.let { url ->
-                Box(
+            if (showCharacterMosaic) {
+                HeroCharacterMosaic(
+                    imageUrls = mosaicImages,
+                    title = media.title.userPreferred,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight()
-                        .fillMaxWidth(if (expanded) 0.72f else 1f),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AsyncImage(
-                        model = url,
-                        contentDescription = media.title.userPreferred,
-                        contentScale = if (expanded) ContentScale.Crop else ContentScale.FillHeight,
-                        alignment = if (expanded) Alignment.Center else Alignment.CenterEnd,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                        .fillMaxWidth(0.72f),
+                )
+            } else {
+                image?.let { url ->
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
+                            .fillMaxWidth(if (expanded) 0.72f else 1f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AsyncImage(
+                            model = url,
+                            contentDescription = media.title.userPreferred,
+                            contentScale = if (expanded) ContentScale.Crop else ContentScale.FillHeight,
+                            alignment = if (expanded) Alignment.Center else Alignment.CenterEnd,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
             Box(
@@ -308,17 +343,20 @@ private fun TrendingHero(
                             colorStops = if (expanded) {
                                 arrayOf(
                                     0.0f to backdrop,
-                                    0.26f to backdrop,
-                                    0.42f to backdrop.copy(alpha = 0.88f),
-                                    0.62f to backdrop.copy(alpha = 0.28f),
-                                    0.76f to backdrop.copy(alpha = 0.06f),
+                                    0.26f to backdrop.copy(alpha = 0.94f),
+                                    0.36f to backdrop.copy(alpha = 0.70f),
+                                    0.50f to backdrop.copy(alpha = 0.38f),
+                                    0.64f to backdrop.copy(alpha = 0.14f),
+                                    0.78f to Color.Transparent,
                                     1.0f to Color.Transparent,
                                 )
                             } else {
                                 arrayOf(
                                     0.0f to backdrop,
-                                    0.38f to backdrop.copy(alpha = 0.98f),
-                                    0.70f to backdrop.copy(alpha = 0.55f),
+                                    0.26f to backdrop.copy(alpha = 0.95f),
+                                    0.36f to backdrop.copy(alpha = 0.74f),
+                                    0.52f to backdrop.copy(alpha = 0.42f),
+                                    0.70f to backdrop.copy(alpha = 0.14f),
                                     1.0f to Color.Transparent,
                                 )
                             },
@@ -331,8 +369,8 @@ private fun TrendingHero(
                     .background(
                         Brush.verticalGradient(
                             0.0f to Color.Transparent,
-                            0.68f to Color.Transparent,
-                            1.0f to backdrop.copy(alpha = 0.9f),
+                            0.72f to Color.Transparent,
+                            1.0f to backdrop.copy(alpha = 0.68f),
                         ),
                     ),
             )
@@ -365,14 +403,14 @@ private fun TrendingHero(
                     compact = true,
                     color = style.colors.panelContent,
                     modifier = Modifier
-                        .fillMaxWidth(if (expanded) 0.42f else 0.68f)
+                        .fillMaxWidth(if (expanded) 0.38f else 0.68f)
                         .height(if (expanded) 116.dp else 92.dp),
                 )
                 media.staff.firstOrNull()?.let { author ->
                     TankobunMediaStatusLabel(
                         text = tankobunString(R.string.home_by_author, author),
                         modifier = Modifier
-                            .fillMaxWidth(if (expanded) 0.40f else 0.66f)
+                            .fillMaxWidth(if (expanded) 0.36f else 0.66f)
                             .padding(top = 4.dp),
                     )
                 }
@@ -382,10 +420,10 @@ private fun TrendingHero(
                         style = MaterialTheme.typography.bodySmall,
                         color = style.colors.panelContent.copy(alpha = 0.86f),
                         lineHeight = 18.sp,
-                        maxLines = 3,
+                        maxLines = if (expanded) 5 else 3,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
-                            .fillMaxWidth(if (expanded) 0.42f else 0.62f)
+                            .fillMaxWidth(if (expanded) 0.38f else 0.62f)
                             .padding(top = 8.dp),
                     )
                 }
@@ -430,6 +468,57 @@ private fun TrendingHero(
 }
 
 @Composable
+private fun HeroCharacterMosaic(
+    imageUrls: List<String>,
+    title: String,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier = modifier) {
+        val overlap = 14.dp
+        val panelWidth = (maxWidth + overlap * (imageUrls.size - 1).toFloat()) / imageUrls.size
+        imageUrls.forEachIndexed { index, imageUrl ->
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
+                modifier = Modifier
+                    .offset(x = (panelWidth - overlap) * index.toFloat())
+                    .width(panelWidth)
+                    .fillMaxHeight()
+                    .clip(
+                        SlantedHeroPanelShape(
+                            first = index == 0,
+                            last = index == imageUrls.lastIndex,
+                        ),
+                    ),
+            )
+        }
+    }
+}
+
+private class SlantedHeroPanelShape(
+    private val first: Boolean,
+    private val last: Boolean,
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val slant = (size.width * 0.10f).coerceAtMost(with(density) { 16.dp.toPx() })
+        val path = Path().apply {
+            moveTo(if (first) 0f else slant, 0f)
+            lineTo(size.width, 0f)
+            lineTo(if (last) size.width else size.width - slant, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
+
+@Composable
 private fun HeroGenreChip(genre: String) {
     Surface(
         shape = RoundedCornerShape(6.dp),
@@ -438,7 +527,7 @@ private fun HeroGenreChip(genre: String) {
         border = BorderStroke(1.dp, LocalTankobunStyle.current.colors.outline.copy(alpha = 0.46f)),
     ) {
         Text(
-            text = genre,
+            text = browseGenreLabel(genre),
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
@@ -612,7 +701,7 @@ private fun GenreHighlightCard(
                     .padding(start = 10.dp, top = 6.dp, end = 6.dp, bottom = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                TankobunMediaStatusLabel(text = highlight.genre)
+                TankobunMediaStatusLabel(text = browseGenreLabel(highlight.genre))
                 Text(
                     text = media.title.userPreferred,
                     fontFamily = TankobunDisplayFontFamily,

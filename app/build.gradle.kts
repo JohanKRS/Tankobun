@@ -51,7 +51,7 @@ android {
         versionCode = 39
         versionName = "3.3.4"
 
-        val clientId = localProperties.getProperty("anilistClientId", "")
+        val clientId = configValue("anilistClientId", "ANILIST_CLIENT_ID")
         buildConfigField("String", "ANILIST_CLIENT_ID", "\"$clientId\"")
         buildConfigField("String", "ANILIST_REDIRECT_URI", "\"tankobun://auth/anilist\"")
         buildConfigField("String", "UPDATE_MANIFEST_URL", buildConfigString(updateManifestUrl))

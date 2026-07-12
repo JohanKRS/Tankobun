@@ -52,6 +52,7 @@ private fun AnilistMediaEntity.withFallbackDetails(fallback: AnilistMediaEntity?
         coverImage = coverImage ?: fallback.coverImage,
         bannerImage = bannerImage ?: fallback.bannerImage,
         mainCharacterImage = mainCharacterImage ?: fallback.mainCharacterImage,
+        characterImages = characterImages.ifEmpty { fallback.characterImages },
         chapters = chapters ?: fallback.chapters,
         volumes = volumes ?: fallback.volumes,
         format = format ?: fallback.format,

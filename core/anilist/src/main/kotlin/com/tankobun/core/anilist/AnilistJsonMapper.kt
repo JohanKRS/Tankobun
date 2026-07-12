@@ -29,6 +29,7 @@ object AnilistJsonMapper {
         val cover = obj["coverImage"]?.jsonObject
         val startDate = obj["startDate"]?.jsonObject
         val endDate = obj["endDate"]?.jsonObject
+        val characterImages = obj.characterImages()
         return AnilistMedia(
             id = obj.int("id"),
             idMal = obj.intOrNull("idMal"),
@@ -59,17 +60,8 @@ object AnilistJsonMapper {
             staff = obj.staffNames(),
             tags = obj.mediaTagNames(),
             countryOfOrigin = obj.stringOrNull("countryOfOrigin"),
-            mainCharacterImage = obj["characters"]
-                ?.takeUnless { it is JsonNull }
-                ?.jsonObject
-                ?.get("nodes")
-                ?.jsonArray
-                ?.firstOrNull()
-                ?.jsonObject
-                ?.get("image")
-                ?.takeUnless { it is JsonNull }
-                ?.jsonObject
-                ?.stringOrNull("large"),
+            mainCharacterImage = characterImages.firstOrNull(),
+            characterImages = characterImages,
         )
     }
 
@@ -220,6 +212,44 @@ object AnilistJsonMapper {
         "REPEATING" -> MediaStatus.REPEATING
         else -> MediaStatus.UNKNOWN
     }
+}
+
+private fun JsonObject.characterImages(): List<String> {
+    val characters = this["characters"]
+        ?.takeUnless { it is JsonNull }
+        ?.jsonObject
+        ?: return emptyList()
+    val imagesByRole = characters["edges"]
+        ?.jsonArray
+        .orEmpty()
+        .mapNotNull { edge ->
+            val edgeObject = edge.jsonObject
+            val image = edgeObject["node"]
+                ?.takeUnless { it is JsonNull }
+                ?.jsonObject
+                ?.get("image")
+                ?.takeUnless { it is JsonNull }
+                ?.jsonObject
+                ?.stringOrNull("large")
+                ?: return@mapNotNull null
+            edgeObject.stringOrNull("role") to image
+        }
+    if (imagesByRole.isNotEmpty()) {
+        return imagesByRole
+            .sortedBy { (role, _) -> if (role == "MAIN") 0 else 1 }
+            .map { (_, image) -> image }
+            .distinct()
+    }
+    return characters["nodes"]
+        ?.jsonArray
+        .orEmpty()
+        .mapNotNull { node ->
+            node.jsonObject["image"]
+                ?.takeUnless { it is JsonNull }
+                ?.jsonObject
+                ?.stringOrNull("large")
+        }
+        .distinct()
 }
 
 private fun JsonObject.int(name: String): Int =

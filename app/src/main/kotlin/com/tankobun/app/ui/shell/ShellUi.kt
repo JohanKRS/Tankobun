@@ -1197,7 +1197,7 @@ internal fun TankobunTopBar(
         0.dp
     }
     val barHeight = if (compact) 48.dp else 72.dp
-    val horizontalPadding = if (compact) 10.dp else 18.dp
+    val horizontalPadding = 18.dp
     val iconSize = if (compact) 18.dp else 24.dp
     val spacing = if (compact) 7.dp else 12.dp
     val contentColor = LocalTankobunStyle.current.colors.panelContent

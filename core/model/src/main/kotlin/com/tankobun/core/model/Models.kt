@@ -95,6 +95,7 @@ data class AnilistMedia(
     val tags: List<String> = emptyList(),
     val countryOfOrigin: String? = null,
     val mainCharacterImage: String? = null,
+    val characterImages: List<String> = emptyList(),
 )
 
 fun AnilistMedia.withFallbackDetails(fallback: AnilistMedia?): AnilistMedia {
@@ -126,6 +127,7 @@ fun AnilistMedia.withFallbackDetails(fallback: AnilistMedia?): AnilistMedia {
         tags = tags.ifEmpty { fallback.tags },
         countryOfOrigin = countryOfOrigin ?: fallback.countryOfOrigin,
         mainCharacterImage = mainCharacterImage ?: fallback.mainCharacterImage,
+        characterImages = characterImages.ifEmpty { fallback.characterImages },
     )
 }
 

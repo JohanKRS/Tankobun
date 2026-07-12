@@ -167,6 +167,7 @@ class AnilistRepository(
                 highlight.copy(
                     media = highlight.media.copy(
                         mainCharacterImage = characterImages[highlight.media.id],
+                        characterImages = listOfNotNull(characterImages[highlight.media.id]),
                     ),
                 )
             },
