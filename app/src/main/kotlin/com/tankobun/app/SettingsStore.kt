@@ -7,6 +7,7 @@ import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistStatItem
 import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.ReaderMode
+import com.tankobun.app.state.LocalReadingActivity
 import java.util.Base64
 import java.util.Locale
 
@@ -418,6 +419,54 @@ class SettingsStore(context: Context) {
         preferences.edit().putString(KEY_VIEWER_BANNER_IMAGE_URL, url).apply()
     }
 
+    fun customProfileAvatarUri(): String? =
+        preferences.getString(KEY_CUSTOM_PROFILE_AVATAR_URI, null)
+
+    fun saveCustomProfileAvatarUri(uri: String?) {
+        preferences.edit().putString(KEY_CUSTOM_PROFILE_AVATAR_URI, uri).apply()
+    }
+
+    fun customProfileBannerUri(): String? =
+        preferences.getString(KEY_CUSTOM_PROFILE_BANNER_URI, null)
+
+    fun saveCustomProfileBannerUri(uri: String?) {
+        preferences.edit().putString(KEY_CUSTOM_PROFILE_BANNER_URI, uri).apply()
+    }
+
+    fun localReadingActivity(): LocalReadingActivity {
+        val parts = preferences.getString(KEY_LOCAL_READING_ACTIVITY, null)?.split('|').orEmpty()
+        if (parts.size != 10) return LocalReadingActivity()
+        return LocalReadingActivity(
+            generatedAtEpochMillis = parts[0].toLongOrNull() ?: 0L,
+            chaptersTracked = parts[1].toIntOrNull() ?: 0,
+            chaptersToday = parts[2].toIntOrNull() ?: 0,
+            chaptersLast7Days = parts[3].toIntOrNull() ?: 0,
+            chaptersLast30Days = parts[4].toIntOrNull() ?: 0,
+            averagePerActiveDay30 = parts[5].toDoubleOrNull() ?: 0.0,
+            currentStreakDays = parts[6].toIntOrNull() ?: 0,
+            longestStreakDays = parts[7].toIntOrNull() ?: 0,
+            totalReadingDays = parts[8].toIntOrNull() ?: 0,
+            last14Days = parts[9].split(',').mapNotNull(String::toIntOrNull).takeIf { it.size == 14 }
+                ?: List(14) { 0 },
+        )
+    }
+
+    fun saveLocalReadingActivity(activity: LocalReadingActivity) {
+        val encoded = listOf(
+            activity.generatedAtEpochMillis,
+            activity.chaptersTracked,
+            activity.chaptersToday,
+            activity.chaptersLast7Days,
+            activity.chaptersLast30Days,
+            activity.averagePerActiveDay30,
+            activity.currentStreakDays,
+            activity.longestStreakDays,
+            activity.totalReadingDays,
+            activity.last14Days.joinToString(","),
+        ).joinToString("|")
+        preferences.edit().putString(KEY_LOCAL_READING_ACTIVITY, encoded).apply()
+    }
+
     fun anilistMangaStats(): AnilistMangaStats? {
         val lines = preferences.getString(KEY_ANILIST_MANGA_STATS, null)
             ?.lineSequence()
@@ -575,6 +624,9 @@ class SettingsStore(context: Context) {
         const val KEY_VIEWER_NAME = "anilist.viewer.name"
         const val KEY_VIEWER_AVATAR_URL = "anilist.viewer.avatar.url"
         const val KEY_VIEWER_BANNER_IMAGE_URL = "anilist.viewer.banner.image.url"
+        const val KEY_CUSTOM_PROFILE_AVATAR_URI = "profile.custom.avatar.uri"
+        const val KEY_CUSTOM_PROFILE_BANNER_URI = "profile.custom.banner.uri"
+        const val KEY_LOCAL_READING_ACTIVITY = "profile.local.reading.activity"
         const val KEY_ANILIST_MANGA_STATS = "anilist.viewer.manga.stats"
         const val KEY_ANILIST_SCORE_FORMAT = "anilist.score.format"
         const val KEY_ANILIST_TITLE_LANGUAGE = "anilist.title.language"

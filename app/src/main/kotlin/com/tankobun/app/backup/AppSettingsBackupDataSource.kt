@@ -15,6 +15,7 @@ import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.logic.visibleSources
 import com.tankobun.app.state.BackupMissingSource
 import com.tankobun.app.state.TankobunUiState
+import com.tankobun.app.state.LocalReadingActivity
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistTitleLanguage
@@ -24,6 +25,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.util.Base64
 
 internal data class AppSettingsBackupRestoreResult(
     val missingSources: List<BackupMissingSource>,
@@ -120,6 +123,9 @@ internal class AppSettingsBackupDataSource(
             .put("backupSchedule", snapshot.backupSchedule.name)
             .put("backupContent", snapshot.backupContent.name)
             .put("scheduledBackupRetentionCount", snapshot.scheduledBackupRetentionCount)
+            .put("localReadingActivity", localReadingActivityJson(snapshot.localReadingActivity))
+            .put("customProfileAvatar", profileImageBase64(snapshot.customProfileAvatarUri) ?: JSONObject.NULL)
+            .put("customProfileBanner", profileImageBase64(snapshot.customProfileBannerUri) ?: JSONObject.NULL)
 
     private fun sourcesJson(snapshot: TankobunUiState): JSONObject =
         JSONObject()
@@ -204,6 +210,13 @@ internal class AppSettingsBackupDataSource(
         settings.enumOrNull<BackupSchedule>("backupSchedule")?.let(store::saveBackupSchedule)
         settings.enumOrNull<BackupContent>("backupContent")?.let(store::saveBackupContent)
         settings.optIntOrNull("scheduledBackupRetentionCount")?.let(store::saveScheduledBackupRetentionCount)
+        settings.optJSONObject("localReadingActivity")?.toLocalReadingActivity()?.let(store::saveLocalReadingActivity)
+        if (settings.has("customProfileAvatar")) {
+            store.saveCustomProfileAvatarUri(restoreProfileImage(settings.optStringOrNull("customProfileAvatar"), "avatar.img"))
+        }
+        if (settings.has("customProfileBanner")) {
+            store.saveCustomProfileBannerUri(restoreProfileImage(settings.optStringOrNull("customProfileBanner"), "banner.img"))
+        }
     }
 
     private fun currentSettingsSnapshot(): TankobunUiState {
@@ -254,6 +267,9 @@ internal class AppSettingsBackupDataSource(
             backupSchedule = store.backupSchedule(),
             backupContent = store.backupContent(),
             scheduledBackupRetentionCount = store.scheduledBackupRetentionCount(),
+            customProfileAvatarUri = store.customProfileAvatarUri(),
+            customProfileBannerUri = store.customProfileBannerUri(),
+            localReadingActivity = store.localReadingActivity(),
             extensionRepositoryUrl = store.extensionRepositoryUrl(),
             sourceLanguages = store.sourceLanguages(),
             disabledSourceKeys = store.disabledSourceKeys(),
@@ -303,8 +319,58 @@ internal class AppSettingsBackupDataSource(
 
     private companion object {
         const val BACKUP_TYPE = "tankobun.app-settings"
-        const val BACKUP_VERSION = 1
+        const val BACKUP_VERSION = 2
         const val JSON_INDENT = 2
+    }
+
+    private fun localReadingActivityJson(activity: LocalReadingActivity): JSONObject =
+        JSONObject()
+            .put("generatedAtEpochMillis", activity.generatedAtEpochMillis)
+            .put("chaptersTracked", activity.chaptersTracked)
+            .put("chaptersToday", activity.chaptersToday)
+            .put("chaptersLast7Days", activity.chaptersLast7Days)
+            .put("chaptersLast30Days", activity.chaptersLast30Days)
+            .put("averagePerActiveDay30", activity.averagePerActiveDay30)
+            .put("currentStreakDays", activity.currentStreakDays)
+            .put("longestStreakDays", activity.longestStreakDays)
+            .put("totalReadingDays", activity.totalReadingDays)
+            .put("last14Days", activity.last14Days.toJsonArray())
+
+    private fun JSONObject.toLocalReadingActivity(): LocalReadingActivity =
+        LocalReadingActivity(
+            generatedAtEpochMillis = optLong("generatedAtEpochMillis", 0L),
+            chaptersTracked = optInt("chaptersTracked", 0),
+            chaptersToday = optInt("chaptersToday", 0),
+            chaptersLast7Days = optInt("chaptersLast7Days", 0),
+            chaptersLast30Days = optInt("chaptersLast30Days", 0),
+            averagePerActiveDay30 = optDouble("averagePerActiveDay30", 0.0),
+            currentStreakDays = optInt("currentStreakDays", 0),
+            longestStreakDays = optInt("longestStreakDays", 0),
+            totalReadingDays = optInt("totalReadingDays", 0),
+            last14Days = optJSONArray("last14Days")
+                ?.let { array -> (0 until array.length()).map { index -> array.optInt(index, 0) } }
+                ?.takeIf { it.size == 14 }
+                ?: List(14) { 0 },
+        )
+
+    private fun profileImageBase64(uriString: String?): String? {
+        val uri = uriString?.takeIf { it.isNotBlank() }?.let(Uri::parse) ?: return null
+        val bytes = when (uri.scheme) {
+            "file" -> uri.path?.let(::File)?.takeIf(File::isFile)?.readBytes()
+            else -> container.application.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        } ?: return null
+        return Base64.getEncoder().encodeToString(bytes)
+    }
+
+    private fun restoreProfileImage(encoded: String?, fileName: String): String? {
+        val target = File(container.application.filesDir, "profile/$fileName")
+        if (encoded.isNullOrBlank()) {
+            target.delete()
+            return null
+        }
+        target.parentFile?.mkdirs()
+        target.writeBytes(Base64.getDecoder().decode(encoded))
+        return target.toURI().toString()
     }
 }
 

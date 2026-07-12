@@ -2,6 +2,8 @@ package com.tankobun.app.ui.settings
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas as ComposeCanvas
@@ -12,9 +14,12 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -50,6 +55,8 @@ import com.tankobun.app.statusLabel
 import com.tankobun.app.tankobunQuantityString
 import com.tankobun.app.tankobunString
 import com.tankobun.app.state.TankobunUiState
+import com.tankobun.app.state.LocalReadingActivity
+import com.tankobun.app.LibraryMode
 import com.tankobun.app.ui.components.TankobunPanel
 import com.tankobun.app.ui.icons.TankobunIcons
 import com.tankobun.app.ui.library.LibraryConnectPrompt
@@ -67,6 +74,18 @@ internal fun ProfileScreen(
 ) {
     val chromeInsets = LocalTankobunChromeInsets.current
     val context = LocalContext.current
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.setCustomProfileAvatarUri(it.toString()) }
+    }
+    val bannerPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.setCustomProfileBannerUri(it.toString()) }
+    }
+    LaunchedEffect(Unit) { viewModel.refreshLocalReadingActivity() }
+    val stats = if (state.libraryMode == LibraryMode.ANILIST && state.anilistMangaStats != null) {
+        state.anilistMangaStats
+    } else {
+        state.localMangaStats()
+    }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -77,11 +96,16 @@ internal fun ProfileScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        if (state.loggedIn) {
-            val stats = state.anilistMangaStats ?: state.localMangaStats()
-            item { ProfileHeaderCard(state = state) }
-            item { ProfileStatisticsDashboard(stats = stats) }
-        } else {
+        item {
+            ProfileHeaderCard(
+                state = state,
+                onEditAvatar = { avatarPicker.launch(arrayOf("image/*")) },
+                onEditBanner = { bannerPicker.launch(arrayOf("image/*")) },
+                onClearAvatar = { viewModel.setCustomProfileAvatarUri(null) },
+                onClearBanner = { viewModel.setCustomProfileBannerUri(null) },
+            )
+        }
+        if (!state.loggedIn) {
             item {
                 LibraryConnectPrompt(
                     clientConfigured = state.clientConfigured,
@@ -93,6 +117,8 @@ internal fun ProfileScreen(
                 )
             }
         }
+        item { ProfileStatisticsDashboard(stats = stats) }
+        item { ProfileLocalActivitySections(activity = state.localReadingActivity) }
     }
 }
 
@@ -144,18 +170,20 @@ private fun ProfileStatisticsDashboard(stats: AnilistMangaStats) {
                 else -> 2
             }
             val gap = 10.dp
-            val tileWidth = (maxWidth - gap * (columns - 1)) / columns
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(gap),
-                verticalArrangement = Arrangement.spacedBy(gap),
-                maxItemsInEachRow = columns,
-            ) {
-                metrics.forEach { metric ->
-                    ProfileMetricTile(
-                        metric = metric,
-                        modifier = Modifier.width(tileWidth),
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                metrics.chunked(columns).forEach { rowMetrics ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(gap),
+                    ) {
+                        rowMetrics.forEach { metric ->
+                            ProfileMetricTile(
+                                metric = metric,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        repeat(columns - rowMetrics.size) { Spacer(Modifier.weight(1f)) }
+                    }
                 }
             }
         }
@@ -163,17 +191,23 @@ private fun ProfileStatisticsDashboard(stats: AnilistMangaStats) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             if (maxWidth >= 700.dp) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Max),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
                     ProfileStatusPanel(
                         statuses = stats.statuses,
-                        modifier = Modifier.weight(0.44f),
+                        modifier = Modifier
+                            .weight(0.44f)
+                            .fillMaxHeight(),
                     )
                     ProfileGenrePanel(
                         genres = stats.genres,
-                        modifier = Modifier.weight(0.56f),
+                        modifier = Modifier
+                            .weight(0.56f)
+                            .fillMaxHeight(),
                     )
                 }
             } else {
@@ -266,14 +300,16 @@ private fun ProfileStatusPanel(
         } else {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 StatusDonut(
                     statuses = visible,
                     colors = colors,
                     total = total,
-                    modifier = Modifier.size(116.dp),
+                    modifier = Modifier
+                        .padding(start = 4.dp)
+                        .size(136.dp),
                 )
                 Column(
                     modifier = Modifier.weight(1f),
@@ -314,7 +350,7 @@ private fun StatusDonut(
                 style = Stroke(width = strokeWidth),
             )
             var startAngle = -90f
-            val gap = 3f
+            val gap = 2f
             statuses.forEachIndexed { index, item ->
                 val rawSweep = 360f * item.count / total.toFloat()
                 val sweep = (rawSweep - gap).coerceAtLeast(0f) * progress
@@ -324,7 +360,7 @@ private fun StatusDonut(
                         startAngle = startAngle,
                         sweepAngle = sweep,
                         useCenter = false,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Butt),
                     )
                 }
                 startAngle += rawSweep * progress
@@ -419,7 +455,7 @@ private fun ProfileGenreRow(item: AnilistStatItem, maxChapters: Int) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = TankobunIcons.Category,
+                imageVector = profileGenreIcon(item.name),
                 contentDescription = null,
                 tint = accent,
                 modifier = Modifier.size(14.dp),
@@ -458,13 +494,340 @@ private fun ProfileGenreRow(item: AnilistStatItem, maxChapters: Int) {
     }
 }
 
+private data class ActivityMetricSpec(
+    val label: String,
+    val value: String,
+    val icon: ImageVector,
+)
+
+private data class AchievementSpec(
+    val label: String,
+    val unlocked: Boolean,
+)
+
+@Composable
+private fun ProfileLocalActivitySections(activity: LocalReadingActivity) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        if (maxWidth >= 700.dp) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                ProfileActivityPanel(
+                    activity = activity,
+                    modifier = Modifier
+                        .weight(0.62f)
+                        .fillMaxHeight(),
+                )
+                ProfileAchievementsPanel(
+                    activity = activity,
+                    modifier = Modifier
+                        .weight(0.38f)
+                        .fillMaxHeight(),
+                )
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                ProfileActivityPanel(activity = activity)
+                ProfileAchievementsPanel(activity = activity)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ProfileActivityPanel(
+    activity: LocalReadingActivity,
+    modifier: Modifier = Modifier,
+) {
+    val metrics = listOf(
+        ActivityMetricSpec(
+            label = tankobunString(R.string.profile_activity_today),
+            value = activity.chaptersToday.formatProfileNumber(),
+            icon = TankobunIcons.Bolt,
+        ),
+        ActivityMetricSpec(
+            label = tankobunString(R.string.profile_activity_7_days),
+            value = activity.chaptersLast7Days.formatProfileNumber(),
+            icon = TankobunIcons.CalendarMonth,
+        ),
+        ActivityMetricSpec(
+            label = tankobunString(R.string.profile_activity_30_days),
+            value = activity.chaptersLast30Days.formatProfileNumber(),
+            icon = TankobunIcons.CalendarStats,
+        ),
+        ActivityMetricSpec(
+            label = tankobunString(R.string.profile_activity_average),
+            value = activity.averagePerActiveDay30.formatProfileDecimal(),
+            icon = TankobunIcons.ChartBar,
+        ),
+    )
+    ProfileSectionPanel(modifier = modifier) {
+        ProfileSectionHeading(
+            icon = TankobunIcons.Activity,
+            title = tankobunString(R.string.profile_activity_title),
+            subtitle = tankobunString(R.string.profile_activity_desc),
+        )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val columns = if (maxWidth >= 480.dp) 4 else 2
+            val gap = 8.dp
+            Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                metrics.chunked(columns).forEach { rowMetrics ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(gap),
+                    ) {
+                        rowMetrics.forEach { metric ->
+                            ActivityMetricTile(metric = metric, modifier = Modifier.weight(1f))
+                        }
+                        repeat(columns - rowMetrics.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+        Text(
+            text = tankobunString(R.string.profile_activity_last_14_days),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ProfileActivityBars(counts = activity.last14Days)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ActivityStreakTile(
+                label = tankobunString(R.string.profile_current_streak),
+                value = tankobunString(R.string.profile_days_value, activity.currentStreakDays),
+                icon = TankobunIcons.Whatshot,
+                modifier = Modifier.weight(1f),
+            )
+            ActivityStreakTile(
+                label = tankobunString(R.string.profile_best_streak),
+                value = tankobunString(R.string.profile_days_value, activity.longestStreakDays),
+                icon = TankobunIcons.Trophy,
+                modifier = Modifier.weight(1f),
+            )
+            ActivityStreakTile(
+                label = tankobunString(R.string.profile_reading_days),
+                value = tankobunString(R.string.profile_days_value, activity.totalReadingDays),
+                icon = TankobunIcons.CalendarStats,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActivityMetricTile(metric: ActivityMetricSpec, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.height(68.dp),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(
+                    imageVector = metric.icon,
+                    contentDescription = null,
+                    tint = LocalTankobunStyle.current.colors.accent,
+                    modifier = Modifier.size(15.dp),
+                )
+                Text(
+                    text = metric.value,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Text(
+                text = metric.label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileActivityBars(counts: List<Int>) {
+    val normalized = counts.takeLast(14).let { values -> List(14 - values.size) { 0 } + values }
+    val max = normalized.maxOrNull()?.coerceAtLeast(1) ?: 1
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(58.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        normalized.forEachIndexed { index, count ->
+            var started by remember(index, normalized) { mutableStateOf(false) }
+            val target = count.toFloat() / max
+            val progress by animateFloatAsState(
+                targetValue = if (started) target else 0f,
+                animationSpec = tween(durationMillis = 600, delayMillis = index * 24),
+                label = "Reading activity day $index",
+            )
+            LaunchedEffect(index, normalized) { started = true }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight((0.08f + progress * 0.92f).coerceIn(0f, 1f))
+                        .background(
+                            color = if (count > 0) {
+                                LocalTankobunStyle.current.colors.accent
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            },
+                            shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
+                        ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityStreakTile(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+    ) {
+        Column(
+            modifier = Modifier.padding(9.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = LocalTankobunStyle.current.colors.accent,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ProfileAchievementsPanel(
+    activity: LocalReadingActivity,
+    modifier: Modifier = Modifier,
+) {
+    val achievements = listOf(
+        AchievementSpec(tankobunString(R.string.profile_achievement_first), activity.chaptersTracked >= 1),
+        AchievementSpec(tankobunString(R.string.profile_achievement_streak_3), activity.longestStreakDays >= 3),
+        AchievementSpec(tankobunString(R.string.profile_achievement_streak_7), activity.longestStreakDays >= 7),
+        AchievementSpec(tankobunString(R.string.profile_achievement_chapters_100), activity.chaptersTracked >= 100),
+        AchievementSpec(tankobunString(R.string.profile_achievement_streak_30), activity.longestStreakDays >= 30),
+        AchievementSpec(tankobunString(R.string.profile_achievement_chapters_500), activity.chaptersTracked >= 500),
+    )
+    ProfileSectionPanel(modifier = modifier) {
+        ProfileSectionHeading(
+            icon = TankobunIcons.Trophy,
+            title = tankobunString(R.string.profile_achievements),
+            subtitle = tankobunString(R.string.profile_achievements_desc),
+        )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val columns = if (maxWidth >= 260.dp) 2 else 1
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                achievements.chunked(columns).forEach { rowAchievements ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        rowAchievements.forEach { achievement ->
+                            AchievementTile(
+                                achievement = achievement,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        repeat(columns - rowAchievements.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AchievementTile(
+    achievement: AchievementSpec,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        color = if (achievement.unlocked) {
+            LocalTankobunStyle.current.colors.accent.copy(alpha = 0.16f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
+        },
+        contentColor = if (achievement.unlocked) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
+        },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = if (achievement.unlocked) TankobunIcons.Award else TankobunIcons.Lock,
+                contentDescription = null,
+                tint = if (achievement.unlocked) LocalTankobunStyle.current.colors.accent else LocalTankobunStyle.current.colors.mutedContent,
+                modifier = Modifier.size(17.dp),
+            )
+            Text(
+                text = achievement.label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (achievement.unlocked) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProfileTagsPanel(tags: List<AnilistStatItem>) {
     val visible = tags
         .filter { it.count > 0 && it.name.isNotBlank() }
         .sortedWith(compareByDescending<AnilistStatItem> { it.count }.thenByDescending { it.chaptersRead })
-        .take(6)
+        .take(10)
     ProfileSectionPanel {
         ProfileSectionHeading(
             icon = TankobunIcons.Tag,
@@ -603,6 +966,30 @@ private fun statusIcon(name: String): ImageVector =
         "PLANNING", "PLAN_TO_READ" -> TankobunIcons.CalendarMonth
         "PAUSED" -> TankobunIcons.Pause
         "DROPPED" -> TankobunIcons.Close
+        else -> TankobunIcons.Category
+    }
+
+private fun profileGenreIcon(name: String): ImageVector =
+    when (name.trim().lowercase(Locale.ROOT).replace('_', ' ').replace('-', ' ')) {
+        "action" -> TankobunIcons.GenreAction
+        "adventure" -> TankobunIcons.GenreAdventure
+        "comedy" -> TankobunIcons.GenreComedy
+        "drama" -> TankobunIcons.GenreDrama
+        "ecchi" -> TankobunIcons.GenreEcchi
+        "fantasy" -> TankobunIcons.GenreFantasy
+        "hentai" -> TankobunIcons.GenreHentai
+        "horror" -> TankobunIcons.GenreHorror
+        "mahou shoujo" -> TankobunIcons.GenreMahouShoujo
+        "mecha" -> TankobunIcons.GenreMecha
+        "music" -> TankobunIcons.GenreMusic
+        "mystery" -> TankobunIcons.GenreMystery
+        "psychological" -> TankobunIcons.GenrePsychological
+        "romance" -> TankobunIcons.GenreRomance
+        "sci fi", "science fiction" -> TankobunIcons.GenreSciFi
+        "slice of life" -> TankobunIcons.GenreSliceOfLife
+        "sports" -> TankobunIcons.GenreSports
+        "supernatural" -> TankobunIcons.GenreSupernatural
+        "thriller" -> TankobunIcons.GenreThriller
         else -> TankobunIcons.Category
     }
 

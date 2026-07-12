@@ -22,11 +22,14 @@ internal object TankobunIcons {
     val ViewList: ImageVector = TablerIcons.LayoutList
     val AccountCircle: ImageVector = TablerIcons.User
     val Add: ImageVector = TablerIcons.Plus
+    val Activity: ImageVector = TablerIcons.Activity
+    val Award: ImageVector = TablerIcons.Award
     val AutoAwesome: ImageVector = TablerIcons.Stars
     val Backup: ImageVector = TablerIcons.DatabaseExport
     val BooksStack: ImageVector = TablerIcons.Stack2
     val Bolt: ImageVector = TablerIcons.Bolt
     val CalendarMonth: ImageVector = TablerIcons.Calendar
+    val CalendarStats: ImageVector = TablerIcons.CalendarStats
     val Category: ImageVector = TablerIcons.Shape
     val ChartBar: ImageVector = TablerIcons.ChartBar
     val ChartDonut: ImageVector = TablerIcons.ChartDonut
@@ -50,6 +53,7 @@ internal object TankobunIcons {
     val Hash: ImageVector = TablerIcons.Hash
     val Info: ImageVector = TablerIcons.InfoCircle
     val Link: ImageVector = TablerIcons.Link
+    val Lock: ImageVector = TablerIcons.Lock
     val LocalFireDepartment: ImageVector = TablerIcons.Flame
     val LocalOffer: ImageVector = TablerIcons.Tag
     val Palette: ImageVector = TablerIcons.Palette
@@ -58,6 +62,7 @@ internal object TankobunIcons {
     val Person: ImageVector = TablerIcons.User
     val PlayArrow: ImageVector = TablerIcons.PlayerPlay
     val PlaylistRemove: ImageVector = TablerIcons.List
+    val Photo: ImageVector = TablerIcons.Photo
     val Public: ImageVector = TablerIcons.World
     val Refresh: ImageVector = TablerIcons.Refresh
     val Replay: ImageVector = TablerIcons.RotateClockwise
@@ -80,6 +85,7 @@ internal object TankobunIcons {
     val Tag: ImageVector = TablerIcons.Tag
     val Translate: ImageVector = TablerIcons.Language
     val Tune: ImageVector = TablerIcons.AdjustmentsHorizontal
+    val Trophy: ImageVector = TablerIcons.Trophy
     val ViewAgenda: ImageVector = TablerIcons.LayoutRows
     val ViewModule: ImageVector = TablerIcons.LayoutGrid
     val ViewStream: ImageVector = TablerIcons.LayoutList

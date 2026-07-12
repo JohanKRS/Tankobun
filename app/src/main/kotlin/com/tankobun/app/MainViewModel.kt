@@ -49,6 +49,7 @@ import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.logic.sourcePickerDiagnosticDetail
 import com.tankobun.app.logic.sourcePickerSources
 import com.tankobun.app.logic.toAniListScore
+import com.tankobun.app.logic.toLocalReadingActivity
 import com.tankobun.app.logic.userMessage
 import com.tankobun.app.logic.visibleSources
 import com.tankobun.app.logic.withDeletedAniListCustomList
@@ -148,6 +149,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.security.SecureRandom
+import java.io.File
 import java.util.Base64
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -298,7 +300,10 @@ class MainViewModel(
             appUpdateLastCheckedAtEpochMillis = container.settingsStore.lastAppUpdateCheckAtEpochMillis(),
             viewerAvatarUrl = container.settingsStore.viewerAvatarUrl(),
             viewerBannerImageUrl = container.settingsStore.viewerBannerImageUrl(),
+            customProfileAvatarUri = container.settingsStore.customProfileAvatarUri(),
+            customProfileBannerUri = container.settingsStore.customProfileBannerUri(),
             anilistMangaStats = container.settingsStore.anilistMangaStats(),
+            localReadingActivity = container.settingsStore.localReadingActivity(),
             showNsfwContent = container.settingsStore.showNsfwContent(),
             anilistAutoSaveTrackingChanges = container.settingsStore.anilistAutoSaveTrackingChanges(),
             anilistAutoSyncReaderProgress = container.settingsStore.anilistAutoSyncReaderProgress(),
@@ -340,6 +345,7 @@ class MainViewModel(
             refreshExtensionIndex(silent = true)
         }
         refreshCacheStorageSummary()
+        refreshLocalReadingActivity()
         loadHomeFeed()
         if (_state.value.libraryMode == LibraryMode.LOCAL || _state.value.loggedIn) {
             loadCachedLibrary(syncIfEmpty = _state.value.libraryMode == LibraryMode.ANILIST && _state.value.loggedIn)
@@ -410,6 +416,53 @@ class MainViewModel(
                 anilistMangaStats = null,
                 message = string(R.string.msg_signed_out),
             )
+        }
+    }
+
+    fun setCustomProfileAvatarUri(uri: String?) {
+        saveCustomProfileImage(uri = uri, fileName = "avatar.img", avatar = true)
+    }
+
+    fun setCustomProfileBannerUri(uri: String?) {
+        saveCustomProfileImage(uri = uri, fileName = "banner.img", avatar = false)
+    }
+
+    private fun saveCustomProfileImage(uri: String?, fileName: String, avatar: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val target = File(container.application.filesDir, "profile/$fileName")
+                    if (uri == null) {
+                        target.delete()
+                        null
+                    } else {
+                        target.parentFile?.mkdirs()
+                        val source = container.application.contentResolver.openInputStream(Uri.parse(uri))
+                        checkNotNull(source) { "Could not open selected profile image" }
+                        source.use { input -> target.outputStream().use(input::copyTo) }
+                        target.toURI().toString()
+                    }
+                }
+            }.onSuccess { storedUri ->
+                if (avatar) {
+                    container.settingsStore.saveCustomProfileAvatarUri(storedUri)
+                    _state.update { it.copy(customProfileAvatarUri = storedUri) }
+                } else {
+                    container.settingsStore.saveCustomProfileBannerUri(storedUri)
+                    _state.update { it.copy(customProfileBannerUri = storedUri) }
+                }
+            }.onFailure { error ->
+                Log.w(TAG, "Could not store custom profile image", error)
+                _state.update { it.copy(message = string(R.string.msg_profile_image_failed)) }
+            }
+        }
+    }
+
+    fun refreshLocalReadingActivity() {
+        viewModelScope.launch {
+            val activity = readerDataSource.allLocalProgress().toLocalReadingActivity()
+            container.settingsStore.saveLocalReadingActivity(activity)
+            _state.update { it.copy(localReadingActivity = activity) }
         }
     }
 
@@ -1163,6 +1216,7 @@ class MainViewModel(
             }.onSuccess { result ->
                 container.settingsStore.saveAnilistCustomLists(result.customLists)
                 loadCachedLibrary()
+                refreshLocalReadingActivity()
                 _state.update {
                     it.copy(
                         anilistCustomLists = result.customLists,
@@ -1289,6 +1343,9 @@ class MainViewModel(
                 anilistSyncManualReadProgress = store.anilistSyncManualReadProgress(),
                 autoUpdateStatusFromReading = store.autoUpdateStatusFromReading(),
                 anilistCustomLists = store.anilistCustomLists(),
+                customProfileAvatarUri = store.customProfileAvatarUri(),
+                customProfileBannerUri = store.customProfileBannerUri(),
+                localReadingActivity = store.localReadingActivity(),
                 backupSchedule = store.backupSchedule(),
                 backupContent = store.backupContent(),
                 scheduledBackupRetentionCount = store.scheduledBackupRetentionCount(),
@@ -4301,6 +4358,7 @@ class MainViewModel(
                 }
             }
             loadRecentReadingProgress()
+            refreshLocalReadingActivity()
             if (_state.value.keepNextTenDownloads) {
                 ensureNextTenDownloads()
             }
@@ -4695,6 +4753,9 @@ class MainViewModel(
                 }
             }
             loadRecentReadingProgress()
+            if (progress.completed) {
+                refreshLocalReadingActivity()
+            }
             if (_state.value.keepNextTenDownloads) {
                 ensureNextTenDownloads()
             }

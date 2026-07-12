@@ -103,6 +103,9 @@ internal class ReaderDataSource(
     suspend fun cachedProgressForChapter(mediaId: Int, chapterUrl: String): ReadingProgress? =
         container.database.progressDao().progressForChapter(mediaId, chapterUrl)?.toModel()
 
+    suspend fun allLocalProgress(): List<ReadingProgress> =
+        container.database.progressDao().allProgress().map { it.toModel() }
+
     suspend fun markChapterRead(
         mediaId: Int,
         chapter: SourceChapter,

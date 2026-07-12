@@ -247,6 +247,7 @@ internal const val TankobunGithubUrl = "https://github.com/JohanKRS/Tankobun"
 internal const val TankobunAniListUrl = "https://anilist.co"
 
 internal val SettingsDetailRoutes = listOf(
+    SettingsRoute.ANILIST,
     SettingsRoute.APPEARANCE,
     SettingsRoute.LANGUAGES,
     SettingsRoute.LIBRARY,
@@ -254,7 +255,6 @@ internal val SettingsDetailRoutes = listOf(
     SettingsRoute.READER,
     SettingsRoute.SOURCES,
     SettingsRoute.DOWNLOADS,
-    SettingsRoute.ANILIST,
     SettingsRoute.CUSTOM_LISTS,
     SettingsRoute.BACKUPS,
     SettingsRoute.ABOUT,

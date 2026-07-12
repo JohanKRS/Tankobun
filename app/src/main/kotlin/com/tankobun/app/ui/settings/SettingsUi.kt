@@ -220,7 +220,7 @@ internal fun SettingsScreen(
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val tabletLayout = maxWidth >= 720.dp
-        val detailRoute = if (route == SettingsRoute.MAIN) SettingsRoute.APPEARANCE else route
+        val detailRoute = if (route == SettingsRoute.MAIN) SettingsRoute.ANILIST else route
 
         if (tabletLayout) {
             Row(
@@ -788,10 +788,18 @@ internal fun SettingsGroupDivider(label: String) {
 }
 
 @Composable
-internal fun ProfileHeaderCard(state: TankobunUiState) {
+internal fun ProfileHeaderCard(
+    state: TankobunUiState,
+    onEditAvatar: () -> Unit,
+    onEditBanner: () -> Unit,
+    onClearAvatar: () -> Unit,
+    onClearBanner: () -> Unit,
+) {
     val context = LocalContext.current
-    val bannerUrl = state.viewerBannerImageUrl?.takeIf { it.isNotBlank() }
-    val avatarUrl = state.viewerAvatarUrl?.takeIf { it.isNotBlank() }
+    val bannerUrl = state.customProfileBannerUri?.takeIf { it.isNotBlank() }
+        ?: state.viewerBannerImageUrl?.takeIf { it.isNotBlank() }
+    val avatarUrl = state.customProfileAvatarUri?.takeIf { it.isNotBlank() }
+        ?: state.viewerAvatarUrl?.takeIf { it.isNotBlank() }
     val profileName = state.viewerName ?: tankobunString(R.string.settings_profile_local_name)
     val hasBanner = bannerUrl != null
     val headerTextColor = if (hasBanner) Color.White else MaterialTheme.colorScheme.onSurface
@@ -813,7 +821,7 @@ internal fun ProfileHeaderCard(state: TankobunUiState) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(178.dp)
+                .height(220.dp)
                 .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.panel)),
         ) {
             if (bannerUrl != null) {
@@ -856,37 +864,99 @@ internal fun ProfileHeaderCard(state: TankobunUiState) {
             }
             Row(
                 modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (state.customProfileBannerUri != null) {
+                    IconButton(
+                        onClick = onClearBanner,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.pill))
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)),
+                    ) {
+                        Icon(
+                            imageVector = TankobunIcons.Close,
+                            contentDescription = tankobunString(R.string.profile_remove_custom_image),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = onEditBanner,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.pill))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)),
+                ) {
+                    Icon(
+                        imageVector = TankobunIcons.Pencil,
+                        contentDescription = tankobunString(R.string.profile_change_banner),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Surface(
-                    modifier = Modifier.size(76.dp),
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.pill),
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 2.dp,
-                ) {
-                    if (avatarUrl != null) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(avatarUrl)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = tankobunString(R.string.profile_avatar_cd),
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                TankobunIcons.AccountCircle,
-                                contentDescription = null,
-                                modifier = Modifier.size(54.dp),
-                                tint = LocalTankobunStyle.current.colors.accent,
+                Box(modifier = Modifier.size(82.dp)) {
+                    Surface(
+                        modifier = Modifier
+                            .size(76.dp)
+                            .align(Alignment.Center)
+                            .clickable(onClick = onEditAvatar),
+                        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.pill),
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 2.dp,
+                    ) {
+                        if (avatarUrl != null) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(avatarUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = tankobunString(R.string.profile_avatar_cd),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
                             )
+                        } else {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    TankobunIcons.AccountCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(54.dp),
+                                    tint = LocalTankobunStyle.current.colors.accent,
+                                )
+                            }
                         }
+                    }
+                    IconButton(
+                        onClick = if (state.customProfileAvatarUri != null) onClearAvatar else onEditAvatar,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(30.dp)
+                            .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.pill))
+                            .background(MaterialTheme.colorScheme.surface),
+                    ) {
+                        Icon(
+                            imageVector = if (state.customProfileAvatarUri != null) TankobunIcons.Close else TankobunIcons.Pencil,
+                            contentDescription = tankobunString(
+                                if (state.customProfileAvatarUri != null) {
+                                    R.string.profile_remove_custom_image
+                                } else {
+                                    R.string.profile_change_avatar
+                                },
+                            ),
+                            modifier = Modifier.size(15.dp),
+                        )
                     }
                 }
                 Column(
@@ -1167,23 +1237,31 @@ internal fun TankobunUiState.localMangaStats(): AnilistMangaStats {
         chaptersRead = libraryItems.sumOf { it.entry.progress.coerceAtLeast(0) },
         volumesRead = 0,
         meanScore = scores.takeIf { it.isNotEmpty() }?.average(),
-        genres = libraryItems.flatMap { it.media.genres }.toProfileStatItems(),
-        tags = libraryItems.flatMap { it.media.tags }.toProfileStatItems(),
-        formats = libraryItems.mapNotNull { it.media.format }.toProfileStatItems(),
-        statuses = libraryItems.map { it.entry.status.name }.toProfileStatItems(),
+        genres = libraryItems.flatMap { item ->
+            item.media.genres.map { genre -> genre to item.entry.progress.coerceAtLeast(0) }
+        }.toProfileStatItems(),
+        tags = libraryItems.flatMap { item ->
+            item.media.tags.map { tag -> tag to item.entry.progress.coerceAtLeast(0) }
+        }.toProfileStatItems(),
+        formats = libraryItems.mapNotNull { item ->
+            item.media.format?.let { format -> format to item.entry.progress.coerceAtLeast(0) }
+        }.toProfileStatItems(),
+        statuses = libraryItems.map { item ->
+            item.entry.status.name to item.entry.progress.coerceAtLeast(0)
+        }.toProfileStatItems(),
     )
 }
 
-private fun List<String>.toProfileStatItems(): List<AnilistStatItem> =
-    mapNotNull { name ->
-        name.trim().takeIf { it.isNotBlank() }
+private fun List<Pair<String, Int>>.toProfileStatItems(): List<AnilistStatItem> =
+    mapNotNull { (name, chaptersRead) ->
+        name.trim().takeIf { it.isNotBlank() }?.let { it to chaptersRead }
     }
-        .groupBy { it.lowercase(Locale.ROOT) }
-        .map { (_, names) ->
+        .groupBy { (name, _) -> name.lowercase(Locale.ROOT) }
+        .map { (_, entries) ->
             AnilistStatItem(
-                name = names.first(),
-                count = names.size,
-                chaptersRead = 0,
+                name = entries.first().first,
+                count = entries.size,
+                chaptersRead = entries.sumOf { it.second },
             )
         }
         .sortedWith(compareByDescending<AnilistStatItem> { it.count }.thenBy { it.name.lowercase(Locale.ROOT) })

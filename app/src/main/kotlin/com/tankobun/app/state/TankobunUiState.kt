@@ -33,6 +33,19 @@ import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceManga
 import com.tankobun.core.model.SourceSearchResult
 
+data class LocalReadingActivity(
+    val generatedAtEpochMillis: Long = 0L,
+    val chaptersTracked: Int = 0,
+    val chaptersToday: Int = 0,
+    val chaptersLast7Days: Int = 0,
+    val chaptersLast30Days: Int = 0,
+    val averagePerActiveDay30: Double = 0.0,
+    val currentStreakDays: Int = 0,
+    val longestStreakDays: Int = 0,
+    val totalReadingDays: Int = 0,
+    val last14Days: List<Int> = List(14) { 0 },
+)
+
 data class TankobunUiState(
     val loggedIn: Boolean = false,
     val clientConfigured: Boolean = false,
@@ -50,7 +63,10 @@ data class TankobunUiState(
     val viewerName: String? = null,
     val viewerAvatarUrl: String? = null,
     val viewerBannerImageUrl: String? = null,
+    val customProfileAvatarUri: String? = null,
+    val customProfileBannerUri: String? = null,
     val anilistMangaStats: AnilistMangaStats? = null,
+    val localReadingActivity: LocalReadingActivity = LocalReadingActivity(),
     val showNsfwContent: Boolean = false,
     val anilistScoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
     val anilistTitleLanguage: AnilistTitleLanguage = AnilistTitleLanguage.ROMAJI,
