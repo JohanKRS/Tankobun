@@ -75,12 +75,46 @@ data class TankobunPaletteChoice(
 )
 
 fun tankobunArtDirectionChoices(): List<TankobunArtDirectionChoice> = listOf(
-    TankobunArtDirectionChoice(TankobunArtDirection.STORYBOOK, "Storybook", "Organic, warm, and hand-crafted"),
-    TankobunArtDirectionChoice(TankobunArtDirection.MOCHI_POP, "Mochi Pop", "Soft, clean, and playful"),
-    TankobunArtDirectionChoice(TankobunArtDirection.PANEL_RIOT, "Panel Riot", "Graphic, angular, and loud"),
-    TankobunArtDirectionChoice(TankobunArtDirection.NOIR_ATELIER, "Noir Atelier", "Dark, tailored, and refined"),
-    TankobunArtDirectionChoice(TankobunArtDirection.NEON_CURRENT, "Neon Current", "Luminous, fluid, and electric"),
+    TankobunArtDirectionChoice(TankobunArtDirection.STORYBOOK, "Paper", "Warm, rounded, textured"),
+    TankobunArtDirectionChoice(TankobunArtDirection.MOCHI_POP, "Soft", "Clean, rounded, low contrast"),
+    TankobunArtDirectionChoice(TankobunArtDirection.PANEL_RIOT, "Panel", "Angular, outlined, high contrast"),
+    TankobunArtDirectionChoice(TankobunArtDirection.NOIR_ATELIER, "Noir", "Dark, restrained, metallic"),
+    TankobunArtDirectionChoice(TankobunArtDirection.NEON_CURRENT, "Neon", "Glossy, luminous, fluid"),
 )
+
+fun TankobunArtDirection.themeNameRes(): Int = when (this) {
+    TankobunArtDirection.STORYBOOK -> R.string.theme_direction_paper
+    TankobunArtDirection.MOCHI_POP -> R.string.theme_direction_soft
+    TankobunArtDirection.PANEL_RIOT -> R.string.theme_direction_panel
+    TankobunArtDirection.NOIR_ATELIER -> R.string.theme_direction_noir
+    TankobunArtDirection.NEON_CURRENT -> R.string.theme_direction_neon
+}
+
+fun TankobunArtDirection.themeDescriptionRes(): Int = when (this) {
+    TankobunArtDirection.STORYBOOK -> R.string.theme_direction_paper_desc
+    TankobunArtDirection.MOCHI_POP -> R.string.theme_direction_soft_desc
+    TankobunArtDirection.PANEL_RIOT -> R.string.theme_direction_panel_desc
+    TankobunArtDirection.NOIR_ATELIER -> R.string.theme_direction_noir_desc
+    TankobunArtDirection.NEON_CURRENT -> R.string.theme_direction_neon_desc
+}
+
+fun TankobunPaletteId.themeNameRes(): Int = when (this) {
+    TankobunPaletteId.MATCHA_MEADOW -> R.string.theme_palette_matcha
+    TankobunPaletteId.PEACH_COUNTRYSIDE -> R.string.theme_palette_peach
+    TankobunPaletteId.YUZU_GARDEN -> R.string.theme_palette_yuzu
+    TankobunPaletteId.BUNNY_BERRY -> R.string.theme_palette_berry
+    TankobunPaletteId.SAKURA_MINT -> R.string.theme_palette_sakura
+    TankobunPaletteId.CLOUDBERRY -> R.string.theme_palette_cobalt
+    TankobunPaletteId.REDLINE -> R.string.theme_palette_redline
+    TankobunPaletteId.ELECTRIC_BERRY -> R.string.theme_palette_ultraviolet
+    TankobunPaletteId.CITRUS_CLASH -> R.string.theme_palette_citrus
+    TankobunPaletteId.CHARCOAL_GOLD -> R.string.theme_palette_charcoal
+    TankobunPaletteId.VELVET_PLUM -> R.string.theme_palette_plum
+    TankobunPaletteId.STARRY_INK -> R.string.theme_palette_ink
+    TankobunPaletteId.NEON_KOI -> R.string.theme_palette_koi
+    TankobunPaletteId.MOON_JELLY -> R.string.theme_palette_moonlight
+    TankobunPaletteId.ACID_AURORA -> R.string.theme_palette_aurora
+}
 
 fun tankobunPaletteChoices(): List<TankobunPaletteChoice> =
     PaletteCatalog.values.map { it.choice() }
@@ -134,14 +168,6 @@ fun TankobunThemePreference.toLegacyThemeMode(): TankobunThemeMode {
     }
 }
 
-enum class TankobunThemeEffect {
-    GRAIN,
-    BUBBLE_WASH,
-    HALFTONE,
-    SPECULAR,
-    AURORA,
-}
-
 @Immutable
 data class ThemeShapeSet(
     val panel: CornerBasedShape,
@@ -168,13 +194,6 @@ data class ThemeMotionSet(
 )
 
 @Immutable
-data class ThemeEffectSet(
-    val kind: TankobunThemeEffect,
-    val intensity: Float,
-    val animated: Boolean,
-)
-
-@Immutable
 data class TankobunThemeTokens(
     val appBackdrop: Color,
     val elevatedSurface: Color,
@@ -198,7 +217,6 @@ data class TankobunStyle(
     val themeShapes: ThemeShapeSet,
     val strokes: ThemeStrokeSet,
     val motion: ThemeMotionSet,
-    val effects: ThemeEffectSet,
     val radii: TankobunRadii,
     val spacing: TankobunSpacing = TankobunSpacing(),
     val sizes: TankobunSizes = TankobunSizes(),
@@ -254,7 +272,6 @@ private data class DirectionSpec(
     val shapes: ThemeShapeSet,
     val strokes: ThemeStrokeSet,
     val motion: ThemeMotionSet,
-    val effects: ThemeEffectSet,
     val materialShapes: Shapes,
     val radii: TankobunRadii,
 )
@@ -301,13 +318,6 @@ private fun directionSpec(direction: TankobunArtDirection): DirectionSpec {
         TankobunArtDirection.NOIR_ATELIER -> ThemeMotionSet(0.99f, 180, false)
         TankobunArtDirection.NEON_CURRENT -> ThemeMotionSet(0.965f, 220, true)
     }
-    val effects = when (direction) {
-        TankobunArtDirection.STORYBOOK -> ThemeEffectSet(TankobunThemeEffect.GRAIN, 0.12f, false)
-        TankobunArtDirection.MOCHI_POP -> ThemeEffectSet(TankobunThemeEffect.BUBBLE_WASH, 0.16f, true)
-        TankobunArtDirection.PANEL_RIOT -> ThemeEffectSet(TankobunThemeEffect.HALFTONE, 0.20f, false)
-        TankobunArtDirection.NOIR_ATELIER -> ThemeEffectSet(TankobunThemeEffect.SPECULAR, 0.14f, true)
-        TankobunArtDirection.NEON_CURRENT -> ThemeEffectSet(TankobunThemeEffect.AURORA, 0.28f, true)
-    }
     val radii = when (direction) {
         TankobunArtDirection.STORYBOOK -> TankobunRadii(12.dp, 16.dp, 10.dp)
         TankobunArtDirection.MOCHI_POP -> TankobunRadii(20.dp, 18.dp, 14.dp)
@@ -319,7 +329,6 @@ private fun directionSpec(direction: TankobunArtDirection): DirectionSpec {
         shapes = shapes,
         strokes = stroke,
         motion = motion,
-        effects = effects,
         materialShapes = Shapes(
             extraSmall = shapes.chip,
             small = shapes.control,
@@ -401,21 +410,21 @@ private data class PaletteDefinition(
 
 private object PaletteCatalog {
     val values = listOf(
-        light(TankobunPaletteId.MATCHA_MEADOW, "Matcha Meadow", 0xFF2F7D4B, 0xFFC07A1A, 0xFF6B8F1A, 0xFFF0F8E8, 0xFF172016, 0xFFFBFFF7, 0xFFD3E8CB, 0xFF3F4D3B, 0xFFC9EBCF, 0xFF102514, 0xFFFFE4B4, 0xFF2B2105),
-        light(TankobunPaletteId.PEACH_COUNTRYSIDE, "Peach Countryside", 0xFFC84A2D, 0xFF008C86, 0xFFFFA82A, 0xFFFFF0E5, 0xFF2B1710, 0xFFFFFAF6, 0xFFFFD9C7, 0xFF644239, 0xFFFFD2C0, 0xFF4A1005, 0xFFC7F3EF, 0xFF002F2C),
-        light(TankobunPaletteId.YUZU_GARDEN, "Yuzu Garden", 0xFF007E71, 0xFFD19500, 0xFF5C8A1F, 0xFFFFFBE0, 0xFF171E12, 0xFFFFFFF7, 0xFFF0E9B8, 0xFF465038, 0xFFC2F0E9, 0xFF003B34, 0xFFFFE68A, 0xFF332500),
-        light(TankobunPaletteId.BUNNY_BERRY, "Bunny Berry", 0xFFB82235, 0xFFEF7048, 0xFFE1A900, 0xFFFFF7F8, 0xFF241316, 0xFFFFFFFF, 0xFFFFE0DE, 0xFF5D403B, 0xFFFFDDE3, 0xFF3F0010, 0xFFFFE0C7, 0xFF3B1500),
-        light(TankobunPaletteId.SAKURA_MINT, "Sakura Mint", 0xFFB43D76, 0xFF008B77, 0xFF5A67C8, 0xFFFFEFF6, 0xFF26151C, 0xFFFFFAFC, 0xFFFFD6E6, 0xFF5A3D48, 0xFFFFD1E3, 0xFF43111F, 0xFFBDEFE4, 0xFF003B34),
-        light(TankobunPaletteId.CLOUDBERRY, "Cloudberry", 0xFF2F63C3, 0xFFD92265, 0xFF008F8C, 0xFFF5F8FF, 0xFF111B2B, 0xFFFFFFFF, 0xFFDCE8FF, 0xFF3D4961, 0xFFD5E3FF, 0xFF0A1E46, 0xFFFFD5E4, 0xFF4B0D21),
+        light(TankobunPaletteId.MATCHA_MEADOW, "Matcha", 0xFF2F7D4B, 0xFFC07A1A, 0xFF6B8F1A, 0xFFF0F8E8, 0xFF172016, 0xFFFBFFF7, 0xFFD3E8CB, 0xFF3F4D3B, 0xFFC9EBCF, 0xFF102514, 0xFFFFE4B4, 0xFF2B2105),
+        light(TankobunPaletteId.PEACH_COUNTRYSIDE, "Peach", 0xFFC84A2D, 0xFF008C86, 0xFFFFA82A, 0xFFFFF0E5, 0xFF2B1710, 0xFFFFFAF6, 0xFFFFD9C7, 0xFF644239, 0xFFFFD2C0, 0xFF4A1005, 0xFFC7F3EF, 0xFF002F2C),
+        light(TankobunPaletteId.YUZU_GARDEN, "Yuzu", 0xFF007E71, 0xFFD19500, 0xFF5C8A1F, 0xFFFFFBE0, 0xFF171E12, 0xFFFFFFF7, 0xFFF0E9B8, 0xFF465038, 0xFFC2F0E9, 0xFF003B34, 0xFFFFE68A, 0xFF332500),
+        light(TankobunPaletteId.BUNNY_BERRY, "Berry", 0xFFB82235, 0xFFEF7048, 0xFFE1A900, 0xFFFFF7F8, 0xFF241316, 0xFFFFFFFF, 0xFFFFE0DE, 0xFF5D403B, 0xFFFFDDE3, 0xFF3F0010, 0xFFFFE0C7, 0xFF3B1500),
+        light(TankobunPaletteId.SAKURA_MINT, "Sakura", 0xFFB43D76, 0xFF008B77, 0xFF5A67C8, 0xFFFFEFF6, 0xFF26151C, 0xFFFFFAFC, 0xFFFFD6E6, 0xFF5A3D48, 0xFFFFD1E3, 0xFF43111F, 0xFFBDEFE4, 0xFF003B34),
+        light(TankobunPaletteId.CLOUDBERRY, "Cobalt", 0xFF2F63C3, 0xFFD92265, 0xFF008F8C, 0xFFF5F8FF, 0xFF111B2B, 0xFFFFFFFF, 0xFFDCE8FF, 0xFF3D4961, 0xFFD5E3FF, 0xFF0A1E46, 0xFFFFD5E4, 0xFF4B0D21),
         light(TankobunPaletteId.REDLINE, "Redline", 0xFFC9261B, 0xFF151419, 0xFF008B91, 0xFFFFF4E8, 0xFF211515, 0xFFFFFBF5, 0xFFFFD4C8, 0xFF5F403D, 0xFFFFD5CF, 0xFF490601, 0xFFE4E0E3, 0xFF1C1B20),
-        dark(TankobunPaletteId.ELECTRIC_BERRY, "Electric Berry", 0xFFFF6FB1, 0xFF5BD9FF, 0xFFA8F0A1, 0xFF180B24, 0xFFFFECFF, 0xFF241332, 0xFF463255, 0xFFE3C9ED, 0xFF74254E, 0xFFFFD6E9, 0xFF0C5268, 0xFFC6F1FF),
-        light(TankobunPaletteId.CITRUS_CLASH, "Citrus Clash", 0xFF007E73, 0xFFE09C00, 0xFFD92D5B, 0xFFFFF9D9, 0xFF171C16, 0xFFFFFFF5, 0xFFECE5A7, 0xFF46503D, 0xFFC2EFE7, 0xFF003B34, 0xFFFFE17A, 0xFF332500),
-        dark(TankobunPaletteId.CHARCOAL_GOLD, "Charcoal Gold", 0xFFE8B44D, 0xFFD8C49A, 0xFFFFD98A, 0xFF11100E, 0xFFF7EFE0, 0xFF1B1915, 0xFF3A3428, 0xFFE0D3B8, 0xFF5A4113, 0xFFFFE2A4, 0xFF403727, 0xFFF4E3C2),
-        dark(TankobunPaletteId.VELVET_PLUM, "Velvet Plum", 0xFFE58AD8, 0xFFA7E8BD, 0xFFFFC48D, 0xFF170F1E, 0xFFFFECFA, 0xFF21162A, 0xFF49344F, 0xFFE7C8E8, 0xFF6E2B66, 0xFFFFD6F8, 0xFF275038, 0xFFC8F9D8),
-        dark(TankobunPaletteId.STARRY_INK, "Starry Ink", 0xFF8FB6FF, 0xFFFFD166, 0xFF8CE6D2, 0xFF0A1020, 0xFFEAF0FF, 0xFF10182A, 0xFF23314A, 0xFFC7D3E8, 0xFF244A85, 0xFFD9E7FF, 0xFF5A4210, 0xFFFFE7A7),
-        dark(TankobunPaletteId.NEON_KOI, "Neon Koi", 0xFFFF8A7D, 0xFF5EF2D6, 0xFFFFD166, 0xFF071B1D, 0xFFE7FEFA, 0xFF0E272A, 0xFF234245, 0xFFB8D8D4, 0xFF7C261F, 0xFFFFD7D1, 0xFF0D5B52, 0xFFC8FFF4),
-        dark(TankobunPaletteId.MOON_JELLY, "Moon Jelly", 0xFFB8A7FF, 0xFF72E6FF, 0xFFFF9FCB, 0xFF071720, 0xFFEAF7FF, 0xFF0E202B, 0xFF253847, 0xFFC3D5E2, 0xFF46347F, 0xFFE6DFFF, 0xFF0D5464, 0xFFC7F6FF),
-        dark(TankobunPaletteId.ACID_AURORA, "Acid Aurora", 0xFFC8FF43, 0xFFFF4FD8, 0xFF5FF3FF, 0xFF100D22, 0xFFF5F0FF, 0xFF1C1731, 0xFF3A3150, 0xFFD9CEEA, 0xFF405C08, 0xFFE9FFB9, 0xFF682252, 0xFFFFD8F0),
+        dark(TankobunPaletteId.ELECTRIC_BERRY, "Ultraviolet", 0xFFFF6FB1, 0xFF5BD9FF, 0xFFA8F0A1, 0xFF180B24, 0xFFFFECFF, 0xFF241332, 0xFF463255, 0xFFE3C9ED, 0xFF74254E, 0xFFFFD6E9, 0xFF0C5268, 0xFFC6F1FF),
+        light(TankobunPaletteId.CITRUS_CLASH, "Citrus", 0xFF007E73, 0xFFE09C00, 0xFFD92D5B, 0xFFFFF9D9, 0xFF171C16, 0xFFFFFFF5, 0xFFECE5A7, 0xFF46503D, 0xFFC2EFE7, 0xFF003B34, 0xFFFFE17A, 0xFF332500),
+        dark(TankobunPaletteId.CHARCOAL_GOLD, "Charcoal", 0xFFE8B44D, 0xFFD8C49A, 0xFFFFD98A, 0xFF11100E, 0xFFF7EFE0, 0xFF1B1915, 0xFF3A3428, 0xFFE0D3B8, 0xFF5A4113, 0xFFFFE2A4, 0xFF403727, 0xFFF4E3C2),
+        dark(TankobunPaletteId.VELVET_PLUM, "Plum", 0xFFE58AD8, 0xFFA7E8BD, 0xFFFFC48D, 0xFF170F1E, 0xFFFFECFA, 0xFF21162A, 0xFF49344F, 0xFFE7C8E8, 0xFF6E2B66, 0xFFFFD6F8, 0xFF275038, 0xFFC8F9D8),
+        dark(TankobunPaletteId.STARRY_INK, "Ink", 0xFF8FB6FF, 0xFFFFD166, 0xFF8CE6D2, 0xFF0A1020, 0xFFEAF0FF, 0xFF10182A, 0xFF23314A, 0xFFC7D3E8, 0xFF244A85, 0xFFD9E7FF, 0xFF5A4210, 0xFFFFE7A7),
+        dark(TankobunPaletteId.NEON_KOI, "Koi", 0xFFFF8A7D, 0xFF5EF2D6, 0xFFFFD166, 0xFF071B1D, 0xFFE7FEFA, 0xFF0E272A, 0xFF234245, 0xFFB8D8D4, 0xFF7C261F, 0xFFFFD7D1, 0xFF0D5B52, 0xFFC8FFF4),
+        dark(TankobunPaletteId.MOON_JELLY, "Moonlight", 0xFFB8A7FF, 0xFF72E6FF, 0xFFFF9FCB, 0xFF071720, 0xFFEAF7FF, 0xFF0E202B, 0xFF253847, 0xFFC3D5E2, 0xFF46347F, 0xFFE6DFFF, 0xFF0D5464, 0xFFC7F6FF),
+        dark(TankobunPaletteId.ACID_AURORA, "Aurora", 0xFFC8FF43, 0xFFFF4FD8, 0xFF5FF3FF, 0xFF100D22, 0xFFF5F0FF, 0xFF1C1731, 0xFF3A3150, 0xFFD9CEEA, 0xFF405C08, 0xFFE9FFB9, 0xFF682252, 0xFFFFD8F0),
     )
 
     fun value(id: TankobunPaletteId) = values.first { it.id == id }
@@ -472,6 +481,24 @@ private val DefaultDirection = directionSpec(TankobunArtDirection.MOCHI_POP)
 private val DefaultColors = DefaultPalette.colorScheme()
 private val DefaultTokens = DefaultPalette.tokens()
 
+private fun whiteTextContainer(color: Color): Color {
+    if (color.luminance() <= 0.183f) return color
+    var lighterBound = 0f
+    var darkerBound = 1f
+    repeat(10) {
+        val amount = (lighterBound + darkerBound) / 2f
+        if (lerp(color, Color.Black, amount).luminance() <= 0.183f) {
+            darkerBound = amount
+        } else {
+            lighterBound = amount
+        }
+    }
+    return lerp(color, Color.Black, darkerBound)
+}
+
+internal fun tankobunActionContainer(id: TankobunPaletteId): Color =
+    whiteTextContainer(tankobunColorScheme(id).secondary)
+
 val LocalTankobunTokens = staticCompositionLocalOf { DefaultTokens }
 val LocalTankobunStyle = staticCompositionLocalOf {
     TankobunStyle(
@@ -481,19 +508,18 @@ val LocalTankobunStyle = staticCompositionLocalOf {
             panel = DefaultTokens.elevatedSurface,
             panelContent = DefaultColors.onSurface,
             accent = DefaultColors.primary,
-            action = DefaultColors.secondary,
-            actionContent = DefaultColors.onSecondary,
+            action = whiteTextContainer(DefaultColors.secondary),
+            actionContent = Color.White,
             mutedContent = DefaultColors.onSurfaceVariant,
             chip = DefaultColors.surfaceVariant,
             chipContent = DefaultColors.onSurface,
-            selectedChip = DefaultColors.primaryContainer,
-            selectedChipContent = DefaultColors.onPrimaryContainer,
+            selectedChip = whiteTextContainer(DefaultColors.primary),
+            selectedChipContent = Color.White,
             outline = DefaultColors.outline,
         ),
         themeShapes = DefaultDirection.shapes,
         strokes = DefaultDirection.strokes,
         motion = DefaultDirection.motion,
-        effects = DefaultDirection.effects,
         radii = DefaultDirection.radii,
     )
 }
@@ -513,19 +539,18 @@ fun TankobunTheme(
             panel = tokens.elevatedSurface,
             panelContent = colors.onSurface,
             accent = colors.primary,
-            action = colors.secondary,
-            actionContent = colors.onSecondary,
+            action = whiteTextContainer(colors.secondary),
+            actionContent = Color.White,
             mutedContent = colors.onSurfaceVariant,
             chip = colors.surfaceVariant,
             chipContent = colors.onSurface,
-            selectedChip = colors.primaryContainer,
-            selectedChipContent = colors.onPrimaryContainer,
+            selectedChip = whiteTextContainer(colors.primary),
+            selectedChipContent = Color.White,
             outline = colors.outline,
         ),
         themeShapes = resolved.direction.shapes,
         strokes = resolved.direction.strokes,
         motion = resolved.direction.motion,
-        effects = resolved.direction.effects,
         radii = resolved.direction.radii,
     )
     MaterialTheme(colorScheme = colors, shapes = resolved.direction.materialShapes) {

@@ -141,6 +141,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -148,6 +150,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -1382,6 +1385,7 @@ internal fun TankobunBottomNavigationBar(
         Triple(tankobunString(R.string.nav_settings), TankobunIcons.Settings, 4),
     )
     val selectedIndex = selectedTab.coerceIn(0, items.lastIndex)
+    val indicatorShape = LocalTankobunStyle.current.themeShapes.indicator
     val itemSize = 44.dp
     val itemSpacing = 8.dp
     val indicatorSize = 40.dp
@@ -1398,6 +1402,7 @@ internal fun TankobunBottomNavigationBar(
             itemSize = itemSize,
             itemSpacing = itemSpacing,
             indicatorSize = indicatorSize,
+            shape = indicatorShape,
             color = styleColors.accent.copy(alpha = 0.88f),
             modifier = Modifier.fillMaxSize(),
         )
@@ -1474,6 +1479,7 @@ private fun DockSelectionIndicator(
     itemSize: Dp,
     itemSpacing: Dp,
     indicatorSize: Dp,
+    shape: Shape,
     color: Color,
     modifier: Modifier = Modifier,
 ) {
@@ -1649,26 +1655,42 @@ private fun DockSelectionIndicator(
     Canvas(modifier = modifier) {
         val centerY = size.height / 2f
         val base = indicatorSizePx
+        fun drawThemedIndicator(
+            left: Float,
+            top: Float,
+            width: Float,
+            height: Float,
+            fill: Color = color,
+        ) {
+            val safeWidth = width.coerceAtLeast(1f)
+            val safeHeight = height.coerceAtLeast(1f)
+            val outline = shape.createOutline(Size(safeWidth, safeHeight), layoutDirection, this)
+            withTransform({ translate(left, top) }) {
+                when (outline) {
+                    is Outline.Rectangle -> drawRect(color = fill, size = Size(safeWidth, safeHeight))
+                    is Outline.Rounded -> drawPath(
+                        path = Path().apply { addRoundRect(outline.roundRect) },
+                        color = fill,
+                    )
+                    is Outline.Generic -> drawPath(path = outline.path, color = fill)
+                }
+            }
+        }
         when (animation) {
             DockIndicatorAnimation.BOUNCY -> {
                 val width = base + stretchPx.value.coerceAtLeast(0f)
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(centerPx.value - width / 2f, centerY - base / 2f),
-                    size = Size(width, base),
-                    cornerRadius = CornerRadius(base / 2f, base / 2f),
-                )
+                drawThemedIndicator(centerPx.value - width / 2f, centerY - base / 2f, width, base)
             }
 
             DockIndicatorAnimation.INCHWORM -> {
                 val left = minOf(leftEdgePx.value, rightEdgePx.value)
                 val right = maxOf(leftEdgePx.value, rightEdgePx.value)
                 val height = base
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(left, centerY - height / 2f),
-                    size = Size((right - left).coerceAtLeast(base * 0.76f), height),
-                    cornerRadius = CornerRadius(height / 2f, height / 2f),
+                drawThemedIndicator(
+                    left,
+                    centerY - height / 2f,
+                    (right - left).coerceAtLeast(base * 0.76f),
+                    height,
                 )
             }
 
@@ -1677,19 +1699,17 @@ private fun DockSelectionIndicator(
                 val stretchRatio = (stretch / maxStretchPx).coerceIn(0f, 1f)
                 val width = base + stretch
                 val height = base * (1f - 0.16f * stretchRatio)
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(centerPx.value - width / 2f, centerY - height / 2f),
-                    size = Size(width, height),
-                    cornerRadius = CornerRadius(height / 2f, height / 2f),
-                )
+                drawThemedIndicator(centerPx.value - width / 2f, centerY - height / 2f, width, height)
             }
 
             DockIndicatorAnimation.POP -> {
-                drawCircle(
-                    color = color.copy(alpha = color.alpha * alpha.value),
-                    radius = base / 2f * scale.value,
-                    center = Offset(centerPx.value, centerY),
+                val scaledSize = base * scale.value
+                drawThemedIndicator(
+                    centerPx.value - scaledSize / 2f,
+                    centerY - scaledSize / 2f,
+                    scaledSize,
+                    scaledSize,
+                    color.copy(alpha = color.alpha * alpha.value),
                 )
             }
 
@@ -1715,7 +1735,7 @@ private fun DockSelectionIndicator(
                         center = Offset(x, centerY),
                     )
                 }
-                drawCircle(color = color, radius = base / 2f, center = Offset(end, centerY))
+                drawThemedIndicator(end - base / 2f, centerY - base / 2f, base, base)
             }
         }
     }

@@ -82,7 +82,6 @@ import com.tankobun.app.state.TankobunUiState
 import com.tankobun.app.tankobunString
 import com.tankobun.app.ui.browse.browseGenreLabel
 import com.tankobun.app.ui.components.TankobunMediaStatusLabel
-import com.tankobun.app.ui.components.TankobunThemeEffectLayer
 import com.tankobun.app.ui.shell.LocalTankobunChromeInsets
 import com.tankobun.app.ui.media.AutoResizingMangaTitle
 import com.tankobun.core.model.AnilistGenreHighlight
@@ -380,10 +379,6 @@ private fun TrendingHero(
                     }
                 }
             }
-            TankobunThemeEffectLayer(
-                modifier = Modifier.fillMaxSize(),
-                shape = style.themeShapes.panel,
-            )
             Box(
                 Modifier
                     .fillMaxSize()
@@ -429,18 +424,20 @@ private fun TrendingHero(
                     .padding(16.dp),
             ) {
                 Surface(
+                    modifier = Modifier.size(44.dp),
                     shape = style.themeShapes.indicator,
                     color = style.colors.chip.copy(alpha = 0.82f),
                     contentColor = MaterialTheme.colorScheme.primary,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.52f)),
                 ) {
-                    Text(
-                        text = rank.toString().padStart(2, '0'),
-                        fontFamily = TankobunDisplayFontFamily,
-                        fontSize = 22.sp,
-                        lineHeight = 22.sp,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = rank.toString().padStart(2, '0'),
+                            fontFamily = TankobunDisplayFontFamily,
+                            fontSize = 22.sp,
+                            lineHeight = 22.sp,
+                        )
+                    }
                 }
                 if (expanded) {
                     Spacer(Modifier.height(18.dp))

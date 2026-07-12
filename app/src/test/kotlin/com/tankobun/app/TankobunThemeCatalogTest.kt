@@ -61,6 +61,14 @@ class TankobunThemeCatalogTest {
         }
     }
 
+    @Test
+    fun highlightedActionsSupportWhiteTextInEveryPalette() {
+        TankobunPaletteId.entries.forEach { palette ->
+            val contrast = contrastRatio(Color.White, tankobunActionContainer(palette))
+            assertTrue("${palette.name} action contrast was $contrast", contrast >= 4.5)
+        }
+    }
+
     private fun contrastRatio(a: Color, b: Color): Double {
         val first = luminance(a)
         val second = luminance(b)

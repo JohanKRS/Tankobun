@@ -209,8 +209,8 @@ internal fun ThemePicker(
     val normalized = selected.normalized()
     val directions = tankobunArtDirectionChoices()
     val palettes = tankobunPaletteChoices()
-    val currentDirection = directions.first { it.id == normalized.direction }
-    val currentPalette = tankobunPaletteChoice(normalized.palette)
+    val currentDirectionName = tankobunString(normalized.direction.themeNameRes())
+    val currentPaletteName = tankobunString(normalized.palette.themeNameRes())
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(tankobunString(R.string.settings_theme_section), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -259,8 +259,8 @@ internal fun ThemePicker(
         }
         Text(tankobunString(R.string.settings_theme_preview), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         ThemeSampler(
-            title = if (normalized.automatic) tankobunString(R.string.settings_theme_automatic) else currentDirection.name,
-            subtitle = if (normalized.automatic) "Mochi Pop / Neon Current" else currentPalette.name,
+            title = if (normalized.automatic) tankobunString(R.string.settings_theme_automatic) else currentDirectionName,
+            subtitle = if (normalized.automatic) tankobunString(R.string.settings_theme_automatic_pair) else currentPaletteName,
         )
     }
 }
@@ -272,25 +272,30 @@ private fun ArtDirectionCard(
     onClick: () -> Unit,
 ) {
     val previewShape = tankobunThemeShapeSet(choice.id).panel
+    val secondaryTextColor = if (selected) {
+        LocalTankobunStyle.current.colors.selectedChipContent.copy(alpha = 0.78f)
+    } else {
+        LocalTankobunStyle.current.colors.mutedContent
+    }
     Surface(
-        modifier = Modifier.widthIn(min = 164.dp, max = 248.dp).clickable(onClick = onClick),
+        modifier = Modifier.widthIn(min = 164.dp, max = 248.dp).height(74.dp).clickable(onClick = onClick),
         shape = previewShape,
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else LocalTankobunStyle.current.colors.panel,
-        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else LocalTankobunStyle.current.colors.panelContent,
+        color = if (selected) LocalTankobunStyle.current.colors.selectedChip else LocalTankobunStyle.current.colors.panel,
+        contentColor = if (selected) LocalTankobunStyle.current.colors.selectedChipContent else LocalTankobunStyle.current.colors.panelContent,
         border = BorderStroke(
             if (selected) LocalTankobunStyle.current.strokes.emphasizedWidth else LocalTankobunStyle.current.strokes.defaultWidth,
             if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.42f),
         ),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Surface(modifier = Modifier.size(34.dp), shape = previewShape, color = MaterialTheme.colorScheme.secondary) {}
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(choice.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(choice.description, style = MaterialTheme.typography.labelSmall, color = LocalTankobunStyle.current.colors.mutedContent, maxLines = 2)
+                Text(tankobunString(choice.id.themeNameRes()), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(tankobunString(choice.id.themeDescriptionRes()), style = MaterialTheme.typography.labelSmall, color = secondaryTextColor, maxLines = 2)
             }
         }
     }
@@ -302,28 +307,33 @@ private fun PaletteChoiceCard(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val secondaryTextColor = if (selected) {
+        LocalTankobunStyle.current.colors.selectedChipContent.copy(alpha = 0.78f)
+    } else {
+        LocalTankobunStyle.current.colors.mutedContent
+    }
     Surface(
-        modifier = Modifier.widthIn(min = 164.dp).clickable(onClick = onClick),
+        modifier = Modifier.widthIn(min = 164.dp).height(58.dp).clickable(onClick = onClick),
         shape = LocalTankobunStyle.current.themeShapes.control,
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else LocalTankobunStyle.current.colors.panel,
-        contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else LocalTankobunStyle.current.colors.panelContent,
+        color = if (selected) LocalTankobunStyle.current.colors.selectedChip else LocalTankobunStyle.current.colors.panel,
+        contentColor = if (selected) LocalTankobunStyle.current.colors.selectedChipContent else LocalTankobunStyle.current.colors.panelContent,
         border = BorderStroke(
             LocalTankobunStyle.current.strokes.defaultWidth,
             if (selected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline.copy(alpha = 0.36f),
         ),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             ThemeSwatches(choice.swatches)
             Column {
-                Text(choice.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Text(tankobunString(choice.id.themeNameRes()), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 Text(
                     if (choice.dark) tankobunString(R.string.common_dark) else tankobunString(R.string.common_light),
                     style = MaterialTheme.typography.labelSmall,
-                    color = LocalTankobunStyle.current.colors.mutedContent,
+                    color = secondaryTextColor,
                 )
             }
         }
@@ -351,8 +361,8 @@ private fun ThemeSampler(title: String, subtitle: String) {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = LocalTankobunStyle.current.colors.mutedContent)
             }
-            TankobunChip(selected = true, onClick = {}, label = { Text("Tag") })
-            TankobunActionButton(label = "Action", onClick = {})
+            TankobunChip(selected = true, onClick = {}, label = { Text(tankobunString(R.string.settings_theme_sample_tag)) })
+            TankobunActionButton(label = tankobunString(R.string.settings_theme_sample_action), onClick = {})
         }
     }
 }

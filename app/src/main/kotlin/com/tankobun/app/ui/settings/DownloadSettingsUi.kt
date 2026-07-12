@@ -720,8 +720,8 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
                 if (preference.automatic) {
                     tankobunString(R.string.settings_theme_automatic)
                 } else {
-                    val direction = tankobunArtDirectionChoices().first { it.id == preference.direction }.name
-                    "$direction · ${tankobunPaletteChoice(preference.palette).name}"
+                    val direction = tankobunString(preference.direction.themeNameRes())
+                    "$direction · ${tankobunString(preference.palette.themeNameRes())}"
                 },
             )
             add(tankobunString(R.string.dock_summary, state.dockAlignment.settingsLabel()))
