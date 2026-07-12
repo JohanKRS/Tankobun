@@ -506,6 +506,22 @@ class AnilistRepository(
         return AnilistJsonMapper.mediaDetails(data)
     }
 
+    suspend fun mediaListEntry(
+        mediaId: Int,
+        accessToken: String,
+        scoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_100,
+    ): AnilistListEntry? {
+        val data = graphQlClient.execute(
+            query = AnilistQueries.MediaListEntry,
+            variables = buildJsonObject {
+                put("id", mediaId)
+                put("scoreFormat", scoreFormat.name)
+            },
+            accessToken = accessToken,
+        )
+        return AnilistJsonMapper.mediaListEntry(data)
+    }
+
     suspend fun mediaRecommendations(
         mediaId: Int,
         page: Int,

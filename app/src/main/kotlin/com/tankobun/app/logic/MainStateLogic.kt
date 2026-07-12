@@ -187,6 +187,38 @@ internal fun TankobunUiState.withSelectedAniListDetails(
     )
 }
 
+internal fun TankobunUiState.withRefreshedTrackingEntry(
+    mediaId: Int,
+    entry: AnilistListEntry?,
+): TankobunUiState {
+    if (selectedMedia?.id != mediaId) return this
+
+    val preserveTrackingForm = trackingDirty || trackingSaveInProgress || trackingSaveFailed
+    val nextItems = if (entry == null) {
+        libraryItems.filterNot { item -> item.media.id == mediaId }
+    } else {
+        val media = selectedMedia
+        (libraryItems.filterNot { item -> item.media.id == mediaId } + LibraryItem(media, entry))
+            .sortedBy { item -> item.media.title.userPreferred.lowercase(Locale.ROOT) }
+    }
+
+    return copy(
+        selectedListEntry = entry,
+        library = nextItems.map { item -> item.media },
+        libraryItems = nextItems,
+        trackingStatus = if (preserveTrackingForm) {
+            trackingStatus
+        } else {
+            entry.trackingStatusForForm(MediaStatus.PLANNING)
+        },
+        trackingProgress = if (preserveTrackingForm) trackingProgress else (entry?.progress ?: 0).toString(),
+        trackingScore = if (preserveTrackingForm) trackingScore else entry?.score.formatTrackingScore(anilistScoreFormat),
+        trackingNotes = if (preserveTrackingForm) trackingNotes else entry?.notes.orEmpty(),
+        trackingPrivate = if (preserveTrackingForm) trackingPrivate else entry?.private == true,
+        trackingCustomLists = if (preserveTrackingForm) trackingCustomLists else entry?.customLists?.toSet().orEmpty(),
+    )
+}
+
 internal fun TankobunUiState.withSyncedListEntry(
     media: AnilistMedia?,
     entry: AnilistListEntry,

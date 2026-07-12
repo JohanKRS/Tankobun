@@ -98,6 +98,57 @@ class MainStateLogicTest {
     }
 
     @Test
+    fun refreshedTrackingEntryReplacesStaleScoreAndMetadata() {
+        val media = media(42, "Manga")
+        val staleEntry = entry(mediaId = 42, progress = 3, score = null)
+        val refreshedEntry = entry(
+            mediaId = 42,
+            status = MediaStatus.COMPLETED,
+            progress = 24,
+            score = 92.0,
+            notes = "updated on AniList",
+            private = true,
+            customLists = listOf("Favorites"),
+        )
+
+        val next = TankobunUiState(
+            selectedMedia = media,
+            selectedListEntry = staleEntry,
+            libraryItems = listOf(LibraryItem(media, staleEntry)),
+            trackingProgress = "3",
+            anilistScoreFormat = AnilistScoreFormat.POINT_100,
+        ).withRefreshedTrackingEntry(mediaId = 42, entry = refreshedEntry)
+
+        assertEquals(refreshedEntry, next.selectedListEntry)
+        assertEquals(refreshedEntry, next.libraryItems.single().entry)
+        assertEquals(MediaStatus.COMPLETED, next.trackingStatus)
+        assertEquals("24", next.trackingProgress)
+        assertEquals("92", next.trackingScore)
+        assertEquals("updated on AniList", next.trackingNotes)
+        assertTrue(next.trackingPrivate)
+        assertEquals(setOf("Favorites"), next.trackingCustomLists)
+    }
+
+    @Test
+    fun refreshedTrackingEntryDoesNotOverwriteUnsavedEdits() {
+        val media = media(42, "Manga")
+        val refreshedEntry = entry(mediaId = 42, progress = 24, score = 92.0)
+
+        val next = TankobunUiState(
+            selectedMedia = media,
+            trackingProgress = "8",
+            trackingScore = "75",
+            trackingNotes = "draft",
+            trackingDirty = true,
+        ).withRefreshedTrackingEntry(mediaId = 42, entry = refreshedEntry)
+
+        assertEquals(refreshedEntry, next.selectedListEntry)
+        assertEquals("8", next.trackingProgress)
+        assertEquals("75", next.trackingScore)
+        assertEquals("draft", next.trackingNotes)
+    }
+
+    @Test
     fun selectedAniListDetailsIgnoreStaleSelection() {
         val state = TankobunUiState(selectedMedia = media(42, "Manga"))
 

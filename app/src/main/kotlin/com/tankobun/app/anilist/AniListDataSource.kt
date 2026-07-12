@@ -875,6 +875,24 @@ internal class AniListDataSource(
         )
     }
 
+    suspend fun refreshListEntry(
+        mediaId: Int,
+        accessToken: String,
+        scoreFormat: AnilistScoreFormat,
+    ): AnilistListEntry? {
+        val listEntry = container.anilistRepository.mediaListEntry(
+            mediaId = mediaId,
+            accessToken = accessToken,
+            scoreFormat = scoreFormat,
+        )
+        if (listEntry == null) {
+            container.database.listEntryDao().deleteEntryForMedia(mediaId)
+        } else {
+            container.database.listEntryDao().upsertEntry(listEntry.toEntity(System.currentTimeMillis()))
+        }
+        return listEntry
+    }
+
     suspend fun enrichRecommendationMedia(
         media: List<AnilistMedia>,
         accessToken: String?,

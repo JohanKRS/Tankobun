@@ -94,6 +94,13 @@ object AnilistJsonMapper {
         )
     }
 
+    fun mediaListEntry(data: JsonObject): AnilistListEntry? = data["Media"]
+        ?.takeUnless { it is JsonNull }
+        ?.jsonObject
+        ?.get("mediaListEntry")
+        ?.takeUnless { it is JsonNull }
+        ?.let(::listEntry)
+
     fun mediaRecommendations(data: JsonObject): AnilistRecommendationPage {
         val mediaObj = data["Media"]
             ?.takeUnless { it is JsonNull }

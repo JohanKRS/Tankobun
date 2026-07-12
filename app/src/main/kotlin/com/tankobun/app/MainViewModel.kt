@@ -64,6 +64,7 @@ import com.tankobun.app.logic.withReaderAdjacentSegment
 import com.tankobun.app.logic.withReaderPagePosition
 import com.tankobun.app.logic.withReaderPagesLoaded
 import com.tankobun.app.logic.withRecentProgressOpened
+import com.tankobun.app.logic.withRefreshedTrackingEntry
 import com.tankobun.app.logic.withSelectedAniListDetails
 import com.tankobun.app.logic.withSelectedMedia
 import com.tankobun.app.logic.withSelectedSource
@@ -219,6 +220,7 @@ private val FALLBACK_HOME_GENRES = listOf(
 private const val READER_ADJACENT_SEGMENT_LOAD_TIMEOUT_MILLIS = 12_000L
 private const val READER_ADJACENT_SEGMENT_STALE_MILLIS = 20_000L
 private const val HOME_FEED_RETRY_DELAY_MILLIS = 30 * 60 * 1000L
+private const val QUICK_DRAWER_TRACKING_REFRESH_MILLIS = 5 * 60 * 1000L
 
 class MainViewModel(
     private val container: AppContainer,
@@ -249,6 +251,8 @@ class MainViewModel(
     private var lastReaderProgressSavedAtEpochMillis: Long = 0L
     private var latestReaderPosition: ReaderPagePosition? = null
     private val readerPageCacheJobs = ConcurrentHashMap<String, Job>()
+    private val quickDrawerTrackingRefreshJobs = ConcurrentHashMap<Int, Job>()
+    private val quickDrawerTrackingRefreshedAt = ConcurrentHashMap<Int, Long>()
     private val initialAccessToken = container.tokenStore.accessToken()
     private val initialOnboardingVersion = container.settingsStore.onboardingVersion()
     private val initialLibraryMode = initialLibraryModeForStartup(
@@ -2293,6 +2297,38 @@ class MainViewModel(
         _state.update { it.withSelectedMedia(displayMedia, existingEntry) }
         loadAnilistDetails(media.id)
         loadCachedSourceState(media.id)
+    }
+
+    fun refreshQuickDrawerTracking(mediaId: Int) {
+        val snapshot = _state.value
+        val token = container.tokenStore.accessToken()
+        if (!snapshot.loggedIn || snapshot.libraryMode != LibraryMode.ANILIST || token.isNullOrBlank()) return
+        if (snapshot.selectedMedia?.id != mediaId) return
+
+        val now = System.currentTimeMillis()
+        val lastRefresh = quickDrawerTrackingRefreshedAt[mediaId] ?: 0L
+        if (now - lastRefresh < QUICK_DRAWER_TRACKING_REFRESH_MILLIS) return
+        if (quickDrawerTrackingRefreshJobs[mediaId]?.isActive == true) return
+
+        val job = viewModelScope.launch {
+            try {
+                runCatching {
+                    aniListDataSource.refreshListEntry(
+                        mediaId = mediaId,
+                        accessToken = token,
+                        scoreFormat = _state.value.anilistScoreFormat,
+                    )
+                }.onSuccess { entry ->
+                    quickDrawerTrackingRefreshedAt[mediaId] = System.currentTimeMillis()
+                    _state.update { it.withRefreshedTrackingEntry(mediaId, entry) }
+                }.onFailure { error ->
+                    Log.w(TAG, "AniList quick drawer tracking refresh failed for $mediaId", error)
+                }
+            } finally {
+                quickDrawerTrackingRefreshJobs.remove(mediaId)
+            }
+        }
+        quickDrawerTrackingRefreshJobs[mediaId] = job
     }
 
     fun selectSource(sourceId: Long) {

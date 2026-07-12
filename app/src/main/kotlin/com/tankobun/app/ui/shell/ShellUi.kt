@@ -1825,6 +1825,9 @@ internal fun QuickDrawer(
 ) {
     val handleSlotWidth = if (showHandle) QuickDrawerHandleSlotWidth else 0.dp
     val chromeInsets = LocalTankobunChromeInsets.current
+    LaunchedEffect(selectedMedia?.id, state.loggedIn, state.libraryMode) {
+        selectedMedia?.id?.let(viewModel::refreshQuickDrawerTracking)
+    }
     Box(modifier = modifier.width(handleSlotWidth + drawerWidth + endPadding)) {
         Surface(
             modifier = Modifier
@@ -1859,7 +1862,10 @@ internal fun QuickDrawer(
                         ),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        QuickDrawerSection(title = tankobunString(R.string.detail_track_manga)) {
+                        QuickDrawerSection(
+                            title = tankobunString(R.string.detail_track_manga),
+                            icon = TankobunIcons.Pencil,
+                        ) {
                             if (selectedMedia != null) {
                                 AniListTrackingSection(state, viewModel, selectedMedia)
                             } else {
@@ -1871,7 +1877,10 @@ internal fun QuickDrawer(
                             }
                         }
 
-                        QuickDrawerSection(title = tankobunString(R.string.chapter_resume_reading)) {
+                        QuickDrawerSection(
+                            title = tankobunString(R.string.chapter_resume_reading),
+                            icon = TankobunIcons.MenuBook,
+                        ) {
                             if (state.recentReadingProgress.isNotEmpty()) {
                                 state.recentReadingProgress.forEach { item ->
                                     RecentReadingAction(item = item, onClick = { onOpenRecentProgress(item) })
@@ -1885,7 +1894,10 @@ internal fun QuickDrawer(
                             }
                         }
 
-                        QuickDrawerSection(title = tankobunString(R.string.common_downloads)) {
+                        QuickDrawerSection(
+                            title = tankobunString(R.string.common_downloads),
+                            icon = TankobunIcons.Download,
+                        ) {
                             if (state.downloads.isEmpty()) {
                                 Text(tankobunString(R.string.downloads_no_queued), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             } else {
@@ -1926,47 +1938,96 @@ internal fun QuickDrawer(
 
 @Composable
 internal fun RecentReadingAction(item: RecentReadingProgress, onClick: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-        Text(
-            item.media.title.userPreferred,
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            listOf(
-                item.chapter?.name
-                    ?: item.progress.chapterNumber.takeIf { it > 0 }?.let { tankobunString(R.string.reader_chapter_number, it.toString()) }
-                    ?: tankobunString(R.string.reader_saved_chapter),
-                tankobunString(R.string.reader_page_fraction, item.progress.pageIndex + 1, item.progress.totalPages),
-            ).joinToString(" / "),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        TankobunActionButton(
-            label = if (item.chapter == null) tankobunString(R.string.reader_open_manga) else tankobunString(R.string.chapter_resume),
-            icon = TankobunIcons.MenuBook,
-            onClick = onClick,
-            modifier = Modifier.fillMaxWidth(),
-            filled = false,
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(LocalTankobunStyle.current.colors.accent.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                TankobunIcons.PlayArrow,
+                contentDescription = null,
+                modifier = Modifier.size(19.dp),
+                tint = LocalTankobunStyle.current.colors.accent,
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(
+                item.media.title.userPreferred,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                listOf(
+                    item.chapter?.name
+                        ?: item.progress.chapterNumber.takeIf { it > 0 }?.let { tankobunString(R.string.reader_chapter_number, it.toString()) }
+                        ?: tankobunString(R.string.reader_saved_chapter),
+                    tankobunString(R.string.reader_page_fraction, item.progress.pageIndex + 1, item.progress.totalPages),
+                ).joinToString(" / "),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            TankobunIcons.ChevronRight,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
 @Composable
-internal fun QuickDrawerSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    TankobunPanel(
+internal fun QuickDrawerSection(
+    title: String,
+    icon: ImageVector,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            TankobunSectionHeader(title = title)
-            content()
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = LocalTankobunStyle.current.colors.accent,
+            )
+            Text(
+                text = title.uppercase(Locale.ROOT),
+                style = LocalTankobunStyle.current.typography.sectionLabel,
+                color = LocalTankobunStyle.current.colors.accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.24f)),
+            )
         }
+        content()
     }
 }

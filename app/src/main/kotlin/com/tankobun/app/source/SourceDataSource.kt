@@ -93,15 +93,36 @@ internal class SourceDataSource(
             }
         }
 
+        val boundSourceHint = binding?.let { cached ->
+            cachedResults.firstOrNull { result ->
+                result.sourcePackageName == cached.sourcePackageName &&
+                    (result.sourceId == cached.sourceId || result.mangaUrl == cached.mangaUrl)
+            }
+        }
         val boundSource = binding?.let { cached ->
             sources.sourceFor(
                 sourceId = cached.sourceId,
                 packageName = cached.sourcePackageName,
+                sourceName = boundSourceHint?.sourceName,
+                sourceLang = boundSourceHint?.sourceLang,
             )
+        }
+        val effectiveBinding = if (binding != null && boundSource != null && (
+                binding.sourceId != boundSource.id || binding.sourcePackageName != boundSource.packageName
+            )
+        ) {
+            binding.copy(
+                sourceId = boundSource.id,
+                sourcePackageName = boundSource.packageName,
+            ).also { migrated ->
+                container.database.sourceBindingDao().upsertBinding(migrated)
+            }
+        } else {
+            binding
         }
         val boundManga = binding?.let { cached ->
             SourceManga(
-                sourceId = cached.sourceId,
+                sourceId = boundSource?.id ?: cached.sourceId,
                 url = cached.mangaUrl,
                 title = cached.mangaTitle,
                 thumbnailUrl = cached.thumbnailUrl,
@@ -144,8 +165,8 @@ internal class SourceDataSource(
         return CachedSourceState(
             sourceMatches = visibleMatches,
             sourceMatchChapterCounts = chapterCounts,
-            boundSourceId = binding?.sourceId,
-            boundSourcePackageName = binding?.sourcePackageName,
+            boundSourceId = effectiveBinding?.sourceId,
+            boundSourcePackageName = effectiveBinding?.sourcePackageName,
             boundSource = boundSource,
             boundManga = boundManga,
             sourceChapters = chapters,
@@ -492,7 +513,9 @@ internal class SourceDataSource(
                 sourceLang != null &&
                 source.name.equals(sourceName, ignoreCase = true) &&
                 source.lang.equals(sourceLang, ignoreCase = true)
-        } ?: firstOrNull { source ->
+        } ?: filter { source ->
+            source.packageName == packageName
+        }.singleOrNull() ?: firstOrNull { source ->
             source.id == sourceId &&
                 sourceName != null &&
                 source.name.equals(sourceName, ignoreCase = true)

@@ -22,8 +22,16 @@ class AnilistQueriesTest {
         assertTrue(AnilistQueries.MangaListCollectionByUserId.contains("hiddenFromStatusLists"))
         assertTrue(AnilistQueries.MangaListCollectionByUserName.contains("hiddenFromStatusLists"))
         assertTrue(AnilistQueries.MediaDetails.contains("hiddenFromStatusLists"))
+        assertTrue(AnilistQueries.MediaListEntry.contains("hiddenFromStatusLists"))
         assertTrue(AnilistQueries.SaveMediaListEntry.contains("\$hiddenFromStatusLists: Boolean"))
         assertTrue(AnilistQueries.SaveMediaListEntry.contains("hiddenFromStatusLists: \$hiddenFromStatusLists"))
+    }
+
+    @Test
+    fun mediaListEntryRefreshIsScopedToOneMangaAndIncludesScoreFormat() {
+        assertTrue(AnilistQueries.MediaListEntry.contains("Media(id: \$id, type: MANGA)"))
+        assertTrue(AnilistQueries.MediaListEntry.contains("score(format: \$scoreFormat)"))
+        assertFalse(AnilistQueries.MediaListEntry.contains("recommendations"))
     }
 
     @Test

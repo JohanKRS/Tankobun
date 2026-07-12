@@ -494,6 +494,25 @@ object AnilistQueries {
         }
     """
 
+    const val MediaListEntry = """
+        query MediaListEntry(${'$'}id: Int!, ${'$'}scoreFormat: ScoreFormat) {
+          Media(id: ${'$'}id, type: MANGA) {
+            mediaListEntry {
+              id
+              mediaId
+              status
+              progress
+              score(format: ${'$'}scoreFormat)
+              notes
+              private
+              customLists(asArray: true)
+              hiddenFromStatusLists
+              updatedAt
+            }
+          }
+        }
+    """
+
     const val MangaListCollectionByUserId = """
         query MangaListCollectionByUserId(${'$'}userId: Int!, ${'$'}scoreFormat: ScoreFormat) {
           MediaListCollection(userId: ${'$'}userId, type: MANGA) {
