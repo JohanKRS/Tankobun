@@ -5,6 +5,10 @@ import com.tankobun.app.ui.icons.TankobunIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,11 +47,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +72,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.tankobun.app.LocalTankobunStyle
+import com.tankobun.app.LocalTankobunTokens
+import com.tankobun.app.TankobunArtDirection
 import com.tankobun.app.R
 import com.tankobun.app.TankobunDisplayFontFamily
 import com.tankobun.app.tankobunString
@@ -85,7 +95,15 @@ internal fun TankobunScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(LocalTankobunStyle.current.colors.backdrop)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        LocalTankobunTokens.current.gradientStart,
+                        LocalTankobunStyle.current.colors.backdrop,
+                        LocalTankobunTokens.current.gradientEnd,
+                    ),
+                ),
+            )
             .padding(resolvedPadding),
         verticalArrangement = Arrangement.spacedBy(LocalTankobunStyle.current.spacing.section),
         content = content,
@@ -101,13 +119,19 @@ internal fun TankobunPanel(
     shadowElevation: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
+    val style = LocalTankobunStyle.current
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = style.themeShapes.panel,
         color = color,
         contentColor = contentColor,
         tonalElevation = tonalElevation,
-        shadowElevation = shadowElevation,
+        shadowElevation = if (style.strokes.hardShadow && shadowElevation == 0.dp) 4.dp else shadowElevation,
+        border = if (style.direction == TankobunArtDirection.PANEL_RIOT || style.direction == TankobunArtDirection.NOIR_ATELIER) {
+            BorderStroke(style.strokes.defaultWidth, style.colors.outline.copy(alpha = 0.48f))
+        } else {
+            null
+        },
         content = content,
     )
 }
@@ -222,7 +246,18 @@ internal fun TankobunActionButton(
     disabledContainerColor: Color? = null,
     disabledContentColor: Color? = null,
 ) {
-    val shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control)
+    val style = LocalTankobunStyle.current
+    val shape = style.themeShapes.control
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) style.motion.pressScale else 1f,
+        animationSpec = tween(style.motion.durationMillis),
+        label = "Tankobun action press",
+    )
+    val animatedModifier = modifier
+        .heightIn(min = style.sizes.iconAction)
+        .graphicsLayer { scaleX = scale; scaleY = scale }
     val resolvedContainerColor = containerColor ?: LocalTankobunStyle.current.colors.action
     val resolvedContentColor = contentColor ?: LocalTankobunStyle.current.colors.actionContent
     val content: @Composable () -> Unit = {
@@ -238,8 +273,9 @@ internal fun TankobunActionButton(
         Button(
             onClick = onClick,
             enabled = enabled,
-            modifier = modifier.heightIn(min = LocalTankobunStyle.current.sizes.iconAction),
+            modifier = animatedModifier,
             shape = shape,
+            interactionSource = interactionSource,
             contentPadding = PaddingValues(horizontal = 14.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = resolvedContainerColor,
@@ -253,8 +289,9 @@ internal fun TankobunActionButton(
         OutlinedButton(
             onClick = onClick,
             enabled = enabled,
-            modifier = modifier.heightIn(min = LocalTankobunStyle.current.sizes.iconAction),
+            modifier = animatedModifier,
             shape = shape,
+            interactionSource = interactionSource,
             contentPadding = PaddingValues(horizontal = 14.dp),
             content = { content() },
         )
@@ -271,7 +308,7 @@ internal fun TankobunIconActionButton(
     filled: Boolean = false,
 ) {
     val size = LocalTankobunStyle.current.sizes.iconAction
-    val shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control)
+    val shape = LocalTankobunStyle.current.themeShapes.control
     if (filled) {
         Button(
             onClick = onClick,
@@ -331,7 +368,7 @@ internal fun TankobunSearchField(
         placeholder = { Text(placeholder) },
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        shape = LocalTankobunStyle.current.themeShapes.control,
     )
 }
 
@@ -371,6 +408,14 @@ internal fun TankobunChip(
     label: @Composable () -> Unit,
     leadingIcon: (@Composable () -> Unit)? = null,
 ) {
+    val style = LocalTankobunStyle.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) style.motion.pressScale else 1f,
+        animationSpec = tween(style.motion.durationMillis),
+        label = "Tankobun chip press",
+    )
     val backgroundColor = if (selected) {
         LocalTankobunStyle.current.colors.selectedChip
     } else {
@@ -389,11 +434,12 @@ internal fun TankobunChip(
     Surface(
         modifier = modifier
             .heightIn(min = 32.dp)
-            .clickable(enabled = enabled, onClick = onClick),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick),
+        shape = style.themeShapes.chip,
         color = if (enabled) backgroundColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
         contentColor = if (enabled) contentColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-        border = BorderStroke(1.dp, borderColor),
+        border = BorderStroke(style.strokes.defaultWidth, borderColor),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -426,7 +472,7 @@ internal fun TankobunClearFiltersChip(
         modifier = modifier
             .heightIn(min = 32.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        shape = LocalTankobunStyle.current.themeShapes.chip,
         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.82f),
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.42f)),
@@ -458,7 +504,7 @@ internal fun TankobunTag(
     val clickableModifier = onClick?.let { modifier.clickable(onClick = it) } ?: modifier
     Surface(
         modifier = clickableModifier,
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        shape = LocalTankobunStyle.current.themeShapes.chip,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
@@ -513,7 +559,7 @@ internal fun TankobunDialogSurface(
             .fillMaxWidth(0.94f)
             .widthIn(max = maxWidth)
             .then(heightModifier),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.dialog,
         color = LocalTankobunStyle.current.colors.panel,
         contentColor = LocalTankobunStyle.current.colors.panelContent,
         tonalElevation = 3.dp,

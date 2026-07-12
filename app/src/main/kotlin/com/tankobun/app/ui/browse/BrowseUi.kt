@@ -1046,7 +1046,7 @@ internal fun BrowseOptionDialog(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
+                    .clip(LocalTankobunStyle.current.themeShapes.control)
                     .clickable { onSelect(option.value) },
                 color = if (option.value == selectedValue) {
                     MaterialTheme.colorScheme.secondaryContainer

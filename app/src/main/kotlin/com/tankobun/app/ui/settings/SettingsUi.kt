@@ -312,7 +312,6 @@ internal fun SettingsRouteRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val routeColor = LocalTankobunStyle.current.colors.accent
     val rowColor = if (selected) {
         LocalTankobunStyle.current.colors.selectedChip.copy(alpha = 0.92f)
     } else {
@@ -326,7 +325,7 @@ internal fun SettingsRouteRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
+            .clip(LocalTankobunStyle.current.themeShapes.control)
             .background(rowColor)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 10.dp),
@@ -349,13 +348,6 @@ internal fun SettingsRouteRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (selected) {
-            Surface(
-                modifier = Modifier.size(width = 3.dp, height = 28.dp),
-                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.pill),
-                color = routeColor,
-            ) {}
-        }
     }
 }
 
@@ -364,7 +356,7 @@ internal fun SettingsRouteIcon(route: SettingsRoute) {
     val routeColor = LocalTankobunStyle.current.colors.accent
     Surface(
         modifier = Modifier.size(36.dp),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        shape = LocalTankobunStyle.current.themeShapes.indicator,
         color = routeColor.copy(alpha = 0.14f),
         contentColor = routeColor,
     ) {
@@ -396,8 +388,8 @@ internal fun SettingsDetailContent(
             modifier = modifier,
         ) {
             ThemePicker(
-                selected = state.themeMode,
-                onSelect = viewModel::setThemeMode,
+                selected = state.themePreference,
+                onSelect = viewModel::setThemePreference,
             )
             Text(tankobunString(R.string.settings_dock_position), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             DockAlignmentRow(
@@ -822,7 +814,7 @@ internal fun ProfileHeaderCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp)
-                .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.panel)),
+                .clip(LocalTankobunStyle.current.themeShapes.panel),
         ) {
             if (bannerUrl != null) {
                 AsyncImage(
@@ -1042,7 +1034,7 @@ private fun ProfileMetricCard(
     emphasized: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control)
+    val shape = LocalTankobunStyle.current.themeShapes.control
     val accent = LocalTankobunStyle.current.colors.accent
     Box(
         modifier = modifier
@@ -1155,7 +1147,7 @@ private fun ProfileBreakdownSection(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
@@ -1442,7 +1434,7 @@ internal fun CustomListNameDialog(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             label = { Text(tankobunString(R.string.settings_list_name)) },
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            shape = LocalTankobunStyle.current.themeShapes.control,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onDismiss) {

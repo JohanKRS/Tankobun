@@ -271,7 +271,7 @@ private fun ProfileMetricTile(
     }
     Surface(
         modifier = modifier.height(96.dp),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        shape = LocalTankobunStyle.current.themeShapes.control,
         color = background,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {

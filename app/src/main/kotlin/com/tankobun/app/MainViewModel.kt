@@ -285,7 +285,7 @@ class MainViewModel(
             sourceLanguages = container.settingsStore.sourceLanguages(),
             disabledSourceKeys = container.settingsStore.disabledSourceKeys(),
             extensionRepositoryUrl = container.settingsStore.extensionRepositoryUrl(),
-            themeMode = container.settingsStore.themeMode(),
+            themePreference = container.settingsStore.themePreference(),
             appLanguage = container.settingsStore.appLanguage(),
             ignoreDisplayCutout = container.settingsStore.ignoreDisplayCutout(),
             showAppStatusBar = container.settingsStore.showAppStatusBar(),
@@ -558,14 +558,14 @@ class MainViewModel(
         loadBrowseTags()
     }
 
-    fun completeOnboardingSetup(mode: LibraryMode, themeMode: TankobunThemeMode) {
+    fun completeOnboardingSetup(mode: LibraryMode, themePreference: TankobunThemePreference) {
         container.settingsStore.saveLibraryMode(mode)
-        container.settingsStore.saveThemeMode(themeMode)
+        container.settingsStore.saveThemePreference(themePreference)
         container.settingsStore.saveOnboardingVersion(CURRENT_ONBOARDING_VERSION)
         _state.update {
             it.copy(
                 libraryMode = mode,
-                themeMode = themeMode,
+                themePreference = themePreference,
                 onboardingVisible = false,
                 appTourVisible = true,
             )
@@ -646,9 +646,10 @@ class MainViewModel(
         _state.update { it.copy(extensionRepositoryUrl = url) }
     }
 
-    fun setThemeMode(mode: TankobunThemeMode) {
-        container.settingsStore.saveThemeMode(mode)
-        _state.update { it.copy(themeMode = mode) }
+    fun setThemePreference(preference: TankobunThemePreference) {
+        val normalized = preference.normalized()
+        container.settingsStore.saveThemePreference(normalized)
+        _state.update { it.copy(themePreference = normalized) }
     }
 
     fun setAppLanguage(language: AppLanguage) {
@@ -1336,7 +1337,7 @@ class MainViewModel(
                 fallbackToFirst = !keepMissingBoundSource,
             )
             current.copy(
-                themeMode = store.themeMode(),
+                themePreference = store.themePreference(),
                 appLanguage = store.appLanguage(),
                 ignoreDisplayCutout = store.ignoreDisplayCutout(),
                 showAppStatusBar = store.showAppStatusBar(),

@@ -106,6 +106,12 @@
     <string name="settings_about_subtitle">A little context about what Tankobun is and is not.</string>
     <string name="settings_downloads_subtitle">Review local chapter storage and remove downloaded manga.</string>
     <string name="settings_theme_section">Theme</string>
+    <string name="settings_theme_automatic">Automatic</string>
+    <string name="settings_theme_custom">Custom</string>
+    <string name="settings_theme_art_direction">Art direction</string>
+    <string name="settings_theme_palette">Color palette</string>
+    <string name="settings_theme_preview">Live sample</string>
+    <string name="settings_theme_automatic_desc">Uses Mochi Pop by day and Neon Current in dark mode.</string>
     <string name="settings_dock_position">Dock position</string>
     <string name="settings_dock_animation">Dock animation</string>
     <string name="settings_system_ui">System UI</string>

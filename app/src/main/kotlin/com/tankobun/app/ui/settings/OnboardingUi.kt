@@ -52,10 +52,8 @@ import com.tankobun.app.LibraryMode
 import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.LocalTankobunTokens
 import com.tankobun.app.R
-import com.tankobun.app.TankobunThemeChoice
-import com.tankobun.app.TankobunThemeMode
+import com.tankobun.app.TankobunThemePreference
 import com.tankobun.app.tankobunString
-import com.tankobun.app.tankobunThemeChoices
 import com.tankobun.app.ui.components.TankobunActionButton
 
 internal enum class AppTourStep {
@@ -74,18 +72,18 @@ private val AppTourSteps = AppTourStep.entries.toList()
 @Composable
 internal fun OnboardingDialog(
     initialLibraryMode: LibraryMode,
-    initialThemeMode: TankobunThemeMode,
+    initialThemePreference: TankobunThemePreference,
     onPrepareBrowse: () -> Unit,
-    onThemeSelected: (TankobunThemeMode) -> Unit,
-    onComplete: (LibraryMode, TankobunThemeMode) -> Unit,
+    onThemeSelected: (TankobunThemePreference) -> Unit,
+    onComplete: (LibraryMode, TankobunThemePreference) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var pageIndex by remember { mutableIntStateOf(0) }
     var selectedLibraryMode by remember(initialLibraryMode) { androidx.compose.runtime.mutableStateOf(initialLibraryMode) }
-    var selectedThemeMode by remember(initialThemeMode) { androidx.compose.runtime.mutableStateOf(initialThemeMode) }
+    var selectedThemePreference by remember(initialThemePreference) { androidx.compose.runtime.mutableStateOf(initialThemePreference) }
     val pageCount = 2
     val isLastPage = pageIndex == pageCount - 1
-    val finish = { onComplete(selectedLibraryMode, selectedThemeMode) }
+    val finish = { onComplete(selectedLibraryMode, selectedThemePreference) }
 
     LaunchedEffect(Unit) {
         onPrepareBrowse()
@@ -131,10 +129,10 @@ internal fun OnboardingDialog(
                             onSelected = { selectedLibraryMode = it },
                         )
                         else -> OnboardingThemeStep(
-                            selected = selectedThemeMode,
-                            onSelected = { mode ->
-                                selectedThemeMode = mode
-                                onThemeSelected(mode)
+                            selected = selectedThemePreference,
+                            onSelected = { preference ->
+                                selectedThemePreference = preference
+                                onThemeSelected(preference)
                             },
                         )
                     }
@@ -259,7 +257,7 @@ private fun OnboardingTopBar(
 private fun OnboardingHeroIcon(icon: ImageVector) {
     Surface(
         modifier = Modifier.size(88.dp),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = LocalTankobunStyle.current.colors.selectedChip,
         contentColor = LocalTankobunStyle.current.colors.selectedChipContent,
     ) {
@@ -302,8 +300,8 @@ private fun OnboardingLibraryModeStep(
 
 @Composable
 private fun OnboardingThemeStep(
-    selected: TankobunThemeMode,
-    onSelected: (TankobunThemeMode) -> Unit,
+    selected: TankobunThemePreference,
+    onSelected: (TankobunThemePreference) -> Unit,
 ) {
     Column(
         modifier = Modifier.widthIn(max = 640.dp),
@@ -314,13 +312,7 @@ private fun OnboardingThemeStep(
             title = tankobunString(R.string.onboarding_theme_title),
             body = tankobunString(R.string.onboarding_theme_body),
         )
-        tankobunThemeChoices().forEach { choice ->
-            OnboardingThemeChoiceButton(
-                choice = choice,
-                selected = selected == choice.mode,
-                onClick = { onSelected(choice.mode) },
-            )
-        }
+        ThemePicker(selected = selected, onSelect = onSelected)
     }
 }
 
@@ -350,7 +342,7 @@ private fun OnboardingChoiceButton(
     icon: ImageVector,
     onClick: () -> Unit,
 ) {
-    val choiceShape = RoundedCornerShape(LocalTankobunStyle.current.radii.control)
+    val choiceShape = LocalTankobunStyle.current.themeShapes.control
     val bodyColor = if (selected) {
         MaterialTheme.colorScheme.onPrimary
     } else {
@@ -373,58 +365,6 @@ private fun OnboardingChoiceButton(
         Button(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = choiceShape) { content() }
     } else {
         OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = choiceShape) { content() }
-    }
-}
-
-@Composable
-private fun OnboardingThemeChoiceButton(
-    choice: TankobunThemeChoice,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val choiceShape = RoundedCornerShape(LocalTankobunStyle.current.radii.control)
-    val descriptionColor = if (selected) {
-        LocalTankobunStyle.current.colors.selectedChipContent
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(choiceShape)
-            .clickable(onClick = onClick),
-        shape = choiceShape,
-        color = if (selected) LocalTankobunStyle.current.colors.selectedChip else LocalTankobunStyle.current.colors.panel,
-        contentColor = if (selected) LocalTankobunStyle.current.colors.selectedChipContent else LocalTankobunStyle.current.colors.panelContent,
-        border = BorderStroke(
-            1.dp,
-            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-        ),
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
-                choice.swatches.take(3).forEach { swatch ->
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(swatch)
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-                    )
-                }
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(choice.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                Text(choice.description, style = MaterialTheme.typography.bodySmall, color = descriptionColor)
-            }
-            if (selected) {
-                Icon(TankobunIcons.Check, contentDescription = null, modifier = Modifier.size(20.dp))
-            }
-        }
     }
 }
 
@@ -486,7 +426,7 @@ private fun TourCoachCard(
         modifier = modifier
             .fillMaxWidth()
             .widthIn(max = 520.dp),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = LocalTankobunStyle.current.colors.panel,
         contentColor = LocalTankobunStyle.current.colors.panelContent,
         tonalElevation = 6.dp,
@@ -498,7 +438,7 @@ private fun TourCoachCard(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     modifier = Modifier.size(46.dp),
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                    shape = LocalTankobunStyle.current.themeShapes.control,
                     color = LocalTankobunStyle.current.colors.selectedChip,
                     contentColor = LocalTankobunStyle.current.colors.selectedChipContent,
                 ) {
@@ -523,7 +463,7 @@ private fun TourCoachCard(
             step.panelRes(libraryMode, tourExampleLoaded)?.let { panelRes ->
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                    shape = LocalTankobunStyle.current.themeShapes.control,
                     color = LocalTankobunTokens.current.elevatedSurface,
                     contentColor = LocalTankobunStyle.current.colors.panelContent,
                 ) {

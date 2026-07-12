@@ -118,7 +118,7 @@ internal fun SourceActionCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = mediaDetailPanelColor(),
         contentColor = mediaDetailForegroundColor(),
     ) {
@@ -161,7 +161,7 @@ internal fun SelectedSourceCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = mediaDetailPanelColor(),
         contentColor = mediaDetailForegroundColor(),
     ) {
@@ -224,7 +224,7 @@ internal fun PlainSourceIcon(
         }
     }
     Box(
-        modifier = modifier.clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control)),
+        modifier = modifier.clip(LocalTankobunStyle.current.themeShapes.control),
         contentAlignment = Alignment.Center,
     ) {
         if (sourceIcon != null) {
@@ -237,7 +237,7 @@ internal fun PlainSourceIcon(
         } else {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                shape = LocalTankobunStyle.current.themeShapes.control,
                 color = mediaDetailAccentColor().copy(alpha = 0.16f),
                 contentColor = mediaDetailAccentColor(),
             ) {
@@ -566,7 +566,7 @@ internal fun SourceMatchRow(
     mediaCover: String?,
     onClick: () -> Unit,
 ) {
-    ElevatedCard(onClick = onClick, shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
+    ElevatedCard(onClick = onClick, shape = LocalTankobunStyle.current.themeShapes.panel) {
         ListItem(
             headlineContent = { Text(match.manga.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = {
@@ -605,7 +605,7 @@ internal fun SourceCandidateRow(
     current: Boolean,
     onClick: () -> Unit,
 ) {
-    ElevatedCard(onClick = onClick, shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
+    ElevatedCard(onClick = onClick, shape = LocalTankobunStyle.current.themeShapes.panel) {
         ListItem(
             headlineContent = { Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = {

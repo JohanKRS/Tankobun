@@ -319,7 +319,7 @@ internal fun DownloadJobRow(
     onRetry: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    ElevatedCard(shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel)) {
+    ElevatedCard(shape = LocalTankobunStyle.current.themeShapes.panel) {
         Column(modifier = Modifier.fillMaxWidth()) {
             ListItem(
                 headlineContent = { Text(job.chapterName, maxLines = 1, overflow = TextOverflow.Ellipsis) },

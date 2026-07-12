@@ -141,6 +141,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Offset
@@ -401,7 +402,7 @@ private fun TankobunAppRootContent(
         selectedMedia == null &&
         (state.hasBrowseQueryOrFilters() || state.browseSearched)
     val appStatusBarVisible = state.showAppStatusBar && !readerOpen
-    val useDarkStatusBarIcons = state.themeMode.useDarkStatusBarIcons(isSystemInDarkTheme())
+    val useDarkStatusBarIcons = !state.themePreference.isDark(isSystemInDarkTheme())
     val currentRoute = TankobunRoute(
         tab = selectedTab,
         settingsRoute = settingsRoute,
@@ -558,7 +559,7 @@ private fun TankobunAppRootContent(
         handleAppBack()
     }
 
-    TankobunTheme(themeMode = state.themeMode) {
+    TankobunTheme(preference = state.themePreference) {
         val effectiveIgnoreDisplayCutout = effectiveIgnoreDisplayCutout(state.ignoreDisplayCutout)
         val cutoutEndPadding = displayCutoutEndPadding(ignoreDisplayCutout = effectiveIgnoreDisplayCutout)
         Box(
@@ -619,9 +620,9 @@ private fun TankobunAppRootContent(
             if (state.onboardingVisible && !readerOpen) {
                 OnboardingDialog(
                     initialLibraryMode = state.libraryMode,
-                    initialThemeMode = state.themeMode,
+                    initialThemePreference = state.themePreference,
                     onPrepareBrowse = viewModel::prepareOnboardingBrowseContent,
-                    onThemeSelected = viewModel::setThemeMode,
+                    onThemeSelected = viewModel::setThemePreference,
                     onComplete = viewModel::completeOnboardingSetup,
                 )
             }
@@ -652,7 +653,7 @@ private fun AniListMergeDialog(
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+            shape = LocalTankobunStyle.current.themeShapes.dialog,
             color = LocalTankobunStyle.current.colors.panel,
             contentColor = LocalTankobunStyle.current.colors.panelContent,
             tonalElevation = 4.dp,
@@ -776,26 +777,6 @@ private tailrec fun Context.findActivity(): Activity? =
         is Activity -> this
         is ContextWrapper -> baseContext.findActivity()
         else -> null
-    }
-
-internal fun TankobunThemeMode.useDarkStatusBarIcons(systemDark: Boolean): Boolean =
-    when (this) {
-        TankobunThemeMode.SYSTEM -> !systemDark
-        TankobunThemeMode.LIGHT,
-        TankobunThemeMode.BUNNY_MOCHI,
-        TankobunThemeMode.PEACH_SODA,
-        TankobunThemeMode.MATCHA_MILK,
-        TankobunThemeMode.SAKURA_MINT,
-        TankobunThemeMode.CLOUDBERRY_POP,
-        TankobunThemeMode.YUZU_GARDEN -> true
-        TankobunThemeMode.DARK,
-        TankobunThemeMode.MIDNIGHT_RAMEN,
-        TankobunThemeMode.STARRY_INK,
-        TankobunThemeMode.PLUM_NIGHT,
-        TankobunThemeMode.NEON_KOI,
-        TankobunThemeMode.MOON_JELLY,
-        TankobunThemeMode.INKBERRY_FIZZ,
-        TankobunThemeMode.CHARCOAL_GOLD -> false
     }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -952,9 +933,11 @@ internal fun TankobunScaffold(
                         modifier = Modifier
                             .width(if (showQuickActionsButton) FrostedDockWithQuickActionsWidth else FrostedDockWidth)
                             .height(FrostedDockHeight),
-                        shape = FrostedDockShape,
+                        shape = LocalTankobunStyle.current.themeShapes.dock,
                         hazeState = chromeHazeState,
                         contentColor = routeContentColor,
+                        baseColor = LocalTankobunTokens.current.dockSurface,
+                        bleedColor = LocalTankobunTokens.current.dockBleed,
                         tintAlpha = FrostedGlassTintAlpha,
                         blurLayerAlpha = FrostedGlassDimAlpha,
                         borderAlpha = 0f,
@@ -1218,6 +1201,8 @@ internal fun TankobunTopBar(
         contentColor = contentColor,
         shape = FrostedTopBarShape,
         hazeState = hazeState,
+        baseColor = LocalTankobunTokens.current.topBarSurface,
+        bleedColor = LocalTankobunTokens.current.topBarBleed,
         tintAlpha = FrostedGlassTintAlpha,
         blurLayerAlpha = FrostedGlassDimAlpha,
         borderAlpha = 0f,
@@ -1283,8 +1268,10 @@ internal fun TankobunTopBar(
 @Composable
 private fun TankobunGlassChrome(
     modifier: Modifier = Modifier,
-    shape: RoundedCornerShape,
+    shape: Shape,
     contentColor: Color = LocalTankobunStyle.current.colors.panelContent,
+    baseColor: Color = LocalTankobunStyle.current.colors.panel,
+    bleedColor: Color = LocalTankobunStyle.current.colors.accent,
     tintAlpha: Float = 0.88f,
     blurLayerAlpha: Float = 0.46f,
     hazeState: HazeState? = null,
@@ -1296,18 +1283,18 @@ private fun TankobunGlassChrome(
 ) {
     val colors = LocalTankobunStyle.current.colors
     val lightBackdrop = colors.backdrop.luminance() >= 0.5f
-    val surfaceTint = colors.panel.copy(alpha = (tintAlpha * 2.2f).coerceIn(0.48f, 0.86f))
-    val colorBleedTint = colors.panel.copy(alpha = tintAlpha.coerceIn(0f, 0.56f))
+    val surfaceTint = baseColor.copy(alpha = (tintAlpha * 2.2f).coerceIn(0.48f, 0.86f))
+    val colorBleedTint = bleedColor.copy(alpha = (tintAlpha * 0.62f).coerceIn(0f, 0.34f))
     val dimTint = if (lightBackdrop) {
         Color.White.copy(alpha = (blurLayerAlpha * 0.56f).coerceIn(0f, 0.28f))
     } else {
         Color.Black.copy(alpha = (blurLayerAlpha * 0.8f).coerceIn(0f, 0.36f))
     }
-    val glassWash = colors.panel.copy(alpha = if (hazeState != null) washAlpha.coerceIn(0f, 1f) else 0f)
+    val glassWash = baseColor.copy(alpha = if (hazeState != null) washAlpha.coerceIn(0f, 1f) else 0f)
     val sheen = Color.White.copy(alpha = if (lightBackdrop) 0.08f else 0.05f)
     val border = BorderStroke(1.dp, colors.outline.copy(alpha = borderAlpha.coerceIn(0f, 1f)))
     val hazeStyle = HazeStyle(
-        backgroundColor = colors.panel,
+        backgroundColor = baseColor,
         tints = listOf(
             HazeTint(colorBleedTint),
             HazeTint(dimTint),
@@ -1943,7 +1930,7 @@ internal fun RecentReadingAction(item: RecentReadingProgress, onClick: () -> Uni
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
+            .clip(LocalTankobunStyle.current.themeShapes.control)
             .clickable(onClick = onClick)
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -185,7 +185,7 @@ internal fun ChapterManualDownloadBar(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.70f),
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
@@ -206,7 +206,7 @@ internal fun ChapterManualDownloadBar(
             Button(
                 onClick = onDownloadSelected,
                 enabled = selectedCount > 0,
-                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                shape = LocalTankobunStyle.current.themeShapes.control,
             ) {
                 Icon(TankobunIcons.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -245,7 +245,7 @@ internal fun ChapterDownloadActionsDialog(
         )
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+            shape = LocalTankobunStyle.current.themeShapes.panel,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 1.dp,
         ) {
@@ -287,13 +287,13 @@ internal fun ChapterDownloadActionRow(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = Color.Transparent,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
+                .clip(LocalTankobunStyle.current.themeShapes.control)
                 .clickable(onClick = onClick)
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,

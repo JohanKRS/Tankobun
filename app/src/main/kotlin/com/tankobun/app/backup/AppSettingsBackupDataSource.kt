@@ -10,6 +10,10 @@ import com.tankobun.app.DockIndicatorAnimation
 import com.tankobun.app.MediaViewMode
 import com.tankobun.app.ReaderScreenOrientation
 import com.tankobun.app.TankobunThemeMode
+import com.tankobun.app.TankobunArtDirection
+import com.tankobun.app.TankobunPaletteId
+import com.tankobun.app.TankobunThemePreference
+import com.tankobun.app.toLegacyThemeMode
 import com.tankobun.app.defaultSourceLanguages
 import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.logic.visibleSources
@@ -92,7 +96,10 @@ internal class AppSettingsBackupDataSource(
 
     private fun settingsJson(snapshot: TankobunUiState): JSONObject =
         JSONObject()
-            .put("themeMode", snapshot.themeMode.name)
+            .put("themeMode", snapshot.themePreference.toLegacyThemeMode().name)
+            .put("themeAutomatic", snapshot.themePreference.automatic)
+            .put("themeArtDirection", snapshot.themePreference.direction.name)
+            .put("themePalette", snapshot.themePreference.palette.name)
             .put("appLanguage", snapshot.appLanguage.storageValue)
             .put("ignoreDisplayCutout", snapshot.ignoreDisplayCutout)
             .put("showAppStatusBar", snapshot.showAppStatusBar)
@@ -177,7 +184,19 @@ internal class AppSettingsBackupDataSource(
 
     private fun restoreSettings(settings: JSONObject) {
         val store = container.settingsStore
-        settings.enumOrNull<TankobunThemeMode>("themeMode")?.let(store::saveThemeMode)
+        val direction = settings.enumOrNull<TankobunArtDirection>("themeArtDirection")
+        val palette = settings.enumOrNull<TankobunPaletteId>("themePalette")
+        if (direction != null && palette != null) {
+            store.saveThemePreference(
+                TankobunThemePreference(
+                    automatic = settings.optBooleanOrNull("themeAutomatic") ?: false,
+                    direction = direction,
+                    palette = palette,
+                ),
+            )
+        } else {
+            settings.enumOrNull<TankobunThemeMode>("themeMode")?.let(store::saveThemeMode)
+        }
         settings.optStringOrNull("appLanguage")
             ?.let(AppLanguage::fromStorageValue)
             ?.let(store::saveAppLanguage)
@@ -235,7 +254,7 @@ internal class AppSettingsBackupDataSource(
         return TankobunUiState(
             loggedIn = container.tokenStore.accessToken() != null,
             libraryMode = store.libraryMode(),
-            themeMode = store.themeMode(),
+            themePreference = store.themePreference(),
             appLanguage = store.appLanguage(),
             ignoreDisplayCutout = store.ignoreDisplayCutout(),
             showAppStatusBar = store.showAppStatusBar(),
@@ -319,7 +338,7 @@ internal class AppSettingsBackupDataSource(
 
     private companion object {
         const val BACKUP_TYPE = "tankobun.app-settings"
-        const val BACKUP_VERSION = 2
+        const val BACKUP_VERSION = 3
         const val JSON_INDENT = 2
     }
 

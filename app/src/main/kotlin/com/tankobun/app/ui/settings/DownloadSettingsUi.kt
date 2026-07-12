@@ -344,7 +344,7 @@ internal fun DownloadsSettingsScreen(
                             detail = summary.totalBytes.formatFileSize(),
                         )
                     },
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                    shape = LocalTankobunStyle.current.themeShapes.control,
                 ) {
                     Icon(TankobunIcons.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -715,7 +715,15 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
             )
         }.joinToString(" / ")
         SettingsRoute.APPEARANCE -> buildList {
-            add(tankobunThemeChoices().firstOrNull { it.mode == state.themeMode }?.name ?: "Neon Koi")
+            val preference = state.themePreference.normalized()
+            add(
+                if (preference.automatic) {
+                    tankobunString(R.string.settings_theme_automatic)
+                } else {
+                    val direction = tankobunArtDirectionChoices().first { it.id == preference.direction }.name
+                    "$direction · ${tankobunPaletteChoice(preference.palette).name}"
+                },
+            )
             add(tankobunString(R.string.dock_summary, state.dockAlignment.settingsLabel()))
             add(state.dockIndicatorAnimation.settingsLabel())
         }.joinToString(" / ")

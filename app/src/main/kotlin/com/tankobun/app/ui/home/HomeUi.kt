@@ -82,6 +82,7 @@ import com.tankobun.app.state.TankobunUiState
 import com.tankobun.app.tankobunString
 import com.tankobun.app.ui.browse.browseGenreLabel
 import com.tankobun.app.ui.components.TankobunMediaStatusLabel
+import com.tankobun.app.ui.components.TankobunThemeEffectLayer
 import com.tankobun.app.ui.shell.LocalTankobunChromeInsets
 import com.tankobun.app.ui.media.AutoResizingMangaTitle
 import com.tankobun.core.model.AnilistGenreHighlight
@@ -216,7 +217,7 @@ private fun HomeSection(
             )
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(LocalTankobunStyle.current.themeShapes.control)
                     .clickable(onClick = onViewAll)
                     .padding(start = 8.dp, top = 6.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -341,12 +342,12 @@ private fun TrendingHero(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(style.themeShapes.panel)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(10.dp),
+        shape = style.themeShapes.panel,
         color = backdrop,
         contentColor = style.colors.panelContent,
-        border = BorderStroke(1.dp, style.colors.outline.copy(alpha = 0.78f)),
+        border = BorderStroke(style.strokes.emphasizedWidth, style.colors.outline.copy(alpha = 0.78f)),
     ) {
         Box(Modifier.fillMaxSize()) {
             if (showCharacterMosaic) {
@@ -379,6 +380,10 @@ private fun TrendingHero(
                     }
                 }
             }
+            TankobunThemeEffectLayer(
+                modifier = Modifier.fillMaxSize(),
+                shape = style.themeShapes.panel,
+            )
             Box(
                 Modifier
                     .fillMaxSize()
@@ -424,7 +429,7 @@ private fun TrendingHero(
                     .padding(16.dp),
             ) {
                 Surface(
-                    shape = RoundedCornerShape(7.dp),
+                    shape = style.themeShapes.indicator,
                     color = style.colors.chip.copy(alpha = 0.82f),
                     contentColor = MaterialTheme.colorScheme.primary,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.52f)),
@@ -491,7 +496,7 @@ private fun TrendingHero(
                     }
                     Spacer(Modifier.width(8.dp))
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = style.themeShapes.control,
                         color = style.colors.action,
                         contentColor = style.colors.actionContent,
                     ) {
@@ -585,7 +590,7 @@ private class SlantedHeroPanelShape(
 @Composable
 private fun HeroGenreChip(genre: String) {
     Surface(
-        shape = RoundedCornerShape(6.dp),
+        shape = LocalTankobunStyle.current.themeShapes.chip,
         color = LocalTankobunStyle.current.colors.chip.copy(alpha = 0.8f),
         contentColor = LocalTankobunStyle.current.colors.chipContent,
         border = BorderStroke(1.dp, LocalTankobunStyle.current.colors.outline.copy(alpha = 0.46f)),
@@ -706,10 +711,10 @@ private fun GenreHighlightCard(
             .fillMaxWidth()
             .height(if (expanded) 70.dp else 74.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(9.dp),
+        shape = style.themeShapes.panel,
         color = style.colors.panel,
         contentColor = style.colors.panelContent,
-        border = BorderStroke(1.dp, style.colors.outline.copy(alpha = 0.58f)),
+        border = BorderStroke(style.strokes.defaultWidth, style.colors.outline.copy(alpha = 0.58f)),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -759,9 +764,9 @@ private fun GenreHighlightCard(
 private fun HomeLoadingPanel(modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = LocalTankobunStyle.current.colors.panel,
-        border = BorderStroke(1.dp, LocalTankobunStyle.current.colors.outline.copy(alpha = 0.45f)),
+        border = BorderStroke(LocalTankobunStyle.current.strokes.defaultWidth, LocalTankobunStyle.current.colors.outline.copy(alpha = 0.45f)),
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(30.dp))
@@ -773,7 +778,7 @@ private fun HomeLoadingPanel(modifier: Modifier = Modifier) {
 private fun HomeEmptyPanel(message: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = LocalTankobunTokens.current.elevatedSurface,
     ) {
         Text(

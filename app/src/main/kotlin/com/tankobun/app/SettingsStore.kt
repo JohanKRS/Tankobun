@@ -22,6 +22,31 @@ class SettingsStore(context: Context) {
         preferences.edit().putString(KEY_EXTENSION_REPOSITORY_URL, url).apply()
     }
 
+    fun themePreference(): TankobunThemePreference {
+        val storedDirection = preferences.getString(KEY_THEME_ART_DIRECTION, null)
+            ?.let { runCatching { TankobunArtDirection.valueOf(it) }.getOrNull() }
+        val storedPalette = preferences.getString(KEY_THEME_PALETTE, null)
+            ?.let { runCatching { TankobunPaletteId.valueOf(it) }.getOrNull() }
+        if (storedDirection != null && storedPalette != null) {
+            return TankobunThemePreference(
+                automatic = preferences.getBoolean(KEY_THEME_AUTOMATIC, false),
+                direction = storedDirection,
+                palette = storedPalette,
+            ).normalized()
+        }
+        return legacyThemePreference(themeMode())
+    }
+
+    fun saveThemePreference(preference: TankobunThemePreference) {
+        val normalized = preference.normalized()
+        preferences.edit()
+            .putBoolean(KEY_THEME_AUTOMATIC, normalized.automatic)
+            .putString(KEY_THEME_ART_DIRECTION, normalized.direction.name)
+            .putString(KEY_THEME_PALETTE, normalized.palette.name)
+            .putString(KEY_THEME_MODE, normalized.toLegacyThemeMode().name)
+            .apply()
+    }
+
     fun themeMode(): TankobunThemeMode =
         preferences.getString(KEY_THEME_MODE, null)
             ?.let { stored -> runCatching { TankobunThemeMode.valueOf(stored) }.getOrNull() }
@@ -29,7 +54,7 @@ class SettingsStore(context: Context) {
             ?: TankobunThemeMode.SYSTEM
 
     fun saveThemeMode(mode: TankobunThemeMode) {
-        preferences.edit().putString(KEY_THEME_MODE, mode.name).apply()
+        saveThemePreference(legacyThemePreference(mode))
     }
 
     fun ignoreDisplayCutout(): Boolean =
@@ -579,6 +604,9 @@ class SettingsStore(context: Context) {
     private companion object {
         const val KEY_EXTENSION_REPOSITORY_URL = "extension.repository.url"
         const val KEY_THEME_MODE = "theme.mode"
+        const val KEY_THEME_AUTOMATIC = "theme.automatic"
+        const val KEY_THEME_ART_DIRECTION = "theme.art.direction"
+        const val KEY_THEME_PALETTE = "theme.palette"
         const val KEY_IGNORE_DISPLAY_CUTOUT = "layout.ignore.display.cutout"
         const val KEY_SHOW_APP_STATUS_BAR = "layout.show.app.status.bar"
         const val KEY_DOCK_ALIGNMENT = "layout.dock.alignment"

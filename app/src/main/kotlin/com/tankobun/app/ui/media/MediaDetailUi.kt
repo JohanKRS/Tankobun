@@ -558,7 +558,7 @@ internal fun DetailPlaceholderCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = mediaDetailPanelColor(),
         contentColor = mediaDetailForegroundColor(),
         tonalElevation = 0.dp,
@@ -775,7 +775,7 @@ private fun MediaDetailStatusDropdown(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = LocalTankobunStyle.current.sizes.iconAction),
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            shape = LocalTankobunStyle.current.themeShapes.control,
             contentPadding = PaddingValues(horizontal = 10.dp),
             border = BorderStroke(
                 width = 1.dp,
@@ -863,7 +863,7 @@ internal fun MangaCoverFrame(media: AnilistMedia, modifier: Modifier = Modifier,
     }
     Surface(
         modifier = coverModifier,
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = Color.Transparent,
         shadowElevation = 8.dp,
     ) {
@@ -1230,7 +1230,7 @@ private fun MangaInfoChip(item: MangaInfoItem, compact: Boolean, modifier: Modif
     }
     Surface(
         modifier = chipModifier.heightIn(min = if (compact) 48.dp else 56.dp),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = mediaDetailPanelColor(),
         contentColor = mediaDetailForegroundColor(),
     ) {
@@ -1444,7 +1444,7 @@ internal fun AniListStatusSelector(selected: MediaStatus?, onSelected: (MediaSta
         OutlinedButton(
             onClick = { expanded = !expanded },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            shape = LocalTankobunStyle.current.themeShapes.control,
         ) {
             if (selected != null) {
                 Icon(
@@ -1465,7 +1465,7 @@ internal fun AniListStatusSelector(selected: MediaStatus?, onSelected: (MediaSta
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),
-                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+                shape = LocalTankobunStyle.current.themeShapes.panel,
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 3.dp,
                 shadowElevation = 2.dp,
@@ -1479,7 +1479,7 @@ internal fun AniListStatusSelector(selected: MediaStatus?, onSelected: (MediaSta
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
+                                .clip(LocalTankobunStyle.current.themeShapes.control)
                                 .clickable {
                                     onSelected(status)
                                     expanded = false
@@ -1538,7 +1538,7 @@ internal fun AniListCustomListSelector(
         OutlinedButton(
             onClick = { expanded = !expanded },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            shape = LocalTankobunStyle.current.themeShapes.control,
         ) {
             Text(selectedLabel, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Icon(TankobunIcons.ExpandMore, contentDescription = null)
@@ -1548,7 +1548,7 @@ internal fun AniListCustomListSelector(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),
-                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+                shape = LocalTankobunStyle.current.themeShapes.panel,
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 3.dp,
                 shadowElevation = 2.dp,
@@ -1576,7 +1576,7 @@ internal fun AniListCustomListSelector(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
+                                    .clip(LocalTankobunStyle.current.themeShapes.control)
                                     .clickable { onListSelected(listName, !selected) }
                                     .padding(horizontal = 10.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1810,7 +1810,7 @@ internal fun RecommendationTile(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Surface(
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+            shape = LocalTankobunStyle.current.themeShapes.panel,
             tonalElevation = 1.dp,
             shadowElevation = 2.dp,
         ) {
@@ -1850,7 +1850,7 @@ internal fun LoadMoreRecommendationsTile(
         modifier = modifier
             .aspectRatio(2f / 3f)
             .clickable(enabled = !loading, onClick = onClick),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         tonalElevation = 1.dp,
@@ -1914,7 +1914,7 @@ internal fun CoverZoomOverlay(media: AnilistMedia, onDismiss: () -> Unit) {
                         indication = null,
                         onClick = {},
                     ),
-                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+                shape = LocalTankobunStyle.current.themeShapes.panel,
                 color = Color.Transparent,
                 shadowElevation = 18.dp,
             ) {

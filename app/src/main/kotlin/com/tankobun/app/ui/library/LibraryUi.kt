@@ -1043,7 +1043,7 @@ internal fun LibraryShareDialog(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             label = { Text(tankobunString(R.string.library_batch_list_name)) },
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            shape = LocalTankobunStyle.current.themeShapes.control,
         )
         Box(
             modifier = Modifier
@@ -1113,7 +1113,7 @@ private fun RecommendationShareItemRow(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = androidx.compose.foundation.BorderStroke(
@@ -1194,7 +1194,7 @@ private fun RecommendationShareItemRow(
                             ),
                         )
                     },
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                    shape = LocalTankobunStyle.current.themeShapes.control,
                 )
             }
         }
@@ -1219,7 +1219,7 @@ internal fun LibraryBatchStatusDialog(
                 OutlinedButton(
                     onClick = { onSelectStatus(status) },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                    shape = LocalTankobunStyle.current.themeShapes.control,
                 ) {
                     Icon(
                         trackingStatusIcon(status),
@@ -1263,7 +1263,7 @@ internal fun LibraryBatchCustomListDialog(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 label = { Text(tankobunString(R.string.library_batch_list_name)) },
-                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                shape = LocalTankobunStyle.current.themeShapes.control,
             )
         }
         if (availableLists.isNotEmpty()) {
@@ -1367,7 +1367,7 @@ internal fun RecommendationImportDialog(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             label = { Text(tankobunString(R.string.library_batch_list_name)) },
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            shape = LocalTankobunStyle.current.themeShapes.control,
         )
         Column(
             modifier = Modifier
@@ -1435,9 +1435,9 @@ internal fun RecommendationImportDialog(
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.panel))
+                                    .clip(LocalTankobunStyle.current.themeShapes.panel)
                                     .clickable { viewModel.toggleRecommendationImportItem(item.media.id) },
-                                shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+                                shape = LocalTankobunStyle.current.themeShapes.panel,
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
                                 contentColor = MaterialTheme.colorScheme.onSurface,
                                 border = androidx.compose.foundation.BorderStroke(

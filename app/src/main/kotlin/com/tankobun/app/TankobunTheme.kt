@@ -1,8 +1,10 @@
 package com.tankobun.app
 
+import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -12,6 +14,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -19,6 +23,156 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+enum class TankobunArtDirection {
+    STORYBOOK,
+    MOCHI_POP,
+    PANEL_RIOT,
+    NOIR_ATELIER,
+    NEON_CURRENT,
+}
+
+enum class TankobunPaletteId {
+    MATCHA_MEADOW,
+    PEACH_COUNTRYSIDE,
+    YUZU_GARDEN,
+    BUNNY_BERRY,
+    SAKURA_MINT,
+    CLOUDBERRY,
+    REDLINE,
+    ELECTRIC_BERRY,
+    CITRUS_CLASH,
+    CHARCOAL_GOLD,
+    VELVET_PLUM,
+    STARRY_INK,
+    NEON_KOI,
+    MOON_JELLY,
+    ACID_AURORA,
+}
+
+@Immutable
+data class TankobunThemePreference(
+    val automatic: Boolean = true,
+    val direction: TankobunArtDirection = TankobunArtDirection.MOCHI_POP,
+    val palette: TankobunPaletteId = TankobunPaletteId.BUNNY_BERRY,
+) {
+    fun normalized(): TankobunThemePreference = this
+}
+
+@Immutable
+data class TankobunArtDirectionChoice(
+    val id: TankobunArtDirection,
+    val name: String,
+    val description: String,
+)
+
+@Immutable
+data class TankobunPaletteChoice(
+    val id: TankobunPaletteId,
+    val name: String,
+    val dark: Boolean,
+    val swatches: List<Color>,
+)
+
+fun tankobunArtDirectionChoices(): List<TankobunArtDirectionChoice> = listOf(
+    TankobunArtDirectionChoice(TankobunArtDirection.STORYBOOK, "Storybook", "Organic, warm, and hand-crafted"),
+    TankobunArtDirectionChoice(TankobunArtDirection.MOCHI_POP, "Mochi Pop", "Soft, clean, and playful"),
+    TankobunArtDirectionChoice(TankobunArtDirection.PANEL_RIOT, "Panel Riot", "Graphic, angular, and loud"),
+    TankobunArtDirectionChoice(TankobunArtDirection.NOIR_ATELIER, "Noir Atelier", "Dark, tailored, and refined"),
+    TankobunArtDirectionChoice(TankobunArtDirection.NEON_CURRENT, "Neon Current", "Luminous, fluid, and electric"),
+)
+
+fun tankobunPaletteChoices(): List<TankobunPaletteChoice> =
+    PaletteCatalog.values.map { it.choice() }
+
+fun tankobunPaletteChoice(id: TankobunPaletteId): TankobunPaletteChoice =
+    PaletteCatalog.value(id).choice()
+
+internal fun tankobunColorScheme(id: TankobunPaletteId): ColorScheme =
+    PaletteCatalog.value(id).colorScheme()
+
+fun tankobunThemeShapeSet(direction: TankobunArtDirection): ThemeShapeSet =
+    directionSpec(direction).shapes
+
+fun legacyThemePreference(mode: TankobunThemeMode): TankobunThemePreference = when (mode) {
+    TankobunThemeMode.SYSTEM -> TankobunThemePreference()
+    TankobunThemeMode.LIGHT,
+    TankobunThemeMode.BUNNY_MOCHI -> TankobunThemePreference(false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.BUNNY_BERRY)
+    TankobunThemeMode.PEACH_SODA -> TankobunThemePreference(false, TankobunArtDirection.STORYBOOK, TankobunPaletteId.PEACH_COUNTRYSIDE)
+    TankobunThemeMode.MATCHA_MILK -> TankobunThemePreference(false, TankobunArtDirection.STORYBOOK, TankobunPaletteId.MATCHA_MEADOW)
+    TankobunThemeMode.SAKURA_MINT -> TankobunThemePreference(false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.SAKURA_MINT)
+    TankobunThemeMode.CLOUDBERRY_POP -> TankobunThemePreference(false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.CLOUDBERRY)
+    TankobunThemeMode.YUZU_GARDEN -> TankobunThemePreference(false, TankobunArtDirection.STORYBOOK, TankobunPaletteId.YUZU_GARDEN)
+    TankobunThemeMode.INKBERRY_FIZZ -> TankobunThemePreference(false, TankobunArtDirection.PANEL_RIOT, TankobunPaletteId.ELECTRIC_BERRY)
+    TankobunThemeMode.CHARCOAL_GOLD -> TankobunThemePreference(false, TankobunArtDirection.NOIR_ATELIER, TankobunPaletteId.CHARCOAL_GOLD)
+    TankobunThemeMode.PLUM_NIGHT -> TankobunThemePreference(false, TankobunArtDirection.NOIR_ATELIER, TankobunPaletteId.VELVET_PLUM)
+    TankobunThemeMode.STARRY_INK -> TankobunThemePreference(false, TankobunArtDirection.NOIR_ATELIER, TankobunPaletteId.STARRY_INK)
+    TankobunThemeMode.DARK,
+    TankobunThemeMode.MIDNIGHT_RAMEN,
+    TankobunThemeMode.NEON_KOI -> TankobunThemePreference(false, TankobunArtDirection.NEON_CURRENT, TankobunPaletteId.NEON_KOI)
+    TankobunThemeMode.MOON_JELLY -> TankobunThemePreference(false, TankobunArtDirection.NEON_CURRENT, TankobunPaletteId.MOON_JELLY)
+}
+
+fun TankobunThemePreference.toLegacyThemeMode(): TankobunThemeMode {
+    if (automatic) return TankobunThemeMode.SYSTEM
+    return when (normalized().palette) {
+        TankobunPaletteId.MATCHA_MEADOW -> TankobunThemeMode.MATCHA_MILK
+        TankobunPaletteId.PEACH_COUNTRYSIDE -> TankobunThemeMode.PEACH_SODA
+        TankobunPaletteId.YUZU_GARDEN -> TankobunThemeMode.YUZU_GARDEN
+        TankobunPaletteId.BUNNY_BERRY -> TankobunThemeMode.BUNNY_MOCHI
+        TankobunPaletteId.SAKURA_MINT -> TankobunThemeMode.SAKURA_MINT
+        TankobunPaletteId.CLOUDBERRY -> TankobunThemeMode.CLOUDBERRY_POP
+        TankobunPaletteId.REDLINE,
+        TankobunPaletteId.CITRUS_CLASH -> TankobunThemeMode.BUNNY_MOCHI
+        TankobunPaletteId.ELECTRIC_BERRY -> TankobunThemeMode.INKBERRY_FIZZ
+        TankobunPaletteId.CHARCOAL_GOLD -> TankobunThemeMode.CHARCOAL_GOLD
+        TankobunPaletteId.VELVET_PLUM -> TankobunThemeMode.PLUM_NIGHT
+        TankobunPaletteId.STARRY_INK -> TankobunThemeMode.STARRY_INK
+        TankobunPaletteId.NEON_KOI -> TankobunThemeMode.NEON_KOI
+        TankobunPaletteId.MOON_JELLY -> TankobunThemeMode.MOON_JELLY
+        TankobunPaletteId.ACID_AURORA -> TankobunThemeMode.NEON_KOI
+    }
+}
+
+enum class TankobunThemeEffect {
+    GRAIN,
+    BUBBLE_WASH,
+    HALFTONE,
+    SPECULAR,
+    AURORA,
+}
+
+@Immutable
+data class ThemeShapeSet(
+    val panel: CornerBasedShape,
+    val control: CornerBasedShape,
+    val chip: CornerBasedShape,
+    val dialog: CornerBasedShape,
+    val dock: CornerBasedShape,
+    val cover: CornerBasedShape,
+    val indicator: CornerBasedShape,
+)
+
+@Immutable
+data class ThemeStrokeSet(
+    val defaultWidth: Dp,
+    val emphasizedWidth: Dp,
+    val hardShadow: Boolean,
+)
+
+@Immutable
+data class ThemeMotionSet(
+    val pressScale: Float,
+    val durationMillis: Int,
+    val springy: Boolean,
+)
+
+@Immutable
+data class ThemeEffectSet(
+    val kind: TankobunThemeEffect,
+    val intensity: Float,
+    val animated: Boolean,
+)
 
 @Immutable
 data class TankobunThemeTokens(
@@ -28,12 +182,24 @@ data class TankobunThemeTokens(
     val readerOverlay: Color,
     val drawerHandle: Color,
     val coverScrim: Color,
+    val topBarSurface: Color,
+    val topBarBleed: Color,
+    val dockSurface: Color,
+    val dockBleed: Color,
+    val gradientStart: Color,
+    val gradientEnd: Color,
+    val glow: Color,
 )
 
 @Immutable
 data class TankobunStyle(
+    val direction: TankobunArtDirection,
     val colors: TankobunStyleColors,
-    val radii: TankobunRadii = TankobunRadii(),
+    val themeShapes: ThemeShapeSet,
+    val strokes: ThemeStrokeSet,
+    val motion: ThemeMotionSet,
+    val effects: ThemeEffectSet,
+    val radii: TankobunRadii,
     val spacing: TankobunSpacing = TankobunSpacing(),
     val sizes: TankobunSizes = TankobunSizes(),
     val typography: TankobunTypography = TankobunTypography(),
@@ -57,14 +223,13 @@ data class TankobunStyleColors(
 
 @Immutable
 data class TankobunRadii(
-    val control: Dp = 7.dp,
-    val panel: Dp = 8.dp,
-    val cover: Dp = 8.dp,
+    val control: Dp,
+    val panel: Dp,
+    val cover: Dp,
     val pill: Dp = 999.dp,
 )
 
-@Immutable
-data class TankobunSpacing(
+@Immutable data class TankobunSpacing(
     val compactScreenPadding: Dp = 16.dp,
     val expandedScreenPadding: Dp = 20.dp,
     val section: Dp = 18.dp,
@@ -72,271 +237,277 @@ data class TankobunSpacing(
     val dense: Dp = 8.dp,
 )
 
-@Immutable
-data class TankobunSizes(
-    val iconAction: Dp = 42.dp,
-)
+@Immutable data class TankobunSizes(val iconAction: Dp = 42.dp)
 
 @Immutable
 data class TankobunTypography(
     val displayFontFamily: FontFamily = TankobunDisplayFontFamily,
-    val sectionLabel: TextStyle = TextStyle(
-        fontFamily = TankobunDisplayFontFamily,
-        fontSize = 20.sp,
-        lineHeight = 20.sp,
-        fontWeight = FontWeight.Normal,
-        letterSpacing = 0.sp,
-    ),
-    val statNumber: TextStyle = TextStyle(
-        fontFamily = TankobunDisplayFontFamily,
-        fontSize = 34.sp,
-        lineHeight = 34.sp,
-        fontWeight = FontWeight.Normal,
-        letterSpacing = 0.sp,
-    ),
-    val chapterTitle: TextStyle = TextStyle(
-        fontFamily = TankobunDisplayFontFamily,
-        fontSize = 28.sp,
-        lineHeight = 28.sp,
-        fontWeight = FontWeight.Normal,
-        letterSpacing = 0.sp,
-    ),
-    val compactStatus: TextStyle = TextStyle(
-        fontSize = 10.sp,
-        lineHeight = 10.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 0.sp,
-    ),
+    val sectionLabel: TextStyle = TextStyle(fontFamily = TankobunDisplayFontFamily, fontSize = 20.sp, lineHeight = 20.sp),
+    val statNumber: TextStyle = TextStyle(fontFamily = TankobunDisplayFontFamily, fontSize = 34.sp, lineHeight = 34.sp),
+    val chapterTitle: TextStyle = TextStyle(fontFamily = TankobunDisplayFontFamily, fontSize = 28.sp, lineHeight = 28.sp),
+    val compactStatus: TextStyle = TextStyle(fontSize = 10.sp, lineHeight = 10.sp, fontWeight = FontWeight.Bold),
 )
 
-@Immutable
-data class TankobunThemeChoice(
-    val mode: TankobunThemeMode,
-    val name: String,
-    val description: String,
-    val dark: Boolean?,
-    val swatches: List<Color>,
+val TankobunDisplayFontFamily = FontFamily(Font(R.font.bebas_neue_regular, FontWeight.Normal))
+
+private data class DirectionSpec(
+    val shapes: ThemeShapeSet,
+    val strokes: ThemeStrokeSet,
+    val motion: ThemeMotionSet,
+    val effects: ThemeEffectSet,
+    val materialShapes: Shapes,
+    val radii: TankobunRadii,
 )
 
-private data class TankobunThemeSpec(
-    val colors: ColorScheme,
-    val tokens: TankobunThemeTokens,
-)
-
-val TankobunDisplayFontFamily = FontFamily(
-    Font(R.font.bebas_neue_regular, FontWeight.Normal),
-)
-
-fun tankobunThemeChoices(): List<TankobunThemeChoice> = listOf(
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.SYSTEM,
-        name = "Bunny's Pick",
-        description = "Follows your tablet",
-        dark = null,
-        swatches = listOf(Color(0xFF071B1D), Color(0xFFFFFFFF), Color(0xFFB82235)),
-    ),
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.BUNNY_MOCHI,
-        name = "Bunny Mochi",
-        description = "White pages, berry ink",
-        dark = false,
-        swatches = listOf(Color(0xFFFFFFFF), Color(0xFFB82235), Color(0xFFFFDDE3)),
-    ),
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.PEACH_SODA,
-        name = "Peach Soda",
-        description = "Bright sunset shelf",
-        dark = false,
-        swatches = listOf(Color(0xFFFFF0E5), Color(0xFFC84A2D), Color(0xFF00A19A)),
-    ),
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.MATCHA_MILK,
-        name = "Matcha Milk",
-        description = "Leafy, calm, warm",
-        dark = false,
-        swatches = listOf(Color(0xFFF0F8E8), Color(0xFF2F7D4B), Color(0xFFC07A1A)),
-    ),
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.SAKURA_MINT,
-        name = "Sakura Mint",
-        description = "Pink bloom, cool mint",
-        dark = false,
-        swatches = listOf(Color(0xFFFFEFF6), Color(0xFFB43D76), Color(0xFF008F7A)),
-    ),
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.CLOUDBERRY_POP,
-        name = "Cloudberry Pop",
-        description = "White sky, blue pop",
-        dark = false,
-        swatches = listOf(Color(0xFFFFFFFF), Color(0xFF2F63C3), Color(0xFFD92265)),
-    ),
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.YUZU_GARDEN,
-        name = "Yuzu Garden",
-        description = "Crisp citrus, teal, and leafy calm",
-        dark = false,
-        swatches = listOf(Color(0xFFFFFBE0), Color(0xFF008577), Color(0xFFD79800)),
-    ),
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.CHARCOAL_GOLD,
-        name = "Charcoal Gold",
-        description = "Matte charcoal with warm gold ink",
-        dark = true,
-        swatches = listOf(Color(0xFF11100E), Color(0xFFE8B44D), Color(0xFF3A3428)),
-    ),
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.STARRY_INK,
-        name = "Starry Ink",
-        description = "Blue-black pages",
-        dark = true,
-        swatches = listOf(Color(0xFF0A1020), Color(0xFF8FB6FF), Color(0xFFFFD166)),
-    ),
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.PLUM_NIGHT,
-        name = "Plum Night",
-        description = "Velvety and gentle",
-        dark = true,
-        swatches = listOf(Color(0xFF170F1E), Color(0xFFE58AD8), Color(0xFFA7E8BD)),
-    ),
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.NEON_KOI,
-        name = "Neon Koi",
-        description = "Deep water with coral and cyan glow",
-        dark = true,
-        swatches = listOf(Color(0xFF071B1D), Color(0xFFFF6F61), Color(0xFF5EF2D6)),
-    ),
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.MOON_JELLY,
-        name = "Moon Jelly",
-        description = "Soft midnight teal and lavender light",
-        dark = true,
-        swatches = listOf(Color(0xFF071720), Color(0xFFB8A7FF), Color(0xFF72E6FF)),
-    ),
-    TankobunThemeChoice(
-        mode = TankobunThemeMode.INKBERRY_FIZZ,
-        name = "Inkberry Fizz",
-        description = "Berry-dark shelves with fizzy blue sparks",
-        dark = true,
-        swatches = listOf(Color(0xFF180B24), Color(0xFFFF6FB1), Color(0xFF5BD9FF)),
-    ),
-)
-
-private val TankobunLightTokens = TankobunThemeTokens(
-    appBackdrop = Color(0xFFFFFFFF),
-    elevatedSurface = Color(0xFFFFFFFF),
-    softAccent = Color(0xFFFFEEF1),
-    readerOverlay = Color(0xCC080609),
-    drawerHandle = Color(0x33B82235),
-    coverScrim = Color(0x22000000),
-)
-
-private val TankobunDarkTokens = TankobunThemeTokens(
-    appBackdrop = Color(0xFF130D10),
-    elevatedSurface = Color(0xFF21171A),
-    softAccent = Color(0xFF331E21),
-    readerOverlay = Color(0xDD000000),
-    drawerHandle = Color(0x55FF7A88),
-    coverScrim = Color(0x44000000),
-)
-
-val LocalTankobunTokens = staticCompositionLocalOf { TankobunLightTokens }
-
-val LocalTankobunStyle = staticCompositionLocalOf {
-    TankobunStyle(
-        colors = TankobunStyleColors(
-            backdrop = TankobunLightTokens.appBackdrop,
-            panel = TankobunLightTokens.elevatedSurface,
-            panelContent = TankobunLightColors.onSurface,
-            accent = TankobunLightColors.primary,
-            action = TankobunLightColors.secondary,
-            actionContent = TankobunLightColors.onSecondary,
-            mutedContent = TankobunLightColors.onSurfaceVariant,
-            chip = TankobunLightColors.surface,
-            chipContent = TankobunLightColors.onSurface,
-            selectedChip = TankobunLightColors.primaryContainer,
-            selectedChipContent = TankobunLightColors.onPrimaryContainer,
-            outline = TankobunLightColors.outline,
+private fun directionSpec(direction: TankobunArtDirection): DirectionSpec {
+    val shapes = when (direction) {
+        TankobunArtDirection.STORYBOOK -> ThemeShapeSet(
+            panel = RoundedCornerShape(18.dp, 10.dp, 18.dp, 8.dp),
+            control = RoundedCornerShape(14.dp, 8.dp, 14.dp, 8.dp),
+            chip = RoundedCornerShape(16.dp, 10.dp, 16.dp, 10.dp),
+            dialog = RoundedCornerShape(24.dp, 14.dp, 24.dp, 14.dp),
+            dock = RoundedCornerShape(24.dp, 18.dp, 24.dp, 18.dp),
+            cover = RoundedCornerShape(12.dp, 7.dp, 12.dp, 7.dp),
+            indicator = RoundedCornerShape(14.dp, 8.dp, 14.dp, 8.dp),
+        )
+        TankobunArtDirection.MOCHI_POP -> ThemeShapeSet(
+            panel = RoundedCornerShape(18.dp), control = RoundedCornerShape(999.dp),
+            chip = RoundedCornerShape(999.dp), dialog = RoundedCornerShape(28.dp),
+            dock = RoundedCornerShape(999.dp), cover = RoundedCornerShape(14.dp), indicator = RoundedCornerShape(999.dp),
+        )
+        TankobunArtDirection.PANEL_RIOT -> ThemeShapeSet(
+            panel = CutCornerShape(10.dp), control = CutCornerShape(topStart = 8.dp, bottomEnd = 8.dp),
+            chip = CutCornerShape(6.dp), dialog = CutCornerShape(16.dp), dock = CutCornerShape(14.dp),
+            cover = CutCornerShape(5.dp), indicator = CutCornerShape(8.dp),
+        )
+        TankobunArtDirection.NOIR_ATELIER -> ThemeShapeSet(
+            panel = CutCornerShape(4.dp), control = CutCornerShape(6.dp), chip = CutCornerShape(4.dp),
+            dialog = CutCornerShape(10.dp), dock = RoundedCornerShape(14.dp), cover = CutCornerShape(3.dp), indicator = CutCornerShape(5.dp),
+        )
+        TankobunArtDirection.NEON_CURRENT -> ThemeShapeSet(
+            panel = RoundedCornerShape(14.dp), control = RoundedCornerShape(11.dp), chip = RoundedCornerShape(999.dp),
+            dialog = RoundedCornerShape(22.dp), dock = RoundedCornerShape(999.dp), cover = RoundedCornerShape(10.dp), indicator = RoundedCornerShape(999.dp),
+        )
+    }
+    val stroke = when (direction) {
+        TankobunArtDirection.PANEL_RIOT -> ThemeStrokeSet(2.dp, 3.dp, true)
+        TankobunArtDirection.NOIR_ATELIER -> ThemeStrokeSet(1.dp, 1.5.dp, false)
+        else -> ThemeStrokeSet(1.dp, 1.5.dp, false)
+    }
+    val motion = when (direction) {
+        TankobunArtDirection.STORYBOOK -> ThemeMotionSet(0.985f, 240, true)
+        TankobunArtDirection.MOCHI_POP -> ThemeMotionSet(0.96f, 190, true)
+        TankobunArtDirection.PANEL_RIOT -> ThemeMotionSet(0.975f, 110, false)
+        TankobunArtDirection.NOIR_ATELIER -> ThemeMotionSet(0.99f, 180, false)
+        TankobunArtDirection.NEON_CURRENT -> ThemeMotionSet(0.965f, 220, true)
+    }
+    val effects = when (direction) {
+        TankobunArtDirection.STORYBOOK -> ThemeEffectSet(TankobunThemeEffect.GRAIN, 0.12f, false)
+        TankobunArtDirection.MOCHI_POP -> ThemeEffectSet(TankobunThemeEffect.BUBBLE_WASH, 0.16f, true)
+        TankobunArtDirection.PANEL_RIOT -> ThemeEffectSet(TankobunThemeEffect.HALFTONE, 0.20f, false)
+        TankobunArtDirection.NOIR_ATELIER -> ThemeEffectSet(TankobunThemeEffect.SPECULAR, 0.14f, true)
+        TankobunArtDirection.NEON_CURRENT -> ThemeEffectSet(TankobunThemeEffect.AURORA, 0.28f, true)
+    }
+    val radii = when (direction) {
+        TankobunArtDirection.STORYBOOK -> TankobunRadii(12.dp, 16.dp, 10.dp)
+        TankobunArtDirection.MOCHI_POP -> TankobunRadii(20.dp, 18.dp, 14.dp)
+        TankobunArtDirection.PANEL_RIOT -> TankobunRadii(4.dp, 4.dp, 4.dp)
+        TankobunArtDirection.NOIR_ATELIER -> TankobunRadii(5.dp, 4.dp, 3.dp)
+        TankobunArtDirection.NEON_CURRENT -> TankobunRadii(11.dp, 14.dp, 10.dp)
+    }
+    return DirectionSpec(
+        shapes = shapes,
+        strokes = stroke,
+        motion = motion,
+        effects = effects,
+        materialShapes = Shapes(
+            extraSmall = shapes.chip,
+            small = shapes.control,
+            medium = shapes.panel,
+            large = shapes.dialog,
+            extraLarge = shapes.dialog,
         ),
+        radii = radii,
     )
 }
 
-private val TankobunShapes = Shapes(
-    extraSmall = RoundedCornerShape(7.dp),
-    small = RoundedCornerShape(7.dp),
-    medium = RoundedCornerShape(7.dp),
-    large = RoundedCornerShape(7.dp),
-    extraLarge = RoundedCornerShape(7.dp),
-)
-
-private val TankobunLightColors = lightColorScheme(
-    primary = Color(0xFFB82235),
-    onPrimary = Color.White,
-    secondary = Color(0xFFFF8A58),
-    onSecondary = Color(0xFF2A0B10),
-    tertiary = Color(0xFFFFD84D),
-    onTertiary = Color(0xFF2D2300),
-    background = Color(0xFFFFFFFF),
-    onBackground = Color(0xFF241316),
-    surface = Color(0xFFFFFBFA),
-    onSurface = Color(0xFF241316),
-    surfaceVariant = Color(0xFFFFE0DE),
-    onSurfaceVariant = Color(0xFF5D403B),
-    primaryContainer = Color(0xFFFFDDE3),
-    onPrimaryContainer = Color(0xFF3F0010),
-    secondaryContainer = Color(0xFFFFE0C7),
-    onSecondaryContainer = Color(0xFF3B1500),
-)
-
-private val TankobunDarkColors = darkColorScheme(
-    primary = Color(0xFFFF7A88),
-    onPrimary = Color(0xFF4C0012),
-    secondary = Color(0xFFFFB078),
-    onSecondary = Color(0xFF4A1D00),
-    tertiary = Color(0xFFFFE66D),
-    onTertiary = Color(0xFF3B3000),
-    background = Color(0xFF171013),
-    onBackground = Color(0xFFFFEDEA),
-    surface = Color(0xFF21171A),
-    onSurface = Color(0xFFFFEDEA),
-    surfaceVariant = Color(0xFF4A3337),
-    onSurfaceVariant = Color(0xFFF1C7C2),
-    primaryContainer = Color(0xFF7C1023),
-    onPrimaryContainer = Color(0xFFFFD9DD),
-    secondaryContainer = Color(0xFF773A12),
-    onSecondaryContainer = Color(0xFFFFE0C7),
-)
-
-@Composable
-fun TankobunTheme(
-    themeMode: TankobunThemeMode,
-    content: @Composable () -> Unit,
+private data class PaletteDefinition(
+    val id: TankobunPaletteId,
+    val name: String,
+    val dark: Boolean,
+    val primary: Color,
+    val onPrimary: Color,
+    val secondary: Color,
+    val onSecondary: Color,
+    val tertiary: Color,
+    val onTertiary: Color,
+    val background: Color,
+    val onBackground: Color,
+    val surface: Color,
+    val surfaceVariant: Color,
+    val onSurfaceVariant: Color,
+    val primaryContainer: Color,
+    val onPrimaryContainer: Color,
+    val secondaryContainer: Color,
+    val onSecondaryContainer: Color,
 ) {
-    val systemDark = isSystemInDarkTheme()
-    val resolvedMode = when (themeMode) {
-        TankobunThemeMode.SYSTEM -> if (systemDark) TankobunThemeMode.NEON_KOI else TankobunThemeMode.BUNNY_MOCHI
-        TankobunThemeMode.LIGHT -> TankobunThemeMode.BUNNY_MOCHI
-        TankobunThemeMode.DARK -> TankobunThemeMode.NEON_KOI
-        else -> themeMode
-    }
-    val spec = themeSpecFor(resolvedMode)
+    fun choice() = TankobunPaletteChoice(id, name, dark, listOf(background, primary, secondary))
 
-    MaterialTheme(
-        colorScheme = spec.colors,
-        shapes = TankobunShapes,
-        typography = MaterialTheme.typography,
-    ) {
-        val style = tankobunStyleFor(spec.colors, spec.tokens)
-        CompositionLocalProvider(
-            LocalTankobunTokens provides spec.tokens,
-            LocalTankobunStyle provides style,
-            content = content,
+    fun colorScheme(): ColorScheme {
+        val builder: (
+            Color, Color, Color, Color, Color, Color, Color, Color, Color, Color, Color,
+            Color, Color, Color, Color, Color,
+        ) -> ColorScheme = if (dark) {
+            { p, op, s, os, t, ot, bg, obg, sf, sv, osv, pc, opc, sc, osc, outline ->
+                darkColorScheme(primary = p, onPrimary = op, secondary = s, onSecondary = os, tertiary = t, onTertiary = ot,
+                    background = bg, onBackground = obg, surface = sf, onSurface = obg, surfaceVariant = sv,
+                    onSurfaceVariant = osv, primaryContainer = pc, onPrimaryContainer = opc,
+                    secondaryContainer = sc, onSecondaryContainer = osc, outline = outline, outlineVariant = outline.copy(alpha = 0.62f))
+            }
+        } else {
+            { p, op, s, os, t, ot, bg, obg, sf, sv, osv, pc, opc, sc, osc, outline ->
+                lightColorScheme(primary = p, onPrimary = op, secondary = s, onSecondary = os, tertiary = t, onTertiary = ot,
+                    background = bg, onBackground = obg, surface = sf, onSurface = obg, surfaceVariant = sv,
+                    onSurfaceVariant = osv, primaryContainer = pc, onPrimaryContainer = opc,
+                    secondaryContainer = sc, onSecondaryContainer = osc, outline = outline, outlineVariant = outline.copy(alpha = 0.62f))
+            }
+        }
+        val outline = lerp(onSurfaceVariant, background, if (dark) 0.36f else 0.48f)
+        return builder(primary, onPrimary, secondary, onSecondary, tertiary, onTertiary, background, onBackground,
+            surface, surfaceVariant, onSurfaceVariant, primaryContainer, onPrimaryContainer,
+            secondaryContainer, onSecondaryContainer, outline)
+    }
+
+    fun tokens(): TankobunThemeTokens {
+        val topBar = lerp(surface, primaryContainer, if (dark) 0.34f else 0.46f)
+        val dock = lerp(surface, secondaryContainer, if (dark) 0.40f else 0.48f)
+        return TankobunThemeTokens(
+            appBackdrop = background,
+            elevatedSurface = surface,
+            softAccent = primaryContainer,
+            readerOverlay = if (dark) Color(0xDD000000) else Color(0xCC080609),
+            drawerHandle = primary.copy(alpha = if (dark) 0.42f else 0.24f),
+            coverScrim = Color.Black.copy(alpha = if (dark) 0.30f else 0.13f),
+            topBarSurface = topBar,
+            topBarBleed = primary,
+            dockSurface = dock,
+            dockBleed = secondary,
+            gradientStart = lerp(background, primaryContainer, if (dark) 0.18f else 0.28f),
+            gradientEnd = lerp(background, secondaryContainer, if (dark) 0.22f else 0.34f),
+            glow = secondary,
         )
     }
 }
 
-@Composable
-private fun tankobunStyleFor(colors: ColorScheme, tokens: TankobunThemeTokens): TankobunStyle =
+private object PaletteCatalog {
+    val values = listOf(
+        light(TankobunPaletteId.MATCHA_MEADOW, "Matcha Meadow", 0xFF2F7D4B, 0xFFC07A1A, 0xFF6B8F1A, 0xFFF0F8E8, 0xFF172016, 0xFFFBFFF7, 0xFFD3E8CB, 0xFF3F4D3B, 0xFFC9EBCF, 0xFF102514, 0xFFFFE4B4, 0xFF2B2105),
+        light(TankobunPaletteId.PEACH_COUNTRYSIDE, "Peach Countryside", 0xFFC84A2D, 0xFF008C86, 0xFFFFA82A, 0xFFFFF0E5, 0xFF2B1710, 0xFFFFFAF6, 0xFFFFD9C7, 0xFF644239, 0xFFFFD2C0, 0xFF4A1005, 0xFFC7F3EF, 0xFF002F2C),
+        light(TankobunPaletteId.YUZU_GARDEN, "Yuzu Garden", 0xFF007E71, 0xFFD19500, 0xFF5C8A1F, 0xFFFFFBE0, 0xFF171E12, 0xFFFFFFF7, 0xFFF0E9B8, 0xFF465038, 0xFFC2F0E9, 0xFF003B34, 0xFFFFE68A, 0xFF332500),
+        light(TankobunPaletteId.BUNNY_BERRY, "Bunny Berry", 0xFFB82235, 0xFFEF7048, 0xFFE1A900, 0xFFFFF7F8, 0xFF241316, 0xFFFFFFFF, 0xFFFFE0DE, 0xFF5D403B, 0xFFFFDDE3, 0xFF3F0010, 0xFFFFE0C7, 0xFF3B1500),
+        light(TankobunPaletteId.SAKURA_MINT, "Sakura Mint", 0xFFB43D76, 0xFF008B77, 0xFF5A67C8, 0xFFFFEFF6, 0xFF26151C, 0xFFFFFAFC, 0xFFFFD6E6, 0xFF5A3D48, 0xFFFFD1E3, 0xFF43111F, 0xFFBDEFE4, 0xFF003B34),
+        light(TankobunPaletteId.CLOUDBERRY, "Cloudberry", 0xFF2F63C3, 0xFFD92265, 0xFF008F8C, 0xFFF5F8FF, 0xFF111B2B, 0xFFFFFFFF, 0xFFDCE8FF, 0xFF3D4961, 0xFFD5E3FF, 0xFF0A1E46, 0xFFFFD5E4, 0xFF4B0D21),
+        light(TankobunPaletteId.REDLINE, "Redline", 0xFFC9261B, 0xFF151419, 0xFF008B91, 0xFFFFF4E8, 0xFF211515, 0xFFFFFBF5, 0xFFFFD4C8, 0xFF5F403D, 0xFFFFD5CF, 0xFF490601, 0xFFE4E0E3, 0xFF1C1B20),
+        dark(TankobunPaletteId.ELECTRIC_BERRY, "Electric Berry", 0xFFFF6FB1, 0xFF5BD9FF, 0xFFA8F0A1, 0xFF180B24, 0xFFFFECFF, 0xFF241332, 0xFF463255, 0xFFE3C9ED, 0xFF74254E, 0xFFFFD6E9, 0xFF0C5268, 0xFFC6F1FF),
+        light(TankobunPaletteId.CITRUS_CLASH, "Citrus Clash", 0xFF007E73, 0xFFE09C00, 0xFFD92D5B, 0xFFFFF9D9, 0xFF171C16, 0xFFFFFFF5, 0xFFECE5A7, 0xFF46503D, 0xFFC2EFE7, 0xFF003B34, 0xFFFFE17A, 0xFF332500),
+        dark(TankobunPaletteId.CHARCOAL_GOLD, "Charcoal Gold", 0xFFE8B44D, 0xFFD8C49A, 0xFFFFD98A, 0xFF11100E, 0xFFF7EFE0, 0xFF1B1915, 0xFF3A3428, 0xFFE0D3B8, 0xFF5A4113, 0xFFFFE2A4, 0xFF403727, 0xFFF4E3C2),
+        dark(TankobunPaletteId.VELVET_PLUM, "Velvet Plum", 0xFFE58AD8, 0xFFA7E8BD, 0xFFFFC48D, 0xFF170F1E, 0xFFFFECFA, 0xFF21162A, 0xFF49344F, 0xFFE7C8E8, 0xFF6E2B66, 0xFFFFD6F8, 0xFF275038, 0xFFC8F9D8),
+        dark(TankobunPaletteId.STARRY_INK, "Starry Ink", 0xFF8FB6FF, 0xFFFFD166, 0xFF8CE6D2, 0xFF0A1020, 0xFFEAF0FF, 0xFF10182A, 0xFF23314A, 0xFFC7D3E8, 0xFF244A85, 0xFFD9E7FF, 0xFF5A4210, 0xFFFFE7A7),
+        dark(TankobunPaletteId.NEON_KOI, "Neon Koi", 0xFFFF8A7D, 0xFF5EF2D6, 0xFFFFD166, 0xFF071B1D, 0xFFE7FEFA, 0xFF0E272A, 0xFF234245, 0xFFB8D8D4, 0xFF7C261F, 0xFFFFD7D1, 0xFF0D5B52, 0xFFC8FFF4),
+        dark(TankobunPaletteId.MOON_JELLY, "Moon Jelly", 0xFFB8A7FF, 0xFF72E6FF, 0xFFFF9FCB, 0xFF071720, 0xFFEAF7FF, 0xFF0E202B, 0xFF253847, 0xFFC3D5E2, 0xFF46347F, 0xFFE6DFFF, 0xFF0D5464, 0xFFC7F6FF),
+        dark(TankobunPaletteId.ACID_AURORA, "Acid Aurora", 0xFFC8FF43, 0xFFFF4FD8, 0xFF5FF3FF, 0xFF100D22, 0xFFF5F0FF, 0xFF1C1731, 0xFF3A3150, 0xFFD9CEEA, 0xFF405C08, 0xFFE9FFB9, 0xFF682252, 0xFFFFD8F0),
+    )
+
+    fun value(id: TankobunPaletteId) = values.first { it.id == id }
+
+    private fun light(id: TankobunPaletteId, name: String, primary: Long, secondary: Long, tertiary: Long,
+        background: Long, onBackground: Long, surface: Long, surfaceVariant: Long, onSurfaceVariant: Long,
+        primaryContainer: Long, onPrimaryContainer: Long, secondaryContainer: Long, onSecondaryContainer: Long): PaletteDefinition {
+        val primaryColor = Color(primary)
+        val secondaryColor = Color(secondary)
+        val tertiaryColor = Color(tertiary)
+        return PaletteDefinition(id, name, false, primaryColor, contentFor(primaryColor), secondaryColor, contentFor(secondaryColor), tertiaryColor, contentFor(tertiaryColor),
+            Color(background), Color(onBackground), Color(surface), Color(surfaceVariant), Color(onSurfaceVariant),
+            Color(primaryContainer), Color(onPrimaryContainer), Color(secondaryContainer), Color(onSecondaryContainer))
+    }
+
+    private fun dark(id: TankobunPaletteId, name: String, primary: Long, secondary: Long, tertiary: Long,
+        background: Long, onBackground: Long, surface: Long, surfaceVariant: Long, onSurfaceVariant: Long,
+        primaryContainer: Long, onPrimaryContainer: Long, secondaryContainer: Long, onSecondaryContainer: Long): PaletteDefinition {
+        val primaryColor = Color(primary)
+        val secondaryColor = Color(secondary)
+        val tertiaryColor = Color(tertiary)
+        return PaletteDefinition(id, name, true, primaryColor, contentFor(primaryColor), secondaryColor, contentFor(secondaryColor), tertiaryColor, contentFor(tertiaryColor),
+            Color(background), Color(onBackground), Color(surface), Color(surfaceVariant), Color(onSurfaceVariant),
+            Color(primaryContainer), Color(onPrimaryContainer), Color(secondaryContainer), Color(onSecondaryContainer))
+    }
+
+    private fun contentFor(color: Color): Color =
+        if (color.luminance() > 0.179f) Color(0xFF08090A) else Color.White
+}
+
+private data class ResolvedTheme(
+    val preference: TankobunThemePreference,
+    val palette: PaletteDefinition,
+    val direction: DirectionSpec,
+)
+
+fun TankobunThemePreference.resolve(systemDark: Boolean): TankobunThemePreference = when {
+    !automatic -> normalized()
+    systemDark -> TankobunThemePreference(false, TankobunArtDirection.NEON_CURRENT, TankobunPaletteId.NEON_KOI)
+    else -> TankobunThemePreference(false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.BUNNY_BERRY)
+}
+
+fun TankobunThemePreference.isDark(systemDark: Boolean): Boolean =
+    PaletteCatalog.value(resolve(systemDark).palette).dark
+
+private fun resolvedTheme(preference: TankobunThemePreference, systemDark: Boolean): ResolvedTheme {
+    val resolved = preference.resolve(systemDark)
+    return ResolvedTheme(resolved, PaletteCatalog.value(resolved.palette), directionSpec(resolved.direction))
+}
+
+private val DefaultPreference = TankobunThemePreference(false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.BUNNY_BERRY)
+private val DefaultPalette = PaletteCatalog.value(TankobunPaletteId.BUNNY_BERRY)
+private val DefaultDirection = directionSpec(TankobunArtDirection.MOCHI_POP)
+private val DefaultColors = DefaultPalette.colorScheme()
+private val DefaultTokens = DefaultPalette.tokens()
+
+val LocalTankobunTokens = staticCompositionLocalOf { DefaultTokens }
+val LocalTankobunStyle = staticCompositionLocalOf {
     TankobunStyle(
+        direction = DefaultPreference.direction,
+        colors = TankobunStyleColors(
+            backdrop = DefaultTokens.appBackdrop,
+            panel = DefaultTokens.elevatedSurface,
+            panelContent = DefaultColors.onSurface,
+            accent = DefaultColors.primary,
+            action = DefaultColors.secondary,
+            actionContent = DefaultColors.onSecondary,
+            mutedContent = DefaultColors.onSurfaceVariant,
+            chip = DefaultColors.surfaceVariant,
+            chipContent = DefaultColors.onSurface,
+            selectedChip = DefaultColors.primaryContainer,
+            selectedChipContent = DefaultColors.onPrimaryContainer,
+            outline = DefaultColors.outline,
+        ),
+        themeShapes = DefaultDirection.shapes,
+        strokes = DefaultDirection.strokes,
+        motion = DefaultDirection.motion,
+        effects = DefaultDirection.effects,
+        radii = DefaultDirection.radii,
+    )
+}
+
+@Composable
+fun TankobunTheme(
+    preference: TankobunThemePreference,
+    content: @Composable () -> Unit,
+) {
+    val resolved = resolvedTheme(preference, isSystemInDarkTheme())
+    val colors = resolved.palette.colorScheme()
+    val tokens = resolved.palette.tokens()
+    val style = TankobunStyle(
+        direction = resolved.preference.direction,
         colors = TankobunStyleColors(
             backdrop = tokens.appBackdrop,
             panel = tokens.elevatedSurface,
@@ -345,328 +516,19 @@ private fun tankobunStyleFor(colors: ColorScheme, tokens: TankobunThemeTokens): 
             action = colors.secondary,
             actionContent = colors.onSecondary,
             mutedContent = colors.onSurfaceVariant,
-            chip = colors.surface,
+            chip = colors.surfaceVariant,
             chipContent = colors.onSurface,
             selectedChip = colors.primaryContainer,
             selectedChipContent = colors.onPrimaryContainer,
             outline = colors.outline,
         ),
+        themeShapes = resolved.direction.shapes,
+        strokes = resolved.direction.strokes,
+        motion = resolved.direction.motion,
+        effects = resolved.direction.effects,
+        radii = resolved.direction.radii,
     )
-
-private fun themeSpecFor(mode: TankobunThemeMode): TankobunThemeSpec = when (mode) {
-    TankobunThemeMode.PEACH_SODA -> TankobunThemeSpec(
-        colors = lightColorScheme(
-            primary = Color(0xFFC84A2D),
-            onPrimary = Color.White,
-            secondary = Color(0xFF00A19A),
-            onSecondary = Color(0xFF001D1B),
-            tertiary = Color(0xFFFFB02E),
-            onTertiary = Color(0xFF332000),
-            background = Color(0xFFFFF0E5),
-            onBackground = Color(0xFF2B1710),
-            surface = Color(0xFFFFFAF6),
-            onSurface = Color(0xFF2B1710),
-            surfaceVariant = Color(0xFFFFD9C7),
-            onSurfaceVariant = Color(0xFF644239),
-            primaryContainer = Color(0xFFFFD2C0),
-            onPrimaryContainer = Color(0xFF4A1005),
-            secondaryContainer = Color(0xFFC7F3EF),
-            onSecondaryContainer = Color(0xFF002F2C),
-        ),
-        tokens = TankobunThemeTokens(
-            appBackdrop = Color(0xFFFFF0E5),
-            elevatedSurface = Color(0xFFFFFFFF),
-            softAccent = Color(0xFFFFDEC9),
-            readerOverlay = Color(0xCC080609),
-            drawerHandle = Color(0x33C84A2D),
-            coverScrim = Color(0x22000000),
-        ),
-    )
-    TankobunThemeMode.MATCHA_MILK -> TankobunThemeSpec(
-        colors = lightColorScheme(
-            primary = Color(0xFF2F7D4B),
-            onPrimary = Color.White,
-            secondary = Color(0xFFC07A1A),
-            onSecondary = Color(0xFF1C1000),
-            tertiary = Color(0xFF6B8F1A),
-            onTertiary = Color(0xFF3B1600),
-            background = Color(0xFFF0F8E8),
-            onBackground = Color(0xFF172016),
-            surface = Color(0xFFFCFFF8),
-            onSurface = Color(0xFF172016),
-            surfaceVariant = Color(0xFFD3E8CB),
-            onSurfaceVariant = Color(0xFF3F4D3B),
-            primaryContainer = Color(0xFFC9EBCF),
-            onPrimaryContainer = Color(0xFF102514),
-            secondaryContainer = Color(0xFFFFE4B4),
-            onSecondaryContainer = Color(0xFF2B2105),
-        ),
-        tokens = TankobunThemeTokens(
-            appBackdrop = Color(0xFFF0F8E8),
-            elevatedSurface = Color(0xFFFFFFFF),
-            softAccent = Color(0xFFDDF0D4),
-            readerOverlay = Color(0xCC050806),
-            drawerHandle = Color(0x332F7D4B),
-            coverScrim = Color(0x22000000),
-        ),
-    )
-    TankobunThemeMode.SAKURA_MINT -> TankobunThemeSpec(
-        colors = lightColorScheme(
-            primary = Color(0xFFB43D76),
-            onPrimary = Color.White,
-            secondary = Color(0xFF008F7A),
-            onSecondary = Color(0xFF00110F),
-            tertiary = Color(0xFF5A67C8),
-            onTertiary = Color.White,
-            background = Color(0xFFFFEFF6),
-            onBackground = Color(0xFF26151C),
-            surface = Color(0xFFFFFFFF),
-            onSurface = Color(0xFF26151C),
-            surfaceVariant = Color(0xFFFFD6E6),
-            onSurfaceVariant = Color(0xFF5A3D48),
-            primaryContainer = Color(0xFFFFD1E3),
-            onPrimaryContainer = Color(0xFF43111F),
-            secondaryContainer = Color(0xFFBDEFE4),
-            onSecondaryContainer = Color(0xFF003B34),
-        ),
-        tokens = TankobunThemeTokens(
-            appBackdrop = Color(0xFFFFEFF6),
-            elevatedSurface = Color(0xFFFFFFFF),
-            softAccent = Color(0xFFFFDDEC),
-            readerOverlay = Color(0xCC090608),
-            drawerHandle = Color(0x33B43D76),
-            coverScrim = Color(0x22000000),
-        ),
-    )
-    TankobunThemeMode.CLOUDBERRY_POP -> TankobunThemeSpec(
-        colors = lightColorScheme(
-            primary = Color(0xFF2F63C3),
-            onPrimary = Color.White,
-            secondary = Color(0xFFD92265),
-            onSecondary = Color.White,
-            tertiary = Color(0xFF00A4A0),
-            onTertiary = Color.White,
-            background = Color(0xFFFFFFFF),
-            onBackground = Color(0xFF111B2B),
-            surface = Color(0xFFF9FBFF),
-            onSurface = Color(0xFF111B2B),
-            surfaceVariant = Color(0xFFDCE8FF),
-            onSurfaceVariant = Color(0xFF3D4961),
-            primaryContainer = Color(0xFFD5E3FF),
-            onPrimaryContainer = Color(0xFF0A1E46),
-            secondaryContainer = Color(0xFFFFD5E4),
-            onSecondaryContainer = Color(0xFF4B0D21),
-        ),
-        tokens = TankobunThemeTokens(
-            appBackdrop = Color(0xFFFFFFFF),
-            elevatedSurface = Color(0xFFFFFFFF),
-            softAccent = Color(0xFFE5EEFF),
-            readerOverlay = Color(0xCC03070D),
-            drawerHandle = Color(0x332F63C3),
-            coverScrim = Color(0x22000000),
-        ),
-    )
-    TankobunThemeMode.YUZU_GARDEN -> TankobunThemeSpec(
-        colors = lightColorScheme(
-            primary = Color(0xFF008577),
-            onPrimary = Color.White,
-            secondary = Color(0xFFD79800),
-            onSecondary = Color(0xFF332500),
-            tertiary = Color(0xFF5C8A1F),
-            onTertiary = Color.White,
-            background = Color(0xFFFFFBE0),
-            onBackground = Color(0xFF171E12),
-            surface = Color(0xFFFFFFFF),
-            onSurface = Color(0xFF171E12),
-            surfaceVariant = Color(0xFFF0E9B8),
-            onSurfaceVariant = Color(0xFF465038),
-            primaryContainer = Color(0xFFC2F0E9),
-            onPrimaryContainer = Color(0xFF003B34),
-            secondaryContainer = Color(0xFFFFE68A),
-            onSecondaryContainer = Color(0xFF332500),
-        ),
-        tokens = TankobunThemeTokens(
-            appBackdrop = Color(0xFFFFFBE0),
-            elevatedSurface = Color(0xFFFFFFFF),
-            softAccent = Color(0xFFFFF0A8),
-            readerOverlay = Color(0xCC030704),
-            drawerHandle = Color(0x33008577),
-            coverScrim = Color(0x22000000),
-        ),
-    )
-    TankobunThemeMode.CHARCOAL_GOLD -> TankobunThemeSpec(
-        colors = darkColorScheme(
-            primary = Color(0xFFE8B44D),
-            onPrimary = Color(0xFF2A1C00),
-            secondary = Color(0xFFD8C49A),
-            onSecondary = Color(0xFF2A2112),
-            tertiary = Color(0xFFFFD98A),
-            onTertiary = Color(0xFF302000),
-            background = Color(0xFF11100E),
-            onBackground = Color(0xFFF7EFE0),
-            surface = Color(0xFF1B1915),
-            onSurface = Color(0xFFF7EFE0),
-            surfaceVariant = Color(0xFF3A3428),
-            onSurfaceVariant = Color(0xFFE0D3B8),
-            primaryContainer = Color(0xFF5A4113),
-            onPrimaryContainer = Color(0xFFFFE2A4),
-            secondaryContainer = Color(0xFF403727),
-            onSecondaryContainer = Color(0xFFF4E3C2),
-            error = Color(0xFFFFB4AB),
-            onError = Color(0xFF690005),
-        ),
-        tokens = TankobunThemeTokens(
-            appBackdrop = Color(0xFF11100E),
-            elevatedSurface = Color(0xFF1B1915),
-            softAccent = Color(0xFF29251D),
-            readerOverlay = Color(0xDD000000),
-            drawerHandle = Color(0x66E8B44D),
-            coverScrim = Color(0x4D000000),
-        ),
-    )
-    TankobunThemeMode.STARRY_INK -> TankobunThemeSpec(
-        colors = darkColorScheme(
-            primary = Color(0xFF8FB6FF),
-            onPrimary = Color(0xFF07152F),
-            secondary = Color(0xFFFFD166),
-            onSecondary = Color(0xFF322300),
-            tertiary = Color(0xFF8CE6D2),
-            onTertiary = Color(0xFF00382F),
-            background = Color(0xFF0A1020),
-            onBackground = Color(0xFFEAF0FF),
-            surface = Color(0xFF10182A),
-            onSurface = Color(0xFFEAF0FF),
-            surfaceVariant = Color(0xFF23314A),
-            onSurfaceVariant = Color(0xFFC7D3E8),
-            primaryContainer = Color(0xFF244A85),
-            onPrimaryContainer = Color(0xFFD9E7FF),
-            secondaryContainer = Color(0xFF5A4210),
-            onSecondaryContainer = Color(0xFFFFE7A7),
-        ),
-        tokens = TankobunThemeTokens(
-            appBackdrop = Color(0xFF0A1020),
-            elevatedSurface = Color(0xFF10182A),
-            softAccent = Color(0xFF1A2944),
-            readerOverlay = Color(0xDD000000),
-            drawerHandle = Color(0x668FB6FF),
-            coverScrim = Color(0x44000000),
-        ),
-    )
-    TankobunThemeMode.PLUM_NIGHT -> TankobunThemeSpec(
-        colors = darkColorScheme(
-            primary = Color(0xFFE58AD8),
-            onPrimary = Color(0xFF42113B),
-            secondary = Color(0xFFA7E8BD),
-            onSecondary = Color(0xFF0F351B),
-            tertiary = Color(0xFFFFC48D),
-            onTertiary = Color(0xFF3F2100),
-            background = Color(0xFF170F1E),
-            onBackground = Color(0xFFFFECFA),
-            surface = Color(0xFF21162A),
-            onSurface = Color(0xFFFFECFA),
-            surfaceVariant = Color(0xFF49344F),
-            onSurfaceVariant = Color(0xFFE7C8E8),
-            primaryContainer = Color(0xFF6E2B66),
-            onPrimaryContainer = Color(0xFFFFD6F8),
-            secondaryContainer = Color(0xFF275038),
-            onSecondaryContainer = Color(0xFFC8F9D8),
-        ),
-        tokens = TankobunThemeTokens(
-            appBackdrop = Color(0xFF170F1E),
-            elevatedSurface = Color(0xFF21162A),
-            softAccent = Color(0xFF34223F),
-            readerOverlay = Color(0xDD000000),
-            drawerHandle = Color(0x66E58AD8),
-            coverScrim = Color(0x44000000),
-        ),
-    )
-    TankobunThemeMode.NEON_KOI -> TankobunThemeSpec(
-        colors = darkColorScheme(
-            primary = Color(0xFFFF8A7D),
-            onPrimary = Color(0xFF4B0B05),
-            secondary = Color(0xFF5EF2D6),
-            onSecondary = Color(0xFF003C35),
-            tertiary = Color(0xFFFFD166),
-            onTertiary = Color(0xFF332300),
-            background = Color(0xFF071B1D),
-            onBackground = Color(0xFFE7FEFA),
-            surface = Color(0xFF0E272A),
-            onSurface = Color(0xFFE7FEFA),
-            surfaceVariant = Color(0xFF234245),
-            onSurfaceVariant = Color(0xFFB8D8D4),
-            primaryContainer = Color(0xFF7C261F),
-            onPrimaryContainer = Color(0xFFFFD7D1),
-            secondaryContainer = Color(0xFF0D5B52),
-            onSecondaryContainer = Color(0xFFC8FFF4),
-        ),
-        tokens = TankobunThemeTokens(
-            appBackdrop = Color(0xFF071B1D),
-            elevatedSurface = Color(0xFF0E272A),
-            softAccent = Color(0xFF17373A),
-            readerOverlay = Color(0xDD000000),
-            drawerHandle = Color(0x66FF8A7D),
-            coverScrim = Color(0x44000000),
-        ),
-    )
-    TankobunThemeMode.MOON_JELLY -> TankobunThemeSpec(
-        colors = darkColorScheme(
-            primary = Color(0xFFB8A7FF),
-            onPrimary = Color(0xFF261558),
-            secondary = Color(0xFF72E6FF),
-            onSecondary = Color(0xFF003743),
-            tertiary = Color(0xFFFF9FCB),
-            onTertiary = Color(0xFF4B1230),
-            background = Color(0xFF071720),
-            onBackground = Color(0xFFEAF7FF),
-            surface = Color(0xFF0E202B),
-            onSurface = Color(0xFFEAF7FF),
-            surfaceVariant = Color(0xFF253847),
-            onSurfaceVariant = Color(0xFFC3D5E2),
-            primaryContainer = Color(0xFF46347F),
-            onPrimaryContainer = Color(0xFFE6DFFF),
-            secondaryContainer = Color(0xFF0D5464),
-            onSecondaryContainer = Color(0xFFC7F6FF),
-        ),
-        tokens = TankobunThemeTokens(
-            appBackdrop = Color(0xFF071720),
-            elevatedSurface = Color(0xFF0E202B),
-            softAccent = Color(0xFF172C39),
-            readerOverlay = Color(0xDD000000),
-            drawerHandle = Color(0x66B8A7FF),
-            coverScrim = Color(0x44000000),
-        ),
-    )
-    TankobunThemeMode.INKBERRY_FIZZ -> TankobunThemeSpec(
-        colors = darkColorScheme(
-            primary = Color(0xFFFF6FB1),
-            onPrimary = Color(0xFF4C0A2C),
-            secondary = Color(0xFF5BD9FF),
-            onSecondary = Color(0xFF003646),
-            tertiary = Color(0xFFA8F0A1),
-            onTertiary = Color(0xFF123A13),
-            background = Color(0xFF180B24),
-            onBackground = Color(0xFFFFECFF),
-            surface = Color(0xFF241332),
-            onSurface = Color(0xFFFFECFF),
-            surfaceVariant = Color(0xFF463255),
-            onSurfaceVariant = Color(0xFFE3C9ED),
-            primaryContainer = Color(0xFF74254E),
-            onPrimaryContainer = Color(0xFFFFD6E9),
-            secondaryContainer = Color(0xFF0C5268),
-            onSecondaryContainer = Color(0xFFC6F1FF),
-        ),
-        tokens = TankobunThemeTokens(
-            appBackdrop = Color(0xFF180B24),
-            elevatedSurface = Color(0xFF241332),
-            softAccent = Color(0xFF352044),
-            readerOverlay = Color(0xDD000000),
-            drawerHandle = Color(0x66FF6FB1),
-            coverScrim = Color(0x44000000),
-        ),
-    )
-    TankobunThemeMode.MIDNIGHT_RAMEN, TankobunThemeMode.DARK -> themeSpecFor(TankobunThemeMode.NEON_KOI)
-    TankobunThemeMode.SYSTEM, TankobunThemeMode.BUNNY_MOCHI, TankobunThemeMode.LIGHT -> TankobunThemeSpec(
-        colors = TankobunLightColors,
-        tokens = TankobunLightTokens,
-    )
+    MaterialTheme(colorScheme = colors, shapes = resolved.direction.materialShapes) {
+        CompositionLocalProvider(LocalTankobunTokens provides tokens, LocalTankobunStyle provides style, content = content)
+    }
 }

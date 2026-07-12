@@ -9,7 +9,7 @@ import com.tankobun.app.LibraryMode
 import com.tankobun.app.MediaViewMode
 import com.tankobun.app.AppLanguage
 import com.tankobun.app.ReaderScreenOrientation
-import com.tankobun.app.TankobunThemeMode
+import com.tankobun.app.TankobunThemePreference
 import com.tankobun.app.defaultSourceLanguages
 import com.tankobun.app.logic.BROWSE_SORT_SEARCH_MATCH
 import com.tankobun.app.updates.AppUpdateInfo
@@ -49,7 +49,7 @@ data class LocalReadingActivity(
 data class TankobunUiState(
     val loggedIn: Boolean = false,
     val clientConfigured: Boolean = false,
-    val themeMode: TankobunThemeMode = TankobunThemeMode.SYSTEM,
+    val themePreference: TankobunThemePreference = TankobunThemePreference(),
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val ignoreDisplayCutout: Boolean = true,
     val showAppStatusBar: Boolean = true,

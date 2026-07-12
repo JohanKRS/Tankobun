@@ -647,7 +647,7 @@ internal fun MediaRow(
             onClick = onClick,
             onLongClick = onLongClick,
         ),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
     ) {
         ListItem(
             headlineContent = {
@@ -768,7 +768,7 @@ internal fun TrackedMediaStatusBadge(
     }
     Surface(
         modifier = modifier.size(24.dp),
-        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+        shape = LocalTankobunStyle.current.themeShapes.indicator,
         color = containerColor,
         contentColor = contentColor,
         border = androidx.compose.foundation.BorderStroke(

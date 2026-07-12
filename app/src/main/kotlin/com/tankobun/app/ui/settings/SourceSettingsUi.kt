@@ -648,11 +648,11 @@ internal fun SourceRepositoryControls(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             label = { Text(tankobunString(R.string.sources_repository_index_url)) },
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            shape = LocalTankobunStyle.current.themeShapes.control,
             trailingIcon = {
                 Button(
                     onClick = onRefreshRepository,
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                    shape = LocalTankobunStyle.current.themeShapes.control,
                     contentPadding = PaddingValues(horizontal = 10.dp),
                     modifier = Modifier
                         .padding(end = 6.dp)
@@ -804,7 +804,7 @@ internal fun SourceSettingsIconActionButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control)
+    val shape = LocalTankobunStyle.current.themeShapes.control
     val contentColor = if (enabled) {
         MaterialTheme.colorScheme.onSurface
     } else {
@@ -889,7 +889,7 @@ internal fun ExtensionRepositoryRow(
                         } else {
                             Modifier
                         },
-                        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                        shape = LocalTankobunStyle.current.themeShapes.control,
                         contentPadding = if (iconOnlyInstallAction) PaddingValues(0.dp) else ButtonDefaults.ContentPadding,
                     ) {
                         if (installing) {
@@ -992,7 +992,7 @@ internal fun ExtensionIcon(
             }
     }
     Box(
-        modifier = modifier.clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control)),
+        modifier = modifier.clip(LocalTankobunStyle.current.themeShapes.control),
         contentAlignment = Alignment.Center,
     ) {
         when {
@@ -1015,7 +1015,7 @@ internal fun ExtensionIcon(
             else -> {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+                    shape = LocalTankobunStyle.current.themeShapes.control,
                     color = LocalTankobunStyle.current.colors.accent.copy(alpha = 0.16f),
                     contentColor = LocalTankobunStyle.current.colors.accent,
                 ) {

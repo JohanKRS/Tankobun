@@ -562,7 +562,7 @@ private fun MissingBackupSourceRow(
         Button(
             onClick = onInstall,
             enabled = extension != null && !installing,
-            shape = RoundedCornerShape(LocalTankobunStyle.current.radii.control),
+            shape = LocalTankobunStyle.current.themeShapes.control,
         ) {
             if (installing) {
                 CircularProgressIndicator(
@@ -587,7 +587,7 @@ private fun ScheduledBackupFolderSummary(folderLabel: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(LocalTankobunStyle.current.radii.control))
+            .clip(LocalTankobunStyle.current.themeShapes.control)
             .background(LocalTankobunStyle.current.colors.selectedChip.copy(alpha = 0.18f))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
