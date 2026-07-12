@@ -1,6 +1,8 @@
 package com.tankobun.app.logic
 
+import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.SourceChapter
 
@@ -39,9 +41,14 @@ internal fun recentReadingMetrics(
 }
 
 internal fun AnilistMedia.shouldShowInContinueReading(
+    entry: AnilistListEntry?,
     progress: ReadingProgress,
     metrics: RecentReadingMetrics,
 ): Boolean =
-    !status.equals("FINISHED", ignoreCase = true) ||
-        !progress.completed ||
-        !metrics.reachedLastAvailableChapter
+    entry?.isInReadingCategory() == true &&
+        (!status.equals("FINISHED", ignoreCase = true) ||
+            !progress.completed ||
+            !metrics.reachedLastAvailableChapter)
+
+internal fun AnilistListEntry.isInReadingCategory(): Boolean =
+    status == MediaStatus.CURRENT && !hiddenFromStatusLists

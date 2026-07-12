@@ -1,7 +1,9 @@
 package com.tankobun.app.logic
 
+import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistTitle
+import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.SourceChapter
@@ -35,7 +37,7 @@ class RecentReadingLogicTest {
             availableChapters = listOf(1f, 58f, 58f).map(::chapter),
         )
 
-        assertFalse(media(status = "FINISHED").shouldShowInContinueReading(completedProgress, metrics))
+        assertFalse(media(status = "FINISHED").shouldShowInContinueReading(entry(), completedProgress, metrics))
     }
 
     @Test
@@ -47,7 +49,31 @@ class RecentReadingLogicTest {
             availableChapters = listOf(1f, 58f).map(::chapter),
         )
 
-        assertTrue(media(status = "RELEASING").shouldShowInContinueReading(completedProgress, metrics))
+        assertTrue(media(status = "RELEASING").shouldShowInContinueReading(entry(), completedProgress, metrics))
+    }
+
+    @Test
+    fun mangaOutsideReadingCategoryLeavesContinueReading() {
+        val progress = progress(chapterNumber = 12f)
+        val metrics = recentReadingMetrics(
+            progress = progress,
+            chapter = chapter(12f),
+            availableChapters = listOf(12f, 20f).map(::chapter),
+        )
+
+        assertFalse(
+            media(status = "RELEASING").shouldShowInContinueReading(
+                entry(status = MediaStatus.COMPLETED),
+                progress,
+                metrics,
+            ),
+        )
+        assertFalse(media(status = "RELEASING").shouldShowInContinueReading(null, progress, metrics))
+    }
+
+    @Test
+    fun entryHiddenFromReadingCategoryLeavesContinueReading() {
+        assertFalse(entry(hiddenFromStatusLists = true).isInReadingCategory())
     }
 
     @Test
@@ -75,6 +101,23 @@ class RecentReadingLogicTest {
             readerMode = ReaderMode.PAGED,
             completed = completed,
             updatedAtEpochMillis = 1L,
+        )
+
+    private fun entry(
+        status: MediaStatus = MediaStatus.CURRENT,
+        hiddenFromStatusLists: Boolean = false,
+    ): AnilistListEntry =
+        AnilistListEntry(
+            id = 1,
+            mediaId = 1,
+            status = status,
+            progress = 0,
+            score = null,
+            notes = null,
+            private = false,
+            customLists = emptyList(),
+            updatedAtEpochSeconds = null,
+            hiddenFromStatusLists = hiddenFromStatusLists,
         )
 
     private fun chapter(chapterNumber: Float): SourceChapter =

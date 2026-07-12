@@ -143,6 +143,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
@@ -881,6 +882,7 @@ internal fun AutoResizingMangaTitle(
     compact: Boolean,
     modifier: Modifier = Modifier,
     color: Color? = null,
+    shadow: Shadow? = null,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val density = LocalDensity.current
@@ -903,7 +905,7 @@ internal fun AutoResizingMangaTitle(
                 textMeasurer = textMeasurer,
             )
         }
-        val style = tankobunMangaTitleTextStyle(layout.fontSize)
+        val style = tankobunMangaTitleTextStyle(layout.fontSize).copy(shadow = shadow)
         Text(
             layout.lines.joinToString("\n"),
             modifier = Modifier.fillMaxSize(),

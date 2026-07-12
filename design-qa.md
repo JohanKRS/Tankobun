@@ -1,14 +1,15 @@
-# Home character mosaic and mobile header QA
+# Home hero hierarchy, fade, contrast, and padding QA
 
 - Source sketch: `/var/folders/37/xbnjjyy16rzcnffjlyv6lwym0000gn/T/codex-clipboard-a6ef4dfc-1e5b-46bf-b52c-1da32a8e586a.png`
-- Combined source/implementation comparison: `/tmp/tankobun-home-final-comparison.png`
-- Tablet portrait implementation: `/tmp/tankobun-center-portrait.png`
-- Tablet landscape implementation: `/tmp/tankobun-tablet-mosaic-balanced-narrow.png`
-- Mobile Home header implementation: `/tmp/tankobun-mobile-header.png`
-- Mobile Library header implementation: `/tmp/tankobun-mobile-library.png`
-- Mobile two-character hero: `/tmp/tankobun-mobile-balanced-final.png`
-- Portuguese genre labels and section spacing: `/tmp/tankobun-home-pt.png`
-- Tablet viewport: Pixel Tablet, 1600 x 2560 portrait and 2560 x 1600 landscape
+- Combined mockup/detail/Home comparison: `/tmp/tankobun-home-hierarchy-fade-comparison.png`
+- Manga details title reference: `/tmp/tankobun-mobile-detail.png`
+- Tablet landscape implementation: `/tmp/tankobun-tablet-mask.png`
+- Mobile light-theme implementation: `/tmp/tankobun-mobile-final-light.png`
+- Mobile dark-theme implementation: `/tmp/tankobun-mobile-shadow-dark.png`
+- Mobile single-character fallback: `/tmp/tankobun-mobile-single-mask-fixed.png`
+- Mobile Library padding hierarchy: `/tmp/tankobun-mobile-library-padding.txt`
+- Mobile Browse padding hierarchy: `/tmp/tankobun-mobile-browse-padding.txt`
+- Tablet viewport: Pixel Tablet, 2560 x 1600 landscape
 - Mobile viewport: Pixel 9, 1080 x 2424 portrait
 - State: live AniList data with a debug-only forced mosaic used for visual inspection; the force was removed before the final build
 
@@ -21,10 +22,14 @@ No actionable P0, P1, or P2 findings remain.
 - AniList character roles are preserved: main characters are prioritized, and the visual ordering places the highest-priority characters in the center before alternating toward the edges.
 - The tablet mosaic occupies 72% of the hero width. Individual strip width is calculated from the available character count, including the small intentional overlap between angled edges.
 - Mobile uses two narrower strips inside the rightmost 72% of the hero. The principal character is always on the right; a single available character keeps the existing fallback.
-- Horizontal and bottom fades were shortened and reduced in opacity. Their leading edge remains opaque enough to hide a hard image boundary, while character color and detail remain visible and title, author, and description retain usable contrast.
-- Tablet text content uses a narrower 38% column, overlaps the image edge slightly, and allows up to five description lines to use the available vertical space without obscuring the central characters.
+- The image region now uses a real alpha mask: it starts fully transparent at its leading edge and reaches full opacity across the first 12% of the image. This removes the straight image cut while keeping the requested 10–15% transition compact.
+- The single-character mobile fallback constrains its image region to the same right-aligned area as the visible artwork, so its alpha mask starts at the actual image edge instead of fading an empty part of the hero.
+- Hero title, author, and description use a zero-offset, softly blurred shadow colored from the theme's banner/card background. The halo therefore blends into light and dark themes instead of introducing a fixed white or black outline.
+- The Home title reuses the details page's auto-resizing manga-title component and expanded hierarchy. Its available height was increased so it is larger and more prominent without clipping long titles.
+- The rank badge is slightly smaller, reducing competition with the title.
+- Tablet text content uses a narrower 38% column, overlaps the image edge slightly, and allows up to four description lines without obscuring the central characters.
 - Banner-backed tablet items remain unchanged.
-- The shared top bar now uses the same 18 dp horizontal inset as page content on compact layouts. Home and Library screenshots confirm the leading page icon aligns with section cards and controls.
+- Home, Library, and Browse all resolve to the same 18 dp compact horizontal inset. Pixel 9 UI hierarchies place their leading content at x=47 px, so no padding adjustment was necessary; the small perceived difference comes from whitespace inside individual Tabler glyphs.
 - Home genre labels now reuse Browse's localized labels; the Portuguese UI tree exposed `Ação`, `Aventura`, and `Comédia` in the genre list and localized hero chips.
 - Home section spacing increased from 20 dp to 24 dp, adding a small amount of breathing room without changing the page rhythm.
 
@@ -39,6 +44,7 @@ No actionable P0, P1, or P2 findings remain.
 - The tablet was inspected in portrait and landscape using UI hierarchy dumps and screenshots.
 - Mobile Home and Library were navigated using UI-tree-derived coordinates.
 - Unit tests cover banner priority, cover fallback, portrait limits, landscape limits, center-first tablet placement, two-character mobile placement, and the one-character mobile fallback.
+- The combined visual comparison confirms title hierarchy against the details page, a smooth 12% image transition, and readable theme-aware contrast in both light and dark themes.
 - Android crash logs contained no Tankobun crash, migration failure, or ANR.
 
 final result: passed

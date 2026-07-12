@@ -42,15 +42,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,11 +69,12 @@ import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.LocalTankobunTokens
 import com.tankobun.app.R
 import com.tankobun.app.TankobunDisplayFontFamily
+import com.tankobun.app.logic.isInReadingCategory
+import com.tankobun.app.logic.mobileHeroCharacterImages
+import com.tankobun.app.logic.tabletHeroCharacterImages
 import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.app.tankobunString
-import com.tankobun.app.logic.tabletHeroCharacterImages
-import com.tankobun.app.logic.mobileHeroCharacterImages
 import com.tankobun.app.ui.browse.browseGenreLabel
 import com.tankobun.app.ui.components.TankobunMediaStatusLabel
 import com.tankobun.app.ui.shell.LocalTankobunChromeInsets
@@ -74,7 +82,6 @@ import com.tankobun.app.ui.media.AutoResizingMangaTitle
 import com.tankobun.core.model.AnilistGenreHighlight
 import com.tankobun.core.model.AnilistMedia
 import kotlinx.coroutines.delay
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -88,6 +95,15 @@ internal fun HomeScreen(
     val chromeInsets = LocalTankobunChromeInsets.current
     val expanded = androidx.compose.ui.platform.LocalConfiguration.current.smallestScreenWidthDp >= 600
     val horizontalPadding = 18.dp
+    val readingMediaIds = remember(state.libraryItems) {
+        state.libraryItems
+            .asSequence()
+            .filter { it.entry.isInReadingCategory() }
+            .mapTo(mutableSetOf()) { it.media.id }
+    }
+    val continueReadingItems = remember(state.recentReadingProgress, readingMediaIds) {
+        state.recentReadingProgress.filter { it.media.id in readingMediaIds }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -121,7 +137,7 @@ internal fun HomeScreen(
             }
         }
 
-        if (state.recentReadingProgress.isNotEmpty()) {
+        if (continueReadingItems.isNotEmpty()) {
             item {
                 HomeSection(
                     title = tankobunString(R.string.home_continue_reading),
@@ -130,7 +146,7 @@ internal fun HomeScreen(
                     headerModifier = Modifier.padding(horizontal = horizontalPadding),
                 ) {
                     ContinueReadingRow(
-                        items = state.recentReadingProgress,
+                        items = continueReadingItems,
                         horizontalPadding = horizontalPadding,
                         onOpen = onOpenRecentProgress,
                     )
@@ -280,6 +296,14 @@ private fun TrendingHero(
 ) {
     val style = LocalTankobunStyle.current
     val backdrop = style.colors.panel
+    val shadowBlurRadius = with(LocalDensity.current) { 7.dp.toPx() }
+    val contentShadow = remember(backdrop, shadowBlurRadius) {
+        Shadow(
+            color = backdrop,
+            offset = Offset.Zero,
+            blurRadius = shadowBlurRadius,
+        )
+    }
     val configuration = LocalConfiguration.current
     val landscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val mosaicImages = if (expanded) {
@@ -295,6 +319,11 @@ private fun TrendingHero(
         media.bannerImage ?: if (showCharacterMosaic) null else media.coverImage ?: media.mainCharacterImage
     } else {
         if (showCharacterMosaic) null else media.mainCharacterImage ?: media.coverImage ?: media.bannerImage
+    }
+    val singleImageWidthFraction = when {
+        expanded -> 0.72f
+        image == media.bannerImage -> 1f
+        else -> 0.60f
     }
     Surface(
         modifier = modifier
@@ -314,7 +343,8 @@ private fun TrendingHero(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight()
-                        .fillMaxWidth(0.72f),
+                        .fillMaxWidth(0.72f)
+                        .heroLeadingEdgeFade(),
                 )
             } else {
                 image?.let { url ->
@@ -322,7 +352,8 @@ private fun TrendingHero(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()
-                            .fillMaxWidth(if (expanded) 0.72f else 1f),
+                            .fillMaxWidth(singleImageWidthFraction)
+                            .heroLeadingEdgeFade(),
                         contentAlignment = Alignment.Center,
                     ) {
                         AsyncImage(
@@ -388,9 +419,9 @@ private fun TrendingHero(
                     Text(
                         text = rank.toString().padStart(2, '0'),
                         fontFamily = TankobunDisplayFontFamily,
-                        fontSize = 24.sp,
-                        lineHeight = 24.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        fontSize = 22.sp,
+                        lineHeight = 22.sp,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
                     )
                 }
                 if (expanded) {
@@ -400,15 +431,17 @@ private fun TrendingHero(
                 }
                 AutoResizingMangaTitle(
                     title = media.title.userPreferred,
-                    compact = true,
+                    compact = !expanded,
                     color = style.colors.panelContent,
+                    shadow = contentShadow,
                     modifier = Modifier
                         .fillMaxWidth(if (expanded) 0.38f else 0.68f)
-                        .height(if (expanded) 116.dp else 92.dp),
+                        .height(if (expanded) 140.dp else 106.dp),
                 )
                 media.staff.firstOrNull()?.let { author ->
                     TankobunMediaStatusLabel(
                         text = tankobunString(R.string.home_by_author, author),
+                        shadow = contentShadow,
                         modifier = Modifier
                             .fillMaxWidth(if (expanded) 0.36f else 0.66f)
                             .padding(top = 4.dp),
@@ -417,10 +450,10 @@ private fun TrendingHero(
                 media.cleanDescription()?.let { description ->
                     Text(
                         text = description,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodySmall.copy(shadow = contentShadow),
                         color = style.colors.panelContent.copy(alpha = 0.86f),
                         lineHeight = 18.sp,
-                        maxLines = if (expanded) 5 else 3,
+                        maxLines = if (expanded) 4 else 3,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxWidth(if (expanded) 0.38f else 0.62f)
@@ -497,6 +530,24 @@ private fun HeroCharacterMosaic(
     }
 }
 
+private fun Modifier.heroLeadingEdgeFade(): Modifier =
+    graphicsLayer {
+        compositingStrategy = CompositingStrategy.Offscreen
+    }.drawWithCache {
+        val mask = Brush.horizontalGradient(
+            colors = listOf(Color.Transparent, Color.Black),
+            startX = 0f,
+            endX = size.width * 0.12f,
+        )
+        onDrawWithContent {
+            drawContent()
+            drawRect(
+                brush = mask,
+                blendMode = BlendMode.DstIn,
+            )
+        }
+    }
+
 private class SlantedHeroPanelShape(
     private val first: Boolean,
     private val last: Boolean,
@@ -557,7 +608,6 @@ private fun ContinueReadingCard(
     width: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit,
 ) {
-    val progress = item.overallProgress ?: 0f
     Column(
         modifier = Modifier
             .width(width)
@@ -590,28 +640,6 @@ private fun ContinueReadingCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
         )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            Box(
-                Modifier
-                    .weight(1f)
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth(progress)
-                        .height(4.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                )
-            }
-            Text(
-                text = item.overallProgress?.let { "${(it * 100).roundToInt()}%" } ?: "—",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 

@@ -2,6 +2,7 @@ package com.tankobun.app.anilist
 
 import android.util.Log
 import com.tankobun.app.AppContainer
+import com.tankobun.app.logic.isInReadingCategory
 import com.tankobun.app.logic.nullableBoolean
 import com.tankobun.app.logic.nullableDouble
 import com.tankobun.app.logic.nullableInt
@@ -765,11 +766,19 @@ internal class AniListDataSource(
         val latestProgress = container.database.progressDao().latestReadingProgress()
             .map { it.toModel() }
         if (latestProgress.isEmpty()) return emptyList()
+        val readingEntriesByMediaId = container.database.listEntryDao()
+            .cachedEntries()
+            .asSequence()
+            .map { it.toModel() }
+            .filter { it.isInReadingCategory() }
+            .associateBy { it.mediaId }
+        if (readingEntriesByMediaId.isEmpty()) return emptyList()
         val mediaById = container.database.mediaDao().cachedMedia().associateBy { it.id }
         val chapterDao = container.database.chapterDao()
         val bindingDao = container.database.sourceBindingDao()
         return buildList {
             for (progress in latestProgress) {
+                val entry = readingEntriesByMediaId[progress.mediaId] ?: continue
                 val media = mediaById[progress.mediaId]?.toModel(titleLanguage) ?: continue
                 val binding = bindingDao.bindingForMedia(progress.mediaId)
                 val boundChapters = binding?.let { selected ->
@@ -786,7 +795,7 @@ internal class AniListDataSource(
                     else -> boundChapters
                 }
                 val metrics = recentReadingMetrics(progress, cachedChapter, availableChapters)
-                if (!media.shouldShowInContinueReading(progress, metrics)) continue
+                if (!media.shouldShowInContinueReading(entry, progress, metrics)) continue
                 add(
                     RecentReadingProgress(
                         media = media,

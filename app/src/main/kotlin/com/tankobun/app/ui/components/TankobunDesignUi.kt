@@ -46,6 +46,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
@@ -566,11 +567,12 @@ internal fun TankobunDialogHeader(title: String, onDismiss: () -> Unit) {
 internal fun TankobunMediaStatusLabel(
     text: String,
     modifier: Modifier = Modifier,
+    shadow: Shadow? = null,
 ) {
     Text(
         text.uppercase(Locale.ROOT),
         modifier = modifier,
-        style = LocalTankobunStyle.current.typography.compactStatus,
+        style = LocalTankobunStyle.current.typography.compactStatus.copy(shadow = shadow),
         color = LocalTankobunStyle.current.colors.accent,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
