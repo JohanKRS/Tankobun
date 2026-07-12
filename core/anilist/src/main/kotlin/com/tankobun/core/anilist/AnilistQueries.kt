@@ -52,7 +52,7 @@ object AnilistQueries {
             pages.map { page ->
                 """
                   genre${index}Page$page: Page(page: $page, perPage: $perPage) {
-                    media(type: MANGA, genre: "$safeGenre", isAdult: ${'$'}isAdult, sort: POPULARITY_DESC) {
+                    media(type: MANGA, genre: "$safeGenre", isAdult: ${'$'}isAdult, sort: TRENDING_DESC) {
                       id
                       title { romaji english native userPreferred }
                       coverImage { extraLarge large color }

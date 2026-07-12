@@ -216,6 +216,7 @@ private val FALLBACK_HOME_GENRES = listOf(
 )
 private const val READER_ADJACENT_SEGMENT_LOAD_TIMEOUT_MILLIS = 12_000L
 private const val READER_ADJACENT_SEGMENT_STALE_MILLIS = 20_000L
+private const val HOME_FEED_RETRY_DELAY_MILLIS = 30 * 60 * 1000L
 
 class MainViewModel(
     private val container: AppContainer,
@@ -235,6 +236,7 @@ class MainViewModel(
     private var scheduledBackupJob: Job? = null
     private var browseLandingJob: Job? = null
     private var homeFeedJob: Job? = null
+    private var homeFeedRefreshJob: Job? = null
     private var readerPreviousAdjacentLoadJob: ReaderAdjacentLoadJob? = null
     private var readerNextAdjacentLoadJob: ReaderAdjacentLoadJob? = null
     private var sourcePickerJob: Job? = null
@@ -1902,9 +1904,11 @@ class MainViewModel(
 
     fun loadHomeFeed(force: Boolean = false) {
         if (homeFeedJob?.isActive == true) return
+        homeFeedRefreshJob?.cancel()
+        homeFeedRefreshJob = null
         homeFeedJob = viewModelScope.launch {
             val includeAdult = _state.value.showNsfwContent
-            val genres = loadHomeGenres(force = force, includeAdult = includeAdult)
+            val genres = cachedHomeGenres(includeAdult = includeAdult)
             val freshCache = if (force) {
                 null
             } else {
@@ -1918,6 +1922,8 @@ class MainViewModel(
                 if (_state.value.showNsfwContent == includeAdult) {
                     applyHomeFeed(freshCache)
                 }
+                scheduleHomeFeedRefresh(includeAdult)
+                refreshHomeGenresIfStale(force = false)
                 return@launch
             }
 
@@ -1943,6 +1949,21 @@ class MainViewModel(
                             )
                         }
                     },
+                    onGenreHighlightsLoaded = { highlights ->
+                        if (_state.value.showNsfwContent == includeAdult && highlights.isNotEmpty()) {
+                            val existingById = _state.value.homeGenreHighlights
+                                .map { it.media }
+                                .associateBy(AnilistMedia::id)
+                            applyHomeGenreHighlights(
+                                genres = genres,
+                                highlights = highlights.map { highlight ->
+                                    highlight.copy(
+                                        media = highlight.media.withFallbackDetails(existingById[highlight.media.id]),
+                                    )
+                                },
+                            )
+                        }
+                    },
                 )
                 val visibleFeed = _state.value
                 val existingMediaById = buildList {
@@ -1963,37 +1984,58 @@ class MainViewModel(
                 if (_state.value.showNsfwContent == includeAdult) {
                     applyHomeFeed(stableFeed)
                 }
+                scheduleHomeFeedRefresh(includeAdult)
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 Log.e(TAG, "AniList home feed failed", error)
                 if (staleCache == null) {
                     _state.update { it.copy(homeLoaded = true) }
                 }
+                scheduleHomeFeedRefresh(includeAdult, HOME_FEED_RETRY_DELAY_MILLIS)
             }
+            refreshHomeGenresIfStale(force = force)
         }
     }
 
-    private suspend fun loadHomeGenres(force: Boolean, includeAdult: Boolean): List<String> {
+    private fun cachedHomeGenres(includeAdult: Boolean): List<String> =
+        container.settingsStore.anilistGenres()
+            .ifEmpty { FALLBACK_HOME_GENRES }
+            .filter { genre -> includeAdult || !genre.equals("Hentai", ignoreCase = true) }
+
+    private suspend fun refreshHomeGenresIfStale(force: Boolean) {
         val cached = container.settingsStore.anilistGenres()
         val cachedAt = container.settingsStore.anilistGenresCachedAtEpochMillis()
         val cacheFresh = cached.isNotEmpty() &&
             System.currentTimeMillis() - cachedAt <= cachePolicy.anilistTaxonomyTtlMillis
-        val genres = if (!force && cacheFresh) {
-            cached
-        } else {
-            runCatching { container.anilistRepository.mediaGenres() }
-                .onSuccess { result ->
-                    if (result.isNotEmpty()) {
-                        container.settingsStore.saveAnilistGenres(result, System.currentTimeMillis())
-                    }
+        if (!force && cacheFresh) return
+        runCatching { container.anilistRepository.mediaGenres() }
+            .onSuccess { result ->
+                if (result.isNotEmpty()) {
+                    container.settingsStore.saveAnilistGenres(result, System.currentTimeMillis())
                 }
-                .getOrElse { error ->
-                    Log.w(TAG, "AniList genre collection failed", error)
-                    cached.ifEmpty { FALLBACK_HOME_GENRES }
-                }
-                .ifEmpty { cached.ifEmpty { FALLBACK_HOME_GENRES } }
+            }
+            .onFailure { error ->
+                Log.w(TAG, "AniList genre collection failed", error)
+            }
+    }
+
+    private fun scheduleHomeFeedRefresh(
+        includeAdult: Boolean,
+        delayMillis: Long? = null,
+    ) {
+        homeFeedRefreshJob?.cancel()
+        val refreshDelayMillis = delayMillis ?: run {
+            val cachedAt = container.settingsStore.homeFeedCachedAtEpochMillis(includeAdult)
+            (cachePolicy.homeFeedTtlMillis - (System.currentTimeMillis() - cachedAt))
+                .coerceAtLeast(1_000L)
         }
-        return genres.filter { genre -> includeAdult || !genre.equals("Hentai", ignoreCase = true) }
+        homeFeedRefreshJob = viewModelScope.launch {
+            delay(refreshDelayMillis)
+            homeFeedRefreshJob = null
+            if (_state.value.showNsfwContent == includeAdult) {
+                loadHomeFeed()
+            }
+        }
     }
 
     private fun applyHomeFeed(feed: com.tankobun.core.model.AnilistHomeFeed) {
@@ -2012,6 +2054,23 @@ class MainViewModel(
         _state.update { state ->
             state.copy(
                 homeTrending = trending.map { media -> media.withTitleLanguage(state.anilistTitleLanguage) },
+            )
+        }
+    }
+
+    private fun applyHomeGenreHighlights(
+        genres: List<String>,
+        highlights: List<com.tankobun.core.model.AnilistGenreHighlight>,
+    ) {
+        _state.update { state ->
+            val existingByGenre = state.homeGenreHighlights.associateBy { it.genre }
+            val incomingByGenre = highlights.associateBy { it.genre }
+            state.copy(
+                homeGenreHighlights = genres.mapNotNull { genre ->
+                    (incomingByGenre[genre] ?: existingByGenre[genre])?.let { highlight ->
+                        highlight.copy(media = highlight.media.withTitleLanguage(state.anilistTitleLanguage))
+                    }
+                },
             )
         }
     }
@@ -2248,6 +2307,8 @@ class MainViewModel(
     fun setShowNsfwContent(enabled: Boolean) {
         homeFeedJob?.cancel()
         homeFeedJob = null
+        homeFeedRefreshJob?.cancel()
+        homeFeedRefreshJob = null
         container.settingsStore.saveShowNsfwContent(enabled)
         _state.update {
             it.copy(

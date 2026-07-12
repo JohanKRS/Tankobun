@@ -13,6 +13,11 @@ import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistStatItem
 import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.MediaStatus
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -45,78 +50,106 @@ class AnilistRepository(
         accessToken: String? = null,
         includeAdult: Boolean = false,
         onTrendingLoaded: (List<AnilistMedia>) -> Unit = {},
-    ): AnilistHomeFeed {
-        val variables = buildJsonObject {
-            if (!includeAdult) put("isAdult", false)
-        }
-        val trendingData = graphQlClient.execute(
-            query = AnilistQueries.HomeTrending,
-            variables = variables,
-            accessToken = accessToken,
-        )
-        val trending = trendingData["trending"]
-            ?.takeUnless { it is JsonNull }
-            ?.jsonObject
-            ?.get("media")
-            ?.jsonArray
-            .orEmpty()
-            .map(AnilistJsonMapper::media)
-        onTrendingLoaded(trending)
-        val candidatesByGenre = linkedMapOf<String, MutableList<AnilistMedia>>()
-
-        suspend fun loadGenreCandidates(
-            targetGenres: List<String>,
-            pages: IntRange,
-        ) {
-            targetGenres.chunked(6).forEach { chunk ->
-                val data = graphQlClient.execute(
-                    query = AnilistQueries.homeGenreCandidates(chunk, pages = pages, perPage = 25),
+        onGenreHighlightsLoaded: (List<AnilistGenreHighlight>) -> Unit = {},
+    ): AnilistHomeFeed = withContext(Dispatchers.Default) {
+        coroutineScope {
+            val variables = buildJsonObject {
+                if (!includeAdult) put("isAdult", false)
+            }
+            val trendingDeferred = async(start = CoroutineStart.UNDISPATCHED) {
+                val trendingData = graphQlClient.execute(
+                    query = AnilistQueries.HomeTrending,
                     variables = variables,
                     accessToken = accessToken,
                 )
-                chunk.forEachIndexed { index, genre ->
-                    val candidates = pages.flatMap { page ->
-                        data["genre${index}Page$page"]
-                            ?.takeUnless { it is JsonNull }
-                            ?.jsonObject
-                            ?.get("media")
-                            ?.jsonArray
-                            .orEmpty()
-                    }
-                        .map(AnilistJsonMapper::media)
-                    val existingIds = candidatesByGenre[genre].orEmpty().mapTo(mutableSetOf(), AnilistMedia::id)
-                    candidatesByGenre.getOrPut(genre, ::mutableListOf)
-                        .addAll(candidates.filterNot { candidate -> candidate.id in existingIds })
+                trendingData["trending"]
+                    ?.takeUnless { it is JsonNull }
+                    ?.jsonObject
+                    ?.get("media")
+                    ?.jsonArray
+                    .orEmpty()
+                    .map(AnilistJsonMapper::media)
+                    .also(onTrendingLoaded)
+            }
+            val candidatesByGenre = linkedMapOf<String, MutableList<AnilistMedia>>()
+            val selectedByGenre = linkedMapOf<String, AnilistMedia>()
+            val usedMediaIds = mutableSetOf<Int>()
+            var lastPublishedIds = emptyList<Int>()
+
+            fun currentHighlights(): List<AnilistGenreHighlight> =
+                genres.mapNotNull { genre ->
+                    selectedByGenre[genre]?.let { media -> AnilistGenreHighlight(genre = genre, media = media) }
+                }
+
+            fun publishHighlights() {
+                val highlights = currentHighlights()
+                val currentIds = highlights.map { it.media.id }
+                if (currentIds != lastPublishedIds) {
+                    lastPublishedIds = currentIds
+                    onGenreHighlightsLoaded(highlights)
                 }
             }
-        }
 
-        loadGenreCandidates(targetGenres = genres, pages = 1..1)
-        val selectedByGenre = linkedMapOf<String, AnilistMedia>()
-        val usedMediaIds = mutableSetOf<Int>()
-        genres.forEach { genre ->
-            candidatesByGenre[genre]
-                ?.firstOrNull { candidate ->
-                    candidate.id !in usedMediaIds &&
-                        candidate.genres.firstOrNull().equals(genre, ignoreCase = true)
+            suspend fun loadGenreCandidates(
+                targetGenres: List<String>,
+                pages: IntRange,
+                onChunkLoaded: (List<String>) -> Unit,
+            ) {
+                targetGenres.chunked(6).forEach { chunk ->
+                    val data = graphQlClient.execute(
+                        query = AnilistQueries.homeGenreCandidates(chunk, pages = pages, perPage = 12),
+                        variables = variables,
+                        accessToken = accessToken,
+                    )
+                    chunk.forEachIndexed { index, genre ->
+                        val candidates = pages.flatMap { page ->
+                            data["genre${index}Page$page"]
+                                ?.takeUnless { it is JsonNull }
+                                ?.jsonObject
+                                ?.get("media")
+                                ?.jsonArray
+                                .orEmpty()
+                        }
+                            .map(AnilistJsonMapper::media)
+                        val existingIds = candidatesByGenre[genre].orEmpty().mapTo(mutableSetOf(), AnilistMedia::id)
+                        candidatesByGenre.getOrPut(genre, ::mutableListOf)
+                            .addAll(candidates.filterNot { candidate -> candidate.id in existingIds })
+                    }
+                    onChunkLoaded(chunk)
                 }
-                ?.let { media ->
-                    selectedByGenre[genre] = media
-                    usedMediaIds += media.id
+            }
+
+            val selectPrimaryCandidates: (List<String>) -> Unit = { loadedGenres ->
+                loadedGenres.forEach { genre ->
+                    if (genre !in selectedByGenre) {
+                        candidatesByGenre[genre]
+                            ?.firstOrNull { candidate ->
+                                candidate.id !in usedMediaIds &&
+                                    candidate.genres.firstOrNull().equals(genre, ignoreCase = true)
+                            }
+                            ?.let { media ->
+                                selectedByGenre[genre] = media
+                                usedMediaIds += media.id
+                            }
+                    }
                 }
-        }
-        genres.filterNot(selectedByGenre::containsKey).forEach { genre ->
-            candidatesByGenre[genre]
-                ?.firstOrNull { candidate -> candidate.id !in usedMediaIds }
-                ?.let { media ->
-                    selectedByGenre[genre] = media
-                    usedMediaIds += media.id
-                }
-        }
-        val missingGenres = genres.filterNot(selectedByGenre::containsKey)
-        if (missingGenres.isNotEmpty()) {
-            loadGenreCandidates(targetGenres = missingGenres, pages = 2..2)
-            missingGenres.forEach { genre ->
+                publishHighlights()
+            }
+
+            loadGenreCandidates(
+                targetGenres = genres,
+                pages = 1..1,
+                onChunkLoaded = selectPrimaryCandidates,
+            )
+            val genresMissingPrimaryCandidate = genres.filterNot(selectedByGenre::containsKey)
+            if (genresMissingPrimaryCandidate.isNotEmpty()) {
+                loadGenreCandidates(
+                    targetGenres = genresMissingPrimaryCandidate,
+                    pages = 2..2,
+                    onChunkLoaded = selectPrimaryCandidates,
+                )
+            }
+            genres.filterNot(selectedByGenre::containsKey).forEach { genre ->
                 candidatesByGenre[genre]
                     ?.firstOrNull { candidate -> candidate.id !in usedMediaIds }
                     ?.let { media ->
@@ -124,54 +157,57 @@ class AnilistRepository(
                         usedMediaIds += media.id
                     }
             }
-        }
-        val genreHighlights = genres.mapNotNull { genre ->
-            selectedByGenre[genre]?.let { media -> AnilistGenreHighlight(genre = genre, media = media) }
-        }
-        val missingCharacterIds = genreHighlights
-            .map { it.media }
-            .filter { it.bannerImage.isNullOrBlank() }
-            .map { it.id }
-            .distinct()
-        val characterImages = if (missingCharacterIds.isEmpty()) {
-            emptyMap()
-        } else {
-            val data = graphQlClient.execute(
-                query = AnilistQueries.homeMainCharacters(missingCharacterIds),
-                accessToken = accessToken,
-            )
-            missingCharacterIds.mapIndexedNotNull { index, mediaId ->
-                val image = data["media$index"]
-                    ?.takeUnless { it is JsonNull }
-                    ?.jsonObject
-                    ?.get("characters")
-                    ?.takeUnless { it is JsonNull }
-                    ?.jsonObject
-                    ?.get("nodes")
-                    ?.jsonArray
-                    ?.firstOrNull()
-                    ?.jsonObject
-                    ?.get("image")
-                    ?.takeUnless { it is JsonNull }
-                    ?.jsonObject
-                    ?.get("large")
-                    ?.jsonPrimitive
-                    ?.content
-                    ?: return@mapIndexedNotNull null
-                mediaId to image
-            }.toMap()
-        }
-        return AnilistHomeFeed(
-            trending = trending,
-            genreHighlights = genreHighlights.map { highlight ->
+            publishHighlights()
+            val genreHighlights = currentHighlights()
+            val missingCharacterIds = genreHighlights
+                .map { it.media }
+                .filter { it.bannerImage.isNullOrBlank() }
+                .map { it.id }
+                .distinct()
+            val characterImages = if (missingCharacterIds.isEmpty()) {
+                emptyMap()
+            } else {
+                val data = graphQlClient.execute(
+                    query = AnilistQueries.homeMainCharacters(missingCharacterIds),
+                    accessToken = accessToken,
+                )
+                missingCharacterIds.mapIndexedNotNull { index, mediaId ->
+                    val image = data["media$index"]
+                        ?.takeUnless { it is JsonNull }
+                        ?.jsonObject
+                        ?.get("characters")
+                        ?.takeUnless { it is JsonNull }
+                        ?.jsonObject
+                        ?.get("nodes")
+                        ?.jsonArray
+                        ?.firstOrNull()
+                        ?.jsonObject
+                        ?.get("image")
+                        ?.takeUnless { it is JsonNull }
+                        ?.jsonObject
+                        ?.get("large")
+                        ?.jsonPrimitive
+                        ?.content
+                        ?: return@mapIndexedNotNull null
+                    mediaId to image
+                }.toMap()
+            }
+            val enrichedHighlights = genreHighlights.map { highlight ->
                 highlight.copy(
                     media = highlight.media.copy(
                         mainCharacterImage = characterImages[highlight.media.id],
                         characterImages = listOfNotNull(characterImages[highlight.media.id]),
                     ),
                 )
-            },
-        )
+            }
+            if (enrichedHighlights != genreHighlights) {
+                onGenreHighlightsLoaded(enrichedHighlights)
+            }
+            AnilistHomeFeed(
+                trending = trendingDeferred.await(),
+                genreHighlights = enrichedHighlights,
+            )
+        }
     }
 
     suspend fun viewer(accessToken: String): AnilistViewer {

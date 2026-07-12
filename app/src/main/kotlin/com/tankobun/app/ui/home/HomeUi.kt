@@ -7,6 +7,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -38,7 +40,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +62,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -243,8 +248,9 @@ private fun TrendingHeroCarousel(
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
     val pagerState = rememberPagerState(pageCount = { media.size })
-    LaunchedEffect(media.map { it.id }) {
-        if (media.size <= 1) return@LaunchedEffect
+    var userInteracted by remember { mutableStateOf(false) }
+    LaunchedEffect(media.map { it.id }, userInteracted) {
+        if (media.size <= 1 || userInteracted) return@LaunchedEffect
         while (true) {
             delay(6_000)
             pagerState.animateScrollToPage((pagerState.currentPage + 1) % media.size)
@@ -255,7 +261,14 @@ private fun TrendingHeroCarousel(
             val heroHeight = if (expanded) 410.dp else 338.dp
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            userInteracted = true
+                        }
+                    },
                 contentPadding = PaddingValues(horizontal = horizontalPadding),
                 pageSpacing = 10.dp,
             ) { page ->
@@ -624,22 +637,21 @@ private fun ContinueReadingCard(
                 .aspectRatio(2f / 3f)
                 .clip(RoundedCornerShape(8.dp)),
         )
-        Text(
-            text = item.media.title.userPreferred,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = item.currentChapterNumber
-                ?.let { chapterNumber -> tankobunString(R.string.home_chapter, chapterNumber.compactNumber()) }
-                ?: item.chapter?.name
-                ?: tankobunString(R.string.reader_saved_chapter),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            Text(
+                text = item.media.title.userPreferred,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            TankobunMediaStatusLabel(
+                text = item.currentChapterNumber
+                    ?.let { chapterNumber -> tankobunString(R.string.home_chapter, chapterNumber.compactNumber()) }
+                    ?: item.chapter?.name
+                    ?: tankobunString(R.string.reader_saved_chapter),
+            )
+        }
     }
 }
 

@@ -45,6 +45,8 @@ class AnilistQueriesTest {
         assertTrue(query.contains("genre0Page3: Page(page: 3, perPage: 50)"))
         assertTrue(query.contains("genre1Page2: Page(page: 2, perPage: 50)"))
         assertTrue(query.contains("genre: \"Slice of Life\""))
+        assertTrue(query.contains("sort: TRENDING_DESC"))
+        assertFalse(query.contains("sort: POPULARITY_DESC"))
         assertFalse(query.contains("Page4"))
     }
 
