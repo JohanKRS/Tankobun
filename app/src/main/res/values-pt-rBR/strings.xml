@@ -74,6 +74,7 @@
     <string name="nav_library">Biblioteca</string>
     <string name="nav_browse">Explorar</string>
     <string name="nav_downloads">Downloads</string>
+    <string name="nav_profile">Perfil</string>
     <string name="nav_settings">Configurações</string>
 
     <string name="settings_appearance">Aparência</string>
@@ -177,6 +178,15 @@
     <string name="profile_metric_chapters">Capítulos</string>
     <string name="profile_metric_volumes">Volumes</string>
     <string name="profile_metric_mean_score">Nota média</string>
+    <string name="profile_metric_chapters_per_manga">Capítulos por mangá</string>
+    <string name="profile_signed_in_label">Conectado como</string>
+    <string name="profile_status_distribution_desc">Como as entradas da sua lista estão distribuídas</string>
+    <string name="profile_status_entries">%1$d entradas</string>
+    <string name="profile_status_entries_label">entradas</string>
+    <string name="profile_genre_signature">Assinatura de leitura</string>
+    <string name="profile_genre_signature_desc">Os gêneros comparam variedade em títulos e profundidade em capítulos.</string>
+    <string name="profile_tag_affinities">Afinidades por tags</string>
+    <string name="profile_tag_affinities_desc">Temas recorrentes na sua biblioteca e no seu histórico de leitura.</string>
     <string name="profile_score_summary">Nota média %1$s</string>
     <string name="profile_top_genres">Gêneros principais</string>
     <string name="profile_top_tags">Tags principais</string>
@@ -184,6 +194,8 @@
     <string name="profile_statuses">Status de leitura</string>
     <string name="profile_stats_empty">Ainda sem dados.</string>
     <string name="profile_stat_detail">%1$d mangás / %2$d capítulos</string>
+    <string name="downloads_activity">Atividade de downloads</string>
+    <string name="downloads_activity_desc">Acompanhe, pause, retome e tente novamente os downloads atuais.</string>
 
     <string name="language_all">Multilíngue</string>
     <string name="language_af">Africâner</string>

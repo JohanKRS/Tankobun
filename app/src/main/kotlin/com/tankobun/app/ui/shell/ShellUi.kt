@@ -247,7 +247,6 @@ internal const val TankobunGithubUrl = "https://github.com/JohanKRS/Tankobun"
 internal const val TankobunAniListUrl = "https://anilist.co"
 
 internal val SettingsDetailRoutes = listOf(
-    SettingsRoute.PROFILE,
     SettingsRoute.APPEARANCE,
     SettingsRoute.LANGUAGES,
     SettingsRoute.LIBRARY,
@@ -255,6 +254,7 @@ internal val SettingsDetailRoutes = listOf(
     SettingsRoute.READER,
     SettingsRoute.SOURCES,
     SettingsRoute.DOWNLOADS,
+    SettingsRoute.ANILIST,
     SettingsRoute.CUSTOM_LISTS,
     SettingsRoute.BACKUPS,
     SettingsRoute.ABOUT,
@@ -276,6 +276,23 @@ internal fun SettingsRoute.settingsTitle(): String =
         SettingsRoute.BACKUPS -> tankobunString(R.string.settings_backups)
         SettingsRoute.ABOUT -> tankobunString(R.string.common_about)
         SettingsRoute.SOURCES -> tankobunString(R.string.settings_sources)
+    }
+
+internal fun SettingsRoute.pageIcon(): ImageVector =
+    when (this) {
+        SettingsRoute.MAIN -> TankobunIcons.Settings
+        SettingsRoute.PROFILE -> TankobunIcons.AccountCircle
+        SettingsRoute.APPEARANCE -> TankobunIcons.Palette
+        SettingsRoute.LANGUAGES -> TankobunIcons.Translate
+        SettingsRoute.LIBRARY -> TankobunIcons.CollectionsBookmark
+        SettingsRoute.BROWSE -> TankobunIcons.Explore
+        SettingsRoute.READER -> TankobunIcons.MenuBook
+        SettingsRoute.DOWNLOADS -> TankobunIcons.Download
+        SettingsRoute.ANILIST -> TankobunIcons.Link
+        SettingsRoute.CUSTOM_LISTS -> TankobunIcons.FormatListBulleted
+        SettingsRoute.BACKUPS -> TankobunIcons.Backup
+        SettingsRoute.ABOUT -> TankobunIcons.Info
+        SettingsRoute.SOURCES -> TankobunIcons.Extension
     }
 
 internal enum class QuickDrawerMode {
@@ -453,7 +470,7 @@ private fun TankobunAppRootContent(
                 AppTourStep.READER -> TankobunRoute(tab = 2, media = exampleMedia)
                 AppTourStep.SOURCES -> TankobunRoute(tab = 4, settingsRoute = SettingsRoute.SOURCES)
                 AppTourStep.BACKUPS -> TankobunRoute(tab = 4, settingsRoute = SettingsRoute.BACKUPS)
-                AppTourStep.PROFILE -> TankobunRoute(tab = 4, settingsRoute = SettingsRoute.PROFILE)
+                AppTourStep.PROFILE -> TankobunRoute(tab = 3)
             },
         )
         quickDrawerMode = if (step == AppTourStep.QUICK_ACTIONS && exampleMedia != null) {
@@ -895,15 +912,15 @@ internal fun TankobunScaffold(
                             0 -> tankobunString(R.string.nav_home)
                             1 -> tankobunString(R.string.common_library)
                             2 -> tankobunString(R.string.common_browse)
-                            3 -> tankobunString(R.string.common_downloads)
+                            3 -> tankobunString(R.string.nav_profile)
                             4 -> settingsRoute.settingsTitle()
                             else -> tankobunString(R.string.app_name)
                         },
                     pageIcon = when (selectedTab) {
                         1 -> TankobunIcons.LibraryBooks
                         2 -> TankobunIcons.Explore
-                        3 -> TankobunIcons.Download
-                        4 -> TankobunIcons.Settings
+                        3 -> TankobunIcons.AccountCircle
+                        4 -> settingsRoute.pageIcon()
                         else -> TankobunIcons.Home
                     },
                     hazeState = chromeHazeState,
@@ -985,11 +1002,7 @@ internal fun TankobunScaffold(
                                 )
                                 1 -> LibraryScreen(state, viewModel, onSelectMedia = onSelectMedia)
                                 2 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                                3 -> DownloadsScreen(
-                                    state = state,
-                                    viewModel = viewModel,
-                                    onOpenStorageManager = { onOpenSettingsRoute(SettingsRoute.DOWNLOADS) },
-                                )
+                                3 -> ProfileScreen(state = state, viewModel = viewModel)
                                 4 -> SettingsScreen(
                                     state = state,
                                     viewModel = viewModel,
@@ -1236,14 +1249,12 @@ internal fun TankobunTopBar(
                         )
                     }
                 }
-                if (!showBack) {
-                    Icon(
-                        imageVector = pageIcon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(27.dp),
-                    )
-                }
+                Icon(
+                    imageVector = pageIcon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(27.dp),
+                )
                 Text(
                     text = if (mediaDetailActive) title else title.uppercase(Locale.ROOT),
                     modifier = Modifier.weight(1f),
@@ -1378,7 +1389,7 @@ internal fun TankobunBottomNavigationBar(
         Triple(tankobunString(R.string.nav_home), TankobunIcons.Home, 0),
         Triple(tankobunString(R.string.nav_library), TankobunIcons.LibraryBooks, 1),
         Triple(tankobunString(R.string.nav_browse), TankobunIcons.Explore, 2),
-        Triple(tankobunString(R.string.nav_downloads), TankobunIcons.Download, 3),
+        Triple(tankobunString(R.string.nav_profile), TankobunIcons.AccountCircle, 3),
         Triple(tankobunString(R.string.nav_settings), TankobunIcons.Settings, 4),
     )
     val selectedIndex = selectedTab.coerceIn(0, items.lastIndex)

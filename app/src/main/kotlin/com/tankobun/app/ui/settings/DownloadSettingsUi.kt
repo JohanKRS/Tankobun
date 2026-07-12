@@ -217,6 +217,72 @@ internal fun DownloadsSettingsScreen(
         subtitle = tankobunString(R.string.settings_downloads_subtitle),
         modifier = modifier,
     ) {
+        val hasActiveDownloads = state.downloads.any {
+            it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING
+        }
+        val hasPausedDownloads = state.downloads.any { it.state == DownloadState.PAUSED }
+        val hasFailedDownloads = state.downloads.any { it.state == DownloadState.FAILED }
+
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                tankobunString(R.string.downloads_activity),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                tankobunString(R.string.downloads_activity_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            state.downloadSummaryLabel(),
+            style = MaterialTheme.typography.labelLarge,
+            color = LocalTankobunStyle.current.colors.mutedContent,
+        )
+        if (hasActiveDownloads || hasPausedDownloads || hasFailedDownloads) {
+            FlowRowCompat {
+                if (hasActiveDownloads) {
+                    TankobunActionButton(
+                        label = tankobunString(R.string.downloads_pause_active),
+                        icon = TankobunIcons.Pause,
+                        onClick = viewModel::pauseActiveDownloads,
+                        filled = false,
+                    )
+                }
+                if (hasPausedDownloads) {
+                    TankobunActionButton(
+                        label = tankobunString(R.string.downloads_resume_paused),
+                        icon = TankobunIcons.PlayArrow,
+                        onClick = viewModel::resumePausedDownloads,
+                    )
+                }
+                if (hasFailedDownloads) {
+                    TankobunActionButton(
+                        label = tankobunString(R.string.downloads_retry_failed),
+                        icon = TankobunIcons.Replay,
+                        onClick = viewModel::retryFailedDownloads,
+                    )
+                }
+            }
+        }
+        if (state.downloads.isEmpty()) {
+            TankobunEmptyState(title = tankobunString(R.string.downloads_empty))
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                state.downloads.forEach { job ->
+                    DownloadJobRow(
+                        job = job,
+                        onPause = { viewModel.pauseDownload(job.id) },
+                        onResume = { viewModel.resumeDownload(job.id) },
+                        onRetry = { viewModel.retryDownload(job.id) },
+                        onRemove = { viewModel.removeDownload(job.id) },
+                    )
+                }
+            }
+        }
+
+        SettingsGroupDivider(label = tankobunString(R.string.downloads_local_storage))
         val summary = state.downloadStorageSummary
         TankobunPanel(
             modifier = Modifier.fillMaxWidth(),

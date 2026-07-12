@@ -74,6 +74,7 @@
     <string name="nav_library">Biblioteca</string>
     <string name="nav_browse">Explorar</string>
     <string name="nav_downloads">Descargas</string>
+    <string name="nav_profile">Perfil</string>
     <string name="nav_settings">Ajustes</string>
 
     <string name="settings_appearance">Apariencia</string>
@@ -177,6 +178,15 @@
     <string name="profile_metric_chapters">Capítulos</string>
     <string name="profile_metric_volumes">Volúmenes</string>
     <string name="profile_metric_mean_score">Puntuación media</string>
+    <string name="profile_metric_chapters_per_manga">Capítulos por manga</string>
+    <string name="profile_signed_in_label">Sesión iniciada como</string>
+    <string name="profile_status_distribution_desc">Cómo se distribuyen las entradas de tu lista</string>
+    <string name="profile_status_entries">%1$d entradas</string>
+    <string name="profile_status_entries_label">entradas</string>
+    <string name="profile_genre_signature">Firma de lectura</string>
+    <string name="profile_genre_signature_desc">Los géneros comparan amplitud en títulos y profundidad en capítulos.</string>
+    <string name="profile_tag_affinities">Afinidades por etiquetas</string>
+    <string name="profile_tag_affinities_desc">Temas recurrentes en tu biblioteca y tu historial de lectura.</string>
     <string name="profile_score_summary">Puntuación media %1$s</string>
     <string name="profile_top_genres">Géneros principales</string>
     <string name="profile_top_tags">Etiquetas principales</string>
@@ -184,6 +194,8 @@
     <string name="profile_statuses">Estados de lectura</string>
     <string name="profile_stats_empty">Aún no hay datos.</string>
     <string name="profile_stat_detail">%1$d manga / %2$d capítulos</string>
+    <string name="downloads_activity">Actividad de descargas</string>
+    <string name="downloads_activity_desc">Sigue, pausa, reanuda y reintenta las descargas actuales.</string>
 
     <string name="language_all">Multilingüe</string>
     <string name="language_af">Afrikáans</string>

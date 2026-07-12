@@ -24,9 +24,12 @@ internal object TankobunIcons {
     val Add: ImageVector = TablerIcons.Plus
     val AutoAwesome: ImageVector = TablerIcons.Stars
     val Backup: ImageVector = TablerIcons.DatabaseExport
+    val BooksStack: ImageVector = TablerIcons.Stack2
     val Bolt: ImageVector = TablerIcons.Bolt
     val CalendarMonth: ImageVector = TablerIcons.Calendar
     val Category: ImageVector = TablerIcons.Shape
+    val ChartBar: ImageVector = TablerIcons.ChartBar
+    val ChartDonut: ImageVector = TablerIcons.ChartDonut
     val Check: ImageVector = TablerIcons.Check
     val ChevronRight: ImageVector = TablerIcons.ChevronRight
     val Close: ImageVector = TablerIcons.X
@@ -44,6 +47,7 @@ internal object TankobunIcons {
     val GridView: ImageVector = TablerIcons.LayoutGrid
     val Groups: ImageVector = TablerIcons.Users
     val Home: ImageVector = TablerIcons.Home
+    val Hash: ImageVector = TablerIcons.Hash
     val Info: ImageVector = TablerIcons.InfoCircle
     val Link: ImageVector = TablerIcons.Link
     val LocalFireDepartment: ImageVector = TablerIcons.Flame

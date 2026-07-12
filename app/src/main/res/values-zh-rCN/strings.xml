@@ -75,6 +75,7 @@
     <string name="nav_library">书架</string>
     <string name="nav_browse">浏览</string>
     <string name="nav_downloads">下载</string>
+    <string name="nav_profile">个人资料</string>
     <string name="nav_settings">设置</string>
 
     <string name="settings_appearance">外观</string>
@@ -181,6 +182,15 @@
     <string name="profile_metric_chapters">章节</string>
     <string name="profile_metric_volumes">卷</string>
     <string name="profile_metric_mean_score">平均分</string>
+    <string name="profile_metric_chapters_per_manga">每部漫画章节数</string>
+    <string name="profile_signed_in_label">登录身份</string>
+    <string name="profile_status_distribution_desc">你的列表条目分布</string>
+    <string name="profile_status_entries">%1$d 个条目</string>
+    <string name="profile_status_entries_label">条目</string>
+    <string name="profile_genre_signature">阅读特征</string>
+    <string name="profile_genre_signature_desc">题材同时比较作品数量与已读章节深度。</string>
+    <string name="profile_tag_affinities">标签偏好</string>
+    <string name="profile_tag_affinities_desc">你的书架与阅读记录中反复出现的主题。</string>
     <string name="profile_score_summary">平均分 %1$s</string>
     <string name="profile_top_genres">主要题材</string>
     <string name="profile_top_tags">主要标签</string>
@@ -188,6 +198,8 @@
     <string name="profile_statuses">阅读状态</string>
     <string name="profile_stats_empty">还没有数据。</string>
     <string name="profile_stat_detail">%1$d 部漫画 / %2$d 章</string>
+    <string name="downloads_activity">下载活动</string>
+    <string name="downloads_activity_desc">跟踪、暂停、继续和重试当前下载任务。</string>
 
     <string name="language_all">多语言</string>
     <string name="language_af">南非荷兰语</string>

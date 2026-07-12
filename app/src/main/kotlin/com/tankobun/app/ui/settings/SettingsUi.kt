@@ -220,7 +220,7 @@ internal fun SettingsScreen(
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val tabletLayout = maxWidth >= 720.dp
-        val detailRoute = if (route == SettingsRoute.MAIN) SettingsRoute.PROFILE else route
+        val detailRoute = if (route == SettingsRoute.MAIN) SettingsRoute.APPEARANCE else route
 
         if (tabletLayout) {
             Row(
@@ -370,21 +370,7 @@ internal fun SettingsRouteIcon(route: SettingsRoute) {
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
-                imageVector = when (route) {
-                    SettingsRoute.MAIN -> TankobunIcons.Settings
-                    SettingsRoute.PROFILE -> TankobunIcons.AccountCircle
-                    SettingsRoute.APPEARANCE -> TankobunIcons.Palette
-                    SettingsRoute.LANGUAGES -> TankobunIcons.Translate
-                    SettingsRoute.LIBRARY -> TankobunIcons.CollectionsBookmark
-                    SettingsRoute.BROWSE -> TankobunIcons.Explore
-                    SettingsRoute.READER -> TankobunIcons.MenuBook
-                    SettingsRoute.DOWNLOADS -> TankobunIcons.Download
-                    SettingsRoute.ANILIST -> TankobunIcons.Link
-                    SettingsRoute.CUSTOM_LISTS -> TankobunIcons.FormatListBulleted
-                    SettingsRoute.BACKUPS -> TankobunIcons.Backup
-                    SettingsRoute.ABOUT -> TankobunIcons.Info
-                    SettingsRoute.SOURCES -> TankobunIcons.Extension
-                },
+                imageVector = route.pageIcon(),
                 contentDescription = null,
                 modifier = Modifier.size(19.dp),
             )
@@ -403,7 +389,7 @@ internal fun SettingsDetailContent(
     when (route) {
         SettingsRoute.MAIN,
         SettingsRoute.PROFILE,
-        SettingsRoute.ANILIST -> ProfileSettingsScreen(state, viewModel, modifier)
+        SettingsRoute.ANILIST -> AniListSettingsScreen(state, viewModel, modifier)
         SettingsRoute.APPEARANCE -> SettingsDetailPanel(
             title = tankobunString(R.string.settings_appearance),
             subtitle = tankobunString(R.string.settings_appearance_subtitle),
@@ -572,24 +558,18 @@ private fun LibraryNewChapterChecksToggle(
 }
 
 @Composable
-internal fun ProfileSettingsScreen(
+internal fun AniListSettingsScreen(
     state: TankobunUiState,
     viewModel: MainViewModel,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     SettingsDetailPanel(
-        title = tankobunString(R.string.settings_profile),
-        subtitle = tankobunString(R.string.settings_profile_subtitle),
+        title = "AniList",
+        subtitle = tankobunString(R.string.settings_anilist_subtitle),
         modifier = modifier,
     ) {
-        if (state.loggedIn) {
-            val stats = remember(state.anilistMangaStats, state.libraryItems) {
-                state.anilistMangaStats ?: state.localMangaStats()
-            }
-            ProfileHeaderCard(state = state)
-            ProfileStatsSections(stats = stats)
-        } else {
+        if (!state.loggedIn) {
             LibraryConnectPrompt(
                 clientConfigured = state.clientConfigured,
                 onConnect = {
@@ -785,7 +765,7 @@ private fun ProfileStatsSections(
 }
 
 @Composable
-private fun SettingsGroupDivider(label: String) {
+internal fun SettingsGroupDivider(label: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -808,7 +788,7 @@ private fun SettingsGroupDivider(label: String) {
 }
 
 @Composable
-private fun ProfileHeaderCard(state: TankobunUiState) {
+internal fun ProfileHeaderCard(state: TankobunUiState) {
     val context = LocalContext.current
     val bannerUrl = state.viewerBannerImageUrl?.takeIf { it.isNotBlank() }
     val avatarUrl = state.viewerAvatarUrl?.takeIf { it.isNotBlank() }
@@ -914,22 +894,22 @@ private fun ProfileHeaderCard(state: TankobunUiState) {
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        profileName,
-                        style = MaterialTheme.typography.titleLarge.copy(shadow = headerTextShadow),
-                        color = headerTextColor,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
                         if (state.loggedIn) {
-                            tankobunString(R.string.settings_signed_in_as, profileName)
+                            tankobunString(R.string.profile_signed_in_label)
                         } else {
                             tankobunString(R.string.settings_profile_signed_out)
                         },
                         style = MaterialTheme.typography.bodySmall.copy(shadow = headerTextShadow),
                         color = headerSecondaryColor,
                         maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        profileName,
+                        style = MaterialTheme.typography.titleLarge.copy(shadow = headerTextShadow),
+                        color = headerTextColor,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -1180,7 +1160,7 @@ private fun ProfileBreakdownSection(
     }
 }
 
-private fun TankobunUiState.localMangaStats(): AnilistMangaStats {
+internal fun TankobunUiState.localMangaStats(): AnilistMangaStats {
     val scores = libraryItems.mapNotNull { it.entry.score }.filter { it > 0.0 }
     return AnilistMangaStats(
         count = libraryItems.size,
