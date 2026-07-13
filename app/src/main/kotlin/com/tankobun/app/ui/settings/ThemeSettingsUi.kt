@@ -235,9 +235,14 @@ internal fun ThemePicker(
             }
         } else {
             Text(tankobunString(R.string.settings_theme_art_direction), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            FlowRow(
+                maxItemsInEachRow = 2,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 directions.forEach { choice ->
                     ArtDirectionCard(
+                        modifier = Modifier.weight(1f),
                         choice = choice,
                         selected = choice.id == normalized.direction,
                         onClick = {
@@ -247,9 +252,14 @@ internal fun ThemePicker(
                 }
             }
             Text(tankobunString(R.string.settings_theme_palette), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            FlowRow(
+                maxItemsInEachRow = 2,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 palettes.forEach { choice ->
                     PaletteChoiceCard(
+                        modifier = Modifier.weight(1f),
                         choice = choice,
                         selected = choice.id == normalized.palette,
                         onClick = { onSelect(normalized.copy(automatic = false, palette = choice.id)) },
@@ -267,18 +277,19 @@ internal fun ThemePicker(
 
 @Composable
 private fun ArtDirectionCard(
+    modifier: Modifier = Modifier,
     choice: TankobunArtDirectionChoice,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val previewShape = tankobunThemeShapeSet(choice.id).panel
+    val previewShape = tankobunThemeShapeSet(choice.id).control
     val secondaryTextColor = if (selected) {
         LocalTankobunStyle.current.colors.selectedChipContent.copy(alpha = 0.78f)
     } else {
         LocalTankobunStyle.current.colors.mutedContent
     }
     Surface(
-        modifier = Modifier.widthIn(min = 164.dp, max = 248.dp).height(74.dp).clickable(onClick = onClick),
+        modifier = modifier.height(74.dp).clickable(onClick = onClick),
         shape = previewShape,
         color = if (selected) LocalTankobunStyle.current.colors.selectedChip else LocalTankobunStyle.current.colors.panel,
         contentColor = if (selected) LocalTankobunStyle.current.colors.selectedChipContent else LocalTankobunStyle.current.colors.panelContent,
@@ -303,6 +314,7 @@ private fun ArtDirectionCard(
 
 @Composable
 private fun PaletteChoiceCard(
+    modifier: Modifier = Modifier,
     choice: TankobunPaletteChoice,
     selected: Boolean,
     onClick: () -> Unit,
@@ -313,7 +325,7 @@ private fun PaletteChoiceCard(
         LocalTankobunStyle.current.colors.mutedContent
     }
     Surface(
-        modifier = Modifier.widthIn(min = 164.dp).height(58.dp).clickable(onClick = onClick),
+        modifier = modifier.height(58.dp).clickable(onClick = onClick),
         shape = LocalTankobunStyle.current.themeShapes.control,
         color = if (selected) LocalTankobunStyle.current.colors.selectedChip else LocalTankobunStyle.current.colors.panel,
         contentColor = if (selected) LocalTankobunStyle.current.colors.selectedChipContent else LocalTankobunStyle.current.colors.panelContent,

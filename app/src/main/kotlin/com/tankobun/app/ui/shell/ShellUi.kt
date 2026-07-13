@@ -936,7 +936,7 @@ internal fun TankobunScaffold(
                         modifier = Modifier
                             .width(if (showQuickActionsButton) FrostedDockWithQuickActionsWidth else FrostedDockWidth)
                             .height(FrostedDockHeight),
-                        shape = LocalTankobunStyle.current.themeShapes.dock,
+                        shape = FrostedDockShape,
                         hazeState = chromeHazeState,
                         contentColor = routeContentColor,
                         baseColor = LocalTankobunTokens.current.dockSurface,
@@ -1385,7 +1385,6 @@ internal fun TankobunBottomNavigationBar(
         Triple(tankobunString(R.string.nav_settings), TankobunIcons.Settings, 4),
     )
     val selectedIndex = selectedTab.coerceIn(0, items.lastIndex)
-    val indicatorShape = LocalTankobunStyle.current.themeShapes.indicator
     val itemSize = 44.dp
     val itemSpacing = 8.dp
     val indicatorSize = 40.dp
@@ -1402,7 +1401,7 @@ internal fun TankobunBottomNavigationBar(
             itemSize = itemSize,
             itemSpacing = itemSpacing,
             indicatorSize = indicatorSize,
-            shape = indicatorShape,
+            shape = CircleShape,
             color = styleColors.accent.copy(alpha = 0.88f),
             modifier = Modifier.fillMaxSize(),
         )

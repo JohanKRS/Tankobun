@@ -332,7 +332,7 @@ internal fun SettingsRouteRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SettingsRouteIcon(route = route)
+        SettingsRouteIcon(route = route, selected = selected)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 route.settingsTitle(),
@@ -352,12 +352,12 @@ internal fun SettingsRouteRow(
 }
 
 @Composable
-internal fun SettingsRouteIcon(route: SettingsRoute) {
-    val routeColor = LocalTankobunStyle.current.colors.accent
+internal fun SettingsRouteIcon(route: SettingsRoute, selected: Boolean = false) {
+    val routeColor = if (selected) Color.White else LocalTankobunStyle.current.colors.accent
     Surface(
         modifier = Modifier.size(36.dp),
         shape = LocalTankobunStyle.current.themeShapes.indicator,
-        color = routeColor.copy(alpha = 0.14f),
+        color = routeColor.copy(alpha = if (selected) 0.16f else 0.14f),
         contentColor = routeColor,
     ) {
         Box(contentAlignment = Alignment.Center) {

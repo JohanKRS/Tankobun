@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 enum class TankobunArtDirection {
+    ORIGINAL,
     STORYBOOK,
     MOCHI_POP,
     PANEL_RIOT,
@@ -56,7 +57,16 @@ data class TankobunThemePreference(
     val direction: TankobunArtDirection = TankobunArtDirection.MOCHI_POP,
     val palette: TankobunPaletteId = TankobunPaletteId.BUNNY_BERRY,
 ) {
-    fun normalized(): TankobunThemePreference = this
+    fun normalized(): TankobunThemePreference = copy(
+        direction = when (direction) {
+            TankobunArtDirection.MOCHI_POP -> TankobunArtDirection.MOCHI_POP
+            else -> TankobunArtDirection.ORIGINAL
+        },
+        palette = when (palette) {
+            TankobunPaletteId.CITRUS_CLASH -> TankobunPaletteId.YUZU_GARDEN
+            else -> palette
+        },
+    )
 }
 
 @Immutable
@@ -75,27 +85,26 @@ data class TankobunPaletteChoice(
 )
 
 fun tankobunArtDirectionChoices(): List<TankobunArtDirectionChoice> = listOf(
-    TankobunArtDirectionChoice(TankobunArtDirection.STORYBOOK, "Paper", "Warm, rounded, textured"),
-    TankobunArtDirectionChoice(TankobunArtDirection.MOCHI_POP, "Soft", "Clean, rounded, low contrast"),
-    TankobunArtDirectionChoice(TankobunArtDirection.PANEL_RIOT, "Panel", "Angular, outlined, high contrast"),
-    TankobunArtDirectionChoice(TankobunArtDirection.NOIR_ATELIER, "Noir", "Dark, restrained, metallic"),
-    TankobunArtDirectionChoice(TankobunArtDirection.NEON_CURRENT, "Neon", "Glossy, luminous, fluid"),
+    TankobunArtDirectionChoice(TankobunArtDirection.ORIGINAL, "Defined", "Light rounding with defined corners"),
+    TankobunArtDirectionChoice(TankobunArtDirection.MOCHI_POP, "Rounded", "Soft curves across controls and surfaces"),
 )
 
 fun TankobunArtDirection.themeNameRes(): Int = when (this) {
-    TankobunArtDirection.STORYBOOK -> R.string.theme_direction_paper
+    TankobunArtDirection.ORIGINAL,
+    TankobunArtDirection.STORYBOOK,
+    TankobunArtDirection.PANEL_RIOT,
+    TankobunArtDirection.NOIR_ATELIER,
+    TankobunArtDirection.NEON_CURRENT -> R.string.theme_direction_original
     TankobunArtDirection.MOCHI_POP -> R.string.theme_direction_soft
-    TankobunArtDirection.PANEL_RIOT -> R.string.theme_direction_panel
-    TankobunArtDirection.NOIR_ATELIER -> R.string.theme_direction_noir
-    TankobunArtDirection.NEON_CURRENT -> R.string.theme_direction_neon
 }
 
 fun TankobunArtDirection.themeDescriptionRes(): Int = when (this) {
-    TankobunArtDirection.STORYBOOK -> R.string.theme_direction_paper_desc
+    TankobunArtDirection.ORIGINAL,
+    TankobunArtDirection.STORYBOOK,
+    TankobunArtDirection.PANEL_RIOT,
+    TankobunArtDirection.NOIR_ATELIER,
+    TankobunArtDirection.NEON_CURRENT -> R.string.theme_direction_original_desc
     TankobunArtDirection.MOCHI_POP -> R.string.theme_direction_soft_desc
-    TankobunArtDirection.PANEL_RIOT -> R.string.theme_direction_panel_desc
-    TankobunArtDirection.NOIR_ATELIER -> R.string.theme_direction_noir_desc
-    TankobunArtDirection.NEON_CURRENT -> R.string.theme_direction_neon_desc
 }
 
 fun TankobunPaletteId.themeNameRes(): Int = when (this) {
@@ -117,7 +126,9 @@ fun TankobunPaletteId.themeNameRes(): Int = when (this) {
 }
 
 fun tankobunPaletteChoices(): List<TankobunPaletteChoice> =
-    PaletteCatalog.values.map { it.choice() }
+    PaletteCatalog.values
+        .filterNot { it.id == TankobunPaletteId.CITRUS_CLASH }
+        .map { it.choice() }
 
 fun tankobunPaletteChoice(id: TankobunPaletteId): TankobunPaletteChoice =
     PaletteCatalog.value(id).choice()
@@ -132,19 +143,19 @@ fun legacyThemePreference(mode: TankobunThemeMode): TankobunThemePreference = wh
     TankobunThemeMode.SYSTEM -> TankobunThemePreference()
     TankobunThemeMode.LIGHT,
     TankobunThemeMode.BUNNY_MOCHI -> TankobunThemePreference(false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.BUNNY_BERRY)
-    TankobunThemeMode.PEACH_SODA -> TankobunThemePreference(false, TankobunArtDirection.STORYBOOK, TankobunPaletteId.PEACH_COUNTRYSIDE)
-    TankobunThemeMode.MATCHA_MILK -> TankobunThemePreference(false, TankobunArtDirection.STORYBOOK, TankobunPaletteId.MATCHA_MEADOW)
+    TankobunThemeMode.PEACH_SODA -> TankobunThemePreference(false, TankobunArtDirection.ORIGINAL, TankobunPaletteId.PEACH_COUNTRYSIDE)
+    TankobunThemeMode.MATCHA_MILK -> TankobunThemePreference(false, TankobunArtDirection.ORIGINAL, TankobunPaletteId.MATCHA_MEADOW)
     TankobunThemeMode.SAKURA_MINT -> TankobunThemePreference(false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.SAKURA_MINT)
     TankobunThemeMode.CLOUDBERRY_POP -> TankobunThemePreference(false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.CLOUDBERRY)
-    TankobunThemeMode.YUZU_GARDEN -> TankobunThemePreference(false, TankobunArtDirection.STORYBOOK, TankobunPaletteId.YUZU_GARDEN)
-    TankobunThemeMode.INKBERRY_FIZZ -> TankobunThemePreference(false, TankobunArtDirection.PANEL_RIOT, TankobunPaletteId.ELECTRIC_BERRY)
-    TankobunThemeMode.CHARCOAL_GOLD -> TankobunThemePreference(false, TankobunArtDirection.NOIR_ATELIER, TankobunPaletteId.CHARCOAL_GOLD)
-    TankobunThemeMode.PLUM_NIGHT -> TankobunThemePreference(false, TankobunArtDirection.NOIR_ATELIER, TankobunPaletteId.VELVET_PLUM)
-    TankobunThemeMode.STARRY_INK -> TankobunThemePreference(false, TankobunArtDirection.NOIR_ATELIER, TankobunPaletteId.STARRY_INK)
+    TankobunThemeMode.YUZU_GARDEN -> TankobunThemePreference(false, TankobunArtDirection.ORIGINAL, TankobunPaletteId.YUZU_GARDEN)
+    TankobunThemeMode.INKBERRY_FIZZ -> TankobunThemePreference(false, TankobunArtDirection.ORIGINAL, TankobunPaletteId.ELECTRIC_BERRY)
+    TankobunThemeMode.CHARCOAL_GOLD -> TankobunThemePreference(false, TankobunArtDirection.ORIGINAL, TankobunPaletteId.CHARCOAL_GOLD)
+    TankobunThemeMode.PLUM_NIGHT -> TankobunThemePreference(false, TankobunArtDirection.ORIGINAL, TankobunPaletteId.VELVET_PLUM)
+    TankobunThemeMode.STARRY_INK -> TankobunThemePreference(false, TankobunArtDirection.ORIGINAL, TankobunPaletteId.STARRY_INK)
     TankobunThemeMode.DARK,
     TankobunThemeMode.MIDNIGHT_RAMEN,
-    TankobunThemeMode.NEON_KOI -> TankobunThemePreference(false, TankobunArtDirection.NEON_CURRENT, TankobunPaletteId.NEON_KOI)
-    TankobunThemeMode.MOON_JELLY -> TankobunThemePreference(false, TankobunArtDirection.NEON_CURRENT, TankobunPaletteId.MOON_JELLY)
+    TankobunThemeMode.NEON_KOI -> TankobunThemePreference(false, TankobunArtDirection.ORIGINAL, TankobunPaletteId.NEON_KOI)
+    TankobunThemeMode.MOON_JELLY -> TankobunThemePreference(false, TankobunArtDirection.ORIGINAL, TankobunPaletteId.MOON_JELLY)
 }
 
 fun TankobunThemePreference.toLegacyThemeMode(): TankobunThemeMode {
@@ -278,6 +289,11 @@ private data class DirectionSpec(
 
 private fun directionSpec(direction: TankobunArtDirection): DirectionSpec {
     val shapes = when (direction) {
+        TankobunArtDirection.ORIGINAL -> ThemeShapeSet(
+            panel = RoundedCornerShape(8.dp), control = RoundedCornerShape(7.dp),
+            chip = RoundedCornerShape(7.dp), dialog = RoundedCornerShape(8.dp),
+            dock = RoundedCornerShape(999.dp), cover = RoundedCornerShape(8.dp), indicator = RoundedCornerShape(7.dp),
+        )
         TankobunArtDirection.STORYBOOK -> ThemeShapeSet(
             panel = RoundedCornerShape(18.dp, 10.dp, 18.dp, 8.dp),
             control = RoundedCornerShape(14.dp, 8.dp, 14.dp, 8.dp),
@@ -312,6 +328,7 @@ private fun directionSpec(direction: TankobunArtDirection): DirectionSpec {
         else -> ThemeStrokeSet(1.dp, 1.5.dp, false)
     }
     val motion = when (direction) {
+        TankobunArtDirection.ORIGINAL -> ThemeMotionSet(0.96f, 190, true)
         TankobunArtDirection.STORYBOOK -> ThemeMotionSet(0.985f, 240, true)
         TankobunArtDirection.MOCHI_POP -> ThemeMotionSet(0.96f, 190, true)
         TankobunArtDirection.PANEL_RIOT -> ThemeMotionSet(0.975f, 110, false)
@@ -319,6 +336,7 @@ private fun directionSpec(direction: TankobunArtDirection): DirectionSpec {
         TankobunArtDirection.NEON_CURRENT -> ThemeMotionSet(0.965f, 220, true)
     }
     val radii = when (direction) {
+        TankobunArtDirection.ORIGINAL -> TankobunRadii(7.dp, 8.dp, 8.dp)
         TankobunArtDirection.STORYBOOK -> TankobunRadii(12.dp, 16.dp, 10.dp)
         TankobunArtDirection.MOCHI_POP -> TankobunRadii(20.dp, 18.dp, 14.dp)
         TankobunArtDirection.PANEL_RIOT -> TankobunRadii(4.dp, 4.dp, 4.dp)
@@ -410,9 +428,9 @@ private data class PaletteDefinition(
 
 private object PaletteCatalog {
     val values = listOf(
-        light(TankobunPaletteId.MATCHA_MEADOW, "Matcha", 0xFF2F7D4B, 0xFFC07A1A, 0xFF6B8F1A, 0xFFF0F8E8, 0xFF172016, 0xFFFBFFF7, 0xFFD3E8CB, 0xFF3F4D3B, 0xFFC9EBCF, 0xFF102514, 0xFFFFE4B4, 0xFF2B2105),
+        light(TankobunPaletteId.MATCHA_MEADOW, "Matcha", 0xFF3F7652, 0xFFA5653A, 0xFF778B3B, 0xFFF2F5E9, 0xFF172018, 0xFFFBFCF5, 0xFFDCE5D2, 0xFF3F4C3D, 0xFFD2E8D5, 0xFF102517, 0xFFFFDBC6, 0xFF3B190A),
         light(TankobunPaletteId.PEACH_COUNTRYSIDE, "Peach", 0xFFC84A2D, 0xFF008C86, 0xFFFFA82A, 0xFFFFF0E5, 0xFF2B1710, 0xFFFFFAF6, 0xFFFFD9C7, 0xFF644239, 0xFFFFD2C0, 0xFF4A1005, 0xFFC7F3EF, 0xFF002F2C),
-        light(TankobunPaletteId.YUZU_GARDEN, "Yuzu", 0xFF007E71, 0xFFD19500, 0xFF5C8A1F, 0xFFFFFBE0, 0xFF171E12, 0xFFFFFFF7, 0xFFF0E9B8, 0xFF465038, 0xFFC2F0E9, 0xFF003B34, 0xFFFFE68A, 0xFF332500),
+        light(TankobunPaletteId.YUZU_GARDEN, "Yuzu", 0xFF007E71, 0xFFD19500, 0xFF5C8A1F, 0xFFFFF9D3, 0xFF191D10, 0xFFFFFFEF, 0xFFF2E49A, 0xFF4D4B2F, 0xFFC2F0E9, 0xFF003B34, 0xFFFFE477, 0xFF332500),
         light(TankobunPaletteId.BUNNY_BERRY, "Berry", 0xFFB82235, 0xFFEF7048, 0xFFE1A900, 0xFFFFF7F8, 0xFF241316, 0xFFFFFFFF, 0xFFFFE0DE, 0xFF5D403B, 0xFFFFDDE3, 0xFF3F0010, 0xFFFFE0C7, 0xFF3B1500),
         light(TankobunPaletteId.SAKURA_MINT, "Sakura", 0xFFB43D76, 0xFF008B77, 0xFF5A67C8, 0xFFFFEFF6, 0xFF26151C, 0xFFFFFAFC, 0xFFFFD6E6, 0xFF5A3D48, 0xFFFFD1E3, 0xFF43111F, 0xFFBDEFE4, 0xFF003B34),
         light(TankobunPaletteId.CLOUDBERRY, "Cobalt", 0xFF2F63C3, 0xFFD92265, 0xFF008F8C, 0xFFF5F8FF, 0xFF111B2B, 0xFFFFFFFF, 0xFFDCE8FF, 0xFF3D4961, 0xFFD5E3FF, 0xFF0A1E46, 0xFFFFD5E4, 0xFF4B0D21),
@@ -463,8 +481,8 @@ private data class ResolvedTheme(
 
 fun TankobunThemePreference.resolve(systemDark: Boolean): TankobunThemePreference = when {
     !automatic -> normalized()
-    systemDark -> TankobunThemePreference(false, TankobunArtDirection.NEON_CURRENT, TankobunPaletteId.NEON_KOI)
-    else -> TankobunThemePreference(false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.BUNNY_BERRY)
+    systemDark -> TankobunThemePreference(false, TankobunArtDirection.ORIGINAL, TankobunPaletteId.VELVET_PLUM)
+    else -> TankobunThemePreference(false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.PEACH_COUNTRYSIDE)
 }
 
 fun TankobunThemePreference.isDark(systemDark: Boolean): Boolean =

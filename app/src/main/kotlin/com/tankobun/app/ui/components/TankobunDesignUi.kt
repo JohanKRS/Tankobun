@@ -73,7 +73,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.LocalTankobunTokens
-import com.tankobun.app.TankobunArtDirection
 import com.tankobun.app.R
 import com.tankobun.app.TankobunDisplayFontFamily
 import com.tankobun.app.tankobunString
@@ -127,11 +126,7 @@ internal fun TankobunPanel(
         contentColor = contentColor,
         tonalElevation = tonalElevation,
         shadowElevation = if (style.strokes.hardShadow && shadowElevation == 0.dp) 4.dp else shadowElevation,
-        border = if (style.direction == TankobunArtDirection.PANEL_RIOT || style.direction == TankobunArtDirection.NOIR_ATELIER) {
-            BorderStroke(style.strokes.defaultWidth, style.colors.outline.copy(alpha = 0.48f))
-        } else {
-            null
-        },
+        border = null,
         content = content,
     )
 }

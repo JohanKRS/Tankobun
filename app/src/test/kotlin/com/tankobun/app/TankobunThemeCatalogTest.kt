@@ -10,9 +10,9 @@ import kotlin.math.pow
 
 class TankobunThemeCatalogTest {
     @Test
-    fun catalogHasFiveDirectionsAndFifteenIndependentPalettes() {
-        assertEquals(5, tankobunArtDirectionChoices().size)
-        assertEquals(15, tankobunPaletteChoices().size)
+    fun catalogHasTwoShapesAndFourteenIndependentPalettes() {
+        assertEquals(2, tankobunArtDirectionChoices().size)
+        assertEquals(14, tankobunPaletteChoices().size)
         assertEquals(15, TankobunPaletteId.entries.size)
     }
 
@@ -20,26 +20,39 @@ class TankobunThemeCatalogTest {
     fun everyLegacyModeMigratesToAValidPreference() {
         TankobunThemeMode.entries.forEach { legacy ->
             val preference = legacyThemePreference(legacy).normalized()
-            assertTrue(preference.direction in TankobunArtDirection.entries)
-            assertTrue(preference.palette in TankobunPaletteId.entries)
+            assertTrue(preference.direction in tankobunArtDirectionChoices().map { it.id })
+            assertTrue(preference.palette in tankobunPaletteChoices().map { it.id })
         }
     }
 
     @Test
-    fun everyDirectionCanUseEveryPaletteWithoutNormalizationChangingIt() {
-        TankobunArtDirection.entries.forEach { direction ->
-            TankobunPaletteId.entries.forEach { palette ->
-                val preference = TankobunThemePreference(false, direction, palette)
+    fun everyVisibleShapeCanUseEveryVisiblePaletteWithoutNormalizationChangingIt() {
+        tankobunArtDirectionChoices().forEach { direction ->
+            tankobunPaletteChoices().forEach { palette ->
+                val preference = TankobunThemePreference(false, direction.id, palette.id)
                 assertEquals(preference, preference.normalized())
             }
         }
     }
 
     @Test
+    fun retiredOptionsNormalizeWithoutLosingTheColorChoice() {
+        val retiredShape = TankobunThemePreference(false, TankobunArtDirection.NEON_CURRENT, TankobunPaletteId.VELVET_PLUM)
+        assertEquals(TankobunArtDirection.ORIGINAL, retiredShape.normalized().direction)
+        assertEquals(TankobunPaletteId.VELVET_PLUM, retiredShape.normalized().palette)
+
+        val retiredPalette = TankobunThemePreference(false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.CITRUS_CLASH)
+        assertEquals(TankobunArtDirection.MOCHI_POP, retiredPalette.normalized().direction)
+        assertEquals(TankobunPaletteId.YUZU_GARDEN, retiredPalette.normalized().palette)
+    }
+
+    @Test
     fun automaticModeResolvesToTheDocumentedDefaults() {
         val automatic = TankobunThemePreference()
-        assertEquals(TankobunPaletteId.BUNNY_BERRY, automatic.resolve(systemDark = false).palette)
-        assertEquals(TankobunPaletteId.NEON_KOI, automatic.resolve(systemDark = true).palette)
+        assertEquals(TankobunPaletteId.PEACH_COUNTRYSIDE, automatic.resolve(systemDark = false).palette)
+        assertEquals(TankobunPaletteId.VELVET_PLUM, automatic.resolve(systemDark = true).palette)
+        assertEquals(TankobunArtDirection.MOCHI_POP, automatic.resolve(systemDark = false).direction)
+        assertEquals(TankobunArtDirection.ORIGINAL, automatic.resolve(systemDark = true).direction)
     }
 
     @Test
