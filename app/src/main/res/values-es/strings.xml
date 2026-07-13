@@ -681,6 +681,11 @@
     <string name="about_changelog_v322_source_bindings">Las fuentes seleccionadas permanecen vinculadas al manga con más fiabilidad mientras se actualizan extensiones y filtros.</string>
     <string name="about_changelog_v331_filter_chips">Los chips de filtro en Browse y Biblioteca ahora se desplazan horizontalmente con el mismo comportamiento de borde a borde que las listas de manga.</string>
     <string name="about_changelog_v331_detail_dates">Los años de publicación en detalles del manga son más compactos en móvil, evitando cortes en fechas de obras en emisión e intervalos.</string>
+    <string name="about_changelog_v4_home">Inicio se reconstruyó con un hero editorial adaptable, estante Continuar leyendo y destacados por género para móvil y tablet.</string>
+    <string name="about_changelog_v4_home_feed">Los feeds de Inicio ahora almacenan y enriquecen los datos de AniList con más inteligencia, manteniendo coherentes portadas, personajes, géneros y progreso de lectura.</string>
+    <string name="about_changelog_v4_profile">Perfil rediseñado con actividad de lectura, estadísticas más completas, información por género, logros e imágenes personalizadas.</string>
+    <string name="about_changelog_v4_themes">Se añadieron 14 paletas de colores independientes de las formas Definido o Redondeado, con Haze teñido y valores automáticos Melocotón o Ciruela.</string>
+    <string name="about_changelog_v4_polish">Se refinaron Ajustes, navegación, descargas, copias de seguridad, persistencia de fuentes y diseños adaptables en toda la app.</string>
     <string name="about_unofficial">Tankobun es un lector de manga no oficial y no está afiliado con AniList.</string>
     <string name="about_anilist_thanks">Gracias a AniList por poner su API a disposición de usuarios y apps de la comunidad.</string>
     <string name="about_anilist_data">AniList es una base de datos y un sitio social de seguimiento de anime y manga. No aloja, sube, comparte, vende ni proporciona manga, capítulos o scanlations. Tankobun accede a metadatos de AniList mediante la API de AniList; la sincronización de cuenta usa autorización del usuario.</string>

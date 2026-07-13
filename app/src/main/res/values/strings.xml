@@ -689,6 +689,11 @@
     <string name="about_changelog_v322_source_bindings">Source selections stay bound to manga more reliably while extensions and filters refresh.</string>
     <string name="about_changelog_v331_filter_chips">Browse and Library filter chips now scroll horizontally with the same edge-to-edge rail behavior as manga shelves.</string>
     <string name="about_changelog_v331_detail_dates">Manga detail publication years are more compact on mobile, preventing ongoing and ranged dates from being clipped.</string>
+    <string name="about_changelog_v4_home">Rebuilt Home around an adaptive editorial hero, Continue Reading shelf, and genre highlights for phone and tablet.</string>
+    <string name="about_changelog_v4_home_feed">Home feeds now cache and enrich AniList data more intelligently, keeping covers, character art, genres, and reading progress coherent.</string>
+    <string name="about_changelog_v4_profile">Redesigned Profile with reading activity, richer statistics, genre insights, achievements, and custom profile imagery.</string>
+    <string name="about_changelog_v4_themes">Added 14 color palettes independent from Defined or Rounded component shapes, with tinted Haze chrome and automatic Peach or Plum defaults.</string>
+    <string name="about_changelog_v4_polish">Refined Settings, navigation, downloads, backups, source persistence, and responsive layouts across the app.</string>
     <string name="about_unofficial">Tankobun is an unofficial manga reader and is not affiliated with AniList.</string>
     <string name="about_anilist_thanks">Thanks to AniList for making its API available to users and community apps.</string>
     <string name="about_anilist_data">AniList is an anime and manga database, tracking, and social site. It does not host, upload, share, sell, or provide manga, chapters, or scanlations. Tankobun accesses AniList metadata through the AniList API; account sync uses user authorization.</string>

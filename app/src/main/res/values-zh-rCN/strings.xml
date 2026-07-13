@@ -688,6 +688,11 @@
     <string name="about_changelog_v322_source_bindings">刷新扩展和筛选时，漫画的来源选择会更可靠地保持绑定。</string>
     <string name="about_changelog_v331_filter_chips">Browse 和书库筛选标签现在可横向滚动，并与漫画书架一样延伸到屏幕边缘。</string>
     <string name="about_changelog_v331_detail_dates">漫画详情页的出版年份在手机上更紧凑，避免连载中和年份范围日期被截断。</string>
+    <string name="about_changelog_v4_home">重构首页，为手机和平板带来自适应编辑式主视觉、继续阅读书架和分类精选。</string>
+    <string name="about_changelog_v4_home_feed">首页信息流现在会更智能地缓存并补充 AniList 数据，让封面、角色图、分类和阅读进度保持一致。</string>
+    <string name="about_changelog_v4_profile">重新设计个人资料页，加入阅读活动、更丰富的统计、分类洞察、成就和自定义资料图片。</string>
+    <string name="about_changelog_v4_themes">新增 14 套独立配色，可搭配利落或圆润组件形状，并为 Haze 顶栏和底栏着色，自动模式默认使用桃色或梅紫。</string>
+    <string name="about_changelog_v4_polish">全面优化设置、导航、下载、备份、来源绑定和响应式布局。</string>
     <string name="about_unofficial">Tankobun 是非官方漫画阅读器，与 AniList 没有关联。</string>
     <string name="about_anilist_thanks">感谢 AniList 向用户和社区应用开放 API。</string>
     <string name="about_anilist_data">AniList 是动画和漫画数据库、追踪与社交网站。它不托管、上传、分享、销售或提供漫画、章节或扫图。Tankobun 通过 AniList API 访问 AniList 元数据；账号同步使用用户授权。</string>

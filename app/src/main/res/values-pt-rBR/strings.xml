@@ -681,6 +681,11 @@
     <string name="about_changelog_v322_source_bindings">Seleções de source permanecem vinculadas aos mangás com mais confiabilidade durante refresh de extensões e filtros.</string>
     <string name="about_changelog_v331_filter_chips">Chips de filtro no Browse e na Biblioteca agora rolam horizontalmente com o mesmo comportamento de trilho até a borda das listas de mangá.</string>
     <string name="about_changelog_v331_detail_dates">Anos de publicação nos detalhes do mangá ficam mais compactos no mobile, evitando cortes em datas de obras em lançamento e intervalos.</string>
+    <string name="about_changelog_v4_home">Home reconstruída com hero editorial adaptativo, prateleira Continuar lendo e destaques por gênero para celular e tablet.</string>
+    <string name="about_changelog_v4_home_feed">Os feeds da Home agora armazenam e enriquecem dados do AniList com mais inteligência, mantendo capas, personagens, gêneros e progresso de leitura coerentes.</string>
+    <string name="about_changelog_v4_profile">Perfil redesenhado com atividade de leitura, estatísticas mais ricas, destaques por gênero, conquistas e imagens personalizadas.</string>
+    <string name="about_changelog_v4_themes">Adicionadas 14 paletas de cores independentes dos formatos Definido ou Arredondado, com Haze tingido e padrões automáticos Pêssego ou Ameixa.</string>
+    <string name="about_changelog_v4_polish">Refinados Configurações, navegação, downloads, backups, persistência de fontes e layouts responsivos em todo o app.</string>
     <string name="about_unofficial">Tankobun é um leitor de mangás não oficial e não é afiliado ao AniList.</string>
     <string name="about_anilist_thanks">Agradecemos ao AniList por disponibilizar sua API para usuários e apps da comunidade.</string>
     <string name="about_anilist_data">O AniList é uma base de dados, acompanhamento e site social de animes e mangás. Ele não hospeda, envia, compartilha, vende nem fornece mangás, capítulos ou scanlations. O Tankobun acessa metadados do AniList pela API do AniList; a sincronização da conta usa autorização do usuário.</string>

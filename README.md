@@ -20,7 +20,7 @@
 
 ## What Tankobun Is
 
-Tankobun is an Android reader and tracking client built around an AniList-compatible workflow.
+Tankobun is an Android reader and tracking client built around an AniList-compatible workflow, with an adaptive Home dashboard, responsive phone/tablet layouts, and a customizable visual system.
 
 It is designed as a personal reading shelf: use a local library or sign in with AniList, browse manga metadata, open a manga entry, choose a user-installed source when available, read in paged or webtoon mode, and keep your progress organized.
 
@@ -32,6 +32,9 @@ Tankobun is not a content service, content host, extension repository, or manga 
 
 - Local manga library mode with AniList-matched entries.
 - AniList login and user-authorized library sync.
+- Adaptive Home with AniList metadata highlights, Continue Reading, and genre discovery.
+- Profile dashboard with reading activity, library statistics, genre insights, and achievements.
+- Fourteen color palettes with independent Defined or Rounded component shapes.
 - Manga list browsing, status management, scoring, custom lists, and progress updates.
 - Reader interface with paged and webtoon modes.
 - Local reading state, caching, and optional offline storage for user-selected sources where permitted by the source and applicable law.

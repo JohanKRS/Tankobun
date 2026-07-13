@@ -1894,9 +1894,9 @@ class MainViewModel(
             }
 
             val trendingFresh = !force && browseDataSource.browseCacheFresh(trendingKey, cachePolicy.browseLandingTtlMillis)
-            val popularFresh = !force && browseDataSource.browseCacheFresh(popularKey, cachePolicy.anilistSearchTtlMillis)
-            val manhwaFresh = !force && browseDataSource.browseCacheFresh(manhwaKey, cachePolicy.anilistSearchTtlMillis)
-            val topMangaFresh = !force && browseDataSource.browseCacheFresh(topMangaKey, cachePolicy.anilistSearchTtlMillis)
+            val popularFresh = !force && browseDataSource.browseCacheFresh(popularKey, cachePolicy.browseLandingTtlMillis)
+            val manhwaFresh = !force && browseDataSource.browseCacheFresh(manhwaKey, cachePolicy.browseLandingTtlMillis)
+            val topMangaFresh = !force && browseDataSource.browseCacheFresh(topMangaKey, cachePolicy.browseLandingTtlMillis)
             if (trendingFresh && popularFresh && manhwaFresh && topMangaFresh) {
                 _state.update { it.copy(browseLandingLoaded = true, busy = false) }
                 return@launch
