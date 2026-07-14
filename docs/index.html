@@ -500,7 +500,8 @@
 
       .mode-panel.sync {
         background:
-          linear-gradient(135deg, rgba(128, 170, 219, 0.15), transparent 42%),
+          radial-gradient(circle at 82% 74%, rgba(104, 224, 199, 0.16), transparent 34%),
+          linear-gradient(135deg, rgba(120, 77, 164, 0.2), transparent 48%),
           var(--panel);
       }
 
@@ -591,32 +592,49 @@
         transform: scale(1.018);
       }
 
-      .phone-strip {
+      .dark-strip {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 260px));
+        grid-template-columns: repeat(2, minmax(0, 440px));
         justify-content: center;
         gap: 22px;
         align-items: start;
       }
 
-      .tablet-strip {
+      .light-strip {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
         gap: 22px;
         align-items: start;
       }
 
-      .theme-strip {
+      .profile-strip {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 260px));
+        grid-template-columns: repeat(2, minmax(0, 150px));
         justify-content: center;
-        gap: 22px;
+        gap: 18px;
+        align-items: start;
+        margin-top: 4px;
+        padding-top: 28px;
+        border-top: 1px solid var(--line);
+        opacity: 0.78;
+      }
+
+      .internal-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 290px));
+        justify-content: center;
+        gap: 18px;
         align-items: start;
       }
 
-      .phone-strip .screen-shot img,
-      .tablet-strip .screen-shot img,
-      .theme-strip .screen-shot img {
+      .profile-strip .screen-frame {
+        box-shadow: 0 18px 52px rgba(0, 0, 0, 0.28);
+      }
+
+      .dark-strip .screen-shot img,
+      .light-strip .screen-shot img,
+      .internal-strip .screen-shot img,
+      .profile-strip .screen-shot img {
         height: auto;
         object-fit: contain;
       }
@@ -785,17 +803,6 @@
           border-bottom: 1px solid var(--line);
         }
 
-        .phone-strip {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .theme-strip {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .tablet-strip {
-          grid-template-columns: 1fr;
-        }
       }
 
       @media (max-width: 620px) {
@@ -905,18 +912,15 @@
           gap: 20px;
         }
 
-        .phone-strip {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+        .dark-strip,
+        .light-strip,
+        .internal-strip {
           gap: 10px;
         }
 
-        .theme-strip {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+        .profile-strip {
           gap: 10px;
-        }
-
-        .tablet-strip {
-          gap: 14px;
+          padding-top: 20px;
         }
 
         .screen-shot figcaption {
@@ -958,7 +962,7 @@
           <img src="mockups/v4/phone-home-flat.webp" alt="">
         </span>
         <span class="device phone-side">
-          <img src="mockups/v4/phone-profile-flat.webp" alt="">
+          <img src="mockups/v4/phone-plum-home-flat.webp" alt="">
         </span>
       </div>
 
@@ -966,9 +970,8 @@
         <div class="hero-content">
           <h1>Tankobun</h1>
           <p class="lead">
-            Tankobun 4 rebuilds Home around an adaptive editorial hero,
-            Continue Reading, and genre discovery, then carries its new visual
-            system across tracking, reading, profiles, backups, and settings.
+            A personal Android manga shelf for building a library, finding what
+            to read next, and keeping progress organized locally or with AniList.
           </p>
           <div class="hero-actions">
             <a class="button primary" href="https://github.com/JohanKRS/Tankobun/releases/download/v4.0.1/tankobun-4.0.1.apk">
@@ -983,7 +986,7 @@
           </div>
           <div class="release-line" aria-label="Release metadata">
             <span>Version 4.0.1</span>
-            <span>Home &amp; Themes Update</span>
+            <span>Personal manga shelf</span>
             <span>Android APK</span>
             <span class="hash">SHA-256 036CFB81924A3114EB817FBA163B2451723EBACFC08DDCD57054B60CFFA4247D</span>
           </div>
@@ -1014,11 +1017,11 @@
       <section id="library">
         <div class="wrap">
           <div class="section-head">
-            <h2>Home and profile, rebuilt.</h2>
+            <h2>Your shelf, your way.</h2>
             <p>
-              The new adaptive Home puts discovery and unfinished reading up
-              front, while Profile turns local reading history into a clear,
-              responsive overview.
+              Start with a local library or connect AniList, move naturally from
+              discovery to reading, and tune the interface to suit your screen
+              and preferred palette.
             </p>
           </div>
 
@@ -1027,8 +1030,8 @@
               <div class="copy">
                 <h3>Adaptive Home</h3>
                 <p>
-                  An editorial hero, genre rows, and Continue Reading scale from
-                  a focused phone layout to a spacious tablet dashboard.
+                  Continue Reading, highlights, and genre discovery stay useful
+                  from a focused phone layout to a spacious tablet dashboard.
                 </p>
               </div>
               <img src="mockups/v4/tablet-home-flat.webp" alt="Tankobun adaptive Home on a tablet with original fictional manga titles and artwork">
@@ -1036,13 +1039,13 @@
 
             <article class="mode-panel sync">
               <div class="copy">
-                <h3>Reading profile</h3>
+                <h3>Make it yours</h3>
                 <p>
-                  Library totals, recent momentum, and achievements make reading
-                  activity useful at a glance without turning it into a contest.
+                  Choose from light and dark palettes, then pair them with the
+                  interface shape that feels right without changing how the app works.
                 </p>
               </div>
-              <img src="mockups/v4/phone-profile-flat.webp" alt="Tankobun reading profile on a phone with a fictional local profile">
+              <img src="mockups/v4/tablet-koi-home-flat.webp" alt="Tankobun Home in the dark Koi palette on a portrait tablet with original fictional manga titles and artwork">
             </article>
           </div>
         </div>
@@ -1089,107 +1092,20 @@
           <div class="section-head">
             <h2>Screenshots</h2>
             <p>
-              Captured from the current Android build, then populated with
-              entirely fictional titles, characters, covers, profile details,
-              and original artwork created for this project.
+              A look at Home, the library, discovery, manga details, and reading
+              activity across phones, tablets, and different palettes. Every
+              preview title, character, cover, and artwork is original to this project.
             </p>
           </div>
 
           <div class="screen-gallery">
-            <div class="phone-strip">
-              <figure class="screen-shot">
-                <div class="screen-frame">
-                  <img src="mockups/v4/phone-home-studio.webp" alt="Tankobun Home phone mockup with original fictional manga titles and artwork">
-                </div>
-                <figcaption>
-                  <span>Home</span>
-                  <span>Phone mockup</span>
-                </figcaption>
-              </figure>
-              <figure class="screen-shot">
-                <div class="screen-frame">
-                  <img src="mockups/v4/phone-profile-studio.webp" alt="Tankobun reading profile phone mockup with a fictional local profile">
-                </div>
-                <figcaption>
-                  <span>Profile</span>
-                  <span>Phone mockup</span>
-                </figcaption>
-              </figure>
-              <figure class="screen-shot">
-                <div class="screen-frame">
-                  <img src="mockups/v4/phone-home-flat.webp" alt="Tankobun Home phone capture with original fictional manga titles and artwork">
-                </div>
-                <figcaption>
-                  <span>Home</span>
-                  <span>Phone capture</span>
-                </figcaption>
-              </figure>
-              <figure class="screen-shot">
-                <div class="screen-frame">
-                  <img src="mockups/v4/phone-profile-flat.webp" alt="Tankobun reading profile phone capture with a fictional local profile">
-                </div>
-                <figcaption>
-                  <span>Profile</span>
-                  <span>Phone capture</span>
-                </figcaption>
-              </figure>
-            </div>
-
-            <div class="tablet-strip">
-              <figure class="screen-shot">
-                <div class="screen-frame">
-                  <img src="mockups/v4/tablet-home-studio.webp" alt="Tankobun adaptive Home tablet mockup with original fictional manga titles and artwork">
-                </div>
-                <figcaption>
-                  <span>Adaptive Home</span>
-                  <span>Tablet mockup</span>
-                </figcaption>
-              </figure>
-              <figure class="screen-shot">
-                <div class="screen-frame">
-                  <img src="mockups/v4/tablet-profile-studio.webp" alt="Tankobun reading profile tablet mockup with a fictional local profile">
-                </div>
-                <figcaption>
-                  <span>Reading profile</span>
-                  <span>Tablet mockup</span>
-                </figcaption>
-              </figure>
-              <figure class="screen-shot">
-                <div class="screen-frame">
-                  <img src="mockups/v4/tablet-home-flat.webp" alt="Tankobun adaptive Home tablet capture with original fictional manga titles and artwork">
-                </div>
-                <figcaption>
-                  <span>Adaptive Home</span>
-                  <span>Tablet capture</span>
-                </figcaption>
-              </figure>
-              <figure class="screen-shot">
-                <div class="screen-frame">
-                  <img src="mockups/v4/tablet-profile-flat.webp" alt="Tankobun reading profile tablet capture with a fictional local profile">
-                </div>
-                <figcaption>
-                  <span>Reading profile</span>
-                  <span>Tablet capture</span>
-                </figcaption>
-              </figure>
-            </div>
-
-            <div class="theme-strip">
+            <div class="dark-strip">
               <figure class="screen-shot">
                 <div class="screen-frame">
                   <img src="mockups/v4/tablet-koi-home-portrait.webp" alt="Tankobun Koi Home on a portrait tablet with an original fictional manga catalog">
                 </div>
                 <figcaption>
                   <span>Koi Home</span>
-                  <span>Portrait tablet</span>
-                </figcaption>
-              </figure>
-              <figure class="screen-shot">
-                <div class="screen-frame">
-                  <img src="mockups/v4/tablet-koi-profile-portrait.webp" alt="Tankobun Koi profile on a portrait tablet with a fictional local identity">
-                </div>
-                <figcaption>
-                  <span>Koi profile</span>
                   <span>Portrait tablet</span>
                 </figcaption>
               </figure>
@@ -1202,13 +1118,76 @@
                   <span>Phone mockup</span>
                 </figcaption>
               </figure>
+            </div>
+
+            <div class="light-strip">
               <figure class="screen-shot">
                 <div class="screen-frame">
-                  <img src="mockups/v4/phone-plum-profile.webp" alt="Tankobun Plum profile phone mockup with a fictional local identity">
+                  <img src="mockups/v4/phone-home-studio.webp" alt="Tankobun Home phone mockup in a light palette with original fictional manga titles and artwork">
                 </div>
                 <figcaption>
-                  <span>Plum profile</span>
+                  <span>Light Home</span>
                   <span>Phone mockup</span>
+                </figcaption>
+              </figure>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/v4/tablet-home-studio.webp" alt="Tankobun adaptive Home tablet mockup in a light palette with original fictional manga titles and artwork">
+                </div>
+                <figcaption>
+                  <span>Adaptive Home</span>
+                  <span>Landscape tablet</span>
+                </figcaption>
+              </figure>
+            </div>
+
+            <div class="internal-strip">
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/v4/internal-library.webp" alt="Tankobun library on a phone with original fictional manga titles and artwork">
+                </div>
+                <figcaption>
+                  <span>Library</span>
+                  <span>Statuses and lists</span>
+                </figcaption>
+              </figure>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/v4/internal-browse.webp" alt="Tankobun discovery screen on a phone with original fictional manga titles and artwork">
+                </div>
+                <figcaption>
+                  <span>Discover</span>
+                  <span>Browse and filter</span>
+                </figcaption>
+              </figure>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/v4/internal-detail.webp" alt="Tankobun manga details on a phone for an original fictional title">
+                </div>
+                <figcaption>
+                  <span>Manga details</span>
+                  <span>Track and continue</span>
+                </figcaption>
+              </figure>
+            </div>
+
+            <div class="profile-strip">
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/v4/phone-profile-studio.webp" alt="Tankobun reading profile phone sample with a fictional local profile">
+                </div>
+                <figcaption>
+                  <span>Profile</span>
+                  <span>Phone sample</span>
+                </figcaption>
+              </figure>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/v4/tablet-koi-profile-portrait.webp" alt="Tankobun Koi profile sample on a portrait tablet with a fictional local identity">
+                </div>
+                <figcaption>
+                  <span>Koi profile</span>
+                  <span>Tablet sample</span>
                 </figcaption>
               </figure>
             </div>
@@ -1250,10 +1229,10 @@
         <div class="wrap">
           <div class="download-box">
             <div>
-              <h2>Ready for testers.</h2>
+              <h2>Get Tankobun.</h2>
               <p>
-                Download the official v4.0.1 APK from GitHub Releases. Android
-                may ask you to confirm installation from outside an app store.
+                Download the current APK from GitHub Releases. Android may ask
+                you to confirm installation from outside an app store.
               </p>
             </div>
             <a class="button primary" href="https://github.com/JohanKRS/Tankobun/releases/download/v4.0.1/tankobun-4.0.1.apk">
