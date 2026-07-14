@@ -13,20 +13,17 @@
 </p>
 
 <p align="center">
-  <img src="docs/mockups/v4/phone-home-studio.webp" width="46%" alt="Tankobun Home on a phone with original fictional manga titles and artwork">
-  <img src="docs/mockups/v4/phone-profile-studio.webp" width="46%" alt="Tankobun reading profile on a phone with a fictional local profile">
+  <img src="docs/mockups/v4/phone-home-studio.webp" width="31%" alt="Tankobun light Home on a phone with original fictional manga titles and artwork">
+  <img src="docs/mockups/v4/tablet-home-studio.webp" width="62%" alt="Tankobun light adaptive Home on a tablet with original fictional manga titles and artwork">
 </p>
 
 <p align="center">
-  <img src="docs/mockups/v4/tablet-home-studio.webp" width="92%" alt="Tankobun adaptive Home on a tablet with original fictional manga titles and artwork">
+  <img src="docs/mockups/v4/phone-plum-home.webp" width="46%" alt="Tankobun dark Plum Home on a phone with an original fictional manga catalog">
+  <img src="docs/mockups/v4/tablet-koi-home-portrait.webp" width="46%" alt="Tankobun dark Koi Home on a portrait tablet with a different original fictional manga catalog">
 </p>
 
 <p align="center">
-  <img src="docs/mockups/v4/tablet-profile-studio.webp" width="92%" alt="Tankobun reading profile dashboard on a tablet with a fictional local profile">
-</p>
-
-<p align="center">
-  <sub>All titles, characters, covers, profile details, and artwork shown above are fictional preview material created for this project.</sub>
+  <sub>All titles, characters, covers, and artwork shown above are fictional preview material created for this project.</sub>
 </p>
 
 ## What Tankobun Is

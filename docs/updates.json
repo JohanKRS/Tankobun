@@ -2,42 +2,30 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 40,
-    "versionName": "4.0.0",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v4.0.0/tankobun-4.0.0.apk",
-    "apkSha256": "5485FFA9207909427F5889117B5B0B7110710C8B842C1FFC55AAABE27770E381",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v4.0.0",
-    "publishedAt": "2026-07-13T01:41:55Z",
-    "sizeBytes": 12083916,
+    "versionCode": 41,
+    "versionName": "4.0.1",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v4.0.1/tankobun-4.0.1.apk",
+    "apkSha256": "036CFB81924A3114EB817FBA163B2451723EBACFC08DDCD57054B60CFFA4247D",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v4.0.1",
+    "publishedAt": "2026-07-14T01:42:30Z",
+    "sizeBytes": 12084060,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Home was rebuilt with an adaptive editorial hero, Continue Reading shelf, and genre highlights for phone and tablet.",
-        "Home feeds now cache and enrich AniList data more intelligently, keeping covers, character art, genres, and reading progress coherent.",
-        "Profile was redesigned with reading activity, richer statistics, genre insights, achievements, and custom profile imagery.",
-        "The new theme system combines 14 color palettes with Defined or Rounded component shapes, tinted Haze chrome, and automatic Peach or Plum defaults.",
-        "Settings, navigation, downloads, backups, source persistence, and responsive layouts were refined across the app."
+        "Rounded mode now uses defined corner radii for dropdowns, reading-status selectors, drawer controls, and profile cards instead of turning them into oversized pills.",
+        "Chips and the floating dock keep their intentional pill shape, while small Material surfaces now follow the selected component shape."
       ],
       "pt-BR": [
-        "A Home foi reconstruída com hero editorial adaptativo, prateleira Continuar lendo e destaques por gênero para celular e tablet.",
-        "Os feeds da Home agora armazenam e enriquecem dados do AniList com mais inteligência, mantendo capas, personagens, gêneros e progresso de leitura coerentes.",
-        "O Perfil foi redesenhado com atividade de leitura, estatísticas mais ricas, destaques por gênero, conquistas e imagens personalizadas.",
-        "O novo sistema de temas combina 14 paletas com formatos Definido ou Arredondado, Haze tingido e padrões automáticos Pêssego ou Ameixa.",
-        "Configurações, navegação, downloads, backups, persistência de fontes e layouts responsivos foram refinados em todo o app."
+        "O modo Arredondado agora usa raios de canto definidos em dropdowns, seletores de status de leitura, controles da gaveta e cards do perfil, em vez de transformá-los em cápsulas exageradas.",
+        "Chips e o dock flutuante mantêm o formato de cápsula intencional, enquanto superfícies pequenas do Material passam a seguir o formato de componente selecionado."
       ],
       "es": [
-        "Inicio se reconstruyó con un hero editorial adaptable, estante Continuar leyendo y destacados por género para móvil y tablet.",
-        "Los feeds de Inicio ahora almacenan y enriquecen los datos de AniList con más inteligencia, manteniendo coherentes portadas, personajes, géneros y progreso de lectura.",
-        "Perfil se rediseñó con actividad de lectura, estadísticas más completas, información por género, logros e imágenes personalizadas.",
-        "El nuevo sistema de temas combina 14 paletas con formas Definido o Redondeado, Haze teñido y valores automáticos Melocotón o Ciruela.",
-        "Ajustes, navegación, descargas, copias de seguridad, persistencia de fuentes y diseños adaptables se refinaron en toda la app."
+        "El modo Redondeado ahora usa radios de esquina definidos en menús desplegables, selectores de estado de lectura, controles del cajón y tarjetas de perfil, en lugar de convertirlos en cápsulas exageradas.",
+        "Las etiquetas y el dock flotante conservan su forma de cápsula intencional, mientras que las superficies Material pequeñas siguen la forma de componente seleccionada."
       ],
       "zh-CN": [
-        "重构首页，为手机和平板带来自适应编辑式主视觉、继续阅读书架和分类精选。",
-        "首页信息流现在会更智能地缓存并补充 AniList 数据，让封面、角色图、分类和阅读进度保持一致。",
-        "重新设计个人资料页，加入阅读活动、更丰富的统计、分类洞察、成就和自定义资料图片。",
-        "新主题系统可将 14 套配色与利落或圆润组件形状组合，并为 Haze 顶栏和底栏着色，自动模式默认使用桃色或梅紫。",
-        "全面优化设置、导航、下载、备份、来源绑定和响应式布局。"
+        "圆润模式现在会为下拉菜单、阅读状态选择器、侧边栏控件和个人资料卡片使用明确的圆角半径，不再把它们变成过度拉长的胶囊形。",
+        "标签和浮动 Dock 仍保留刻意设计的胶囊形，小型 Material 表面则会遵循所选的组件形状。"
       ]
     }
   }
