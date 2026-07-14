@@ -17,7 +17,7 @@ class SourceMatcherTest {
         val media = AnilistMedia(
             id = 1,
             idMal = null,
-            title = AnilistTitle("Sousou no Frieren", "Frieren: Beyond Journey's End", null, "Frieren"),
+            title = AnilistTitle("Hoshikawa no Tabibito", "The Hoshikawa Traveler", null, "Hoshikawa"),
             description = null,
             coverImage = null,
             bannerImage = null,
@@ -31,13 +31,13 @@ class SourceMatcherTest {
             endDateYear = null,
             siteUrl = null,
             genres = emptyList(),
-            synonyms = listOf("Frieren at the Funeral"),
+            synonyms = listOf("Traveler of Hoshikawa"),
             isAdult = false,
             updatedAtEpochSeconds = null,
         )
         val candidates = listOf(
             SourceManga(1, "/a", "Random Fantasy", null, null, null, null, null),
-            SourceManga(1, "/b", "Frieren", null, null, null, null, null),
+            SourceManga(1, "/b", "Hoshikawa", null, null, null, null, null),
         )
 
         val ranked = matcher.rank(media, source, candidates, searchedAtEpochMillis = 0)
@@ -49,49 +49,49 @@ class SourceMatcherTest {
     @Test
     fun accentedLatinTitlesMatchPlainSourceTitles() {
         val ranked = matcher.rank(
-            media = media("Pokémon Adventures"),
+            media = media("Café Azul Adventures"),
             source = source,
-            candidates = listOf(SourceManga(1, "/pokemon", "Pokemon Adventures", null, null, null, null, null)),
+            candidates = listOf(SourceManga(1, "/cafe-azul", "Cafe Azul Adventures", null, null, null, null, null)),
             searchedAtEpochMillis = 0,
         )
 
-        assertEquals("/pokemon", ranked.first().manga.url)
+        assertEquals("/cafe-azul", ranked.first().manga.url)
         assertTrue(ranked.first().score > 0.95)
     }
 
     @Test
     fun acronymTitlesCanMatchLongTitles() {
         val ranked = matcher.rank(
-            media = media("The Beginning After the End"),
+            media = media("The Moon After the Rain"),
             source = source,
-            candidates = listOf(SourceManga(1, "/tbate", "TBATE", null, null, null, null, null)),
+            candidates = listOf(SourceManga(1, "/tmatr", "TMATR", null, null, null, null, null)),
             searchedAtEpochMillis = 0,
         )
 
-        assertEquals("/tbate", ranked.first().manga.url)
+        assertEquals("/tmatr", ranked.first().manga.url)
         assertTrue(ranked.first().score >= 0.9)
     }
 
     @Test
     fun titleOverrideRanksAgainstTemporarySearchTitle() {
         val ranked = matcher.rank(
-            media = media("Monster #8"),
+            media = media("Archive #8"),
             source = source,
-            candidates = listOf(SourceManga(1, "/kaiju", "Kaiju No. 8", null, null, null, null, null)),
+            candidates = listOf(SourceManga(1, "/archive", "Archive No. 8", null, null, null, null, null)),
             searchedAtEpochMillis = 0,
-            titleOverrides = listOf("Kaiju No. 8"),
+            titleOverrides = listOf("Archive No. 8"),
         )
 
-        assertEquals("/kaiju", ranked.first().manga.url)
+        assertEquals("/archive", ranked.first().manga.url)
         assertTrue(ranked.first().score > 0.95)
     }
 
     @Test
     fun singleWordInsideDifferentTitleIsLooseMatch() {
         val ranked = matcher.rank(
-            media = media("Berserk"),
+            media = media("Rift"),
             source = source,
-            candidates = listOf(SourceManga(1, "/berserk-princess", "Berserk Princess", null, null, null, null, null)),
+            candidates = listOf(SourceManga(1, "/rift-princess", "Rift Princess", null, null, null, null, null)),
             searchedAtEpochMillis = 0,
         )
 
@@ -101,13 +101,13 @@ class SourceMatcherTest {
     @Test
     fun nonLatinLetterTitlesArePreserved() {
         val ranked = matcher.rank(
-            media = media("나 혼자만 레벨업"),
+            media = media("별빛 기록실"),
             source = source,
-            candidates = listOf(SourceManga(1, "/solo-leveling", "나 혼자만 레벨업", null, null, null, null, null)),
+            candidates = listOf(SourceManga(1, "/starlight-archive", "별빛 기록실", null, null, null, null, null)),
             searchedAtEpochMillis = 0,
         )
 
-        assertEquals("/solo-leveling", ranked.first().manga.url)
+        assertEquals("/starlight-archive", ranked.first().manga.url)
         assertTrue(ranked.first().score > 0.95)
     }
 

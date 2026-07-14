@@ -13,9 +13,20 @@
 </p>
 
 <p align="center">
-  <img src="docs/mockups/readme/phone-detail.png" width="31%" alt="Tankobun manga detail screen with generated preview content">
-  <img src="docs/mockups/readme/phone-library.png" width="31%" alt="Tankobun local library screen with generated preview content">
-  <img src="docs/mockups/readme/phone-browse.png" width="31%" alt="Tankobun browse screen with generated preview content">
+  <img src="docs/mockups/v4/phone-home-studio.webp" width="46%" alt="Tankobun Home on a phone with original fictional manga titles and artwork">
+  <img src="docs/mockups/v4/phone-profile-studio.webp" width="46%" alt="Tankobun reading profile on a phone with a fictional local profile">
+</p>
+
+<p align="center">
+  <img src="docs/mockups/v4/tablet-home-studio.webp" width="92%" alt="Tankobun adaptive Home on a tablet with original fictional manga titles and artwork">
+</p>
+
+<p align="center">
+  <img src="docs/mockups/v4/tablet-profile-studio.webp" width="92%" alt="Tankobun reading profile dashboard on a tablet with a fictional local profile">
+</p>
+
+<p align="center">
+  <sub>All titles, characters, covers, profile details, and artwork shown above are fictional preview material created for this project.</sub>
 </p>
 
 ## What Tankobun Is

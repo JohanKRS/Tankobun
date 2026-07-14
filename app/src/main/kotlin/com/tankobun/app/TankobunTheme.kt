@@ -304,7 +304,7 @@ private fun directionSpec(direction: TankobunArtDirection): DirectionSpec {
             indicator = RoundedCornerShape(14.dp, 8.dp, 14.dp, 8.dp),
         )
         TankobunArtDirection.MOCHI_POP -> ThemeShapeSet(
-            panel = RoundedCornerShape(18.dp), control = RoundedCornerShape(999.dp),
+            panel = RoundedCornerShape(18.dp), control = RoundedCornerShape(14.dp),
             chip = RoundedCornerShape(999.dp), dialog = RoundedCornerShape(28.dp),
             dock = RoundedCornerShape(999.dp), cover = RoundedCornerShape(14.dp), indicator = RoundedCornerShape(999.dp),
         )
@@ -348,7 +348,7 @@ private fun directionSpec(direction: TankobunArtDirection): DirectionSpec {
         strokes = stroke,
         motion = motion,
         materialShapes = Shapes(
-            extraSmall = shapes.chip,
+            extraSmall = shapes.control,
             small = shapes.control,
             medium = shapes.panel,
             large = shapes.dialog,

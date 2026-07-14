@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Tankobun - Android Manga Shelf</title>
+    <link rel="icon" href="app-icon.png">
     <meta
       name="description"
       content="Tankobun is a personal Android manga shelf for local or AniList-synced tracking, reading, backups, and metadata-only recommendation sharing."
@@ -182,24 +183,45 @@
       .device {
         position: absolute;
         display: block;
-        filter: drop-shadow(0 28px 60px rgba(0, 0, 0, 0.46));
+        padding: 8px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 40px;
+        background: #090a0c;
+        box-shadow:
+          0 34px 70px rgba(0, 0, 0, 0.5),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.08);
         transform: var(--pose);
         animation: deviceFloat 10s ease-in-out infinite alternate;
         will-change: transform;
+      }
+
+      .device::after {
+        content: "";
+        position: absolute;
+        top: 15px;
+        left: 50%;
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #050608;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.05);
+        transform: translateX(-50%);
       }
 
       .device img {
         display: block;
         width: 100%;
         height: 100%;
-        object-fit: contain;
+        border-radius: 32px;
+        object-fit: cover;
       }
 
       .phone-main {
-        width: min(34vw, 440px);
-        aspect-ratio: 3 / 4;
+        width: min(25vw, 330px);
+        aspect-ratio: 9 / 20;
         right: 22vw;
-        top: 34px;
+        top: 12px;
         z-index: 3;
         --pose: rotate(2deg);
         --float-x: 8px;
@@ -207,10 +229,10 @@
       }
 
       .phone-side {
-        width: min(27vw, 350px);
-        aspect-ratio: 3 / 4;
-        right: 10vw;
-        top: 180px;
+        width: min(22vw, 290px);
+        aspect-ratio: 9 / 20;
+        right: 9vw;
+        top: 120px;
         z-index: 2;
         opacity: 0.88;
         --pose: rotate(8deg);
@@ -218,20 +240,6 @@
         --float-y: -10px;
         animation-duration: 12s;
         animation-delay: -2.4s;
-      }
-
-      .phone-low {
-        width: min(26vw, 340px);
-        aspect-ratio: 3 / 4;
-        right: 38vw;
-        top: 220px;
-        z-index: 1;
-        opacity: 0.75;
-        --pose: rotate(-7deg);
-        --float-x: 10px;
-        --float-y: -9px;
-        animation-duration: 11s;
-        animation-delay: -4.2s;
       }
 
       .hero-content {
@@ -439,7 +447,7 @@
 
       .mode-panel {
         position: relative;
-        min-height: 430px;
+        min-height: 560px;
         overflow: hidden;
         border: 1px solid var(--line);
         border-radius: var(--radius);
@@ -497,7 +505,14 @@
       }
 
       .mode-panel.sync img {
-        width: min(62%, 420px);
+        bottom: -165px;
+        width: min(46%, 310px);
+      }
+
+      .mode-panel.local img {
+        right: -34px;
+        bottom: -24px;
+        width: min(92%, 650px);
       }
 
       .feature-list {
@@ -578,16 +593,31 @@
 
       .phone-strip {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 300px));
+        grid-template-columns: repeat(4, minmax(0, 260px));
         justify-content: center;
         gap: 22px;
+        align-items: start;
       }
 
-      .phone-strip .screen-frame {
-        aspect-ratio: 3 / 4;
+      .tablet-strip {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 22px;
+        align-items: start;
       }
 
-      .phone-strip .screen-shot img {
+      .theme-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 260px));
+        justify-content: center;
+        gap: 22px;
+        align-items: start;
+      }
+
+      .phone-strip .screen-shot img,
+      .tablet-strip .screen-shot img,
+      .theme-strip .screen-shot img {
+        height: auto;
         object-fit: contain;
       }
 
@@ -754,6 +784,18 @@
         .feature:nth-child(2) {
           border-bottom: 1px solid var(--line);
         }
+
+        .phone-strip {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .theme-strip {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .tablet-strip {
+          grid-template-columns: 1fr;
+        }
       }
 
       @media (max-width: 620px) {
@@ -786,20 +828,14 @@
         }
 
         .phone-main {
-          width: 265px;
-          right: 160px;
+          width: 220px;
+          right: 220px;
         }
 
         .phone-side {
-          width: 230px;
-          right: 20px;
-          top: 76px;
-        }
-
-        .phone-low {
-          width: 230px;
-          right: 290px;
-          top: 126px;
+          width: 205px;
+          right: 110px;
+          top: 58px;
         }
 
         .hero-content {
@@ -826,13 +862,25 @@
         }
 
         .mode-panel {
-          min-height: 520px;
+          min-height: 620px;
         }
 
         .mode-panel img {
           width: 74%;
           right: -22px;
           bottom: -120px;
+        }
+
+        .mode-panel.local img {
+          right: -18px;
+          bottom: 28px;
+          width: 94%;
+        }
+
+        .mode-panel.sync img {
+          right: -12px;
+          bottom: -150px;
+          width: min(72%, 310px);
         }
 
         .feature-list {
@@ -858,8 +906,17 @@
         }
 
         .phone-strip {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 10px;
+        }
+
+        .theme-strip {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .tablet-strip {
+          gap: 14px;
         }
 
         .screen-shot figcaption {
@@ -897,14 +954,11 @@
 
     <header class="hero">
       <div class="hero-stage" aria-hidden="true">
-        <span class="device phone-low">
-          <img src="mockups/site/phone-library-tilt.png" alt="">
-        </span>
         <span class="device phone-main">
-          <img src="mockups/site/phone-detail-eclipse.png" alt="">
+          <img src="mockups/v4/phone-home-flat.webp" alt="">
         </span>
         <span class="device phone-side">
-          <img src="mockups/site/phone-browse-dark.png" alt="">
+          <img src="mockups/v4/phone-profile-flat.webp" alt="">
         </span>
       </div>
 
@@ -960,35 +1014,35 @@
       <section id="library">
         <div class="wrap">
           <div class="section-head">
-            <h2>Two library modes, one shelf.</h2>
+            <h2>Home and profile, rebuilt.</h2>
             <p>
-              Tankobun supports local-first use without closing the door on
-              AniList. The Book Club Release adds metadata-only recommendation
-              sharing so friends can preview lists before importing them.
+              The new adaptive Home puts discovery and unfinished reading up
+              front, while Profile turns local reading history into a clear,
+              responsive overview.
             </p>
           </div>
 
           <div class="mode-grid">
             <article class="mode-panel local">
               <div class="copy">
-                <h3>Local library</h3>
+                <h3>Adaptive Home</h3>
                 <p>
-                  Track status, score, notes, private flags, progress, and custom
-                  lists on this device without signing in.
+                  An editorial hero, genre rows, and Continue Reading scale from
+                  a focused phone layout to a spacious tablet dashboard.
                 </p>
               </div>
-              <img src="mockups/site/phone-library-light.png" alt="Tankobun local library screen with generated preview entries">
+              <img src="mockups/v4/tablet-home-flat.webp" alt="Tankobun adaptive Home on a tablet with original fictional manga titles and artwork">
             </article>
 
             <article class="mode-panel sync">
               <div class="copy">
-                <h3>AniList sync</h3>
+                <h3>Reading profile</h3>
                 <p>
-                  Connect AniList when you want user-authorized account sync,
-                  list import, and remote tracking updates.
+                  Library totals, recent momentum, and achievements make reading
+                  activity useful at a glance without turning it into a contest.
                 </p>
               </div>
-              <img src="mockups/site/phone-detail-celestial.png" alt="Tankobun manga detail and tracking screen with generated preview entry">
+              <img src="mockups/v4/phone-profile-flat.webp" alt="Tankobun reading profile on a phone with a fictional local profile">
             </article>
           </div>
         </div>
@@ -1035,8 +1089,9 @@
           <div class="section-head">
             <h2>Screenshots</h2>
             <p>
-              Captured from the current Android build with generated test titles
-              and cover art.
+              Captured from the current Android build, then populated with
+              entirely fictional titles, characters, covers, profile details,
+              and original artwork created for this project.
             </p>
           </div>
 
@@ -1044,56 +1099,116 @@
             <div class="phone-strip">
               <figure class="screen-shot">
                 <div class="screen-frame">
-                  <img src="mockups/site/phone-library-tilt.png" alt="Tankobun phone library screen with generated preview entries and cover art">
+                  <img src="mockups/v4/phone-home-studio.webp" alt="Tankobun Home phone mockup with original fictional manga titles and artwork">
                 </div>
                 <figcaption>
-                  <span>Library</span>
-                  <span>Phone</span>
+                  <span>Home</span>
+                  <span>Phone mockup</span>
                 </figcaption>
               </figure>
               <figure class="screen-shot">
                 <div class="screen-frame">
-                  <img src="mockups/site/phone-browse-dark.png" alt="Tankobun phone browse screen with generated preview entries and cover art">
+                  <img src="mockups/v4/phone-profile-studio.webp" alt="Tankobun reading profile phone mockup with a fictional local profile">
                 </div>
                 <figcaption>
-                  <span>Browse</span>
-                  <span>Phone</span>
+                  <span>Profile</span>
+                  <span>Phone mockup</span>
                 </figcaption>
               </figure>
               <figure class="screen-shot">
                 <div class="screen-frame">
-                  <img src="mockups/site/phone-detail-eclipse.png" alt="Tankobun phone manga detail screen with generated preview entry and cover art">
+                  <img src="mockups/v4/phone-home-flat.webp" alt="Tankobun Home phone capture with original fictional manga titles and artwork">
                 </div>
                 <figcaption>
-                  <span>Tracking</span>
-                  <span>Phone</span>
+                  <span>Home</span>
+                  <span>Phone capture</span>
                 </figcaption>
               </figure>
               <figure class="screen-shot">
                 <div class="screen-frame">
-                  <img src="mockups/site/phone-library-fantasy.png" alt="Tankobun phone library screen with generated preview entries and cover art">
+                  <img src="mockups/v4/phone-profile-flat.webp" alt="Tankobun reading profile phone capture with a fictional local profile">
                 </div>
                 <figcaption>
-                  <span>Library</span>
-                  <span>Phone</span>
+                  <span>Profile</span>
+                  <span>Phone capture</span>
+                </figcaption>
+              </figure>
+            </div>
+
+            <div class="tablet-strip">
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/v4/tablet-home-studio.webp" alt="Tankobun adaptive Home tablet mockup with original fictional manga titles and artwork">
+                </div>
+                <figcaption>
+                  <span>Adaptive Home</span>
+                  <span>Tablet mockup</span>
                 </figcaption>
               </figure>
               <figure class="screen-shot">
                 <div class="screen-frame">
-                  <img src="mockups/site/phone-library-light.png" alt="Tankobun phone local library screen with generated preview entries and cover art">
+                  <img src="mockups/v4/tablet-profile-studio.webp" alt="Tankobun reading profile tablet mockup with a fictional local profile">
                 </div>
                 <figcaption>
-                  <span>Local</span>
-                  <span>Phone</span>
+                  <span>Reading profile</span>
+                  <span>Tablet mockup</span>
                 </figcaption>
               </figure>
               <figure class="screen-shot">
                 <div class="screen-frame">
-                  <img src="mockups/site/phone-detail-celestial.png" alt="Tankobun phone manga detail screen with generated preview entry and cover art">
+                  <img src="mockups/v4/tablet-home-flat.webp" alt="Tankobun adaptive Home tablet capture with original fictional manga titles and artwork">
                 </div>
                 <figcaption>
-                  <span>Tracking</span>
-                  <span>Phone</span>
+                  <span>Adaptive Home</span>
+                  <span>Tablet capture</span>
+                </figcaption>
+              </figure>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/v4/tablet-profile-flat.webp" alt="Tankobun reading profile tablet capture with a fictional local profile">
+                </div>
+                <figcaption>
+                  <span>Reading profile</span>
+                  <span>Tablet capture</span>
+                </figcaption>
+              </figure>
+            </div>
+
+            <div class="theme-strip">
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/v4/tablet-koi-home-portrait.webp" alt="Tankobun Koi Home on a portrait tablet with an original fictional manga catalog">
+                </div>
+                <figcaption>
+                  <span>Koi Home</span>
+                  <span>Portrait tablet</span>
+                </figcaption>
+              </figure>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/v4/tablet-koi-profile-portrait.webp" alt="Tankobun Koi profile on a portrait tablet with a fictional local identity">
+                </div>
+                <figcaption>
+                  <span>Koi profile</span>
+                  <span>Portrait tablet</span>
+                </figcaption>
+              </figure>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/v4/phone-plum-home.webp" alt="Tankobun Plum Home phone mockup with a different original fictional manga catalog">
+                </div>
+                <figcaption>
+                  <span>Plum Home</span>
+                  <span>Phone mockup</span>
+                </figcaption>
+              </figure>
+              <figure class="screen-shot">
+                <div class="screen-frame">
+                  <img src="mockups/v4/phone-plum-profile.webp" alt="Tankobun Plum profile phone mockup with a fictional local identity">
+                </div>
+                <figcaption>
+                  <span>Plum profile</span>
+                  <span>Phone mockup</span>
                 </figcaption>
               </figure>
             </div>
