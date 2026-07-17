@@ -2,30 +2,34 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 41,
-    "versionName": "4.0.1",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v4.0.1/tankobun-4.0.1.apk",
-    "apkSha256": "036CFB81924A3114EB817FBA163B2451723EBACFC08DDCD57054B60CFFA4247D",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v4.0.1",
-    "publishedAt": "2026-07-14T01:42:30Z",
-    "sizeBytes": 12084060,
+    "versionCode": 42,
+    "versionName": "4.0.2",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v4.0.2/tankobun-4.0.2.apk",
+    "apkSha256": "13DCF7FDD1F3ADA54B981ABAF97E3E9ACDED674CF9031E0C5CB584B637D70F39",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v4.0.2",
+    "publishedAt": "2026-07-17T14:22:45Z",
+    "sizeBytes": 12096680,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Rounded mode now uses defined corner radii for dropdowns, reading-status selectors, drawer controls, and profile cards instead of turning them into oversized pills.",
-        "Chips and the floating dock keep their intentional pill shape, while small Material surfaces now follow the selected component shape."
+        "Onboarding now starts with theme selection, preloads Home, and provides a faster tour of Home, Library, Browse, Profile, and Settings.",
+        "Color palettes and component shapes remain visible while Follow system light/dark is selected, making customization easier to discover.",
+        "Home refreshes now transition item by item with lightweight loading feedback, genre art falls back from banner to character to cover, and heading icons use optical alignment."
       ],
       "pt-BR": [
-        "O modo Arredondado agora usa raios de canto definidos em dropdowns, seletores de status de leitura, controles da gaveta e cards do perfil, em vez de transformá-los em cápsulas exageradas.",
-        "Chips e o dock flutuante mantêm o formato de cápsula intencional, enquanto superfícies pequenas do Material passam a seguir o formato de componente selecionado."
+        "O onboarding agora começa pela escolha do tema, pré-carrega a Home e oferece um tour mais rápido pela Home, Biblioteca, Explorar, Perfil e Configurações.",
+        "Paletas e formatos dos componentes permanecem visíveis mesmo com Seguir claro/escuro selecionado, deixando a personalização mais fácil de descobrir.",
+        "As atualizações da Home agora entram item a item com feedback leve de carregamento, as imagens por gênero fazem fallback de banner para personagem e capa, e os ícones dos cabeçalhos receberam alinhamento óptico."
       ],
       "es": [
-        "El modo Redondeado ahora usa radios de esquina definidos en menús desplegables, selectores de estado de lectura, controles del cajón y tarjetas de perfil, en lugar de convertirlos en cápsulas exageradas.",
-        "Las etiquetas y el dock flotante conservan su forma de cápsula intencional, mientras que las superficies Material pequeñas siguen la forma de componente seleccionada."
+        "La configuración inicial ahora empieza por la elección del tema, precarga Inicio y ofrece un recorrido más rápido por Inicio, Biblioteca, Explorar, Perfil y Ajustes.",
+        "Las paletas y formas de los componentes siguen visibles incluso con Seguir claro/oscuro seleccionado, para que la personalización sea más fácil de descubrir.",
+        "Las actualizaciones de Inicio ahora aparecen elemento por elemento con una señal de carga sutil; las imágenes por género recurren a banner, personaje y portada, y los iconos de los encabezados usan alineación óptica."
       ],
       "zh-CN": [
-        "圆润模式现在会为下拉菜单、阅读状态选择器、侧边栏控件和个人资料卡片使用明确的圆角半径，不再把它们变成过度拉长的胶囊形。",
-        "标签和浮动 Dock 仍保留刻意设计的胶囊形，小型 Material 表面则会遵循所选的组件形状。"
+        "初始设置现在从主题选择开始，会预加载首页，并以更简短的导览介绍首页、书架、浏览、个人资料和设置。",
+        "即使选择“跟随系统深浅色”，配色和组件形状仍会保持可见，让自定义选项更容易发现。",
+        "首页刷新现在会逐项显示轻量加载反馈和过渡；分类图片按横幅、角色图、封面的顺序回退，标题图标也采用了视觉对齐。"
       ]
     }
   }

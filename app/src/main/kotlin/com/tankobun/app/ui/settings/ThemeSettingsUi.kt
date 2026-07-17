@@ -207,71 +207,59 @@ internal fun ThemePicker(
     onSelect: (TankobunThemePreference) -> Unit,
 ) {
     val normalized = selected.normalized()
+    val manualBase = if (normalized.automatic) {
+        normalized.resolve(isSystemInDarkTheme())
+    } else {
+        normalized
+    }
     val directions = tankobunArtDirectionChoices()
     val palettes = tankobunPaletteChoices()
     val currentDirectionName = tankobunString(normalized.direction.themeNameRes())
     val currentPaletteName = tankobunString(normalized.palette.themeNameRes())
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(tankobunString(R.string.settings_theme_section), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TankobunChip(
-                selected = normalized.automatic,
-                onClick = { onSelect(normalized.copy(automatic = true)) },
-                label = { Text(tankobunString(R.string.settings_theme_automatic)) },
-            )
-            TankobunChip(
-                selected = !normalized.automatic,
-                onClick = { onSelect(normalized.copy(automatic = false)) },
-                label = { Text(tankobunString(R.string.settings_theme_custom)) },
-            )
-        }
-        if (normalized.automatic) {
-            TankobunPanel(color = LocalTankobunTokens.current.softAccent) {
-                Text(
-                    tankobunString(R.string.settings_theme_automatic_desc),
-                    modifier = Modifier.padding(14.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        } else {
-            Text(tankobunString(R.string.settings_theme_art_direction), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            FlowRow(
-                maxItemsInEachRow = 2,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                directions.forEach { choice ->
-                    ArtDirectionCard(
-                        modifier = Modifier.weight(1f),
-                        choice = choice,
-                        selected = choice.id == normalized.direction,
-                        onClick = {
-                            onSelect(normalized.copy(automatic = false, direction = choice.id))
-                        },
-                    )
-                }
-            }
-            Text(tankobunString(R.string.settings_theme_palette), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            FlowRow(
-                maxItemsInEachRow = 2,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                palettes.forEach { choice ->
-                    PaletteChoiceCard(
-                        modifier = Modifier.weight(1f),
-                        choice = choice,
-                        selected = choice.id == normalized.palette,
-                        onClick = { onSelect(normalized.copy(automatic = false, palette = choice.id)) },
-                    )
-                }
-            }
-        }
+        TankobunChip(
+            selected = normalized.automatic,
+            onClick = { onSelect(normalized.copy(automatic = true)) },
+            label = { Text(tankobunString(R.string.settings_theme_automatic)) },
+        )
         Text(tankobunString(R.string.settings_theme_preview), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         ThemeSampler(
-            title = if (normalized.automatic) tankobunString(R.string.settings_theme_automatic) else currentDirectionName,
+            title = if (normalized.automatic) tankobunString(R.string.settings_theme_automatic_preview) else currentDirectionName,
             subtitle = if (normalized.automatic) tankobunString(R.string.settings_theme_automatic_pair) else currentPaletteName,
         )
+        Text(tankobunString(R.string.settings_theme_art_direction), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        FlowRow(
+            maxItemsInEachRow = 2,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            directions.forEach { choice ->
+                ArtDirectionCard(
+                    modifier = Modifier.weight(1f),
+                    choice = choice,
+                    selected = !normalized.automatic && choice.id == normalized.direction,
+                    onClick = {
+                        onSelect(manualBase.copy(automatic = false, direction = choice.id))
+                    },
+                )
+            }
+        }
+        Text(tankobunString(R.string.settings_theme_palette), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        FlowRow(
+            maxItemsInEachRow = 2,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            palettes.forEach { choice ->
+                PaletteChoiceCard(
+                    modifier = Modifier.weight(1f),
+                    choice = choice,
+                    selected = !normalized.automatic && choice.id == normalized.palette,
+                    onClick = { onSelect(manualBase.copy(automatic = false, palette = choice.id)) },
+                )
+            }
+        }
     }
 }
 

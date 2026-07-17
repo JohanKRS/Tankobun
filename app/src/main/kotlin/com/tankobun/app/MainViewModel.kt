@@ -556,7 +556,8 @@ class MainViewModel(
         _state.update { it.copy(onboardingVisible = false) }
     }
 
-    fun prepareOnboardingBrowseContent() {
+    fun prepareOnboardingContent() {
+        loadHomeFeed()
         loadBrowseLanding()
         loadBrowseTags()
     }
@@ -581,7 +582,7 @@ class MainViewModel(
     }
 
     fun startAppTour() {
-        prepareOnboardingBrowseContent()
+        prepareOnboardingContent()
         _state.update { it.copy(onboardingVisible = false, appTourVisible = true) }
     }
 

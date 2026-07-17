@@ -2,42 +2,34 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 40,
-    "versionName": "4.0.0",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v4.0.0/tankobun-4.0.0.apk",
-    "apkSha256": "5485FFA9207909427F5889117B5B0B7110710C8B842C1FFC55AAABE27770E381",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v4.0.0",
-    "publishedAt": "2026-07-13T01:41:55Z",
-    "sizeBytes": 12083916,
+    "versionCode": 42,
+    "versionName": "4.0.2",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v4.0.2/tankobun-4.0.2.apk",
+    "apkSha256": "13DCF7FDD1F3ADA54B981ABAF97E3E9ACDED674CF9031E0C5CB584B637D70F39",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v4.0.2",
+    "publishedAt": "2026-07-17T14:22:45Z",
+    "sizeBytes": 12096680,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Home was rebuilt with an adaptive editorial hero, Continue Reading shelf, and genre highlights for phone and tablet.",
-        "Home feeds now cache and enrich AniList data more intelligently, keeping covers, character art, genres, and reading progress coherent.",
-        "Profile was redesigned with reading activity, richer statistics, genre insights, achievements, and custom profile imagery.",
-        "The new theme system combines 14 color palettes with Defined or Rounded component shapes, tinted Haze chrome, and automatic Peach or Plum defaults.",
-        "Settings, navigation, downloads, backups, source persistence, and responsive layouts were refined across the app."
+        "Onboarding now starts with theme selection, preloads Home, and provides a faster tour of Home, Library, Browse, Profile, and Settings.",
+        "Color palettes and component shapes remain visible while Follow system light/dark is selected, making customization easier to discover.",
+        "Home refreshes now transition item by item with lightweight loading feedback, genre art falls back from banner to character to cover, and heading icons use optical alignment."
       ],
       "pt-BR": [
-        "A Home foi reconstruída com hero editorial adaptativo, prateleira Continuar lendo e destaques por gênero para celular e tablet.",
-        "Os feeds da Home agora armazenam e enriquecem dados do AniList com mais inteligência, mantendo capas, personagens, gêneros e progresso de leitura coerentes.",
-        "O Perfil foi redesenhado com atividade de leitura, estatísticas mais ricas, destaques por gênero, conquistas e imagens personalizadas.",
-        "O novo sistema de temas combina 14 paletas com formatos Definido ou Arredondado, Haze tingido e padrões automáticos Pêssego ou Ameixa.",
-        "Configurações, navegação, downloads, backups, persistência de fontes e layouts responsivos foram refinados em todo o app."
+        "O onboarding agora começa pela escolha do tema, pré-carrega a Home e oferece um tour mais rápido pela Home, Biblioteca, Explorar, Perfil e Configurações.",
+        "Paletas e formatos dos componentes permanecem visíveis mesmo com Seguir claro/escuro selecionado, deixando a personalização mais fácil de descobrir.",
+        "As atualizações da Home agora entram item a item com feedback leve de carregamento, as imagens por gênero fazem fallback de banner para personagem e capa, e os ícones dos cabeçalhos receberam alinhamento óptico."
       ],
       "es": [
-        "Inicio se reconstruyó con un hero editorial adaptable, estante Continuar leyendo y destacados por género para móvil y tablet.",
-        "Los feeds de Inicio ahora almacenan y enriquecen los datos de AniList con más inteligencia, manteniendo coherentes portadas, personajes, géneros y progreso de lectura.",
-        "Perfil se rediseñó con actividad de lectura, estadísticas más completas, información por género, logros e imágenes personalizadas.",
-        "El nuevo sistema de temas combina 14 paletas con formas Definido o Redondeado, Haze teñido y valores automáticos Melocotón o Ciruela.",
-        "Ajustes, navegación, descargas, copias de seguridad, persistencia de fuentes y diseños adaptables se refinaron en toda la app."
+        "La configuración inicial ahora empieza por la elección del tema, precarga Inicio y ofrece un recorrido más rápido por Inicio, Biblioteca, Explorar, Perfil y Ajustes.",
+        "Las paletas y formas de los componentes siguen visibles incluso con Seguir claro/oscuro seleccionado, para que la personalización sea más fácil de descubrir.",
+        "Las actualizaciones de Inicio ahora aparecen elemento por elemento con una señal de carga sutil; las imágenes por género recurren a banner, personaje y portada, y los iconos de los encabezados usan alineación óptica."
       ],
       "zh-CN": [
-        "重构首页，为手机和平板带来自适应编辑式主视觉、继续阅读书架和分类精选。",
-        "首页信息流现在会更智能地缓存并补充 AniList 数据，让封面、角色图、分类和阅读进度保持一致。",
-        "重新设计个人资料页，加入阅读活动、更丰富的统计、分类洞察、成就和自定义资料图片。",
-        "新主题系统可将 14 套配色与利落或圆润组件形状组合，并为 Haze 顶栏和底栏着色，自动模式默认使用桃色或梅紫。",
-        "全面优化设置、导航、下载、备份、来源绑定和响应式布局。"
+        "初始设置现在从主题选择开始，会预加载首页，并以更简短的导览介绍首页、书架、浏览、个人资料和设置。",
+        "即使选择“跟随系统深浅色”，配色和组件形状仍会保持可见，让自定义选项更容易发现。",
+        "首页刷新现在会逐项显示轻量加载反馈和过渡；分类图片按横幅、角色图、封面的顺序回退，标题图标也采用了视觉对齐。"
       ]
     }
   }

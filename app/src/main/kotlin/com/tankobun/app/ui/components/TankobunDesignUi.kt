@@ -141,7 +141,9 @@ internal fun TankobunHeadingLead(
     iconTint: Color = MaterialTheme.colorScheme.primary,
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
-    val iconBaselineInset = with(LocalDensity.current) { 2.dp.roundToPx() }
+    val iconBaselineInset = with(LocalDensity.current) {
+        (2.dp + headingIconOpticalBaselineAdjustment(icon)).roundToPx()
+    }
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -166,6 +168,31 @@ internal fun TankobunHeadingLead(
         )
     }
 }
+
+/**
+ * Tabler glyphs share a 24x24 viewport, but not the same visible bottom edge.
+ * Low, horizontal drawings therefore need a small optical correction after the
+ * icon box itself has been aligned to the text baseline.
+ */
+private fun headingIconOpticalBaselineAdjustment(icon: ImageVector): Dp =
+    when (icon) {
+        TankobunIcons.TrendingUp -> 3.dp
+        TankobunIcons.MenuBook -> 2.dp
+        TankobunIcons.FormatListBulleted,
+        TankobunIcons.Link,
+        -> 2.dp
+        TankobunIcons.AccountCircle,
+        TankobunIcons.CollectionsBookmark,
+        TankobunIcons.Download,
+        TankobunIcons.Explore,
+        TankobunIcons.Extension,
+        TankobunIcons.Info,
+        TankobunIcons.Palette,
+        TankobunIcons.Settings,
+        TankobunIcons.Translate,
+        -> 1.dp
+        else -> 0.dp
+    }
 
 @Composable
 internal fun TankobunSectionHeader(
