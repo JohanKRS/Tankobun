@@ -53,6 +53,9 @@ import com.tankobun.app.logic.toLocalReadingActivity
 import com.tankobun.app.logic.userMessage
 import com.tankobun.app.logic.visibleSources
 import com.tankobun.app.logic.withDeletedAniListCustomList
+import com.tankobun.app.logic.withHomeFeedRefreshStarted
+import com.tankobun.app.logic.withHomeFeedRefreshStopped
+import com.tankobun.app.logic.withHomeGenresRefreshProgress
 import com.tankobun.app.logic.withAddedTrackingCustomList
 import com.tankobun.app.logic.withActivatedReaderSegment
 import com.tankobun.app.logic.withAniListTitleLanguage
@@ -2015,6 +2018,7 @@ class MainViewModel(
             if (_state.value.showNsfwContent == includeAdult) {
                 staleCache?.let(::applyHomeFeed)
             }
+            _state.update { it.withHomeFeedRefreshStarted(includeAdult, genres) }
 
             try {
                 val feed = container.anilistRepository.homeFeed(
@@ -2068,8 +2072,13 @@ class MainViewModel(
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 Log.e(TAG, "AniList home feed failed", error)
-                if (staleCache == null) {
-                    _state.update { it.copy(homeLoaded = true) }
+                _state.update { state ->
+                    if (state.showNsfwContent != includeAdult) {
+                        state
+                    } else {
+                        state.copy(homeLoaded = state.homeLoaded || staleCache == null)
+                            .withHomeFeedRefreshStopped(includeAdult)
+                    }
                 }
                 scheduleHomeFeedRefresh(includeAdult, HOME_FEED_RETRY_DELAY_MILLIS)
             }
@@ -2126,6 +2135,9 @@ class MainViewModel(
                     highlight.copy(media = highlight.media.withTitleLanguage(it.anilistTitleLanguage))
                 },
                 homeLoaded = true,
+                homeTrendingRefreshing = false,
+                homeGenreHighlightsRefreshing = false,
+                homeRefreshingGenres = emptySet(),
             )
         }
     }
@@ -2134,6 +2146,7 @@ class MainViewModel(
         _state.update { state ->
             state.copy(
                 homeTrending = trending.map { media -> media.withTitleLanguage(state.anilistTitleLanguage) },
+                homeTrendingRefreshing = false,
             )
         }
     }
@@ -2151,7 +2164,7 @@ class MainViewModel(
                         highlight.copy(media = highlight.media.withTitleLanguage(state.anilistTitleLanguage))
                     }
                 },
-            )
+            ).withHomeGenresRefreshProgress(highlights.mapTo(mutableSetOf()) { it.genre })
         }
     }
 
@@ -2428,6 +2441,9 @@ class MainViewModel(
                 homeTrending = emptyList(),
                 homeGenreHighlights = emptyList(),
                 homeLoaded = false,
+                homeTrendingRefreshing = false,
+                homeGenreHighlightsRefreshing = false,
+                homeRefreshingGenres = emptySet(),
                 browseLandingLoaded = false,
                 searchResults = emptyList(),
                 browseSearched = false,

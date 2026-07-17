@@ -1237,20 +1237,12 @@ internal fun TankobunTopBar(
                         )
                     }
                 }
-                Icon(
-                    imageVector = pageIcon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .offset(y = (-1).dp)
-                        .size(27.dp),
-                )
-                Text(
-                    text = if (mediaDetailActive) title else title.uppercase(Locale.ROOT),
+                TankobunHeadingLead(
+                    title = if (mediaDetailActive) title else title.uppercase(Locale.ROOT),
+                    icon = pageIcon,
                     modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = when {
+                    titleColor = contentColor,
+                    textStyle = when {
                         mediaDetailActive && compact -> MaterialTheme.typography.titleMedium
                         mediaDetailActive -> MaterialTheme.typography.titleLarge
                         else -> MaterialTheme.typography.headlineSmall.copy(

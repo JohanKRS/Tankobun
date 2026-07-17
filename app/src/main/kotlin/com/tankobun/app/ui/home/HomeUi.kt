@@ -3,6 +3,18 @@ package com.tankobun.app.ui.home
 import com.tankobun.app.ui.icons.TankobunIcons
 
 import android.content.res.Configuration
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -40,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -81,6 +94,7 @@ import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.app.tankobunString
 import com.tankobun.app.ui.browse.browseGenreLabel
+import com.tankobun.app.ui.components.TankobunHeadingLead
 import com.tankobun.app.ui.components.TankobunMediaStatusLabel
 import com.tankobun.app.ui.shell.LocalTankobunChromeInsets
 import com.tankobun.app.ui.media.AutoResizingMangaTitle
@@ -109,6 +123,10 @@ internal fun HomeScreen(
     val continueReadingItems = remember(state.recentReadingProgress, readingMediaIds) {
         state.recentReadingProgress.filter { it.media.id in readingMediaIds }
     }
+    val trendingRefreshing = state.homeTrendingRefreshing && state.homeTrending.isNotEmpty()
+    val genresRefreshing = state.homeGenreHighlightsRefreshing && state.homeGenreHighlights.isNotEmpty()
+    val trendingDisplayState = homeFeedDisplayState(state.homeTrending.isNotEmpty(), state.homeLoaded)
+    val genresDisplayState = homeFeedDisplayState(state.homeGenreHighlights.isNotEmpty(), state.homeLoaded)
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -123,20 +141,30 @@ internal fun HomeScreen(
                 title = tankobunString(R.string.home_trending),
                 icon = TankobunIcons.Whatshot,
                 onViewAll = onOpenBrowse,
+                isRefreshing = trendingRefreshing,
                 headerModifier = Modifier.padding(horizontal = horizontalPadding),
             ) {
-                when {
-                    state.homeTrending.isNotEmpty() -> TrendingHeroCarousel(
-                        media = state.homeTrending,
-                        expanded = expanded,
-                        horizontalPadding = horizontalPadding,
-                        onSelectMedia = onSelectMedia,
-                    )
-                    !state.homeLoaded -> Box(Modifier.padding(horizontal = horizontalPadding)) {
-                        HomeLoadingPanel(Modifier.height(if (expanded) 410.dp else 338.dp))
-                    }
-                    else -> Box(Modifier.padding(horizontal = horizontalPadding)) {
-                        HomeEmptyPanel(tankobunString(R.string.home_trending_empty))
+                HomeFeedAnimatedContent(
+                    targetState = trendingDisplayState,
+                    refreshing = false,
+                    contentKey = { it },
+                    label = "home-trending-content",
+                    modifier = Modifier.fillMaxWidth(),
+                ) { displayState ->
+                    when (displayState) {
+                        HomeFeedDisplayState.CONTENT -> TrendingHeroCarousel(
+                            media = state.homeTrending,
+                            refreshing = trendingRefreshing,
+                            expanded = expanded,
+                            horizontalPadding = horizontalPadding,
+                            onSelectMedia = onSelectMedia,
+                        )
+                        HomeFeedDisplayState.LOADING -> Box(Modifier.padding(horizontal = horizontalPadding)) {
+                            HomeLoadingPanel(Modifier.height(if (expanded) 410.dp else 338.dp))
+                        }
+                        HomeFeedDisplayState.EMPTY -> Box(Modifier.padding(horizontal = horizontalPadding)) {
+                            HomeEmptyPanel(tankobunString(R.string.home_trending_empty))
+                        }
                     }
                 }
             }
@@ -164,23 +192,46 @@ internal fun HomeScreen(
                 title = tankobunString(R.string.home_trending_by_genre),
                 icon = TankobunIcons.TrendingUp,
                 onViewAll = onOpenBrowse,
+                isRefreshing = genresRefreshing,
                 headerModifier = Modifier.padding(horizontal = horizontalPadding),
             ) {
                 Box(Modifier.padding(horizontal = horizontalPadding)) {
-                    when {
-                        state.homeGenreHighlights.isNotEmpty() -> GenreHighlightList(
-                            highlights = state.homeGenreHighlights,
-                            expanded = expanded,
-                            onSelectMedia = onSelectMedia,
-                        )
-                        !state.homeLoaded -> HomeLoadingPanel(Modifier.height(220.dp))
-                        else -> HomeEmptyPanel(tankobunString(R.string.home_genres_empty))
+                    HomeFeedAnimatedContent(
+                        targetState = genresDisplayState,
+                        refreshing = false,
+                        contentKey = { it },
+                        label = "home-genre-content",
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { displayState ->
+                        when (displayState) {
+                            HomeFeedDisplayState.CONTENT -> GenreHighlightList(
+                                highlights = state.homeGenreHighlights,
+                                refreshingGenres = state.homeRefreshingGenres,
+                                expanded = expanded,
+                                onSelectMedia = onSelectMedia,
+                            )
+                            HomeFeedDisplayState.LOADING -> HomeLoadingPanel(Modifier.height(220.dp))
+                            HomeFeedDisplayState.EMPTY -> HomeEmptyPanel(tankobunString(R.string.home_genres_empty))
+                        }
                     }
                 }
             }
         }
     }
 }
+
+private enum class HomeFeedDisplayState {
+    LOADING,
+    CONTENT,
+    EMPTY,
+}
+
+private fun homeFeedDisplayState(hasContent: Boolean, loaded: Boolean): HomeFeedDisplayState =
+    when {
+        hasContent -> HomeFeedDisplayState.CONTENT
+        !loaded -> HomeFeedDisplayState.LOADING
+        else -> HomeFeedDisplayState.EMPTY
+    }
 
 @Composable
 private fun HomeSection(
@@ -189,6 +240,7 @@ private fun HomeSection(
     onViewAll: () -> Unit,
     modifier: Modifier = Modifier,
     headerModifier: Modifier = Modifier,
+    isRefreshing: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -196,24 +248,33 @@ private fun HomeSection(
             modifier = headerModifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(27.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = title.uppercase(),
-                style = MaterialTheme.typography.headlineSmall.copy(
+            TankobunHeadingLead(
+                title = title.uppercase(),
+                icon = icon,
+                textStyle = MaterialTheme.typography.headlineSmall.copy(
                     fontFamily = TankobunDisplayFontFamily,
                     fontSize = 25.sp,
                     lineHeight = 26.sp,
                     letterSpacing = 1.2.sp,
                 ),
-                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
+            AnimatedVisibility(
+                visible = isRefreshing,
+                enter = fadeIn(tween(180)) + scaleIn(tween(220), initialScale = 0.76f),
+                exit = fadeOut(tween(140)),
+            ) {
+                Box(
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
+            }
             Row(
                 modifier = Modifier
                     .clip(LocalTankobunStyle.current.themeShapes.control)
@@ -239,10 +300,95 @@ private fun HomeSection(
     }
 }
 
+@Composable
+private fun <T> HomeFeedAnimatedContent(
+    targetState: T,
+    refreshing: Boolean,
+    contentKey: (T) -> Any,
+    label: String,
+    modifier: Modifier = Modifier,
+    content: @Composable (T) -> Unit,
+) {
+    AnimatedContent(
+        targetState = targetState,
+        modifier = modifier,
+        contentAlignment = Alignment.TopStart,
+        transitionSpec = {
+            (fadeIn(tween(durationMillis = 340, delayMillis = 70)) +
+                scaleIn(tween(durationMillis = 340, delayMillis = 70), initialScale = 0.994f))
+                .togetherWith(fadeOut(tween(durationMillis = 160)))
+        },
+        contentKey = contentKey,
+        label = label,
+    ) { visibleState ->
+        HomeRefreshingContent(refreshing = refreshing) {
+            content(visibleState)
+        }
+    }
+}
+
+@Composable
+private fun HomeRefreshingContent(
+    refreshing: Boolean,
+    content: @Composable () -> Unit,
+) {
+    if (refreshing) {
+        val accent = MaterialTheme.colorScheme.primary
+        val refreshTransition = rememberInfiniteTransition(label = "home-refresh")
+        val pulseAlpha by refreshTransition.animateFloat(
+            initialValue = 0.90f,
+            targetValue = 0.98f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 860),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "home-refresh-alpha",
+        )
+        val sweepProgress by refreshTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1_450, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "home-refresh-sweep",
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer { alpha = pulseAlpha }
+                .drawWithCache {
+                    val halfBandWidth = size.width * 0.24f
+                    val centerX = -halfBandWidth + (size.width + halfBandWidth * 2f) * sweepProgress
+                    val wash = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            accent.copy(alpha = 0.10f),
+                            Color.Transparent,
+                        ),
+                        startX = centerX - halfBandWidth,
+                        endX = centerX + halfBandWidth,
+                    )
+                    onDrawWithContent {
+                        drawContent()
+                        drawRect(brush = wash)
+                    }
+                },
+        ) {
+            content()
+        }
+    } else {
+        Box(Modifier.fillMaxWidth()) {
+            content()
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TrendingHeroCarousel(
     media: List<AnilistMedia>,
+    refreshing: Boolean,
     expanded: Boolean,
     horizontalPadding: androidx.compose.ui.unit.Dp,
     onSelectMedia: (AnilistMedia) -> Unit,
@@ -272,13 +418,22 @@ private fun TrendingHeroCarousel(
                 contentPadding = PaddingValues(horizontal = horizontalPadding),
                 pageSpacing = 10.dp,
             ) { page ->
-                TrendingHero(
-                    media = media[page],
-                    rank = page + 1,
-                    expanded = expanded,
-                    onClick = { onSelectMedia(media[page]) },
+                val pageMedia = media[page]
+                HomeFeedAnimatedContent(
+                    targetState = pageMedia,
+                    refreshing = refreshing,
+                    contentKey = AnilistMedia::homeVisualKey,
+                    label = "home-hero-item-$page",
                     modifier = Modifier.height(heroHeight),
-                )
+                ) { visibleMedia ->
+                    TrendingHero(
+                        media = visibleMedia,
+                        rank = page + 1,
+                        expanded = expanded,
+                        onClick = { onSelectMedia(visibleMedia) },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -660,6 +815,7 @@ private fun ContinueReadingCard(
 @Composable
 private fun GenreHighlightList(
     highlights: List<AnilistGenreHighlight>,
+    refreshingGenres: Set<String>,
     expanded: Boolean,
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
@@ -672,11 +828,18 @@ private fun GenreHighlightList(
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
                     columnItems.forEach { highlight ->
-                        GenreHighlightCard(
-                            highlight = highlight,
-                            expanded = true,
-                            onClick = { onSelectMedia(highlight.media) },
-                        )
+                        HomeFeedAnimatedContent(
+                            targetState = highlight,
+                            refreshing = highlight.genre in refreshingGenres,
+                            contentKey = { item -> item.genre to item.media.homeVisualKey() },
+                            label = "home-genre-${highlight.genre}",
+                        ) { visibleHighlight ->
+                            GenreHighlightCard(
+                                highlight = visibleHighlight,
+                                expanded = true,
+                                onClick = { onSelectMedia(visibleHighlight.media) },
+                            )
+                        }
                     }
                 }
             }
@@ -684,11 +847,18 @@ private fun GenreHighlightList(
     } else {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             highlights.forEach { highlight ->
-                GenreHighlightCard(
-                    highlight = highlight,
-                    expanded = false,
-                    onClick = { onSelectMedia(highlight.media) },
-                )
+                HomeFeedAnimatedContent(
+                    targetState = highlight,
+                    refreshing = highlight.genre in refreshingGenres,
+                    contentKey = { item -> item.genre to item.media.homeVisualKey() },
+                    label = "home-genre-${highlight.genre}",
+                ) { visibleHighlight ->
+                    GenreHighlightCard(
+                        highlight = visibleHighlight,
+                        expanded = false,
+                        onClick = { onSelectMedia(visibleHighlight.media) },
+                    )
+                }
             }
         }
     }
@@ -701,7 +871,14 @@ private fun GenreHighlightCard(
     onClick: () -> Unit,
 ) {
     val media = highlight.media
-    val image = media.bannerImage ?: media.mainCharacterImage ?: media.coverImage
+    val imageCandidates = remember(media.bannerImage, media.coverImage, media.mainCharacterImage) {
+        listOfNotNull(
+            media.bannerImage?.takeIf(String::isNotBlank),
+            media.mainCharacterImage?.takeIf(String::isNotBlank),
+            media.coverImage?.takeIf(String::isNotBlank),
+        ).distinct()
+    }
+    var imageIndex by remember(imageCandidates) { mutableIntStateOf(0) }
     val style = LocalTankobunStyle.current
     Surface(
         modifier = Modifier
@@ -720,10 +897,15 @@ private fun GenreHighlightCard(
                     .fillMaxHeight(),
             ) {
                 AsyncImage(
-                    model = image,
+                    model = imageCandidates.getOrNull(imageIndex),
                     contentDescription = media.title.userPreferred,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
+                    onError = {
+                        if (imageIndex < imageCandidates.lastIndex) {
+                            imageIndex += 1
+                        }
+                    },
                 )
                 Box(
                     Modifier
@@ -796,6 +978,24 @@ private fun AnilistMedia.cleanDescription(): String? = description
     ?.replace(Regex("\\s+"), " ")
     ?.trim()
     ?.takeIf { it.isNotBlank() }
+
+private data class HomeMediaVisualKey(
+    val id: Int,
+    val title: String,
+    val bannerImage: String?,
+    val mainCharacterImage: String?,
+    val coverImage: String?,
+    val characterImages: List<String>,
+)
+
+private fun AnilistMedia.homeVisualKey(): HomeMediaVisualKey = HomeMediaVisualKey(
+    id = id,
+    title = title.userPreferred,
+    bannerImage = bannerImage,
+    mainCharacterImage = mainCharacterImage,
+    coverImage = coverImage,
+    characterImages = characterImages,
+)
 
 private fun Float.compactNumber(): String =
     if (this % 1f == 0f) toInt().toString() else toString().trimEnd('0').trimEnd('.')

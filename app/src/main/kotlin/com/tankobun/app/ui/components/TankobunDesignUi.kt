@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -129,6 +130,41 @@ internal fun TankobunPanel(
         border = null,
         content = content,
     )
+}
+
+@Composable
+internal fun TankobunHeadingLead(
+    title: String,
+    icon: ImageVector,
+    textStyle: TextStyle,
+    modifier: Modifier = Modifier,
+    iconTint: Color = MaterialTheme.colorScheme.primary,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    val iconBaselineInset = with(LocalDensity.current) { 2.dp.roundToPx() }
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier
+                .size(27.dp)
+                .alignBy { measurable -> measurable.measuredHeight - iconBaselineInset },
+        )
+        Text(
+            text = title,
+            modifier = Modifier
+                .weight(1f)
+                .alignByBaseline(),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = textStyle,
+            color = titleColor,
+        )
+    }
 }
 
 @Composable

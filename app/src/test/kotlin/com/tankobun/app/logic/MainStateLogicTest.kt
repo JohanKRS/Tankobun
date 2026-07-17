@@ -4,6 +4,7 @@ import com.tankobun.app.LibraryMode
 import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.core.model.AnilistListEntry
+import com.tankobun.core.model.AnilistGenreHighlight
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistScoreFormat
@@ -22,6 +23,51 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MainStateLogicTest {
+    @Test
+    fun homeFeedRefreshTracksBothProgressiveSections() {
+        val refreshing = TankobunUiState(
+            showNsfwContent = false,
+            homeGenreHighlights = listOf(
+                AnilistGenreHighlight("Action", media(1, "First")),
+                AnilistGenreHighlight("Romance", media(2, "Second")),
+            ),
+        )
+            .withHomeFeedRefreshStarted(
+                includeAdult = false,
+                genres = listOf("Action", "Romance"),
+            )
+
+        assertTrue(refreshing.homeTrendingRefreshing)
+        assertTrue(refreshing.homeGenreHighlightsRefreshing)
+        assertEquals(setOf("Action", "Romance"), refreshing.homeRefreshingGenres)
+
+        val partiallyRefreshed = refreshing.withHomeGenresRefreshProgress(setOf("Action"))
+
+        assertTrue(partiallyRefreshed.homeGenreHighlightsRefreshing)
+        assertEquals(setOf("Romance"), partiallyRefreshed.homeRefreshingGenres)
+
+        val finished = partiallyRefreshed.withHomeGenresRefreshProgress(setOf("Romance"))
+
+        assertFalse(finished.homeGenreHighlightsRefreshing)
+        assertTrue(finished.homeRefreshingGenres.isEmpty())
+
+        val stopped = finished.withHomeFeedRefreshStopped(includeAdult = false)
+
+        assertFalse(stopped.homeTrendingRefreshing)
+        assertFalse(stopped.homeGenreHighlightsRefreshing)
+    }
+
+    @Test
+    fun homeFeedRefreshIgnoresResultsFromPreviousContentMode() {
+        val state = TankobunUiState(showNsfwContent = false)
+
+        assertSame(
+            state,
+            state.withHomeFeedRefreshStarted(includeAdult = true, genres = listOf("Action")),
+        )
+        assertSame(state, state.withHomeFeedRefreshStopped(includeAdult = true))
+    }
+
     @Test
     fun selectedAniListDetailsUpdateLibraryAndTrackingFormWhenClean() {
         val media = media(42, "Updated")

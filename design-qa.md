@@ -47,4 +47,19 @@ No actionable P0, P1, or P2 findings remain.
 - The combined visual comparison confirms title hierarchy against the details page, a smooth 12% image transition, and readable theme-aware contrast in both light and dark themes.
 - Android crash logs contained no Tankobun crash, migration failure, or ANR.
 
+## Home heading grid and icon baseline QA — 2026-07-17
+
+- Annotated reference: `/var/folders/37/xbnjjyy16rzcnffjlyv6lwym0000gn/T/codex-clipboard-8451d41d-8e37-4904-a167-3c5b80bf6f12.png`
+- Pixel Tablet implementation in Portuguese: `/tmp/tankobun-tablet-heading-alignment-pt.png`
+- UI hierarchy: `/tmp/tankobun-tablet-home-pt-ui-summary.txt`
+- Viewport: Pixel Tablet, 2560 x 1600 landscape
+
+No actionable P0, P1, P2, or P3 findings remain.
+
+- The top chrome and Home section headings now reuse one leading-layout primitive, so icon size and icon-to-text spacing cannot diverge between them.
+- `INÍCIO`, `EM ALTA`, and `EM ALTA POR GÊNERO` all begin at x=110 px in the captured UI hierarchy.
+- Icons use an explicit optical alignment line tied to the text's first typographic baseline rather than vertical centering. The home and flame glyphs visibly finish on the baseline of the main letter body, while diacritics and descenders do not affect placement.
+- The shared component preserves the existing typeface, size, color, trailing actions, responsive padding, and navigation behavior.
+- Unit tests pass and the Android crash buffer is empty.
+
 final result: passed

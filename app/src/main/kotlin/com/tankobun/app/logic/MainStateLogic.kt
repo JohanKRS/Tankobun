@@ -41,6 +41,41 @@ internal fun TankobunUiState.withAniListTitleLanguage(language: AnilistTitleLang
         },
     )
 
+internal fun TankobunUiState.withHomeFeedRefreshStarted(
+    includeAdult: Boolean,
+    genres: Collection<String>,
+): TankobunUiState =
+    if (showNsfwContent != includeAdult) {
+        this
+    } else {
+        copy(
+            homeTrendingRefreshing = true,
+            homeGenreHighlightsRefreshing = true,
+            homeRefreshingGenres = genres.toCollection(linkedSetOf()),
+        )
+    }
+
+internal fun TankobunUiState.withHomeFeedRefreshStopped(includeAdult: Boolean): TankobunUiState =
+    if (showNsfwContent != includeAdult) {
+        this
+    } else {
+        copy(
+            homeTrendingRefreshing = false,
+            homeGenreHighlightsRefreshing = false,
+            homeRefreshingGenres = emptySet(),
+        )
+    }
+
+internal fun TankobunUiState.withHomeGenresRefreshProgress(
+    refreshedGenres: Set<String>,
+): TankobunUiState {
+    val remainingGenres = homeRefreshingGenres - refreshedGenres
+    return copy(
+        homeGenreHighlightsRefreshing = remainingGenres.isNotEmpty(),
+        homeRefreshingGenres = remainingGenres,
+    )
+}
+
 internal fun TankobunUiState.mediaTitle(mediaId: Int, fallback: String = "Manga $mediaId"): String =
     libraryItems.firstOrNull { it.media.id == mediaId }?.media?.title?.userPreferred
         ?: library.firstOrNull { it.id == mediaId }?.title?.userPreferred
