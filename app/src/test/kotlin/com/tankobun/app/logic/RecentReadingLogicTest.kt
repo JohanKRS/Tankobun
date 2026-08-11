@@ -15,6 +15,90 @@ import org.junit.Test
 
 class RecentReadingLogicTest {
     @Test
+    fun currentSourceReplacesChapterFromOldSourceByChapterNumber() {
+        val oldProgress = progress(chapterNumber = 12f)
+        val item = com.tankobun.app.state.RecentReadingProgress(
+            media = media(status = "RELEASING"),
+            progress = oldProgress,
+            chapter = chapter(12f, sourceId = 1L, mangaUrl = "old-manga"),
+            sourcePackageName = "old.package",
+        )
+        val currentChapters = listOf(
+            chapter(13f, sourceId = 2L, mangaUrl = "current-manga", url = "current-13"),
+            chapter(12f, sourceId = 2L, mangaUrl = "current-manga", url = "current-12"),
+        )
+
+        val resolved = item.withCurrentSourceChapters("current.package", currentChapters)
+
+        assertEquals(2L, resolved.chapter?.sourceId)
+        assertEquals("current-manga", resolved.chapter?.mangaUrl)
+        assertEquals(12f, resolved.chapter?.chapterNumber)
+        assertEquals("current.package", resolved.sourcePackageName)
+    }
+
+    @Test
+    fun completedProgressContinuesAtNextChapterFromCurrentSource() {
+        val item = com.tankobun.app.state.RecentReadingProgress(
+            media = media(status = "RELEASING"),
+            progress = progress(chapterNumber = 12f, completed = true),
+            chapter = chapter(12f, sourceId = 1L, mangaUrl = "old-manga"),
+        )
+        val currentChapters = listOf(
+            chapter(12f, sourceId = 2L, mangaUrl = "current-manga", url = "current-12"),
+            chapter(13f, sourceId = 2L, mangaUrl = "current-manga", url = "current-13"),
+        )
+
+        val resolved = item.withCurrentSourceChapters("current.package", currentChapters)
+
+        assertEquals(13f, resolved.chapter?.chapterNumber)
+        assertEquals(2L, resolved.chapter?.sourceId)
+    }
+
+    @Test
+    fun currentBindingWithoutCachedChaptersNeverFallsBackToOldSource() {
+        val item = com.tankobun.app.state.RecentReadingProgress(
+            media = media(status = "RELEASING"),
+            progress = progress(chapterNumber = 12f),
+            chapter = chapter(12f, sourceId = 1L, mangaUrl = "old-manga"),
+            sourcePackageName = "old.package",
+        )
+
+        val resolved = item.withCurrentSourceChapters("current.package", emptyList())
+
+        assertNull(resolved.chapter)
+        assertEquals("current.package", resolved.sourcePackageName)
+    }
+
+    @Test
+    fun currentSourcePrefersExactChapterUrlEvenWhenNumberIsUnknown() {
+        val unknownProgress = progress(chapterNumber = 0f).copy(chapterUrl = "shared-chapter-url")
+        val item = com.tankobun.app.state.RecentReadingProgress(
+            media = media(status = "RELEASING"),
+            progress = unknownProgress,
+            chapter = chapter(
+                chapterNumber = 0f,
+                sourceId = 1L,
+                mangaUrl = "old-manga",
+                url = "shared-chapter-url",
+            ),
+        )
+        val expected = chapter(
+            chapterNumber = 34f,
+            sourceId = 2L,
+            mangaUrl = "current-manga",
+            url = "shared-chapter-url",
+        )
+
+        val resolved = item.withCurrentSourceChapters(
+            sourcePackageName = "current.package",
+            chapters = listOf(chapter(1f, sourceId = 2L), expected),
+        )
+
+        assertEquals(expected, resolved.chapter)
+        assertEquals("current.package", resolved.sourcePackageName)
+    }
+
+    @Test
     fun overallProgressUsesHighestChapterNumberInsteadOfDuplicateCount() {
         val metrics = recentReadingMetrics(
             progress = progress(chapterNumber = 20f),
@@ -120,11 +204,16 @@ class RecentReadingLogicTest {
             hiddenFromStatusLists = hiddenFromStatusLists,
         )
 
-    private fun chapter(chapterNumber: Float): SourceChapter =
+    private fun chapter(
+        chapterNumber: Float,
+        sourceId: Long = 1L,
+        mangaUrl: String = "manga",
+        url: String = "chapter-$chapterNumber",
+    ): SourceChapter =
         SourceChapter(
-            sourceId = 1L,
-            mangaUrl = "manga",
-            url = "chapter-$chapterNumber",
+            sourceId = sourceId,
+            mangaUrl = mangaUrl,
+            url = url,
             name = "Chapter $chapterNumber",
             chapterNumber = chapterNumber,
             scanlator = null,

@@ -13,6 +13,8 @@ import com.tankobun.app.logic.sourceMatchKey
 import com.tankobun.app.logic.sourcePickerDiagnosticDetail
 import com.tankobun.app.logic.sourceSearchQueries
 import com.tankobun.app.logic.sourceSearchRankTitleVariants
+import com.tankobun.app.logic.withCurrentSourceChapters
+import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.core.database.SourceSearchResultEntity
 import com.tankobun.core.database.toEntity
 import com.tankobun.core.database.toModel
@@ -252,6 +254,34 @@ internal class SourceDataSource(
             .progressForMedia(mediaId)
             .map { it.toModel() }
             .associateBy { it.chapterUrl }
+
+    suspend fun resolveRecentReadingProgress(
+        item: RecentReadingProgress,
+        sources: List<SourceDescriptor>,
+        now: Long,
+    ): RecentReadingProgress {
+        val cached = cachedSourceState(item.media.id, sources)
+        val boundPackageName = cached.boundSource?.packageName ?: cached.boundSourcePackageName
+            ?: return item
+        val source = cached.boundSource
+        val manga = cached.boundManga
+        if (source == null || manga == null) {
+            return item.withCurrentSourceChapters(boundPackageName, emptyList())
+        }
+        val chapters = cached.sourceChapters.ifEmpty {
+            runCatching {
+                loadChapters(
+                    source = source,
+                    manga = manga,
+                    mediaId = item.media.id,
+                    now = now,
+                ).chapters
+            }.onFailure { error ->
+                Log.w(TAG, "Current source chapter load failed for ${item.media.id}/${source.name}", error)
+            }.getOrDefault(emptyList())
+        }
+        return item.withCurrentSourceChapters(source.packageName, chapters)
+    }
 
     suspend fun searchSourceMatches(
         media: AnilistMedia,

@@ -115,15 +115,22 @@ class ReaderStateLogicTest {
             activeChapter = chapter("old"),
             readerPages = listOf(page(0)),
             selectedSourceId = 5,
+            selectedSourcePackageName = "old.source.package",
             anilistScoreFormat = AnilistScoreFormat.POINT_100,
         ).withRecentProgressOpened(
-            item = RecentReadingProgress(media = media, progress = progress, chapter = chapter),
+            item = RecentReadingProgress(
+                media = media,
+                progress = progress,
+                chapter = chapter,
+                sourcePackageName = "current.source.package",
+            ),
             existingEntry = entry,
         )
 
         assertEquals(media, next.selectedMedia)
         assertEquals(entry, next.selectedListEntry)
         assertEquals(1L, next.selectedSourceId)
+        assertEquals("current.source.package", next.selectedSourcePackageName)
         assertEquals(progress, next.latestProgress)
         assertEquals(mapOf("chapter-1" to progress), next.chapterProgress)
         assertNull(next.activeChapter)

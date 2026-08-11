@@ -1,6 +1,7 @@
 package com.tankobun.app.ui.library
 
 import com.tankobun.app.ui.icons.TankobunIcons
+import com.tankobun.app.ui.icons.genreIcon
 
 import android.content.Context
 import android.content.Intent
@@ -1551,7 +1552,7 @@ internal fun LibraryGenreDialog(
                         TankobunChip(
                             selected = genre in selectedGenres,
                             onClick = { onGenreSelected(genre, genre !in selectedGenres) },
-                            leadingIcon = { TankobunChipIcon(TankobunIcons.Category) },
+                            leadingIcon = { TankobunChipIcon(genreIcon(genre)) },
                             label = {
                                 Text(browseGenreLabel(genre), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             },

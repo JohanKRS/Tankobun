@@ -1,6 +1,7 @@
 package com.tankobun.app.ui.browse
 
 import com.tankobun.app.ui.icons.TankobunIcons
+import com.tankobun.app.ui.icons.genreIcon
 
 import android.content.Context
 import android.content.Intent
@@ -922,14 +923,14 @@ internal fun BrowseGenreDialog(
             ) {
                 FlowRowCompat {
                     BrowseGenres.forEach { genre ->
-                    TankobunChip(
-                        selected = genre in state.browseGenres,
-                        onClick = { viewModel.setBrowseGenre(genre, genre !in state.browseGenres) },
-                        leadingIcon = { TankobunChipIcon(TankobunIcons.Category) },
-                        label = {
-                                    Text(browseGenreLabel(genre), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        },
-                    )
+                        TankobunChip(
+                            selected = genre in state.browseGenres,
+                            onClick = { viewModel.setBrowseGenre(genre, genre !in state.browseGenres) },
+                            leadingIcon = { TankobunChipIcon(genreIcon(genre)) },
+                            label = {
+                                Text(browseGenreLabel(genre), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            },
+                        )
                     }
                 }
             }

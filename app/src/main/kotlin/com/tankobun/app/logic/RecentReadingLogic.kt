@@ -1,5 +1,6 @@
 package com.tankobun.app.logic
 
+import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.MediaStatus
@@ -12,6 +13,31 @@ internal data class RecentReadingMetrics(
     val overallProgress: Float?,
     val reachedLastAvailableChapter: Boolean,
 )
+
+internal fun RecentReadingProgress.withCurrentSourceChapters(
+    sourcePackageName: String,
+    chapters: List<SourceChapter>,
+): RecentReadingProgress {
+    val previousChapter = chapter
+    val effectiveProgress = previousChapter
+        ?.chapterNumber
+        ?.takeIf { progress.chapterNumber <= 0f && it > 0f }
+        ?.let { previousNumber -> progress.copy(chapterNumber = previousNumber) }
+        ?: progress
+    val previousName = previousChapter?.name?.trim().orEmpty()
+    val currentChapter = chapters.firstOrNull { it.url == progress.chapterUrl }
+        ?: if (effectiveProgress.chapterNumber > 0f) {
+            chapters.chapterNearProgress(effectiveProgress)
+        } else {
+            chapters.firstOrNull { current ->
+                previousName.isNotEmpty() && current.name.trim().equals(previousName, ignoreCase = true)
+            } ?: chapters.firstInReadingOrder()
+        }
+    return copy(
+        chapter = currentChapter,
+        sourcePackageName = sourcePackageName,
+    )
+}
 
 internal fun recentReadingMetrics(
     progress: ReadingProgress,

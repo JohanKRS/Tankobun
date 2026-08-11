@@ -95,7 +95,7 @@ internal object TankobunIcons {
     val GenreAction: ImageVector = TablerIcons.Bolt
     val GenreAdventure: ImageVector = TablerIcons.Compass
     val GenreComedy: ImageVector = TablerIcons.MoodHappy
-    val GenreDrama: ImageVector = TablerIcons.Mask
+    val GenreDrama: ImageVector = TablerIcons.HeartBroken
     val GenreEcchi: ImageVector = TablerIcons.Heart
     val GenreFantasy: ImageVector = TablerIcons.Wand
     val GenreHentai: ImageVector = TablerIcons.Venus

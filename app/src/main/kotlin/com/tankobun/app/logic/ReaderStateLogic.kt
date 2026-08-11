@@ -104,6 +104,7 @@ internal fun TankobunUiState.withRecentProgressOpened(
         trackingPrivate = existingEntry?.private ?: false,
         trackingCustomLists = existingEntry?.customLists.orEmpty().toSet(),
         selectedSourceId = item.chapter?.sourceId ?: selectedSourceId,
+        selectedSourcePackageName = item.sourcePackageName,
         selectedSourceManga = null,
         sourceChapters = emptyList(),
         latestProgress = item.progress,

@@ -3821,6 +3821,7 @@ class MainViewModel(
                     Log.i(TAG, "Chapter load ${source.name}/${detailedManga.title}: chapters=${chapters.size}")
                 }
                 _state.update { it.withSourceChaptersLoaded(localizedContext(), source, detailedManga, chapters, chapterProgress) }
+                loadRecentReadingProgress()
                 if (_state.value.keepNextTenDownloads) {
                     val result = ensureNextTenDownloads()
                     if (result.changed > 0) {
@@ -4061,17 +4062,27 @@ class MainViewModel(
     }
 
     fun openRecentProgress(item: RecentReadingProgress) {
-        val existingEntry = _state.value.libraryItems.firstOrNull { libraryItem ->
-            libraryItem.media.id == item.media.id
-        }?.entry
-        _state.update { it.withRecentProgressOpened(item, existingEntry) }
-        loadAnilistDetails(item.media.id)
-        loadCachedSourceState(item.media.id)
-        val chapter = item.chapter
-        if (chapter == null) {
-            _state.update { it.copy(message = string(R.string.msg_chapter_cache_missing, item.media.title.userPreferred)) }
-        } else {
-            openChapter(chapter)
+        viewModelScope.launch {
+            val sources = _state.value.allInstalledSources.ifEmpty { _state.value.installedSources }
+            val resolvedItem = sourceDataSource.resolveRecentReadingProgress(
+                item = item,
+                sources = sources,
+                now = System.currentTimeMillis(),
+            )
+            val existingEntry = _state.value.libraryItems.firstOrNull { libraryItem ->
+                libraryItem.media.id == resolvedItem.media.id
+            }?.entry
+            _state.update { it.withRecentProgressOpened(resolvedItem, existingEntry) }
+            loadAnilistDetails(resolvedItem.media.id)
+            loadCachedSourceState(resolvedItem.media.id)
+            val chapter = resolvedItem.chapter
+            if (chapter == null) {
+                _state.update {
+                    it.copy(message = string(R.string.msg_chapter_cache_missing, resolvedItem.media.title.userPreferred))
+                }
+            } else {
+                openChapter(chapter)
+            }
         }
     }
 

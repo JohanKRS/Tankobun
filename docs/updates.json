@@ -2,34 +2,42 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 42,
-    "versionName": "4.0.2",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v4.0.2/tankobun-4.0.2.apk",
-    "apkSha256": "13DCF7FDD1F3ADA54B981ABAF97E3E9ACDED674CF9031E0C5CB584B637D70F39",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v4.0.2",
-    "publishedAt": "2026-07-17T14:22:45Z",
-    "sizeBytes": 12096680,
+    "versionCode": 43,
+    "versionName": "4.1.0",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v4.1.0/tankobun-4.1.0.apk",
+    "apkSha256": "1DCCA840510CB1BB0A956295B7AC384806B29B6E40EB37C90328D6FFBE659679",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v4.1.0",
+    "publishedAt": "2026-08-11T16:48:15Z",
+    "sizeBytes": 13906450,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Onboarding now starts with theme selection, preloads Home, and provides a faster tour of Home, Library, Browse, Profile, and Settings.",
-        "Color palettes and component shapes remain visible while Follow system light/dark is selected, making customization easier to discover.",
-        "Home refreshes now transition item by item with lightweight loading feedback, genre art falls back from banner to character to cover, and heading icons use optical alignment."
+        "AniList and Home now batch compatible requests, reuse fresh caches, update sections progressively, and respect rate-limit feedback to feel faster without unnecessary traffic.",
+        "Source browsing and matching now better handle modern Mihon-compatible extension indexes, conditional metadata refreshes, legacy identifiers, and user-installed repositories without bundling any source links.",
+        "Downloads, reader pages, covers, banners, and source icons now use safer bounded concurrency, resumable state, request deduplication, and stronger cache reuse.",
+        "Continue Reading now resolves chapters through the currently selected source instead of reopening stale source data.",
+        "Genre filters now use the same genre-specific icons as Profile, with a clearer Drama icon."
       ],
       "pt-BR": [
-        "O onboarding agora começa pela escolha do tema, pré-carrega a Home e oferece um tour mais rápido pela Home, Biblioteca, Explorar, Perfil e Configurações.",
-        "Paletas e formatos dos componentes permanecem visíveis mesmo com Seguir claro/escuro selecionado, deixando a personalização mais fácil de descobrir.",
-        "As atualizações da Home agora entram item a item com feedback leve de carregamento, as imagens por gênero fazem fallback de banner para personagem e capa, e os ícones dos cabeçalhos receberam alinhamento óptico."
+        "AniList e Home agora agrupam requisições compatíveis, reaproveitam caches válidos, atualizam seções progressivamente e respeitam os limites informados, entregando mais velocidade sem tráfego desnecessário.",
+        "A busca e associação de fontes agora lidam melhor com índices modernos de extensões compatíveis com Mihon, atualizações condicionais de metadados, identificadores antigos e repositórios instalados pelo usuário, sem embutir links de fontes.",
+        "Downloads, páginas do leitor, capas, banners e ícones de fontes agora usam concorrência limitada com segurança, retomada persistente, deduplicação de requisições e melhor reaproveitamento de cache.",
+        "O Continuar lendo agora resolve capítulos pela fonte atualmente selecionada, em vez de reabrir dados de uma fonte antiga.",
+        "Os filtros de gêneros agora usam os mesmos ícones específicos do Perfil, com um ícone mais claro para Drama."
       ],
       "es": [
-        "La configuración inicial ahora empieza por la elección del tema, precarga Inicio y ofrece un recorrido más rápido por Inicio, Biblioteca, Explorar, Perfil y Ajustes.",
-        "Las paletas y formas de los componentes siguen visibles incluso con Seguir claro/oscuro seleccionado, para que la personalización sea más fácil de descubrir.",
-        "Las actualizaciones de Inicio ahora aparecen elemento por elemento con una señal de carga sutil; las imágenes por género recurren a banner, personaje y portada, y los iconos de los encabezados usan alineación óptica."
+        "AniList e Inicio ahora agrupan solicitudes compatibles, reutilizan cachés vigentes, actualizan secciones progresivamente y respetan los límites indicados para ofrecer más velocidad sin tráfico innecesario.",
+        "La búsqueda y asociación de fuentes ahora gestionan mejor los índices modernos de extensiones compatibles con Mihon, las actualizaciones condicionales de metadatos, los identificadores antiguos y los repositorios instalados por el usuario, sin incluir enlaces de fuentes.",
+        "Las descargas, páginas del lector, portadas, banners e iconos de fuentes ahora usan concurrencia limitada y segura, estado reanudable, deduplicación de solicitudes y mejor reutilización de caché.",
+        "Continuar leyendo ahora resuelve los capítulos mediante la fuente seleccionada actualmente, en lugar de reabrir datos de una fuente antigua.",
+        "Los filtros de géneros ahora usan los mismos iconos específicos de Perfil, con un icono más claro para Drama."
       ],
       "zh-CN": [
-        "初始设置现在从主题选择开始，会预加载首页，并以更简短的导览介绍首页、书架、浏览、个人资料和设置。",
-        "即使选择“跟随系统深浅色”，配色和组件形状仍会保持可见，让自定义选项更容易发现。",
-        "首页刷新现在会逐项显示轻量加载反馈和过渡；分类图片按横幅、角色图、封面的顺序回退，标题图标也采用了视觉对齐。"
+        "AniList 与首页现在会合并兼容请求、复用有效缓存、逐步更新各区块，并遵守限流反馈，在减少不必要流量的同时提升速度。",
+        "来源浏览与匹配现在更好地支持兼容 Mihon 的现代扩展索引、条件式元数据刷新、旧标识符及用户安装的仓库，应用仍不会内置任何来源链接。",
+        "下载、阅读器页面、封面、横幅和来源图标现在采用安全的并发上限、可恢复状态、请求去重和更充分的缓存复用。",
+        "继续阅读现在会通过当前选中的来源解析章节，不再重新打开旧来源的数据。",
+        "分类筛选现在与个人资料页共用分类专属图标，并为剧情分类换用了更清晰的图标。"
       ]
     }
   }

@@ -62,6 +62,8 @@ import com.tankobun.app.MainViewModel
 import com.tankobun.app.R
 import com.tankobun.app.TankobunDisplayFontFamily
 import com.tankobun.app.tankobunString
+import com.tankobun.app.logic.chapterNearProgress
+import com.tankobun.app.logic.firstInReadingOrder
 import com.tankobun.app.logic.nextInReadingOrderAfter
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.app.ui.components.TankobunActionButton
@@ -322,25 +324,6 @@ internal fun TankobunUiState.primaryReadingActionChapter(): SourceChapter? =
 
 internal fun TankobunUiState.nextReaderChapter(): SourceChapter? =
     sourceChapters.nextInReadingOrderAfter(activeChapter ?: return null)
-
-internal fun List<SourceChapter>.chapterNearProgress(progress: ReadingProgress): SourceChapter? {
-    val chapterNumber = progress.chapterNumber
-    if (chapterNumber > 0f) {
-        val nextChapter = if (progress.completed) {
-            filter { it.chapterNumber > chapterNumber }.minByOrNull { it.chapterNumber }
-        } else {
-            filter { it.chapterNumber >= chapterNumber }.minByOrNull { it.chapterNumber }
-        }
-        if (nextChapter != null) return nextChapter
-        return minByOrNull { abs((it.chapterNumber.takeIf { number -> number > 0f } ?: chapterNumber) - chapterNumber) }
-    }
-    return firstInReadingOrder()
-}
-
-internal fun List<SourceChapter>.firstInReadingOrder(): SourceChapter? =
-    filter { it.chapterNumber > 0f }
-        .minByOrNull { it.chapterNumber }
-        ?: lastOrNull()
 
 internal fun SourceChapter.isReadBy(progressByChapter: Map<String, ReadingProgress>): Boolean =
     progressByChapter[url]?.completed == true

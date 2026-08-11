@@ -60,6 +60,7 @@ import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.LibraryMode
 import com.tankobun.app.ui.components.TankobunPanel
 import com.tankobun.app.ui.icons.TankobunIcons
+import com.tankobun.app.ui.icons.genreIcon
 import com.tankobun.app.ui.library.LibraryConnectPrompt
 import com.tankobun.app.ui.shell.LocalTankobunChromeInsets
 import com.tankobun.core.model.AnilistMangaStats
@@ -504,7 +505,7 @@ private fun ProfileGenreRow(item: AnilistStatItem, maxChapters: Int) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = profileGenreIcon(item.name),
+                imageVector = genreIcon(item.name),
                 contentDescription = null,
                 tint = accent,
                 modifier = Modifier
@@ -1068,30 +1069,6 @@ private fun statusIcon(name: String): ImageVector =
         "PLANNING", "PLAN_TO_READ" -> TankobunIcons.CalendarMonth
         "PAUSED" -> TankobunIcons.Pause
         "DROPPED" -> TankobunIcons.Close
-        else -> TankobunIcons.Category
-    }
-
-private fun profileGenreIcon(name: String): ImageVector =
-    when (name.trim().lowercase(Locale.ROOT).replace('_', ' ').replace('-', ' ')) {
-        "action" -> TankobunIcons.GenreAction
-        "adventure" -> TankobunIcons.GenreAdventure
-        "comedy" -> TankobunIcons.GenreComedy
-        "drama" -> TankobunIcons.GenreDrama
-        "ecchi" -> TankobunIcons.GenreEcchi
-        "fantasy" -> TankobunIcons.GenreFantasy
-        "hentai" -> TankobunIcons.GenreHentai
-        "horror" -> TankobunIcons.GenreHorror
-        "mahou shoujo" -> TankobunIcons.GenreMahouShoujo
-        "mecha" -> TankobunIcons.GenreMecha
-        "music" -> TankobunIcons.GenreMusic
-        "mystery" -> TankobunIcons.GenreMystery
-        "psychological" -> TankobunIcons.GenrePsychological
-        "romance" -> TankobunIcons.GenreRomance
-        "sci fi", "science fiction" -> TankobunIcons.GenreSciFi
-        "slice of life" -> TankobunIcons.GenreSliceOfLife
-        "sports" -> TankobunIcons.GenreSports
-        "supernatural" -> TankobunIcons.GenreSupernatural
-        "thriller" -> TankobunIcons.GenreThriller
         else -> TankobunIcons.Category
     }
 
