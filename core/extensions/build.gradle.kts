@@ -18,7 +18,6 @@ dependencies {
     implementation(libs.androidx.preference)
     implementation(libs.okhttp)
     implementation(libs.okhttp.brotli)
-    implementation(libs.okhttp.zstd)
     implementation(libs.rxjava)
     implementation(libs.jsoup)
     implementation(libs.kotlinx.coroutines.android)

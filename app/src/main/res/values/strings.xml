@@ -700,6 +700,7 @@
     <string name="about_changelog_v41_continue_reading">Continue Reading now resolves chapters through the currently selected source instead of stale source data.</string>
     <string name="about_changelog_v41_genres">Genre filters now use the same genre-specific icons as Profile, with a clearer Drama icon.</string>
     <string name="about_changelog_v411_extension_validation">Extension packages are now checked against repository identity and signing data before Android opens the installer.</string>
+    <string name="about_changelog_v412_install_compatibility">Improved Android installation compatibility while keeping extension discovery and management intact.</string>
     <string name="about_unofficial">Tankobun is an unofficial manga reader and is not affiliated with AniList.</string>
     <string name="about_anilist_thanks">Thanks to AniList for making its API available to users and community apps.</string>
     <string name="about_anilist_data">AniList is an anime and manga database, tracking, and social site. It does not host, upload, share, sell, or provide manga, chapters, or scanlations. Tankobun accesses AniList metadata through the AniList API; account sync uses user authorization.</string>
@@ -722,7 +723,7 @@
     <string name="sources_all_on">All on</string>
     <string name="sources_all_off">All off</string>
     <string name="sources_update_cd">Update %1$s</string>
-    <string name="sources_uninstall_cd">Uninstall %1$s</string>
+    <string name="sources_uninstall_cd">Manage or uninstall %1$s</string>
     <string name="sources_nsfw">NSFW</string>
     <string name="sources_installed_sources_count">%1$d sources installed</string>
     <string name="sources_source_fallback">Source %1$d</string>

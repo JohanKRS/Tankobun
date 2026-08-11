@@ -692,6 +692,7 @@
     <string name="about_changelog_v41_continue_reading">Continuar leyendo ahora resuelve los capítulos mediante la fuente seleccionada actualmente, en lugar de usar datos antiguos de otra fuente.</string>
     <string name="about_changelog_v41_genres">Los filtros de géneros ahora usan los mismos iconos específicos de Perfil, con un icono más claro para Drama.</string>
     <string name="about_changelog_v411_extension_validation">Los paquetes de extensiones ahora se comprueban con los datos de identidad y firma del repositorio antes de que Android abra el instalador.</string>
+    <string name="about_changelog_v412_install_compatibility">Mejorada la compatibilidad de instalación en Android, manteniendo intactos el descubrimiento y la gestión de extensiones.</string>
     <string name="about_unofficial">Tankobun es un lector de manga no oficial y no está afiliado con AniList.</string>
     <string name="about_anilist_thanks">Gracias a AniList por poner su API a disposición de usuarios y apps de la comunidad.</string>
     <string name="about_anilist_data">AniList es una base de datos y un sitio social de seguimiento de anime y manga. No aloja, sube, comparte, vende ni proporciona manga, capítulos o scanlations. Tankobun accede a metadatos de AniList mediante la API de AniList; la sincronización de cuenta usa autorización del usuario.</string>
@@ -714,7 +715,7 @@
     <string name="sources_all_on">Todas activadas</string>
     <string name="sources_all_off">Todas desactivadas</string>
     <string name="sources_update_cd">Actualizar %1$s</string>
-    <string name="sources_uninstall_cd">Desinstalar %1$s</string>
+    <string name="sources_uninstall_cd">Gestionar o desinstalar %1$s</string>
     <string name="sources_nsfw">NSFW</string>
     <string name="sources_installed_sources_count">%1$d fuentes instaladas</string>
     <string name="sources_source_fallback">Fuente %1$d</string>

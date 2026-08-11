@@ -699,6 +699,7 @@
     <string name="about_changelog_v41_continue_reading">继续阅读现在会通过当前选中的来源解析章节，不再使用其他来源的旧数据。</string>
     <string name="about_changelog_v41_genres">分类筛选现在与个人资料页共用分类专属图标，并为剧情分类换用了更清晰的图标。</string>
     <string name="about_changelog_v411_extension_validation">扩展包现在会先与仓库的身份和签名信息核对，再由 Android 打开安装器。</string>
+    <string name="about_changelog_v412_install_compatibility">改进了 Android 安装兼容性，同时保持扩展发现与管理功能不变。</string>
     <string name="about_unofficial">Tankobun 是非官方漫画阅读器，与 AniList 没有关联。</string>
     <string name="about_anilist_thanks">感谢 AniList 向用户和社区应用开放 API。</string>
     <string name="about_anilist_data">AniList 是动画和漫画数据库、追踪与社交网站。它不托管、上传、分享、销售或提供漫画、章节或扫图。Tankobun 通过 AniList API 访问 AniList 元数据；账号同步使用用户授权。</string>
@@ -721,7 +722,7 @@
     <string name="sources_all_on">全部开启</string>
     <string name="sources_all_off">全部关闭</string>
     <string name="sources_update_cd">更新 %1$s</string>
-    <string name="sources_uninstall_cd">卸载 %1$s</string>
+    <string name="sources_uninstall_cd">管理或卸载 %1$s</string>
     <string name="sources_nsfw">NSFW</string>
     <string name="sources_installed_sources_count">已安装 %1$d 个来源</string>
     <string name="sources_source_fallback">来源 %1$d</string>

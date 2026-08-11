@@ -463,6 +463,7 @@ private fun currentVersionChangelog(context: Context, language: AppLanguage): Li
         localized.getString(R.string.about_changelog_v41_continue_reading),
         localized.getString(R.string.about_changelog_v41_genres),
         localized.getString(R.string.about_changelog_v411_extension_validation),
+        localized.getString(R.string.about_changelog_v412_install_compatibility),
     )
 }
 

@@ -1160,7 +1160,7 @@ internal fun downloadedExtensionInstallIntent(installRequest: ExtensionInstallRe
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
 internal fun extensionUninstallIntent(packageName: String): Intent =
-    Intent(Intent.ACTION_DELETE, Uri.parse("package:$packageName"))
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
 internal fun sourceLanguageSortPriority(language: String): Int =
