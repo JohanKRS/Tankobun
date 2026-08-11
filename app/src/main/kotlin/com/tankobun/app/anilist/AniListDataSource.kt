@@ -900,13 +900,15 @@ internal class AniListDataSource(
     ): List<AnilistMedia> {
         if (media.isEmpty()) return emptyList()
         val now = System.currentTimeMillis()
-        val enriched = media.distinctBy { it.id }.map { original ->
-            runCatching {
-                container.anilistRepository.mangaById(original.id, accessToken)
-                    ?.withTitleLanguage(titleLanguage)
-            }.onFailure { error ->
-                Log.w(TAG, "Failed to enrich recommendation media ${original.id}", error)
-            }.getOrNull() ?: original.withTitleLanguage(titleLanguage)
+        val originals = media.distinctBy { it.id }
+        val fetchedById = runCatching {
+            container.anilistRepository.mangaByIds(originals.map { it.id }, accessToken)
+                .associateBy { it.id }
+        }.onFailure { error ->
+            Log.w(TAG, "Failed to batch-enrich recommendation media", error)
+        }.getOrDefault(emptyMap())
+        val enriched = originals.map { original ->
+            (fetchedById[original.id] ?: original).withTitleLanguage(titleLanguage)
         }
         container.database.mediaDao().upsertMedia(enriched.map { it.toEntity(now) })
         return enriched

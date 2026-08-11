@@ -13,9 +13,15 @@ data class ExtensionIndexEntry(
     @SerialName("version") val versionName: String,
     @SerialName("nsfw") val nsfwFlag: Int = 0,
     val sources: List<ExtensionIndexSource> = emptyList(),
+    val iconUrl: String? = null,
 ) {
     val isNsfw: Boolean get() = nsfwFlag == 1
 }
+
+data class ExtensionIndexResult(
+    val entries: List<ExtensionIndexEntry>,
+    val resolvedIndexUrl: String,
+)
 
 @Serializable
 data class ExtensionIndexSource(

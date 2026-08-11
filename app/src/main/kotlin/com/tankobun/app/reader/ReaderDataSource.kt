@@ -14,7 +14,12 @@ import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.reader.ReaderProgressCalculator
 import com.tankobun.core.reader.ReaderSession
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.io.File
 
 internal data class ChapterReadUpdate(
@@ -80,22 +85,28 @@ internal class ReaderDataSource(
         if (initialDelayMillis > 0L) {
             delay(initialDelayMillis)
         }
-        pagesToCache.forEachIndexed { index, page ->
-            if (index > 0) delay(READER_CACHE_REQUEST_SPACING_MILLIS)
-            runCatching {
-                ReaderPageCache.cachedOrFetch(
-                    context = container.application,
-                    mediaId = mediaId,
-                    chapter = chapter,
-                    page = page,
-                ) {
-                    container.sourceHost.imageBytes(source, page)
+        val semaphore = Semaphore(READER_CACHE_CONCURRENCY)
+        coroutineScope {
+            pagesToCache.map { page ->
+                async {
+                    semaphore.withPermit {
+                        try {
+                            ReaderPageCache.cachedOrFetch(
+                                context = container.application,
+                                mediaId = mediaId,
+                                chapter = chapter,
+                                page = page,
+                            ) {
+                                container.sourceHost.imageBytes(source, page)
+                            }
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Throwable) {
+                            Log.w(TAG, "Reader cache failed for ${chapter.name} page ${page.index + 1}", error)
+                        }
+                    }
                 }
-            }.onFailure { error ->
-                if (error !is CancellationException) {
-                    Log.w(TAG, "Reader cache failed for ${chapter.name} page ${page.index + 1}", error)
-                }
-            }
+            }.awaitAll()
         }
         ReaderPageCache.prune(container.application)
     }
@@ -213,6 +224,6 @@ internal class ReaderDataSource(
         private const val READER_CACHE_BACK_PAGES = 5
         private const val READER_CACHE_FORWARD_PAGES = 10
         private const val READER_ADJACENT_CACHE_PAGE_COUNT = 2
-        private const val READER_CACHE_REQUEST_SPACING_MILLIS = 250L
+        private const val READER_CACHE_CONCURRENCY = 3
     }
 }

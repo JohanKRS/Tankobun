@@ -2,9 +2,14 @@ package com.tankobun.core.downloads
 
 import com.tankobun.core.model.DownloadJob
 import com.tankobun.core.model.ReaderPage
-import com.tankobun.core.network.RespectfulRateLimiter
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import java.util.concurrent.atomic.AtomicInteger
 
 interface DownloadPageFetcher {
     suspend fun pages(job: DownloadJob): List<ReaderPage>
@@ -12,6 +17,7 @@ interface DownloadPageFetcher {
 }
 
 interface DownloadPageStorage {
+    suspend fun storedPageIndexes(job: DownloadJob): Set<Int> = emptySet()
     suspend fun writePage(job: DownloadJob, page: ReaderPage, bytes: ByteArray): String
 }
 
@@ -33,8 +39,8 @@ class DownloadTaskRunner(
     private val pageFetcher: DownloadPageFetcher,
     private val pageStorage: DownloadPageStorage,
     private val stateStore: DownloadStateStore,
-    private val sourceRateLimiter: RespectfulRateLimiter,
     private val retryPolicy: DownloadRetryPolicy = DownloadRetryPolicy(),
+    private val pageConcurrency: Int = DEFAULT_PAGE_CONCURRENCY,
 ) {
     suspend fun run(job: DownloadJob) {
         try {
@@ -42,16 +48,32 @@ class DownloadTaskRunner(
             stateStore.markRunning(job.id)
             if (!stateStore.shouldContinue(job.id)) return
             val pages = runWithRetries(job.id, "Chapter pages") {
-                sourceRateLimiter.run { pageFetcher.pages(job) }
+                pageFetcher.pages(job)
             }
-            stateStore.markPageComplete(job.id, 0, pages.size)
-            pages.forEachIndexed { index, page ->
-                if (!stateStore.shouldContinue(job.id)) return
-                val bytes = runWithRetries(job.id, "Page ${index + 1}") {
-                    sourceRateLimiter.run { pageFetcher.bytes(page) }
-                }
-                pageStorage.writePage(job, page, bytes)
-                stateStore.markPageComplete(job.id, index + 1, pages.size)
+            val validPageIndexes = pages.asSequence().map { it.index }.toSet()
+            val storedPageIndexes = pageStorage.storedPageIndexes(job)
+                .filterTo(mutableSetOf()) { it in validPageIndexes }
+            val completedPages = AtomicInteger(storedPageIndexes.size)
+            stateStore.markPageComplete(job.id, completedPages.get(), pages.size)
+
+            val semaphore = Semaphore(pageConcurrency.coerceAtLeast(1))
+            coroutineScope {
+                pages.filterNot { it.index in storedPageIndexes }.map { page ->
+                    async {
+                        semaphore.withPermit {
+                            if (!stateStore.shouldContinue(job.id)) throw DownloadStoppedException()
+                            val bytes = runWithRetries(job.id, "Page ${page.index + 1}") {
+                                pageFetcher.bytes(page)
+                            }
+                            pageStorage.writePage(job, page, bytes)
+                            stateStore.markPageComplete(
+                                jobId = job.id,
+                                completedPages = completedPages.incrementAndGet(),
+                                pageCount = pages.size,
+                            )
+                        }
+                    }
+                }.awaitAll()
             }
             stateStore.markComplete(job.id, pages.size)
         } catch (_: DownloadStoppedException) {
@@ -102,6 +124,10 @@ class DownloadTaskRunner(
     private fun nextRetryDelay(currentDelayMillis: Long, maxDelayMillis: Long): Long {
         if (currentDelayMillis <= 0L || maxDelayMillis <= 0L) return currentDelayMillis
         return (currentDelayMillis * 2).coerceAtMost(maxDelayMillis)
+    }
+
+    private companion object {
+        const val DEFAULT_PAGE_CONCURRENCY = 5
     }
 }
 

@@ -3,11 +3,13 @@ package com.tankobun.core.downloads
 import com.tankobun.core.model.DownloadJob
 import com.tankobun.core.model.DownloadState
 import com.tankobun.core.model.ReaderPage
-import com.tankobun.core.network.RespectfulRateLimiter
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Collections
+import java.util.concurrent.atomic.AtomicInteger
 
 class DownloadTaskRunnerTest {
     @Test
@@ -38,6 +40,55 @@ class DownloadTaskRunnerTest {
         assertTrue(stateStore.failedMessages.single().contains("Page 1 failed after 2 attempts"))
     }
 
+    @Test
+    fun fetchesUpToFivePagesConcurrently() = runBlocking {
+        val activeFetches = AtomicInteger()
+        val maxActiveFetches = AtomicInteger()
+        val fetcher = object : DownloadPageFetcher {
+            override suspend fun pages(job: DownloadJob): List<ReaderPage> =
+                (0 until 10).map { index ->
+                    ReaderPage(index, "https://example.test/$index.jpg", null)
+                }
+
+            override suspend fun bytes(page: ReaderPage): ByteArray {
+                val active = activeFetches.incrementAndGet()
+                maxActiveFetches.updateAndGet { maxOf(it, active) }
+                delay(20L)
+                activeFetches.decrementAndGet()
+                return byteArrayOf(1)
+            }
+        }
+
+        runner(fetcher, RecordingPageStorage(), RecordingDownloadStateStore(), maxAttempts = 1)
+            .run(testJob())
+
+        assertEquals(5, maxActiveFetches.get())
+    }
+
+    @Test
+    fun resumesWithoutRefetchingPagesAlreadyStored() = runBlocking {
+        val fetchedIndexes = mutableListOf<Int>()
+        val fetcher = object : DownloadPageFetcher {
+            override suspend fun pages(job: DownloadJob): List<ReaderPage> =
+                (0 until 3).map { index ->
+                    ReaderPage(index, "https://example.test/$index.jpg", null)
+                }
+
+            override suspend fun bytes(page: ReaderPage): ByteArray {
+                fetchedIndexes += page.index
+                return byteArrayOf(1)
+            }
+        }
+        val storage = RecordingPageStorage(storedIndexes = setOf(0, 2))
+        val stateStore = RecordingDownloadStateStore()
+
+        runner(fetcher, storage, stateStore, maxAttempts = 1).run(testJob())
+
+        assertEquals(listOf(1), fetchedIndexes)
+        assertEquals(listOf(2 to 3, 3 to 3), stateStore.progress)
+        assertEquals(DownloadState.COMPLETE, stateStore.state)
+    }
+
     private fun runner(
         fetcher: DownloadPageFetcher,
         storage: DownloadPageStorage,
@@ -48,7 +99,6 @@ class DownloadTaskRunnerTest {
             pageFetcher = fetcher,
             pageStorage = storage,
             stateStore = stateStore,
-            sourceRateLimiter = RespectfulRateLimiter(minSpacingMillis = 0),
             retryPolicy = DownloadRetryPolicy(
                 maxAttempts = maxAttempts,
                 initialDelayMillis = 0,
@@ -89,8 +139,12 @@ class DownloadTaskRunnerTest {
         }
     }
 
-    private class RecordingPageStorage : DownloadPageStorage {
-        val writtenPageIndexes = mutableListOf<Int>()
+    private class RecordingPageStorage(
+        private val storedIndexes: Set<Int> = emptySet(),
+    ) : DownloadPageStorage {
+        val writtenPageIndexes = Collections.synchronizedList(mutableListOf<Int>())
+
+        override suspend fun storedPageIndexes(job: DownloadJob): Set<Int> = storedIndexes
 
         override suspend fun writePage(job: DownloadJob, page: ReaderPage, bytes: ByteArray): String {
             writtenPageIndexes += page.index

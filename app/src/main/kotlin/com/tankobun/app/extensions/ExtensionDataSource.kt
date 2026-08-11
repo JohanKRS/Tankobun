@@ -6,6 +6,7 @@ import com.tankobun.app.AppContainer
 import com.tankobun.app.logic.preferredVisibleSources
 import com.tankobun.app.logic.visibleSources
 import com.tankobun.core.extensions.ExtensionIndexEntry
+import com.tankobun.core.extensions.ExtensionIndexResult
 import com.tankobun.core.model.SourceDescriptor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -52,7 +53,7 @@ internal class ExtensionDataSource(
         )
     }
 
-    suspend fun fetchExtensionIndex(repositoryUrl: String): List<ExtensionIndexEntry> =
+    suspend fun fetchExtensionIndex(repositoryUrl: String): ExtensionIndexResult =
         container.extensionRepository.fetchIndex(repositoryUrl)
 
     fun extensionApkUrl(repositoryUrl: String, entry: ExtensionIndexEntry): String =

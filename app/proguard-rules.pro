@@ -1,3 +1,8 @@
+# Extension APKs are independently obfuscated. Keeping Tankobun's class names
+# prevents parent-first class loading from resolving their short names (a, b,
+# p0, and so on) to unrelated app classes. Mihon uses the same boundary rule.
+-dontobfuscate
+
 # Tachiyomi extensions are loaded from external APKs and link against these
 # compatibility shims by their original JVM names.
 -keep class eu.kanade.tachiyomi.** { *; }

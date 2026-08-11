@@ -12,37 +12,15 @@ class RoomDownloadStateStore(
     }
 
     override suspend fun markPageComplete(jobId: String, completedPages: Int, pageCount: Int) {
-        val job = downloadDao.getDownload(jobId) ?: return
-        downloadDao.upsertDownload(
-            job.copy(
-                pageCount = pageCount,
-                completedPages = completedPages,
-                updatedAtEpochMillis = nowMillis(),
-            ),
-        )
+        downloadDao.updateProgress(jobId, completedPages, pageCount, nowMillis())
     }
 
     override suspend fun markComplete(jobId: String, pageCount: Int) {
-        val job = downloadDao.getDownload(jobId) ?: return
-        downloadDao.upsertDownload(
-            job.copy(
-                state = DownloadState.COMPLETE,
-                pageCount = pageCount,
-                completedPages = pageCount,
-                updatedAtEpochMillis = nowMillis(),
-            ),
-        )
+        downloadDao.markComplete(jobId, pageCount, nowMillis())
     }
 
     override suspend fun markFailed(jobId: String, message: String) {
-        val job = downloadDao.getDownload(jobId) ?: return
-        downloadDao.upsertDownload(
-            job.copy(
-                state = DownloadState.FAILED,
-                retryCount = job.retryCount + 1,
-                updatedAtEpochMillis = nowMillis(),
-            ),
-        )
+        downloadDao.markFailed(jobId, nowMillis())
     }
 
     override suspend fun shouldContinue(jobId: String): Boolean {

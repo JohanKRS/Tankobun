@@ -3,6 +3,7 @@ package com.tankobun.app
 import com.tankobun.app.backup.BackupDataSource
 import com.tankobun.app.backup.AppSettingsBackupDataSource
 import com.tankobun.app.backup.isDue
+import com.tankobun.app.backup.isBackupDocumentProviderAvailable
 import com.tankobun.app.backup.pruneScheduledBackups as pruneScheduledBackupFiles
 import com.tankobun.app.backup.scheduledBackupFileKinds
 import com.tankobun.app.anilist.AniListDataSource
@@ -831,12 +832,16 @@ class MainViewModel(
             }
             runCatching {
                 extensionDataSource.fetchExtensionIndex(repositoryUrl)
-            }.onSuccess { extensions ->
+            }.onSuccess { result ->
+                if (result.resolvedIndexUrl != repositoryUrl) {
+                    container.settingsStore.saveExtensionRepositoryUrl(result.resolvedIndexUrl)
+                }
                 _state.update {
                     it.copy(
-                        availableExtensions = extensions,
+                        extensionRepositoryUrl = result.resolvedIndexUrl,
+                        availableExtensions = result.entries,
                         busy = if (silent) it.busy else false,
-                        message = if (silent) it.message else string(R.string.msg_loaded_extensions, extensions.size),
+                        message = if (silent) it.message else string(R.string.msg_loaded_extensions, result.entries.size),
                     )
                 }
             }.onFailure { error ->
@@ -1473,6 +1478,12 @@ class MainViewModel(
             }
             return
         }
+        if (!container.application.isBackupDocumentProviderAvailable(folderUri)) {
+            if (reportResult) {
+                _state.update { it.copy(message = string(R.string.msg_scheduled_backup_failed)) }
+            }
+            return
+        }
         if (content == BackupContent.LIBRARY && snapshot.libraryItems.isEmpty()) {
             if (reportResult) {
                 _state.update { it.copy(message = string(R.string.msg_sync_before_backup)) }
@@ -1907,56 +1918,24 @@ class MainViewModel(
             }
             runCatching {
                 val accessToken = container.tokenStore.accessToken()
-                val trending = if (trendingFresh && cachedLanding.trending.isNotEmpty()) {
-                    cachedLanding.trending
-                } else {
-                    browseDataSource.refreshAnilistBrowseMedia(trendingKey) {
-                        container.anilistRepository.browseManga(
-                            sort = BROWSE_TRENDING_SORT,
-                            perPage = BROWSE_LANDING_SECTION_SIZE,
-                            accessToken = accessToken,
-                            includeAdult = includeAdult,
-                        )
-                    }
-                }
-                val popular = if (popularFresh && cachedLanding.popular.isNotEmpty()) {
-                    cachedLanding.popular
-                } else {
-                    browseDataSource.refreshAnilistBrowseMedia(popularKey) {
-                        container.anilistRepository.browseManga(
-                            sort = "POPULARITY_DESC",
-                            perPage = BROWSE_LANDING_SECTION_SIZE,
-                            accessToken = accessToken,
-                            includeAdult = includeAdult,
-                        )
-                    }
-                }
-                val popularManhwa = if (manhwaFresh && cachedLanding.popularManhwa.isNotEmpty()) {
-                    cachedLanding.popularManhwa
-                } else {
-                    browseDataSource.refreshAnilistBrowseMedia(manhwaKey) {
-                        container.anilistRepository.browseManga(
-                            countryOfOrigin = "KR",
-                            sort = "POPULARITY_DESC",
-                            perPage = BROWSE_LANDING_SECTION_SIZE,
-                            accessToken = accessToken,
-                            includeAdult = includeAdult,
-                        )
-                    }
-                }
-                val topManga = if (topMangaFresh && cachedLanding.topManga.isNotEmpty()) {
-                    cachedLanding.topManga
-                } else {
-                    browseDataSource.refreshAnilistBrowseMedia(topMangaKey) {
-                        container.anilistRepository.browseManga(
-                            sort = "SCORE_DESC",
-                            perPage = BROWSE_LANDING_SECTION_SIZE,
-                            accessToken = accessToken,
-                            includeAdult = includeAdult,
-                        )
-                    }.take(BROWSE_LANDING_SECTION_SIZE)
-                }
-                BrowseLandingData(trending, popular, popularManhwa, topManga)
+                val remote = container.anilistRepository.browseLanding(
+                    perPage = BROWSE_LANDING_SECTION_SIZE,
+                    accessToken = accessToken,
+                    includeAdult = includeAdult,
+                )
+                val landing = BrowseLandingData(
+                    trending = remote.trending.map { it.withTitleLanguage(snapshot.anilistTitleLanguage) },
+                    popular = remote.popular.map { it.withTitleLanguage(snapshot.anilistTitleLanguage) },
+                    popularManhwa = remote.popularManhwa.map { it.withTitleLanguage(snapshot.anilistTitleLanguage) },
+                    topManga = remote.topManga
+                        .take(BROWSE_LANDING_SECTION_SIZE)
+                        .map { it.withTitleLanguage(snapshot.anilistTitleLanguage) },
+                )
+                browseDataSource.cacheBrowseMedia(trendingKey, landing.trending)
+                browseDataSource.cacheBrowseMedia(popularKey, landing.popular)
+                browseDataSource.cacheBrowseMedia(manhwaKey, landing.popularManhwa)
+                browseDataSource.cacheBrowseMedia(topMangaKey, landing.topManga)
+                landing
             }.onSuccess { landing ->
                 _state.update {
                     it.copy(

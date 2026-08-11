@@ -83,7 +83,11 @@ class AppContainer(application: Application) {
     val anilistRepository = AnilistRepository(
         AnilistGraphQlClient(
             okHttpClient = okHttpClient,
-            rateLimiter = RespectfulRateLimiter(minSpacingMillis = 2_500L),
+            rateLimiter = RespectfulRateLimiter(
+                minSpacingMillis = 2_200L,
+                serverRateLimitWindowMillis = 60_000L,
+                targetUtilization = 0.9,
+            ),
             userAgent = tankobunAniListUserAgent(),
         ),
     )
@@ -107,7 +111,6 @@ class AppContainer(application: Application) {
         deleteAllFiles = { deleteAllDownloadedFiles() },
     )
     private val downloadSemaphores = ConcurrentHashMap<Long, Semaphore>()
-    private val downloadRateLimiters = ConcurrentHashMap<Long, RespectfulRateLimiter>()
 
     init {
         DownloadWorkerDelegateRegistry.delegate = { jobId -> runDownloadJob(jobId) }
@@ -135,15 +138,11 @@ class AppContainer(application: Application) {
                 uploadedAtEpochMillis = null,
             )
         val semaphore = downloadSemaphores.getOrPut(job.sourceId) { Semaphore(DOWNLOAD_SOURCE_CONCURRENCY) }
-        val limiter = downloadRateLimiters.getOrPut(job.sourceId) {
-            RespectfulRateLimiter(minSpacingMillis = DOWNLOAD_REQUEST_SPACING_MILLIS)
-        }
         semaphore.withPermit {
             DownloadTaskRunner(
                 pageFetcher = sourcePageFetcher(source, chapter, job),
                 pageStorage = filePageStorage(),
                 stateStore = RoomDownloadStateStore(database.downloadDao()),
-                sourceRateLimiter = limiter,
             ).run(job)
         }
         return true
@@ -164,6 +163,14 @@ class AppContainer(application: Application) {
 
     private fun filePageStorage(): DownloadPageStorage =
         object : DownloadPageStorage {
+            override suspend fun storedPageIndexes(job: DownloadJob): Set<Int> =
+                database.downloadPageDao()
+                    .pagesForJob(job.id)
+                    .asSequence()
+                    .filter { File(it.filePath).isFile }
+                    .map { it.pageIndex }
+                    .toSet()
+
             override suspend fun writePage(job: DownloadJob, page: ReaderPage, bytes: ByteArray): String =
                 writeDownloadedPage(job, page, bytes)
         }
@@ -284,7 +291,6 @@ class AppContainer(application: Application) {
 
     companion object {
         private const val DOWNLOAD_SOURCE_CONCURRENCY = 1
-        private const val DOWNLOAD_REQUEST_SPACING_MILLIS = 2_500L
         private val DOWNLOAD_IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "gif")
     }
 }

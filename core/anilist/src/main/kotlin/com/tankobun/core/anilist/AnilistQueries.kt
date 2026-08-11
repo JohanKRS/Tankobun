@@ -7,7 +7,7 @@ object AnilistQueries {
         }
     """
 
-    const val HomeTrending = """
+    val HomeTrending = """
         query HomeTrending(${'$'}isAdult: Boolean) {
           trending: Page(page: 1, perPage: 5) {
             media(type: MANGA, isAdult: ${'$'}isAdult, sort: TRENDING_DESC) {
@@ -15,6 +15,50 @@ object AnilistQueries {
             }
           }
         }
+    """ + HOME_TRENDING_MEDIA_FRAGMENT
+
+    fun homeInitial(genres: List<String>, perPage: Int): String =
+        """
+            query HomeInitial(${'$'}isAdult: Boolean) {
+              trending: Page(page: 1, perPage: 5) {
+                media(type: MANGA, isAdult: ${'$'}isAdult, sort: TRENDING_DESC) {
+                  ...HomeTrendingMedia
+                }
+              }
+              ${homeGenrePageFields(genres, pages = 1..1, perPage = perPage)}
+            }
+            $HOME_TRENDING_MEDIA_FRAGMENT
+        """.trimIndent()
+
+    fun homeGenreCandidates(genres: List<String>, pages: IntRange, perPage: Int): String {
+        return """
+            query HomeGenreCandidates(${'$'}isAdult: Boolean) {
+              ${homeGenrePageFields(genres, pages, perPage)}
+            }
+        """.trimIndent()
+    }
+
+    private fun homeGenrePageFields(genres: List<String>, pages: IntRange, perPage: Int): String =
+        genres.flatMapIndexed { index, genre ->
+            val safeGenre = genre.replace("\\", "\\\\").replace("\"", "\\\"")
+            pages.map { page ->
+                """
+                  genre${index}Page$page: Page(page: $page, perPage: $perPage) {
+                    media(type: MANGA, genre: "$safeGenre", isAdult: ${'$'}isAdult, sort: TRENDING_DESC) {
+                      id
+                      title { romaji english native userPreferred }
+                      coverImage { extraLarge large color }
+                      bannerImage
+                      popularity
+                      genres
+                      isAdult
+                    }
+                  }
+                """.trimIndent()
+            }
+        }.joinToString("\n")
+
+    private const val HOME_TRENDING_MEDIA_FRAGMENT = """
 
         fragment HomeTrendingMedia on Media {
           id
@@ -45,32 +89,6 @@ object AnilistQueries {
           updatedAt
         }
     """
-
-    fun homeGenreCandidates(genres: List<String>, pages: IntRange, perPage: Int): String {
-        val genrePages = genres.flatMapIndexed { index, genre ->
-            val safeGenre = genre.replace("\\", "\\\\").replace("\"", "\\\"")
-            pages.map { page ->
-                """
-                  genre${index}Page$page: Page(page: $page, perPage: $perPage) {
-                    media(type: MANGA, genre: "$safeGenre", isAdult: ${'$'}isAdult, sort: TRENDING_DESC) {
-                      id
-                      title { romaji english native userPreferred }
-                      coverImage { extraLarge large color }
-                      bannerImage
-                      popularity
-                      genres
-                      isAdult
-                    }
-                  }
-                """.trimIndent()
-            }
-        }.joinToString("\n")
-        return """
-            query HomeGenreCandidates(${'$'}isAdult: Boolean) {
-              $genrePages
-            }
-        """.trimIndent()
-    }
 
     fun homeMainCharacters(mediaIds: List<Int>): String {
         val mediaFields = mediaIds.mapIndexed { index, mediaId ->
@@ -168,10 +186,21 @@ object AnilistQueries {
         }
     """
 
-    const val SearchFallbackMangaPage = """
-        query SearchFallbackMangaPage(${'$'}page: Int!, ${'$'}sort: [MediaSort], ${'$'}isAdult: Boolean) {
-          Page(page: ${'$'}page, perPage: 50) {
-            media(type: MANGA, sort: ${'$'}sort, isAdult: ${'$'}isAdult) {
+    const val SearchFallbackManga = """
+        query SearchFallbackManga(${'$'}isAdult: Boolean) {
+          popular: Page(page: 1, perPage: 25) {
+            media(type: MANGA, sort: POPULARITY_DESC, isAdult: ${'$'}isAdult) {
+              ...SearchFallbackMedia
+            }
+          }
+          trending: Page(page: 1, perPage: 25) {
+            media(type: MANGA, sort: TRENDING_DESC, isAdult: ${'$'}isAdult) {
+              ...SearchFallbackMedia
+            }
+          }
+        }
+
+        fragment SearchFallbackMedia on Media {
               id
               idMal
               title { romaji english native userPreferred }
@@ -192,8 +221,54 @@ object AnilistQueries {
               synonyms
               isAdult
               updatedAt
+        }
+    """
+
+    const val BrowseLanding = """
+        query BrowseLanding(${'$'}perPage: Int!, ${'$'}isAdult: Boolean) {
+          trending: Page(page: 1, perPage: ${'$'}perPage) {
+            media(type: MANGA, isAdult: ${'$'}isAdult, sort: TRENDING_DESC) {
+              ...BrowseLandingMedia
             }
           }
+          popular: Page(page: 1, perPage: ${'$'}perPage) {
+            media(type: MANGA, isAdult: ${'$'}isAdult, sort: POPULARITY_DESC) {
+              ...BrowseLandingMedia
+            }
+          }
+          popularManhwa: Page(page: 1, perPage: ${'$'}perPage) {
+            media(type: MANGA, countryOfOrigin: KR, isAdult: ${'$'}isAdult, sort: POPULARITY_DESC) {
+              ...BrowseLandingMedia
+            }
+          }
+          topManga: Page(page: 1, perPage: ${'$'}perPage) {
+            media(type: MANGA, isAdult: ${'$'}isAdult, sort: SCORE_DESC) {
+              ...BrowseLandingMedia
+            }
+          }
+        }
+
+        fragment BrowseLandingMedia on Media {
+          id
+          idMal
+          title { romaji english native userPreferred }
+          description(asHtml: false)
+          coverImage { extraLarge large color }
+          bannerImage
+          chapters
+          volumes
+          format
+          countryOfOrigin
+          status
+          averageScore
+          popularity
+          startDate { year }
+          endDate { year }
+          siteUrl
+          genres
+          synonyms
+          isAdult
+          updatedAt
         }
     """
 
@@ -223,6 +298,48 @@ object AnilistQueries {
           }
         }
     """
+
+    fun mangaByIds(count: Int): String {
+        require(count > 0)
+        val variables = (0 until count).joinToString(", ") { index ->
+            "${'$'}id$index: Int!"
+        }
+        val mediaFields = (0 until count).joinToString("\n") { index ->
+            """
+              media$index: Media(id: ${'$'}id$index, type: MANGA) {
+                ...BatchMangaMedia
+              }
+            """.trimIndent()
+        }
+        return """
+            query MangaByIds($variables) {
+              $mediaFields
+            }
+
+            fragment BatchMangaMedia on Media {
+              id
+              idMal
+              title { romaji english native userPreferred }
+              description(asHtml: false)
+              coverImage { extraLarge large color }
+              bannerImage
+              chapters
+              volumes
+              format
+              countryOfOrigin
+              status
+              averageScore
+              popularity
+              startDate { year }
+              endDate { year }
+              siteUrl
+              genres
+              synonyms
+              isAdult
+              updatedAt
+            }
+        """.trimIndent()
+    }
 
     const val MangaByMalId = """
         query MangaByMalId(${'$'}idMal: Int!) {

@@ -36,4 +36,17 @@ class NetworkHelperTest {
             ),
         )
     }
+
+    @Test
+    fun defaultClientMatchesModernKeiyoushiInterceptorContract() {
+        val client = NetworkHelper().client
+        val applicationInterceptors = client.interceptors.mapNotNull { it::class.simpleName }
+        val networkInterceptors = client.networkInterceptors.mapNotNull { it::class.simpleName }
+
+        assertTrue("UserAgentInterceptor" in applicationInterceptors)
+        assertTrue("UncaughtExceptionInterceptor" in applicationInterceptors)
+        assertTrue("CloudflareInterceptor" in applicationInterceptors)
+        assertFalse("IgnoreGzipInterceptor" in networkInterceptors)
+        assertFalse("BrotliInterceptor" in networkInterceptors)
+    }
 }

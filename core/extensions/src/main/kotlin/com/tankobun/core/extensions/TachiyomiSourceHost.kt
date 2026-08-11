@@ -396,8 +396,8 @@ class TachiyomiSourceHost(
     companion object {
         private const val TAG = "TankobunSources"
         private const val SOURCE_PAGE_LIST_TIMEOUT_MILLIS = 8_000L
-        private const val SOURCE_IMAGE_FETCH_CONCURRENCY = 1
-        private const val SOURCE_IMAGE_REQUEST_SPACING_MILLIS = 1_500L
+        private const val SOURCE_IMAGE_FETCH_CONCURRENCY = 5
+        private const val SOURCE_IMAGE_REQUEST_SPACING_MILLIS = 200L
         private const val SOURCE_IMAGE_RETRY_ATTEMPTS = 3
         private const val SOURCE_IMAGE_ATTEMPT_TIMEOUT_MILLIS = 25_000L
         private const val SOURCE_IMAGE_RETRY_INITIAL_DELAY_MILLIS = 2_500L

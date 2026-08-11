@@ -8,14 +8,14 @@ package eu.kanade.tachiyomi.network
 import android.content.Context
 import android.webkit.WebSettings
 import eu.kanade.tachiyomi.network.interceptor.CloudflareInterceptor
-import eu.kanade.tachiyomi.network.interceptor.IgnoreGzipInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UncaughtExceptionInterceptor
 import okhttp3.Cache
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
-import okhttp3.brotli.BrotliInterceptor
 import java.io.File
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
 class NetworkHelper {
@@ -58,11 +58,9 @@ class NetworkHelper {
                 .readTimeout(45, TimeUnit.SECONDS)
                 .addInterceptor(UncaughtExceptionInterceptor)
                 .addInterceptor(SupportedEncodingInterceptor)
-                .addInterceptor(DefaultUserAgentInterceptor)
+                .addInterceptor(UserAgentInterceptor)
                 .addInterceptor(CloudflareInterceptor)
                 .addInterceptor(PoliteHostThrottleInterceptor)
-                .addNetworkInterceptor(IgnoreGzipInterceptor)
-                .addNetworkInterceptor(BrotliInterceptor)
 
         private fun sourceCache(): Cache? {
             val context = appContext ?: return null
@@ -111,7 +109,7 @@ private object SupportedEncodingInterceptor : Interceptor {
     }
 }
 
-private object DefaultUserAgentInterceptor : Interceptor {
+private object UserAgentInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         if (request.header("User-Agent") != null) {
@@ -139,20 +137,55 @@ private object PoliteHostThrottleInterceptor : Interceptor {
     private val nextRequestAtByHost = mutableMapOf<String, Long>()
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        awaitTurn(chain.request().url.host)
-        return chain.proceed(chain.request())
+        val host = chain.request().url.host
+        awaitTurn(host)
+        return chain.proceed(chain.request()).also { response ->
+            recordServerLimit(host, response)
+        }
     }
 
     private fun awaitTurn(host: String) {
-        val delayMillis = synchronized(nextRequestAtByHost) {
-            val now = System.currentTimeMillis()
-            val nextAt = nextRequestAtByHost[host] ?: 0L
-            val delay = (nextAt - now).coerceAtLeast(0L)
-            nextRequestAtByHost[host] = maxOf(now, nextAt) + MIN_SPACING_MILLIS
-            delay
-        }
-        if (delayMillis > 0L) {
+        while (true) {
+            val delayMillis = synchronized(nextRequestAtByHost) {
+                val now = System.currentTimeMillis()
+                val nextAt = nextRequestAtByHost[host] ?: 0L
+                if (now >= nextAt) {
+                    nextRequestAtByHost[host] = now + MIN_SPACING_MILLIS
+                    NO_WAIT_REQUIRED
+                } else {
+                    nextAt - now
+                }
+            }
+            if (delayMillis == NO_WAIT_REQUIRED) return
             Thread.sleep(delayMillis)
         }
     }
+
+    private fun recordServerLimit(host: String, response: Response) {
+        val now = System.currentTimeMillis()
+        val retryAfterMillis = response.header("Retry-After")?.let { value ->
+            value.toLongOrNull()?.coerceAtLeast(0L)?.times(1_000L)
+                ?: runCatching {
+                    ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME)
+                        .toInstant()
+                        .toEpochMilli()
+                }.getOrNull()?.minus(now)?.coerceAtLeast(0L)
+        }
+        val remaining = response.header("X-RateLimit-Remaining")?.toLongOrNull()
+        val resetAtMillis = response.header("X-RateLimit-Reset")
+            ?.toLongOrNull()
+            ?.times(1_000L)
+            ?.takeIf { response.code == 429 || remaining == 0L }
+        val waitUntil = when {
+            retryAfterMillis != null -> now + retryAfterMillis
+            resetAtMillis != null -> resetAtMillis
+            else -> return
+        }
+
+        synchronized(nextRequestAtByHost) {
+            nextRequestAtByHost[host] = maxOf(nextRequestAtByHost[host] ?: 0L, waitUntil)
+        }
+    }
+
+    private const val NO_WAIT_REQUIRED = -1L
 }

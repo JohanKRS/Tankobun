@@ -1,8 +1,10 @@
 package com.tankobun.app.backup
 
+import android.content.ContentResolver
+import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.DocumentsContract
-import android.content.ContentResolver
 import com.tankobun.app.AppContainer
 import com.tankobun.app.logic.normalizedCustomLists
 import com.tankobun.app.state.LibraryItem
@@ -150,6 +152,12 @@ internal fun createDocumentInTree(
         mimeType,
         displayName,
     ) ?: error("Could not create backup file in selected folder")
+}
+
+internal fun Context.isBackupDocumentProviderAvailable(treeUri: Uri): Boolean {
+    val authority = treeUri.authority ?: return false
+    val flags = PackageManager.MATCH_DIRECT_BOOT_AWARE or PackageManager.MATCH_DIRECT_BOOT_UNAWARE
+    return packageManager.resolveContentProvider(authority, flags) != null
 }
 
 private fun suggestedScheduledAniListBackupFileName(viewerName: String?): String {

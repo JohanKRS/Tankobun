@@ -15,8 +15,7 @@ class AnilistHomeFeedTest {
 
         MockWebServer().use { server ->
             server.start()
-            server.enqueue(response(trendingResponse()))
-            server.enqueue(response(genreResponse(genres.take(6))))
+            server.enqueue(response(initialResponse(genres.take(6))))
             server.enqueue(response(genreResponse(genres.drop(6))))
 
             val repository = AnilistRepository(
@@ -39,7 +38,7 @@ class AnilistHomeFeedTest {
             assertEquals(listOf(6, 7), genreCallbackSizes)
             assertEquals(1, feed.trending.size)
             assertEquals(genres, feed.genreHighlights.map { it.genre })
-            assertEquals(3, server.requestCount)
+            assertEquals(2, server.requestCount)
         }
     }
 
@@ -50,8 +49,13 @@ class AnilistHomeFeedTest {
             .body(body)
             .build()
 
-    private fun trendingResponse(): String =
-        """{"data":{"trending":{"media":[${mediaJson(1, "Action")} ]}}}"""
+    private fun initialResponse(genres: List<String>): String {
+        val genreFields = genres.mapIndexed { index, genre ->
+            "\"genre${index}Page1\":{\"media\":[${mediaJson(index + genre.hashCode(), genre)}]}"
+        }
+        val fields = listOf("\"trending\":{\"media\":[${mediaJson(1, "Action")}]}") + genreFields
+        return "{\"data\":{${fields.joinToString(",")}}}"
+    }
 
     private fun genreResponse(genres: List<String>): String {
         val fields = genres.mapIndexed { index, genre ->

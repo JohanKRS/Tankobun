@@ -62,4 +62,27 @@ class AnilistQueriesTest {
     fun mediaGenresUsesAniListGenreCollection() {
         assertTrue(AnilistQueries.MediaGenres.contains("GenreCollection"))
     }
+
+    @Test
+    fun browseLandingBatchesAllFourSections() {
+        assertTrue(AnilistQueries.BrowseLanding.contains("trending: Page"))
+        assertTrue(AnilistQueries.BrowseLanding.contains("popular: Page"))
+        assertTrue(AnilistQueries.BrowseLanding.contains("popularManhwa: Page"))
+        assertTrue(AnilistQueries.BrowseLanding.contains("topManga: Page"))
+    }
+
+    @Test
+    fun fallbackSearchIsBoundedToTwoSmallCandidateSets() {
+        assertTrue(AnilistQueries.SearchFallbackManga.contains("popular: Page(page: 1, perPage: 25)"))
+        assertTrue(AnilistQueries.SearchFallbackManga.contains("trending: Page(page: 1, perPage: 25)"))
+        assertFalse(AnilistQueries.SearchFallbackManga.contains("${'$'}page"))
+    }
+
+    @Test
+    fun mangaBatchUsesVariablesInsteadOfEmbeddingIds() {
+        val query = AnilistQueries.mangaByIds(3)
+
+        assertTrue(query.contains("${'$'}id0: Int!"))
+        assertTrue(query.contains("media2: Media(id: ${'$'}id2, type: MANGA)"))
+    }
 }

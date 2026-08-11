@@ -15,6 +15,7 @@ import androidx.work.workDataOf
 import com.tankobun.app.backup.AppSettingsBackupDataSource
 import com.tankobun.app.backup.BackupDataSource
 import com.tankobun.app.backup.isDue
+import com.tankobun.app.backup.isBackupDocumentProviderAvailable
 import com.tankobun.app.backup.buildMyAnimeListBackupXml
 import com.tankobun.app.backup.createDocumentInTree
 import com.tankobun.app.backup.pruneScheduledBackups
@@ -42,6 +43,8 @@ class ScheduledBackupWorker(
             val folderUri = settings.backupFolderUri()?.let(Uri::parse)
             val now = System.currentTimeMillis()
             if (schedule == BackupSchedule.OFF || folderUri == null) {
+                Result.success()
+            } else if (!applicationContext.isBackupDocumentProviderAvailable(folderUri)) {
                 Result.success()
             } else if (
                 inputData.getBoolean(ScheduledBackupWork.INPUT_RUN_ONLY_IF_DUE, false) &&
@@ -134,7 +137,7 @@ object ScheduledBackupWork {
             .setInputData(workDataOf(INPUT_RUN_ONLY_IF_DUE to true))
             .setConstraints(backupConstraints())
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(DUE_UNIQUE_NAME, ExistingWorkPolicy.REPLACE, request)
+        WorkManager.getInstance(context).enqueueUniqueWork(DUE_UNIQUE_NAME, ExistingWorkPolicy.KEEP, request)
     }
 
     private fun enqueue(
