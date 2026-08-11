@@ -219,7 +219,11 @@ class TachiyomiSourceHost(
         }
     }
 
-    suspend fun imageBytes(source: SourceDescriptor, page: ReaderPage): ByteArray = withContext(Dispatchers.IO) {
+    suspend fun imageBytes(
+        source: SourceDescriptor,
+        page: ReaderPage,
+        maxAttempts: Int = SOURCE_IMAGE_RETRY_ATTEMPTS,
+    ): ByteArray = withContext(Dispatchers.IO) {
         val sourceInstance = findSource(source) ?: error("Source is not installed")
         if (sourceInstance !is HttpSource) {
             error("${sourceInstance.name} does not support HTTP image loading")
@@ -235,6 +239,7 @@ class TachiyomiSourceHost(
                     sourceInstance = sourceInstance,
                     page = page,
                     rateLimiter = rateLimiter,
+                    maxAttempts = maxAttempts,
                 )
             }
         }
@@ -244,6 +249,7 @@ class TachiyomiSourceHost(
         sourceInstance: HttpSource,
         page: ReaderPage,
         rateLimiter: RespectfulRateLimiter,
+        maxAttempts: Int,
     ): ByteArray {
         val sourcePageUrl = page.sourcePageUrl.ifBlank { page.imageUrl }
         val imageUrlCandidate = page.imageUrl.takeIf { it.isNotBlank() }
@@ -264,10 +270,11 @@ class TachiyomiSourceHost(
         }
         val usingDirectFallback = sourcePage.imageUrl == sourcePageUrl && resolutionError != null
         var attempt = 1
+        val attempts = maxAttempts.coerceAtLeast(1)
         var delayMillis = SOURCE_IMAGE_RETRY_INITIAL_DELAY_MILLIS
         var lastError: Throwable? = null
 
-        while (attempt <= SOURCE_IMAGE_RETRY_ATTEMPTS) {
+        while (attempt <= attempts) {
             try {
                 return rateLimiter.run {
                     fetchImageBytesOnce(
@@ -285,7 +292,7 @@ class TachiyomiSourceHost(
                 throw error
             } catch (error: Throwable) {
                 lastError = error
-                if (attempt >= SOURCE_IMAGE_RETRY_ATTEMPTS || !error.isTransientSourceImageFailure()) {
+                if (attempt >= attempts || !error.isTransientSourceImageFailure()) {
                     throw error
                 }
                 delay(delayMillis)

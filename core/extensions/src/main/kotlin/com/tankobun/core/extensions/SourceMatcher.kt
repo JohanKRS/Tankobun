@@ -111,14 +111,14 @@ class SourceMatcher {
 
     private fun normalize(value: String): String {
         val withoutMarks = Normalizer.normalize(value, Normalizer.Form.NFKD)
-            .replace(Regex("\\p{Mn}+"), "")
+            .replace(COMBINING_MARKS_REGEX, "")
         return withoutMarks
             .lowercase(Locale.ROOT)
             .replace("&", " and ")
-            .replace(Regex("['’]"), "")
-            .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
+            .replace(APOSTROPHE_REGEX, "")
+            .replace(NON_ALPHANUMERIC_REGEX, " ")
             .trim()
-            .replace(Regex("\\s+"), " ")
+            .replace(WHITESPACE_REGEX, " ")
     }
 
     private data class TitleMatchScore(
@@ -131,5 +131,9 @@ class SourceMatcher {
 
     private companion object {
         const val MIN_MATCH_SCORE = 0.35
+        val COMBINING_MARKS_REGEX = Regex("\\p{Mn}+")
+        val APOSTROPHE_REGEX = Regex("['’]")
+        val NON_ALPHANUMERIC_REGEX = Regex("[^\\p{L}\\p{N}]+")
+        val WHITESPACE_REGEX = Regex("\\s+")
     }
 }

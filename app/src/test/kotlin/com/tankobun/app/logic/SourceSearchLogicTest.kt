@@ -29,6 +29,8 @@ class SourceSearchLogicTest {
         assertTrue("No 6" in queries)
         assertTrue("6 Side Story Novel" in queries)
         assertTrue("Number Six" in queries)
+        assertTrue(queries.size <= 6)
+        assertTrue(queries.indexOf("Number Six") < queries.indexOf("6 Side Story Novel"))
         assertEquals(queries.distinctBy { it.lowercase() }, queries)
     }
 
@@ -55,6 +57,11 @@ class SourceSearchLogicTest {
         )
         assertEquals("requires a direct URL", sourcePickerDiagnosticDetail(directUrlError))
         assertTrue(isFatalSourceSearchError(forbiddenError))
+        assertTrue(
+            isFatalSourceSearchError(
+                IllegalStateException("Source search failed", UnsupportedOperationException()),
+            ),
+        )
     }
 
     @Test

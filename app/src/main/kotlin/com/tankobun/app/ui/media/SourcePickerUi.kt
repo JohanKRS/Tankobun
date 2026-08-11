@@ -59,6 +59,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.MainViewModel
 import com.tankobun.app.R
+import com.tankobun.app.SourceThumbnailImageModel
 import com.tankobun.app.tankobunQuantityString
 import com.tankobun.app.tankobunString
 import com.tankobun.app.logic.sourceMatchKey
@@ -566,6 +567,14 @@ internal fun SourceMatchRow(
     mediaCover: String?,
     onClick: () -> Unit,
 ) {
+    val sourceThumbnailUrl = match.manga.thumbnailUrl?.takeIf(String::isNotBlank)
+    var useMediaCover by remember(sourceThumbnailUrl, mediaCover) { mutableStateOf(false) }
+    val imageUrl = if (useMediaCover) mediaCover else sourceThumbnailUrl ?: mediaCover
+    val imageModel = if (!useMediaCover && sourceThumbnailUrl != null) {
+        SourceThumbnailImageModel(match.source, sourceThumbnailUrl)
+    } else {
+        mediaCover
+    }
     ElevatedCard(onClick = onClick, shape = LocalTankobunStyle.current.themeShapes.panel) {
         ListItem(
             headlineContent = { Text(match.manga.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -585,9 +594,13 @@ internal fun SourceMatchRow(
             },
             leadingContent = {
                 CoverImage(
-                    url = match.manga.thumbnailUrl ?: mediaCover,
+                    url = imageUrl,
                     title = match.manga.title,
                     modifier = Modifier.size(width = 48.dp, height = 68.dp),
+                    imageModel = imageModel,
+                    onImageError = {
+                        if (!useMediaCover && mediaCover != null) useMediaCover = true
+                    },
                 )
             },
             trailingContent = {

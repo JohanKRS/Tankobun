@@ -19,8 +19,8 @@ import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
 class NetworkHelper {
-    val client: OkHttpClient = baseBuilder()
-        .build()
+    val client: OkHttpClient
+        get() = sharedClient
 
     val cloudflareClient: OkHttpClient = client
 
@@ -29,6 +29,9 @@ class NetworkHelper {
     companion object {
         @Volatile
         private var appContext: Context? = null
+        private val sharedClient: OkHttpClient by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+            baseBuilder().build()
+        }
 
         fun configure(context: Context) {
             appContext = context.applicationContext

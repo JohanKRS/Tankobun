@@ -46,8 +46,12 @@ internal fun sourceSearchQueries(
             addAll(media.synonyms)
         }
 
-    return rawTitles
-        .flatMap(::sourceSearchQueryVariants)
+    val primaryTitles = rawTitles.mapNotNull { title ->
+        sourceSearchQueryVariants(title).firstOrNull()
+    }
+    val fallbackVariants = rawTitles.flatMap(::sourceSearchQueryVariants)
+
+    return (primaryTitles + fallbackVariants)
         .map(::cleanSourceSearchQuery)
         .filter { it.length >= 2 }
         .distinctBy { it.lowercase(Locale.ROOT) }
@@ -440,6 +444,7 @@ internal fun sourcePickerDiagnosticDetail(error: Throwable): String {
 internal fun isFatalSourceSearchError(error: Throwable): Boolean {
     val details = errorDetails(error).joinToString(separator = "\n")
     return isMissingSourceCompatibilityClass(error) ||
+        isUnsupportedSourceSearchError(error) ||
         isDirectUrlRequiredError(error) ||
         isUnexpectedSourceResponseError(error) ||
         details.contains("HTTP error 401", ignoreCase = true) ||
@@ -657,6 +662,9 @@ private fun isMissingSourceCompatibilityClass(error: Throwable): Boolean =
             cause.message?.contains("OkioStreamsKt", ignoreCase = true) == true
     }
 
+private fun isUnsupportedSourceSearchError(error: Throwable): Boolean =
+    generateSequence(error) { it.cause }.any { cause -> cause is UnsupportedOperationException }
+
 private fun isDirectUrlRequiredError(error: Throwable): Boolean =
     errorDetails(error).any { detail ->
         detail.contains("enter a valid", ignoreCase = true) &&
@@ -669,5 +677,5 @@ private fun isUnexpectedSourceResponseError(error: Throwable): Boolean =
     }
 
 private const val SOURCE_READABLE_MATCH_SCORE = 0.9
-private const val SOURCE_SEARCH_QUERY_LIMIT = 12
+private const val SOURCE_SEARCH_QUERY_LIMIT = 6
 private const val SOURCE_PICKER_NO_SOURCES_MESSAGE = "Enable or install a source extension first"

@@ -141,11 +141,24 @@ interface SearchResultDao {
     @Query("SELECT * FROM anilist_search_results WHERE query = :query ORDER BY orderIndex ASC")
     suspend fun cachedSearchRows(query: String): List<AnilistSearchResultEntity>
 
+    @Query("SELECT * FROM anilist_search_results WHERE query IN (:queries) ORDER BY query ASC, orderIndex ASC")
+    suspend fun cachedSearchRows(queries: List<String>): List<AnilistSearchResultEntity>
+
     @Query("DELETE FROM anilist_search_results WHERE query = :query")
     suspend fun deleteForQuery(query: String)
 
+    @Query("DELETE FROM anilist_search_results WHERE query IN (:queries)")
+    suspend fun deleteForQueries(queries: List<String>)
+
     @Upsert
     suspend fun upsertResults(results: List<AnilistSearchResultEntity>)
+
+    @Transaction
+    suspend fun replaceResults(queries: List<String>, results: List<AnilistSearchResultEntity>) {
+        if (queries.isEmpty()) return
+        deleteForQueries(queries)
+        if (results.isNotEmpty()) upsertResults(results)
+    }
 }
 
 @Dao

@@ -24,10 +24,24 @@ internal class HomeDataSource(
         if (cachedAt <= 0L) return null
         if (freshOnly && System.currentTimeMillis() - cachedAt > cachePolicy.homeFeedTtlMillis) return null
 
-        val trending = cachedMedia(trendingKey(includeAdult), includeAdult)
+        val trendingKey = trendingKey(includeAdult)
+        val genreKeys = genres.associateWith { genre -> genreKey(genre, includeAdult) }
+        val keys = listOf(trendingKey) + genreKeys.values
+        val rows = container.database.searchResultDao().cachedSearchRows(keys)
+        val mediaById = container.database.mediaDao()
+            .cachedMedia(rows.map(AnilistSearchResultEntity::mediaId).distinct())
+            .associateBy { it.id }
+        val mediaByKey = rows.groupBy(AnilistSearchResultEntity::query)
+            .mapValues { (_, keyRows) ->
+                keyRows.mapNotNull { row -> mediaById[row.mediaId] }
+                    .map { entity -> entity.toModel(titleLanguage()) }
+                    .filter { media -> includeAdult || !media.isAdult }
+            }
+        val trending = mediaByKey[trendingKey].orEmpty()
         if (trending.isEmpty()) return null
         val highlights = genres.mapNotNull { genre ->
-            cachedMedia(genreKey(genre, includeAdult), includeAdult)
+            mediaByKey[genreKeys.getValue(genre)]
+                .orEmpty()
                 .firstOrNull()
                 ?.let { media -> AnilistGenreHighlight(genre = genre, media = media) }
         }
@@ -39,31 +53,26 @@ internal class HomeDataSource(
         val now = System.currentTimeMillis()
         val media = (feed.trending + feed.genreHighlights.map { it.media }).distinctBy(AnilistMedia::id)
         container.database.mediaDao().upsertMedia(media.map { item -> item.toEntity(now) })
-        replaceResults(trendingKey(includeAdult), feed.trending, now)
-        feed.genreHighlights.forEach { highlight ->
-            replaceResults(genreKey(highlight.genre, includeAdult), listOf(highlight.media), now)
+        val resultsByKey = buildMap {
+            put(trendingKey(includeAdult), feed.trending)
+            feed.genreHighlights.forEach { highlight ->
+                put(genreKey(highlight.genre, includeAdult), listOf(highlight.media))
+            }
         }
-        container.settingsStore.saveHomeFeedCachedAtEpochMillis(includeAdult, now)
-    }
-
-    private suspend fun cachedMedia(key: String, includeAdult: Boolean): List<AnilistMedia> =
-        container.database.searchResultDao()
-            .cachedSearchMedia(key)
-            .map { entity -> entity.toModel(titleLanguage()) }
-            .filter { media -> includeAdult || !media.isAdult }
-
-    private suspend fun replaceResults(key: String, media: List<AnilistMedia>, now: Long) {
-        container.database.searchResultDao().deleteForQuery(key)
-        container.database.searchResultDao().upsertResults(
-            media.mapIndexed { index, item ->
-                AnilistSearchResultEntity(
-                    query = key,
-                    mediaId = item.id,
-                    orderIndex = index,
-                    fetchedAtEpochMillis = now,
-                )
+        container.database.searchResultDao().replaceResults(
+            queries = resultsByKey.keys.toList(),
+            results = resultsByKey.flatMap { (key, items) ->
+                items.mapIndexed { index, item ->
+                    AnilistSearchResultEntity(
+                        query = key,
+                        mediaId = item.id,
+                        orderIndex = index,
+                        fetchedAtEpochMillis = now,
+                    )
+                }
             },
         )
+        container.settingsStore.saveHomeFeedCachedAtEpochMillis(includeAdult, now)
     }
 
     private fun trendingKey(includeAdult: Boolean): String =

@@ -30,13 +30,12 @@ object AnilistQueries {
             $HOME_TRENDING_MEDIA_FRAGMENT
         """.trimIndent()
 
-    fun homeGenreCandidates(genres: List<String>, pages: IntRange, perPage: Int): String {
-        return """
+    fun homeGenreCandidates(genres: List<String>, perPage: Int): String =
+        """
             query HomeGenreCandidates(${'$'}isAdult: Boolean) {
-              ${homeGenrePageFields(genres, pages, perPage)}
+              ${homeGenrePageFields(genres, pages = 1..1, perPage = perPage)}
             }
         """.trimIndent()
-    }
 
     private fun homeGenrePageFields(genres: List<String>, pages: IntRange, perPage: Int): String =
         genres.flatMapIndexed { index, genre ->
@@ -49,8 +48,6 @@ object AnilistQueries {
                       title { romaji english native userPreferred }
                       coverImage { extraLarge large color }
                       bannerImage
-                      popularity
-                      genres
                       isAdult
                     }
                   }
@@ -89,24 +86,6 @@ object AnilistQueries {
           updatedAt
         }
     """
-
-    fun homeMainCharacters(mediaIds: List<Int>): String {
-        val mediaFields = mediaIds.mapIndexed { index, mediaId ->
-            """
-              media$index: Media(id: $mediaId, type: MANGA) {
-              id
-              characters(role: MAIN, sort: [FAVOURITES_DESC], page: 1, perPage: 1) {
-                nodes { image { large } }
-              }
-              }
-            """.trimIndent()
-        }.joinToString("\n")
-        return """
-            query HomeMainCharacters {
-              $mediaFields
-            }
-        """.trimIndent()
-    }
 
     const val Viewer = """
         query Viewer {

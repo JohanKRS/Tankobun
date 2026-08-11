@@ -42,20 +42,29 @@ class AnilistQueriesTest {
     }
 
     @Test
-    fun homeGenreCandidatesBatchGenresAcrossRequestedPages() {
-        val query = AnilistQueries.homeGenreCandidates(
+    fun homeInitialBatchesAllGenresWithCompactHighlightFields() {
+        val query = AnilistQueries.homeInitial(
             genres = listOf("Fantasy", "Slice of Life"),
-            pages = 1..3,
-            perPage = 50,
+            perPage = 3,
         )
 
-        assertTrue(query.contains("genre0Page1: Page(page: 1, perPage: 50)"))
-        assertTrue(query.contains("genre0Page3: Page(page: 3, perPage: 50)"))
-        assertTrue(query.contains("genre1Page2: Page(page: 2, perPage: 50)"))
+        assertTrue(query.contains("trending: Page(page: 1, perPage: 5)"))
+        assertTrue(query.contains("genre0Page1: Page(page: 1, perPage: 3)"))
+        assertTrue(query.contains("genre1Page1: Page(page: 1, perPage: 3)"))
         assertTrue(query.contains("genre: \"Slice of Life\""))
         assertTrue(query.contains("sort: TRENDING_DESC"))
+        assertFalse(query.contains("characters(role: MAIN"))
         assertFalse(query.contains("sort: POPULARITY_DESC"))
-        assertFalse(query.contains("Page4"))
+        assertFalse(query.contains("Page2"))
+    }
+
+    @Test
+    fun homeGenreCandidatesDoesNotRepeatTrendingPayload() {
+        val query = AnilistQueries.homeGenreCandidates(listOf("Fantasy"), perPage = 3)
+
+        assertTrue(query.contains("genre0Page1: Page(page: 1, perPage: 3)"))
+        assertFalse(query.contains("trending:"))
+        assertFalse(query.contains("HomeTrendingMedia"))
     }
 
     @Test

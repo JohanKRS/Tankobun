@@ -6,6 +6,9 @@ import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import coil3.annotation.ExperimentalCoilApi
+import coil3.network.DeDupeConcurrentRequestStrategy
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.tankobun.core.anilist.AnilistGraphQlClient
 import com.tankobun.core.anilist.AnilistRepository
 import com.tankobun.core.database.DatabaseFactory
@@ -43,6 +46,7 @@ import java.util.concurrent.TimeUnit
 class TankobunApplication : Application() {
     val container: AppContainer by lazy { AppContainer(this) }
 
+    @OptIn(ExperimentalCoilApi::class)
     override fun onCreate() {
         super.onCreate()
         TankobunInjektRegistry.registerApplication(this)
@@ -52,6 +56,14 @@ class TankobunApplication : Application() {
                 .components {
                     add(ReaderPageFetcher.Factory(appContainer))
                     add(ReaderPageImageModelKeyer())
+                    add(SourceThumbnailFetcher.Factory(appContainer))
+                    add(SourceThumbnailImageModelKeyer())
+                    add(
+                        OkHttpNetworkFetcherFactory(
+                            callFactory = { appContainer.imageOkHttpClient },
+                            concurrentRequestStrategy = { DeDupeConcurrentRequestStrategy() },
+                        ),
+                    )
                 }
                 .build()
         }
@@ -70,6 +82,13 @@ class AppContainer(application: Application) {
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
+    val imageOkHttpClient: OkHttpClient by lazy {
+        // Coil owns its disk cache. Share OkHttp's dispatcher and connection pool,
+        // but avoid storing every image a second time in the API response cache.
+        okHttpClient.newBuilder()
+            .cache(null)
+            .build()
+    }
 
     val tokenStore = SecureTokenStore(application)
     val settingsStore = SettingsStore(application)
@@ -167,7 +186,7 @@ class AppContainer(application: Application) {
                 database.downloadPageDao()
                     .pagesForJob(job.id)
                     .asSequence()
-                    .filter { File(it.filePath).isFile }
+                    .filter { File(it.filePath).let { file -> file.isFile && file.length() > 0L } }
                     .map { it.pageIndex }
                     .toSet()
 
@@ -188,7 +207,9 @@ class AppContainer(application: Application) {
                 chapter = chapter,
                 page = page,
             ) {
-                sourceHost.imageBytes(source, page)
+                // DownloadTaskRunner owns retry/backoff here. Avoid multiplying its
+                // attempts by the reader-oriented retries inside the source host.
+                sourceHost.imageBytes(source, page, maxAttempts = 1)
             }.bytes
         }
 

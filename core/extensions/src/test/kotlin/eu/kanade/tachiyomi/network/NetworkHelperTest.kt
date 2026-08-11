@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.network
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -48,5 +49,10 @@ class NetworkHelperTest {
         assertTrue("CloudflareInterceptor" in applicationInterceptors)
         assertFalse("IgnoreGzipInterceptor" in networkInterceptors)
         assertFalse("BrotliInterceptor" in networkInterceptors)
+    }
+
+    @Test
+    fun networkHelpersShareConnectionsCookiesAndDiskCache() {
+        assertSame(NetworkHelper().client, NetworkHelper().client)
     }
 }

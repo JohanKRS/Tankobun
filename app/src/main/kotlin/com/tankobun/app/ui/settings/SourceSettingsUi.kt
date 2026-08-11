@@ -235,19 +235,20 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
         state.allInstalledSources.groupBy { it.packageName }
     }
     val normalizedSourceSettingsQuery = remember(sourceSettingsQuery) {
-        sourceSettingsQuery.trim().lowercase()
+        sourceSettingsQuery.trim().lowercase(Locale.ROOT)
     }
-    val searchableInstalledSources = remember(
+    val installedSourceSearchIndex = remember(
         state.allInstalledSources,
         repositoryByPackage,
-        normalizedSourceSettingsQuery,
     ) {
-        state.allInstalledSources.filter { source ->
-            source.matchesSourceSettingsQuery(
-                query = normalizedSourceSettingsQuery,
-                extension = repositoryByPackage[source.packageName],
-            )
+        state.allInstalledSources.map { source ->
+            source to source.sourceSettingsSearchText(repositoryByPackage[source.packageName])
         }
+    }
+    val searchableInstalledSources = remember(installedSourceSearchIndex, normalizedSourceSettingsQuery) {
+        installedSourceSearchIndex
+            .filter { (_, searchText) -> searchText.contains(normalizedSourceSettingsQuery) }
+            .map { (source, _) -> source }
     }
     val visibleInstalledSourceList = remember(
         searchableInstalledSources,
@@ -279,8 +280,13 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                 .thenByDescending { it.versionCode },
         )
     }
-    val searchableRepositoryEntries = remember(repositoryEntries, normalizedSourceSettingsQuery) {
-        repositoryEntries.filter { it.matchesSourceSettingsQuery(normalizedSourceSettingsQuery) }
+    val repositorySearchIndex = remember(repositoryEntries) {
+        repositoryEntries.map { extension -> extension to extension.sourceSettingsSearchText() }
+    }
+    val searchableRepositoryEntries = remember(repositorySearchIndex, normalizedSourceSettingsQuery) {
+        repositorySearchIndex
+            .filter { (_, searchText) -> searchText.contains(normalizedSourceSettingsQuery) }
+            .map { (extension, _) -> extension }
     }
     val activeRepositoryEntries = remember(searchableRepositoryEntries, state.sourceLanguages) {
         searchableRepositoryEntries.filter {
@@ -554,6 +560,11 @@ internal fun SourceSettingsHeader(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var editorQuery by remember { mutableStateOf(query) }
+    LaunchedEffect(editorQuery) {
+        delay(SOURCE_SETTINGS_SEARCH_DEBOUNCE_MILLIS)
+        if (editorQuery != query) onQueryChange(editorQuery)
+    }
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -577,8 +588,8 @@ internal fun SourceSettingsHeader(
             }
         }
         TankobunSearchField(
-            value = query,
-            onValueChange = onQueryChange,
+            value = editorQuery,
+            onValueChange = { editorQuery = it },
             placeholder = if (selectedTab == 0) {
                 tankobunString(R.string.sources_search_installed)
             } else {
@@ -675,6 +686,7 @@ internal fun SourceRepositoryControls(
 }
 
 private val SourceSettingsContentPadding = 18.dp
+private const val SOURCE_SETTINGS_SEARCH_DEBOUNCE_MILLIS = 150L
 
 @Composable
 internal fun SourceLanguageGroupSection(
@@ -926,47 +938,66 @@ internal fun ExtensionRepositoryRow(
 internal fun TankobunUiState.sourceActive(source: SourceDescriptor): Boolean =
     installedSources.any { it.sourceSettingsKey() == source.sourceSettingsKey() }
 
+internal fun SourceDescriptor.sourceSettingsSearchText(
+    extension: ExtensionIndexEntry?,
+): String = buildList<String> {
+    addAll(
+        listOf(
+            name,
+            name.extensionDisplayName(),
+            packageName,
+            packageName.substringAfterLast('.'),
+            lang,
+            sourceLanguageLabel(lang),
+        ),
+    )
+    extension?.let { entry ->
+        add(entry.name)
+        add(entry.name.extensionDisplayName())
+        add(entry.packageName)
+        entry.sources.forEach { source ->
+            add(source.name)
+            add(source.name.extensionDisplayName())
+            source.lang?.let { language ->
+                add(language)
+                add(sourceLanguageLabel(language))
+            }
+        }
+    }
+}.sourceSettingsSearchText()
+
+internal fun ExtensionIndexEntry.sourceSettingsSearchText(): String = buildList<String> {
+    addAll(
+        listOf(
+            name,
+            name.extensionDisplayName(),
+            packageName,
+            packageName.substringAfterLast('.'),
+            lang,
+            sourceLanguageLabel(lang),
+        ),
+    )
+    add(versionName)
+    sources.forEach { source ->
+        add(source.name)
+        add(source.name.extensionDisplayName())
+        source.lang?.let { language ->
+            add(language)
+            add(sourceLanguageLabel(language))
+        }
+    }
+}.sourceSettingsSearchText()
+
+private fun Iterable<String>.sourceSettingsSearchText(): String =
+    joinToString(separator = "\u0000") { value -> value.lowercase(Locale.ROOT) }
+
 internal fun SourceDescriptor.matchesSourceSettingsQuery(
     query: String,
     extension: ExtensionIndexEntry?,
-): Boolean {
-    if (query.isBlank()) return true
-    return listOfNotNull(
-        name,
-        name.extensionDisplayName(),
-        packageName,
-        packageName.substringAfterLast('.'),
-        lang,
-        sourceLanguageLabel(lang),
-        extension?.name,
-        extension?.name?.extensionDisplayName(),
-        extension?.packageName,
-    ).any { it.matchesSourceSettingsQuery(query) } ||
-        extension?.sources.orEmpty().any { source ->
-            listOfNotNull(source.name, source.name.extensionDisplayName(), source.lang, source.lang?.let(::sourceLanguageLabel))
-                .any { it.matchesSourceSettingsQuery(query) }
-        }
-}
+): Boolean = sourceSettingsSearchText(extension).contains(query.lowercase(Locale.ROOT))
 
-internal fun ExtensionIndexEntry.matchesSourceSettingsQuery(query: String): Boolean {
-    if (query.isBlank()) return true
-    return listOfNotNull(
-        name,
-        name.extensionDisplayName(),
-        packageName,
-        packageName.substringAfterLast('.'),
-        lang,
-        sourceLanguageLabel(lang),
-        versionName,
-    ).any { it.matchesSourceSettingsQuery(query) } ||
-        sources.any { source ->
-            listOfNotNull(source.name, source.name.extensionDisplayName(), source.lang, source.lang?.let(::sourceLanguageLabel))
-                .any { it.matchesSourceSettingsQuery(query) }
-        }
-}
-
-internal fun String.matchesSourceSettingsQuery(query: String): Boolean =
-    lowercase().contains(query)
+internal fun ExtensionIndexEntry.matchesSourceSettingsQuery(query: String): Boolean =
+    sourceSettingsSearchText().contains(query.lowercase(Locale.ROOT))
 
 @Composable
 internal fun sourceMetadata(source: SourceDescriptor): String =

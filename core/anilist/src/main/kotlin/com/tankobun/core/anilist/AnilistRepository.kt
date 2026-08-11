@@ -14,6 +14,8 @@ import com.tankobun.core.model.AnilistStatItem
 import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.MediaStatus
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
@@ -59,158 +61,60 @@ class AnilistRepository(
         val variables = buildJsonObject {
             if (!includeAdult) put("isAdult", false)
         }
-        val firstGenreChunk = genres.take(HOME_GENRE_BATCH_SIZE)
-        val initialData = graphQlClient.execute(
-            query = if (firstGenreChunk.isEmpty()) {
-                AnilistQueries.HomeTrending
-            } else {
-                AnilistQueries.homeInitial(firstGenreChunk, perPage = HOME_GENRE_CANDIDATES_PER_PAGE)
-            },
-            variables = variables,
-            accessToken = accessToken,
-        )
-        val trending = initialData.mediaFromPage("trending").also(onTrendingLoaded)
-        val candidatesByGenre = linkedMapOf<String, MutableList<AnilistMedia>>()
-        val selectedByGenre = linkedMapOf<String, AnilistMedia>()
-        val usedMediaIds = mutableSetOf<Int>()
-        var lastPublishedIds = emptyList<Int>()
-
-        fun currentHighlights(): List<AnilistGenreHighlight> =
-            genres.mapNotNull { genre ->
-                selectedByGenre[genre]?.let { media -> AnilistGenreHighlight(genre = genre, media = media) }
-            }
-
-        fun publishHighlights() {
-            val highlights = currentHighlights()
-            val currentIds = highlights.map { it.media.id }
-            if (currentIds != lastPublishedIds) {
-                lastPublishedIds = currentIds
-                onGenreHighlightsLoaded(highlights)
-            }
-        }
-
-        fun addGenreCandidates(chunk: List<String>, pages: IntRange, data: JsonObject) {
-            chunk.forEachIndexed { index, genre ->
-                val candidates = pages.flatMap { page ->
-                    data["genre${index}Page$page"]
-                        ?.takeUnless { it is JsonNull }
-                        ?.jsonObject
-                        ?.get("media")
-                        ?.jsonArray
-                        .orEmpty()
-                }.map(AnilistJsonMapper::media)
-                val existingIds = candidatesByGenre[genre].orEmpty().mapTo(mutableSetOf(), AnilistMedia::id)
-                candidatesByGenre.getOrPut(genre, ::mutableListOf)
-                    .addAll(candidates.filterNot { candidate -> candidate.id in existingIds })
-            }
-        }
-
-        val selectPrimaryCandidates: (List<String>) -> Unit = { loadedGenres ->
-            loadedGenres.forEach { genre ->
-                if (genre !in selectedByGenre) {
-                    candidatesByGenre[genre]
-                        ?.firstOrNull { candidate ->
-                            candidate.id !in usedMediaIds &&
-                                candidate.genres.firstOrNull().equals(genre, ignoreCase = true)
-                        }
-                        ?.let { media ->
-                            selectedByGenre[genre] = media
-                            usedMediaIds += media.id
-                        }
-                }
-            }
-            publishHighlights()
-        }
-
-        suspend fun loadGenreCandidates(
-            targetGenres: List<String>,
-            pages: IntRange,
-        ) {
-            targetGenres.chunked(HOME_GENRE_BATCH_SIZE).forEach { chunk ->
-                val data = graphQlClient.execute(
-                    query = AnilistQueries.homeGenreCandidates(
-                        chunk,
-                        pages = pages,
+        coroutineScope {
+            val firstGenreChunk = genres.take(HOME_GENRE_BATCH_SIZE)
+            val remainingGenres = genres.drop(firstGenreChunk.size)
+            val initialRequest = async {
+                graphQlClient.execute(
+                    query = AnilistQueries.homeInitial(
+                        genres = firstGenreChunk,
                         perPage = HOME_GENRE_CANDIDATES_PER_PAGE,
                     ),
                     variables = variables,
                     accessToken = accessToken,
                 )
-                addGenreCandidates(chunk, pages, data)
-                selectPrimaryCandidates(chunk)
             }
-        }
-
-        if (firstGenreChunk.isNotEmpty()) {
-            addGenreCandidates(firstGenreChunk, pages = 1..1, data = initialData)
-            selectPrimaryCandidates(firstGenreChunk)
-        }
-        loadGenreCandidates(
-            targetGenres = genres.drop(firstGenreChunk.size),
-            pages = 1..1,
-        )
-        val genresMissingPrimaryCandidate = genres.filterNot(selectedByGenre::containsKey)
-        if (genresMissingPrimaryCandidate.isNotEmpty()) {
-            loadGenreCandidates(
-                targetGenres = genresMissingPrimaryCandidate,
-                pages = 2..2,
-            )
-        }
-        genres.filterNot(selectedByGenre::containsKey).forEach { genre ->
-            candidatesByGenre[genre]
-                ?.firstOrNull { candidate -> candidate.id !in usedMediaIds }
-                ?.let { media ->
-                    selectedByGenre[genre] = media
-                    usedMediaIds += media.id
+            val remainingRequest = remainingGenres.takeIf(List<String>::isNotEmpty)?.let { chunk ->
+                async {
+                    graphQlClient.execute(
+                        query = AnilistQueries.homeGenreCandidates(
+                            genres = chunk,
+                            perPage = HOME_GENRE_CANDIDATES_PER_PAGE,
+                        ),
+                        variables = variables,
+                        accessToken = accessToken,
+                    )
                 }
+            }
+            val usedMediaIds = mutableSetOf<Int>()
+            val genreHighlights = mutableListOf<AnilistGenreHighlight>()
+
+            fun appendHighlights(chunk: List<String>, data: JsonObject) {
+                chunk.forEachIndexed { index, genre ->
+                    val candidates = data.mediaFromPage("genre${index}Page1")
+                    val selected = candidates.firstOrNull { it.id !in usedMediaIds }
+                        ?: candidates.firstOrNull()
+                        ?: return@forEachIndexed
+                    usedMediaIds += selected.id
+                    genreHighlights += AnilistGenreHighlight(genre = genre, media = selected)
+                }
+            }
+
+            val initialData = initialRequest.await()
+            val trending = initialData.mediaFromPage("trending").also(onTrendingLoaded)
+            appendHighlights(firstGenreChunk, initialData)
+            if (remainingRequest == null && genreHighlights.isNotEmpty()) {
+                onGenreHighlightsLoaded(genreHighlights.toList())
+            }
+
+            remainingRequest?.await()?.let { remainingData ->
+                appendHighlights(remainingGenres, remainingData)
+                if (genreHighlights.isNotEmpty()) {
+                    onGenreHighlightsLoaded(genreHighlights.toList())
+                }
+            }
+            AnilistHomeFeed(trending = trending, genreHighlights = genreHighlights)
         }
-        publishHighlights()
-        val genreHighlights = currentHighlights()
-        val missingCharacterIds = genreHighlights
-            .map { it.media }
-            .filter { it.bannerImage.isNullOrBlank() }
-            .map { it.id }
-            .distinct()
-        val characterImages = if (missingCharacterIds.isEmpty()) {
-            emptyMap()
-        } else {
-            val data = graphQlClient.execute(
-                query = AnilistQueries.homeMainCharacters(missingCharacterIds),
-                accessToken = accessToken,
-            )
-            missingCharacterIds.mapIndexedNotNull { index, mediaId ->
-                val image = data["media$index"]
-                    ?.takeUnless { it is JsonNull }
-                    ?.jsonObject
-                    ?.get("characters")
-                    ?.takeUnless { it is JsonNull }
-                    ?.jsonObject
-                    ?.get("nodes")
-                    ?.jsonArray
-                    ?.firstOrNull()
-                    ?.jsonObject
-                    ?.get("image")
-                    ?.takeUnless { it is JsonNull }
-                    ?.jsonObject
-                    ?.get("large")
-                    ?.jsonPrimitive
-                    ?.content
-                    ?: return@mapIndexedNotNull null
-                mediaId to image
-            }.toMap()
-        }
-        val enrichedHighlights = genreHighlights.map { highlight ->
-            highlight.copy(
-                media = highlight.media.copy(
-                    mainCharacterImage = characterImages[highlight.media.id],
-                    characterImages = listOfNotNull(characterImages[highlight.media.id]),
-                ),
-            )
-        }
-        if (enrichedHighlights != genreHighlights) {
-            onGenreHighlightsLoaded(enrichedHighlights)
-        }
-        AnilistHomeFeed(trending = trending, genreHighlights = enrichedHighlights)
     }
 
     suspend fun viewer(accessToken: String): AnilistViewer {
@@ -685,8 +589,8 @@ class AnilistRepository(
 }
 
 private const val MANGA_BY_IDS_BATCH_SIZE = 25
-private const val HOME_GENRE_BATCH_SIZE = 6
-private const val HOME_GENRE_CANDIDATES_PER_PAGE = 12
+private const val HOME_GENRE_BATCH_SIZE = 9
+private const val HOME_GENRE_CANDIDATES_PER_PAGE = 3
 private const val DEFAULT_RECOMMENDATIONS_PER_PAGE = 18
 
 private fun JsonObject.mediaFromPage(name: String): List<AnilistMedia> =

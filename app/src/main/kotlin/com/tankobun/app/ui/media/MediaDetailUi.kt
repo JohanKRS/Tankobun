@@ -1958,6 +1958,8 @@ internal fun CoverImage(
     contentScale: ContentScale = ContentScale.Crop,
     imageAlignment: Alignment = Alignment.Center,
     cornerRadius: Dp = 8.dp,
+    imageModel: Any? = url,
+    onImageError: (() -> Unit)? = null,
 ) {
     Box(
         modifier = modifier
@@ -1972,11 +1974,12 @@ internal fun CoverImage(
         contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
-            model = url,
+            model = imageModel,
             contentDescription = title,
             modifier = Modifier.fillMaxSize(),
             contentScale = contentScale,
             alignment = imageAlignment,
+            onError = { onImageError?.invoke() },
         )
         if (url.isNullOrBlank()) {
             Text(

@@ -127,6 +127,19 @@ internal fun HomeScreen(
     val genresRefreshing = state.homeGenreHighlightsRefreshing && state.homeGenreHighlights.isNotEmpty()
     val trendingDisplayState = homeFeedDisplayState(state.homeTrending.isNotEmpty(), state.homeLoaded)
     val genresDisplayState = homeFeedDisplayState(state.homeGenreHighlights.isNotEmpty(), state.homeLoaded)
+    val genreRows = remember(state.homeGenreHighlights, expanded) {
+        if (expanded) {
+            val splitIndex = (state.homeGenreHighlights.size + 1) / 2
+            List(splitIndex) { row ->
+                listOfNotNull(
+                    state.homeGenreHighlights.getOrNull(row),
+                    state.homeGenreHighlights.getOrNull(row + splitIndex),
+                )
+            }
+        } else {
+            state.homeGenreHighlights.map(::listOf)
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -134,7 +147,7 @@ internal fun HomeScreen(
             top = chromeInsets.top + 18.dp,
             bottom = chromeInsets.bottom + 18.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         item {
             HomeSection(
@@ -142,6 +155,7 @@ internal fun HomeScreen(
                 icon = TankobunIcons.Whatshot,
                 onViewAll = onOpenBrowse,
                 isRefreshing = trendingRefreshing,
+                modifier = Modifier.padding(bottom = 24.dp),
                 headerModifier = Modifier.padding(horizontal = horizontalPadding),
             ) {
                 HomeFeedAnimatedContent(
@@ -176,6 +190,7 @@ internal fun HomeScreen(
                     title = tankobunString(R.string.home_continue_reading),
                     icon = TankobunIcons.MenuBook,
                     onViewAll = onOpenLibrary,
+                    modifier = Modifier.padding(bottom = 24.dp),
                     headerModifier = Modifier.padding(horizontal = horizontalPadding),
                 ) {
                     ContinueReadingRow(
@@ -187,7 +202,7 @@ internal fun HomeScreen(
             }
         }
 
-        item {
+        item(key = "home-genres-header", contentType = "home-section-header") {
             HomeSection(
                 title = tankobunString(R.string.home_trending_by_genre),
                 icon = TankobunIcons.TrendingUp,
@@ -204,16 +219,43 @@ internal fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) { displayState ->
                         when (displayState) {
-                            HomeFeedDisplayState.CONTENT -> GenreHighlightList(
-                                highlights = state.homeGenreHighlights,
-                                refreshingGenres = state.homeRefreshingGenres,
-                                expanded = expanded,
-                                onSelectMedia = onSelectMedia,
-                            )
+                            HomeFeedDisplayState.CONTENT -> Spacer(Modifier.height(0.dp))
                             HomeFeedDisplayState.LOADING -> HomeLoadingPanel(Modifier.height(220.dp))
                             HomeFeedDisplayState.EMPTY -> HomeEmptyPanel(tankobunString(R.string.home_genres_empty))
                         }
                     }
+                }
+            }
+        }
+        if (genresDisplayState == HomeFeedDisplayState.CONTENT) {
+            items(
+                items = genreRows,
+                key = { row -> row.joinToString(separator = ":") { it.genre } },
+                contentType = { "home-genre-row" },
+            ) { row ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = horizontalPadding, vertical = 1.5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    row.forEach { highlight ->
+                        Box(Modifier.weight(1f)) {
+                            HomeFeedAnimatedContent(
+                                targetState = highlight,
+                                refreshing = highlight.genre in state.homeRefreshingGenres,
+                                contentKey = { item -> item.genre to item.media.homeVisualKey() },
+                                label = "home-genre-${highlight.genre}",
+                            ) { visibleHighlight ->
+                                GenreHighlightCard(
+                                    highlight = visibleHighlight,
+                                    expanded = expanded,
+                                    onClick = { onSelectMedia(visibleHighlight.media) },
+                                )
+                            }
+                        }
+                    }
+                    if (expanded && row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         }
@@ -808,58 +850,6 @@ private fun ContinueReadingCard(
                     ?: item.chapter?.name
                     ?: tankobunString(R.string.reader_saved_chapter),
             )
-        }
-    }
-}
-
-@Composable
-private fun GenreHighlightList(
-    highlights: List<AnilistGenreHighlight>,
-    refreshingGenres: Set<String>,
-    expanded: Boolean,
-    onSelectMedia: (AnilistMedia) -> Unit,
-) {
-    if (expanded) {
-        val splitIndex = (highlights.size + 1) / 2
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            listOf(highlights.take(splitIndex), highlights.drop(splitIndex)).forEach { columnItems ->
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
-                ) {
-                    columnItems.forEach { highlight ->
-                        HomeFeedAnimatedContent(
-                            targetState = highlight,
-                            refreshing = highlight.genre in refreshingGenres,
-                            contentKey = { item -> item.genre to item.media.homeVisualKey() },
-                            label = "home-genre-${highlight.genre}",
-                        ) { visibleHighlight ->
-                            GenreHighlightCard(
-                                highlight = visibleHighlight,
-                                expanded = true,
-                                onClick = { onSelectMedia(visibleHighlight.media) },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    } else {
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            highlights.forEach { highlight ->
-                HomeFeedAnimatedContent(
-                    targetState = highlight,
-                    refreshing = highlight.genre in refreshingGenres,
-                    contentKey = { item -> item.genre to item.media.homeVisualKey() },
-                    label = "home-genre-${highlight.genre}",
-                ) { visibleHighlight ->
-                    GenreHighlightCard(
-                        highlight = visibleHighlight,
-                        expanded = false,
-                        onClick = { onSelectMedia(visibleHighlight.media) },
-                    )
-                }
-            }
         }
     }
 }

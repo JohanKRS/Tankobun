@@ -3607,7 +3607,7 @@ class MainViewModel(
             return
         }
         if (!_state.value.sourcePickerLoading) {
-            findSourceMatches(forceRefresh = true)
+            findSourceMatches(forceRefresh = false)
         }
     }
 

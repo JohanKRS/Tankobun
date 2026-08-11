@@ -10,13 +10,12 @@ import org.junit.Test
 
 class AnilistHomeFeedTest {
     @Test
-    fun publishesTrendingAndGenreChunksBeforeReturningCompleteFeed() = runTest {
+    fun loadsTrendingAndAllGenresInOneRequest() = runTest {
         val genres = listOf("Action", "Adventure", "Comedy", "Drama", "Fantasy", "Horror", "Mystery")
 
         MockWebServer().use { server ->
             server.start()
-            server.enqueue(response(initialResponse(genres.take(6))))
-            server.enqueue(response(genreResponse(genres.drop(6))))
+            server.enqueue(response(homeResponse(genres)))
 
             val repository = AnilistRepository(
                 AnilistGraphQlClient(
@@ -35,8 +34,40 @@ class AnilistHomeFeedTest {
             )
 
             assertEquals(1, trendingCallbackSize)
-            assertEquals(listOf(6, 7), genreCallbackSizes)
+            assertEquals(listOf(7), genreCallbackSizes)
             assertEquals(1, feed.trending.size)
+            assertEquals(genres, feed.genreHighlights.map { it.genre })
+            assertEquals(1, server.requestCount)
+        }
+    }
+
+    @Test
+    fun overlapsTwoRequestsForTheCompleteGenreSet() = runTest {
+        val genres = listOf(
+            "Action", "Adventure", "Comedy", "Drama", "Ecchi", "Fantasy", "Horror", "Mahou Shoujo", "Mecha",
+            "Music", "Mystery", "Psychological", "Romance", "Sci-Fi", "Slice of Life", "Sports", "Supernatural", "Thriller",
+        )
+
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(response(homeResponse(genres.take(9))))
+            server.enqueue(response(homeResponse(genres.drop(9))))
+
+            val repository = AnilistRepository(
+                AnilistGraphQlClient(
+                    okHttpClient = OkHttpClient(),
+                    rateLimiter = RespectfulRateLimiter(minSpacingMillis = 0L),
+                    endpoint = server.url("/graphql").toString(),
+                ),
+            )
+            val callbackSizes = mutableListOf<Int>()
+
+            val feed = repository.homeFeed(
+                genres = genres,
+                onGenreHighlightsLoaded = { callbackSizes += it.size },
+            )
+
+            assertEquals(listOf(18), callbackSizes)
             assertEquals(genres, feed.genreHighlights.map { it.genre })
             assertEquals(2, server.requestCount)
         }
@@ -49,7 +80,7 @@ class AnilistHomeFeedTest {
             .body(body)
             .build()
 
-    private fun initialResponse(genres: List<String>): String {
+    private fun homeResponse(genres: List<String>): String {
         val genreFields = genres.mapIndexed { index, genre ->
             "\"genre${index}Page1\":{\"media\":[${mediaJson(index + genre.hashCode(), genre)}]}"
         }
@@ -57,13 +88,6 @@ class AnilistHomeFeedTest {
         return "{\"data\":{${fields.joinToString(",")}}}"
     }
 
-    private fun genreResponse(genres: List<String>): String {
-        val fields = genres.mapIndexed { index, genre ->
-            "\"genre${index}Page1\":{\"media\":[${mediaJson(index + genre.hashCode(), genre)}]}"
-        }
-        return "{\"data\":{${fields.joinToString(",")}}}"
-    }
-
     private fun mediaJson(id: Int, genre: String): String =
-        """{"id":$id,"title":{"userPreferred":"$genre manga"},"coverImage":{"extraLarge":"https://example.com/$id.jpg"},"bannerImage":"https://example.com/$id-banner.jpg","genres":["$genre"],"isAdult":false}"""
+        """{"id":$id,"title":{"userPreferred":"$genre manga"},"coverImage":{"extraLarge":"https://example.com/$id.jpg"},"bannerImage":"https://example.com/$id-banner.jpg","isAdult":false}"""
 }

@@ -461,23 +461,38 @@ internal class SourceDataSource(
         candidate: SourceSearchResult,
         now: Long,
     ): VerifiedReadableMatch? {
+        readableChaptersForVerification(source, candidate, now)?.let { chapterCount ->
+            return VerifiedReadableMatch(candidate, chapterCount)
+        }
+
         val resolved = withTimeoutOrNull(SOURCE_DETAILS_TIMEOUT_MILLIS) {
             resolveMangaDetails(candidate)
-        } ?: candidate
-        val attempts = listOf(resolved, candidate)
-            .filter { it.manga.url.isNotBlank() }
-            .distinctBy { "${it.manga.url}:${it.manga.title}" }
+        } ?: return null
+        if (resolved.manga.url == candidate.manga.url && resolved.manga.title == candidate.manga.title) {
+            return null
+        }
+        return readableChaptersForVerification(source, resolved, now)?.let { chapterCount ->
+            VerifiedReadableMatch(resolved, chapterCount)
+        }
+    }
 
-        attempts.forEach { match ->
-            val chapters = withTimeoutOrNull(SOURCE_CHAPTER_TIMEOUT_MILLIS) {
+    private suspend fun readableChaptersForVerification(
+        source: SourceDescriptor,
+        match: SourceSearchResult,
+        now: Long,
+    ): Int? {
+        if (match.manga.url.isBlank()) return null
+        return try {
+            withTimeoutOrNull(SOURCE_CHAPTER_TIMEOUT_MILLIS) {
                 cachedChapters(source, match.manga, now, requireFresh = false)
                     ?: fetchAndCacheChapters(source, match.manga, now)
-            }.orEmpty()
-            if (chapters.isNotEmpty()) {
-                return VerifiedReadableMatch(match, chapters.size)
-            }
+            }?.size?.takeIf { it > 0 }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Log.d(TAG, "Chapter verification failed for ${source.name}/${match.manga.title}", error)
+            null
         }
-        return null
     }
 
     private fun SourceSearchResultEntity.toSearchResult(source: SourceDescriptor): SourceSearchResult =
