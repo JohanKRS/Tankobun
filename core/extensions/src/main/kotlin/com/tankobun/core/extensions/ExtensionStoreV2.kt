@@ -9,7 +9,13 @@ import kotlinx.serialization.protobuf.ProtoNumber
 @Serializable
 internal data class ExtensionRepositoryDescriptor(
     @SerialName("index_v2") val indexV2: String? = null,
-)
+    val meta: Meta? = null,
+) {
+    @Serializable
+    data class Meta(
+        val signingKeyFingerprint: String? = null,
+    )
+}
 
 @Serializable
 internal data class ExtensionStoreV2(
@@ -79,7 +85,9 @@ internal data class ExtensionStoreV2(
     }
 }
 
-internal fun ExtensionStoreV2.ExtensionList.toIndexEntries(): List<ExtensionIndexEntry> =
+internal fun ExtensionStoreV2.ExtensionList.toIndexEntries(
+    repositorySigningKey: String? = null,
+): List<ExtensionIndexEntry> =
     extensions.map { extension ->
         val languages = extension.sources
             .asSequence()
@@ -102,5 +110,6 @@ internal fun ExtensionStoreV2.ExtensionList.toIndexEntries(): List<ExtensionInde
                 )
             },
             iconUrl = extension.resources.iconUrl.takeIf { it.isNotBlank() },
+            repositorySigningKey = repositorySigningKey?.takeIf { it.isNotBlank() },
         )
     }

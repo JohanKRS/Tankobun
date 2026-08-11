@@ -29,15 +29,28 @@ class ExtensionIndexRepository(
         require(requestedUrl.isNotEmpty()) { "Extension index URL must not be blank" }
 
         legacyRepositoryMetadataUrl(requestedUrl)?.let { metadataUrl ->
-            try {
-                val descriptor = decodeRepositoryDescriptor(fetchBytes(metadataUrl))
-                descriptor.indexV2?.takeIf { it.isNotBlank() }?.let { v2Url ->
-                    return decodeIndex(resolveUrl(metadataUrl, v2Url), linkedSetOf())
-                }
+            val descriptor = try {
+                decodeRepositoryDescriptor(fetchBytes(metadataUrl))
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Throwable) {
-                // Older repositories may only expose index.min.json.
+                null
+            }
+            if (descriptor != null) {
+                descriptor.indexV2?.takeIf { it.isNotBlank() }?.let { v2Url ->
+                    try {
+                        return decodeIndex(resolveUrl(metadataUrl, v2Url), linkedSetOf())
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (_: Throwable) {
+                        // Keep legacy repositories usable while a v2 endpoint is unavailable.
+                    }
+                }
+                return decodeIndex(
+                    indexUrl = requestedUrl,
+                    visitedUrls = linkedSetOf(),
+                    repositorySigningKey = descriptor.meta?.signingKeyFingerprint,
+                )
             }
         }
 
@@ -65,6 +78,7 @@ class ExtensionIndexRepository(
     private suspend fun decodeIndex(
         indexUrl: String,
         visitedUrls: MutableSet<String>,
+        repositorySigningKey: String? = null,
     ): ExtensionIndexResult {
         check(visitedUrls.add(indexUrl)) { "Extension repository redirect loop" }
         check(visitedUrls.size <= MAX_REDIRECT_DEPTH) { "Too many extension repository redirects" }
@@ -72,7 +86,9 @@ class ExtensionIndexRepository(
 
         return when (payload.firstMeaningfulByte()) {
             JSON_ARRAY_START -> ExtensionIndexResult(
-                entries = json.decodeFromString<List<ExtensionIndexEntry>>(payload.decodeToString()),
+                entries = json.decodeFromString<List<ExtensionIndexEntry>>(payload.decodeToString()).map { entry ->
+                    entry.copy(repositorySigningKey = repositorySigningKey?.takeIf { it.isNotBlank() })
+                },
                 resolvedIndexUrl = indexUrl,
             )
             JSON_OBJECT_START -> {
@@ -97,7 +113,7 @@ class ExtensionIndexRepository(
             ?.let { listUrl -> decodeV2ExtensionList(resolveUrl(indexUrl, listUrl)) }
             ?: error("Extension repository does not contain an extension list")
         return ExtensionIndexResult(
-            entries = extensionList.toIndexEntries(),
+            entries = extensionList.toIndexEntries(store.signingKey),
             resolvedIndexUrl = indexUrl,
         )
     }

@@ -31,6 +31,7 @@ class ExtensionIndexRepositoryTest {
             assertEquals("Example", result.entries.single().name)
             assertEquals("https://cdn.example.test/example.apk", result.entries.single().apkName)
             assertEquals("https://cdn.example.test/example.png", result.entries.single().iconUrl)
+            assertEquals(SIGNING_KEY, result.entries.single().repositorySigningKey)
             assertEquals(2, server.requestCount)
             assertEquals("/repo.json", server.takeRequest().url.encodedPath)
             assertEquals("/index.pb", server.takeRequest().url.encodedPath)
@@ -55,6 +56,52 @@ class ExtensionIndexRepositoryTest {
         }
     }
 
+    @Test
+    fun legacyRepositorySigningKeyIsPropagatedWithoutChangingItsIndexFormat() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(
+                jsonResponse(
+                    """{"meta":{"name":"Legacy","signingKeyFingerprint":"$SIGNING_KEY"}}""",
+                ),
+            )
+            server.enqueue(
+                jsonResponse(
+                    """[{"name":"Legacy","pkg":"test.legacy","apk":"legacy.apk","lang":"en","code":7,"version":"1.4.7"}]""",
+                ),
+            )
+
+            val result = repository().fetchIndex(server.url("/index.min.json").toString())
+
+            assertEquals(SIGNING_KEY, result.entries.single().repositorySigningKey)
+            assertEquals("Legacy", result.entries.single().name)
+        }
+    }
+
+    @Test
+    fun unavailableV2IndexFallsBackToSignedLegacyIndex() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            val v2Url = server.url("/missing-index.pb").toString()
+            server.enqueue(
+                jsonResponse(
+                    """{"index_v2":"$v2Url","meta":{"signingKeyFingerprint":"$SIGNING_KEY"}}""",
+                ),
+            )
+            server.enqueue(MockResponse.Builder().code(503).build())
+            server.enqueue(
+                jsonResponse(
+                    """[{"name":"Legacy","pkg":"test.legacy","apk":"legacy.apk","lang":"en","code":7,"version":"1.4.7"}]""",
+                ),
+            )
+
+            val result = repository().fetchIndex(server.url("/index.min.json").toString())
+
+            assertEquals(SIGNING_KEY, result.entries.single().repositorySigningKey)
+            assertEquals(3, server.requestCount)
+        }
+    }
+
     private fun repository(): ExtensionIndexRepository =
         ExtensionIndexRepository(
             okHttpClient = OkHttpClient(),
@@ -63,6 +110,7 @@ class ExtensionIndexRepositoryTest {
 
     private fun v2Store(): ExtensionStoreV2 =
         ExtensionStoreV2(
+            signingKey = SIGNING_KEY,
             extensionList = ExtensionStoreV2.ExtensionList(
                 extensions = listOf(
                     ExtensionStoreV2.Extension(
@@ -103,4 +151,8 @@ class ExtensionIndexRepositoryTest {
             GZIPOutputStream(output).use { gzip -> gzip.write(bytes) }
             output.toByteArray()
         }
+
+    private companion object {
+        const val SIGNING_KEY = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
 }

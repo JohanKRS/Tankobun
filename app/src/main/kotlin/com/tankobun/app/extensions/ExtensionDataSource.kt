@@ -26,6 +26,8 @@ internal data class InstalledSourceState(
 internal class ExtensionDataSource(
     private val container: AppContainer,
 ) {
+    private val extensionApkValidator = ExtensionApkValidator(container.application.packageManager)
+
     suspend fun installedSourceState(
         preferredLanguages: Set<String>,
         disabledSourceKeys: Set<String>,
@@ -78,6 +80,7 @@ internal class ExtensionDataSource(
 
     suspend fun downloadExtensionApk(apkUrl: String, entry: ExtensionIndexEntry): Uri =
         withContext(Dispatchers.IO) {
+            extensionApkValidator.validateIndexEntry(entry)
             val cacheDir = File(container.application.cacheDir, "extension_apks").also { it.mkdirs() }
             val safeName = "${entry.packageName}-${entry.versionCode}.apk"
                 .replace(Regex("[^A-Za-z0-9._-]"), "_")
@@ -88,28 +91,35 @@ internal class ExtensionDataSource(
                 ?.filter { it.name.startsWith(entry.packageName) && it.name != apkFile.name }
                 ?.forEach { it.delete() }
 
-            val request = Request.Builder().url(apkUrl).build()
-            container.okHttpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    error("APK download failed: HTTP ${response.code}")
+            try {
+                val request = Request.Builder().url(apkUrl).build()
+                container.okHttpClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        error("APK download failed: HTTP ${response.code}")
+                    }
+                    val body = response.body
+                    partialFile.outputStream().use { output ->
+                        body.byteStream().use { input -> input.copyTo(output) }
+                    }
                 }
-                val body = response.body
-                partialFile.outputStream().use { output ->
-                    body.byteStream().use { input -> input.copyTo(output) }
-                }
-            }
 
-            if (partialFile.length() <= 0L) {
+                if (partialFile.length() <= 0L) {
+                    error("APK download failed: empty file")
+                }
+                if (apkFile.exists()) apkFile.delete()
+                check(partialFile.renameTo(apkFile)) { "APK download failed: could not finalize file" }
+
+                extensionApkValidator.validate(apkFile, entry)
+
+                FileProvider.getUriForFile(
+                    container.application,
+                    "${container.application.packageName}.fileprovider",
+                    apkFile,
+                )
+            } catch (error: Throwable) {
                 partialFile.delete()
-                error("APK download failed: empty file")
+                apkFile.delete()
+                throw error
             }
-            if (apkFile.exists()) apkFile.delete()
-            check(partialFile.renameTo(apkFile)) { "APK download failed: could not finalize file" }
-
-            FileProvider.getUriForFile(
-                container.application,
-                "${container.application.packageName}.fileprovider",
-                apkFile,
-            )
         }
 }

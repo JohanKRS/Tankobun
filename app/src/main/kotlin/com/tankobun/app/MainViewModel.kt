@@ -13,6 +13,7 @@ import com.tankobun.app.cache.CacheClearTarget
 import com.tankobun.app.cache.CacheStorageDataSource
 import com.tankobun.app.download.DownloadDataSource
 import com.tankobun.app.extensions.ExtensionDataSource
+import com.tankobun.app.extensions.ExtensionApkValidationException
 import com.tankobun.app.extensions.InstalledExtensionVersion
 import com.tankobun.app.logic.BROWSE_LANDING_SECTION_SIZE
 import com.tankobun.app.logic.BROWSE_MANHWA_CACHE_KEY
@@ -894,7 +895,11 @@ class MainViewModel(
                 _state.update {
                     it.copy(
                         installingExtensionPackageName = null,
-                        message = error.message ?: string(R.string.msg_extension_download_failed),
+                        message = if (error is ExtensionApkValidationException) {
+                            string(R.string.msg_extension_package_rejected)
+                        } else {
+                            error.message ?: string(R.string.msg_extension_download_failed)
+                        },
                     )
                 }
             }

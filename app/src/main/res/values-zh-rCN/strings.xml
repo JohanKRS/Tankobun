@@ -693,6 +693,12 @@
     <string name="about_changelog_v4_profile">重新设计个人资料页，加入阅读活动、更丰富的统计、分类洞察、成就和自定义资料图片。</string>
     <string name="about_changelog_v4_themes">新增 14 套独立配色，可搭配利落或圆润组件形状，并为 Haze 顶栏和底栏着色，自动模式默认使用桃色或梅紫。</string>
     <string name="about_changelog_v4_polish">全面优化设置、导航、下载、备份、来源绑定和响应式布局。</string>
+    <string name="about_changelog_v41_network">AniList 与首页现在会合并兼容请求、复用有效缓存、逐步更新内容，并遵守限流反馈。</string>
+    <string name="about_changelog_v41_sources">来源浏览与匹配现在更好地支持兼容 Mihon 的现代索引、旧标识符及用户安装的仓库，应用仍不会内置来源链接。</string>
+    <string name="about_changelog_v41_downloads">下载、阅读器页面、封面、横幅和来源图标现在采用并发上限、可恢复状态、请求去重和更充分的缓存复用。</string>
+    <string name="about_changelog_v41_continue_reading">继续阅读现在会通过当前选中的来源解析章节，不再使用其他来源的旧数据。</string>
+    <string name="about_changelog_v41_genres">分类筛选现在与个人资料页共用分类专属图标，并为剧情分类换用了更清晰的图标。</string>
+    <string name="about_changelog_v411_extension_validation">扩展包现在会先与仓库的身份和签名信息核对，再由 Android 打开安装器。</string>
     <string name="about_unofficial">Tankobun 是非官方漫画阅读器，与 AniList 没有关联。</string>
     <string name="about_anilist_thanks">感谢 AniList 向用户和社区应用开放 API。</string>
     <string name="about_anilist_data">AniList 是动画和漫画数据库、追踪与社交网站。它不托管、上传、分享、销售或提供漫画、章节或扫图。Tankobun 通过 AniList API 访问 AniList 元数据；账号同步使用用户授权。</string>
@@ -822,6 +828,7 @@
     <string name="msg_downloading_extension">正在下载 %1$s</string>
     <string name="msg_ready_to_install_extension">%1$s 已准备好安装</string>
     <string name="msg_extension_download_failed">扩展下载失败</string>
+    <string name="msg_extension_package_rejected">下载的文件与扩展仓库不匹配，因此未打开</string>
     <string name="msg_allow_extension_install">允许 Tankobun 安装扩展，然后再次点按“安装”</string>
     <string name="msg_app_update_manifest_not_configured">未配置应用更新清单</string>
     <string name="msg_checking_app_updates">正在检查应用更新</string>

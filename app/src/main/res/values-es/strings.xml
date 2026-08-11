@@ -686,6 +686,12 @@
     <string name="about_changelog_v4_profile">Perfil rediseñado con actividad de lectura, estadísticas más completas, información por género, logros e imágenes personalizadas.</string>
     <string name="about_changelog_v4_themes">Se añadieron 14 paletas de colores independientes de las formas Definido o Redondeado, con Haze teñido y valores automáticos Melocotón o Ciruela.</string>
     <string name="about_changelog_v4_polish">Se refinaron Ajustes, navegación, descargas, copias de seguridad, persistencia de fuentes y diseños adaptables en toda la app.</string>
+    <string name="about_changelog_v41_network">AniList e Inicio ahora agrupan solicitudes compatibles, reutilizan cachés vigentes, actualizan progresivamente y respetan los límites indicados.</string>
+    <string name="about_changelog_v41_sources">La búsqueda y asociación de fuentes ahora admiten mejor índices modernos compatibles con Mihon, identificadores antiguos y repositorios instalados por el usuario, sin incluir enlaces de fuentes.</string>
+    <string name="about_changelog_v41_downloads">Las descargas, páginas del lector, portadas, banners e iconos de fuentes ahora usan concurrencia limitada, estado reanudable, deduplicación de solicitudes y mejor caché.</string>
+    <string name="about_changelog_v41_continue_reading">Continuar leyendo ahora resuelve los capítulos mediante la fuente seleccionada actualmente, en lugar de usar datos antiguos de otra fuente.</string>
+    <string name="about_changelog_v41_genres">Los filtros de géneros ahora usan los mismos iconos específicos de Perfil, con un icono más claro para Drama.</string>
+    <string name="about_changelog_v411_extension_validation">Los paquetes de extensiones ahora se comprueban con los datos de identidad y firma del repositorio antes de que Android abra el instalador.</string>
     <string name="about_unofficial">Tankobun es un lector de manga no oficial y no está afiliado con AniList.</string>
     <string name="about_anilist_thanks">Gracias a AniList por poner su API a disposición de usuarios y apps de la comunidad.</string>
     <string name="about_anilist_data">AniList es una base de datos y un sitio social de seguimiento de anime y manga. No aloja, sube, comparte, vende ni proporciona manga, capítulos o scanlations. Tankobun accede a metadatos de AniList mediante la API de AniList; la sincronización de cuenta usa autorización del usuario.</string>
@@ -771,6 +777,7 @@
     <string name="msg_downloading_extension">Descargando %1$s</string>
     <string name="msg_ready_to_install_extension">%1$s listo para instalar</string>
     <string name="msg_extension_download_failed">Falló la descarga de la extensión</string>
+    <string name="msg_extension_package_rejected">El archivo descargado no coincide con el repositorio de extensiones y no se abrió</string>
     <string name="msg_allow_extension_install">Permite que Tankobun instale extensiones y luego toca Instalar otra vez</string>
     <string name="msg_app_update_manifest_not_configured">El manifiesto de actualizaciones de la app no está configurado</string>
     <string name="msg_checking_app_updates">Buscando actualizaciones de la app</string>

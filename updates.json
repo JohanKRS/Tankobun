@@ -2,13 +2,13 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 43,
-    "versionName": "4.1.0",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v4.1.0/tankobun-4.1.0.apk",
-    "apkSha256": "1DCCA840510CB1BB0A956295B7AC384806B29B6E40EB37C90328D6FFBE659679",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v4.1.0",
-    "publishedAt": "2026-08-11T16:48:15Z",
-    "sizeBytes": 13906450,
+    "versionCode": 44,
+    "versionName": "4.1.1",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v4.1.1/tankobun-4.1.1.apk",
+    "apkSha256": "E7B75AE649595C407F63E9F4F4A74B3F36FB21D3B361980F3297527F7DADF5AB",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v4.1.1",
+    "publishedAt": "2026-08-11T18:00:57Z",
+    "sizeBytes": 13916722,
     "mandatory": false,
     "changelog": {
       "en": [
@@ -16,28 +16,32 @@
         "Source browsing and matching now better handle modern Mihon-compatible extension indexes, conditional metadata refreshes, legacy identifiers, and user-installed repositories without bundling any source links.",
         "Downloads, reader pages, covers, banners, and source icons now use safer bounded concurrency, resumable state, request deduplication, and stronger cache reuse.",
         "Continue Reading now resolves chapters through the currently selected source instead of reopening stale source data.",
-        "Genre filters now use the same genre-specific icons as Profile, with a clearer Drama icon."
+        "Genre filters now use the same genre-specific icons as Profile, with a clearer Drama icon.",
+        "Extension packages are now verified against repository identity and signing metadata before Android opens the installer, while legacy user-managed repositories remain supported."
       ],
       "pt-BR": [
         "AniList e Home agora agrupam requisições compatíveis, reaproveitam caches válidos, atualizam seções progressivamente e respeitam os limites informados, entregando mais velocidade sem tráfego desnecessário.",
         "A busca e associação de fontes agora lidam melhor com índices modernos de extensões compatíveis com Mihon, atualizações condicionais de metadados, identificadores antigos e repositórios instalados pelo usuário, sem embutir links de fontes.",
         "Downloads, páginas do leitor, capas, banners e ícones de fontes agora usam concorrência limitada com segurança, retomada persistente, deduplicação de requisições e melhor reaproveitamento de cache.",
         "O Continuar lendo agora resolve capítulos pela fonte atualmente selecionada, em vez de reabrir dados de uma fonte antiga.",
-        "Os filtros de gêneros agora usam os mesmos ícones específicos do Perfil, com um ícone mais claro para Drama."
+        "Os filtros de gêneros agora usam os mesmos ícones específicos do Perfil, com um ícone mais claro para Drama.",
+        "Os pacotes de extensões agora são conferidos com os dados de identidade e assinatura do repositório antes de o Android abrir o instalador, mantendo o suporte a repositórios antigos gerenciados pelo usuário."
       ],
       "es": [
         "AniList e Inicio ahora agrupan solicitudes compatibles, reutilizan cachés vigentes, actualizan secciones progresivamente y respetan los límites indicados para ofrecer más velocidad sin tráfico innecesario.",
         "La búsqueda y asociación de fuentes ahora gestionan mejor los índices modernos de extensiones compatibles con Mihon, las actualizaciones condicionales de metadatos, los identificadores antiguos y los repositorios instalados por el usuario, sin incluir enlaces de fuentes.",
         "Las descargas, páginas del lector, portadas, banners e iconos de fuentes ahora usan concurrencia limitada y segura, estado reanudable, deduplicación de solicitudes y mejor reutilización de caché.",
         "Continuar leyendo ahora resuelve los capítulos mediante la fuente seleccionada actualmente, en lugar de reabrir datos de una fuente antigua.",
-        "Los filtros de géneros ahora usan los mismos iconos específicos de Perfil, con un icono más claro para Drama."
+        "Los filtros de géneros ahora usan los mismos iconos específicos de Perfil, con un icono más claro para Drama.",
+        "Los paquetes de extensiones ahora se comprueban con los datos de identidad y firma del repositorio antes de que Android abra el instalador, manteniendo la compatibilidad con repositorios antiguos gestionados por el usuario."
       ],
       "zh-CN": [
         "AniList 与首页现在会合并兼容请求、复用有效缓存、逐步更新各区块，并遵守限流反馈，在减少不必要流量的同时提升速度。",
         "来源浏览与匹配现在更好地支持兼容 Mihon 的现代扩展索引、条件式元数据刷新、旧标识符及用户安装的仓库，应用仍不会内置任何来源链接。",
         "下载、阅读器页面、封面、横幅和来源图标现在采用安全的并发上限、可恢复状态、请求去重和更充分的缓存复用。",
         "继续阅读现在会通过当前选中的来源解析章节，不再重新打开旧来源的数据。",
-        "分类筛选现在与个人资料页共用分类专属图标，并为剧情分类换用了更清晰的图标。"
+        "分类筛选现在与个人资料页共用分类专属图标，并为剧情分类换用了更清晰的图标。",
+        "扩展包现在会先与仓库的身份和签名信息核对，再由 Android 打开安装器，同时继续支持用户管理的旧版仓库。"
       ]
     }
   }

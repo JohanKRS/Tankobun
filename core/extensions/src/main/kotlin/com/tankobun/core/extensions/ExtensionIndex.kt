@@ -2,6 +2,7 @@ package com.tankobun.core.extensions
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 @Serializable
 data class ExtensionIndexEntry(
@@ -14,6 +15,7 @@ data class ExtensionIndexEntry(
     @SerialName("nsfw") val nsfwFlag: Int = 0,
     val sources: List<ExtensionIndexSource> = emptyList(),
     val iconUrl: String? = null,
+    @Transient val repositorySigningKey: String? = null,
 ) {
     val isNsfw: Boolean get() = nsfwFlag == 1
 }
