@@ -217,39 +217,6 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
     val context = LocalContext.current
     val chromeInsets = LocalTankobunChromeInsets.current
     var sourceSettingsQuery by remember { mutableStateOf("") }
-    var trustCandidate by remember { mutableStateOf<com.tankobun.core.extensions.UntrustedExtension?>(null) }
-    trustCandidate?.let { candidate ->
-        AlertDialog(
-            shape = LocalTankobunStyle.current.themeShapes.dialog,
-            containerColor = LocalTankobunStyle.current.colors.panel,
-            titleContentColor = LocalTankobunStyle.current.colors.panelContent,
-            textContentColor = LocalTankobunStyle.current.colors.mutedContent,
-            tonalElevation = 0.dp,
-            onDismissRequest = { trustCandidate = null },
-            title = { Text(tankobunString(R.string.sources_trust_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(tankobunString(R.string.sources_trust_explanation, candidate.descriptor.name))
-                    Text(candidate.descriptor.packageName, style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        "SHA-256\n" + candidate.signerFingerprints.sorted().joinToString("\n"),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    trustCandidate = null
-                    viewModel.trustExtension(candidate)
-                }, enabled = candidate.signerFingerprints.isNotEmpty()) {
-                    Text(tankobunString(R.string.sources_trust_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { trustCandidate = null }) { Text(tankobunString(R.string.common_cancel)) }
-            },
-        )
-    }
     var launchedInstallRequest by remember { mutableStateOf<ExtensionInstallRequest?>(null) }
     val installLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         launchedInstallRequest?.let(viewModel::refreshInstalledSourcesAfterExtensionInstall)
@@ -266,11 +233,16 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
             .groupBy { it.packageName }
             .mapValues { (_, entries) -> entries.maxBy { it.versionCode } }
     }
-    val installedByPackage = remember(state.allInstalledSources) {
-        state.allInstalledSources.groupBy { it.packageName }
+    val installedByPackage = remember(state.allInstalledSources, state.untrustedExtensions) {
+        (state.allInstalledSources + state.untrustedExtensions.map { it.descriptor }).groupBy { it.packageName }
     }
     val normalizedSourceSettingsQuery = remember(sourceSettingsQuery) {
         sourceSettingsQuery.trim().lowercase(Locale.ROOT)
+    }
+    val pendingReviews = remember(state.untrustedExtensions, repositoryByPackage, normalizedSourceSettingsQuery) {
+        state.untrustedExtensions.filter { candidate ->
+            candidate.descriptor.matchesSourceSettingsQuery(normalizedSourceSettingsQuery, repositoryByPackage[candidate.descriptor.packageName])
+        }.sortedBy { it.descriptor.name.extensionDisplayName().lowercase(Locale.ROOT) }
     }
     val installedSourceSearchIndex = remember(
         state.allInstalledSources,
@@ -412,8 +384,10 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
         val sourceGroupHeaderHeightPx = with(density) { 58.dp.roundToPx() }
         val sourceRowHeightPx = with(density) { 58.dp.roundToPx() }
         val emptyStateHeightPx = with(density) { 160.dp.roundToPx() }
-        val installedContentHeightPx = if (state.allInstalledSources.isEmpty() || sourceGroups.isEmpty()) {
-            emptyStateHeightPx
+        val pendingReviewHeightPx = if (pendingReviews.isEmpty()) 0 else
+            with(density) { (84.dp + 88.dp * pendingReviews.size).roundToPx() } + sourceGroupGapPx
+        val installedContentHeightPx = pendingReviewHeightPx + if (sourceGroups.isEmpty()) {
+            if (pendingReviews.isEmpty()) emptyStateHeightPx else 0
         } else {
             sourceGroups.sumOf { (_, sources) ->
                 sourceGroupHeaderHeightPx + sourceRowHeightPx * sources.size
@@ -471,13 +445,28 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (page == 0) {
-                    items(state.untrustedExtensions, key = { "trust:${it.descriptor.packageName}" }) { candidate ->
-                        TankobunPanel(modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(candidate.descriptor.name, style = MaterialTheme.typography.titleMedium)
-                                Text(tankobunString(R.string.sources_trust_pending), style = MaterialTheme.typography.bodySmall)
-                                TextButton(onClick = { trustCandidate = candidate }) {
-                                    Text(tankobunString(R.string.sources_trust_review))
+                    if (pendingReviews.isNotEmpty()) {
+                        item(key = "pending-reviews") {
+                            TankobunPanel(modifier = Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(tankobunString(R.string.sources_trust_section), style = LocalTankobunStyle.current.typography.sectionLabel, color = LocalTankobunStyle.current.colors.accent)
+                                        Text(tankobunString(R.string.sources_trust_group_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    pendingReviews.forEach { candidate ->
+                                        val source = candidate.descriptor
+                                        SourceSettingsRow(
+                                            source = source,
+                                            active = false,
+                                            extension = repositoryByPackage[source.packageName],
+                                            iconUrl = repositoryByPackage[source.packageName]?.let(viewModel::extensionIconUrl),
+                                            installing = state.installingExtensionPackageName == source.packageName,
+                                            onEnabledChange = {},
+                                            onInstall = { requestExtensionInstall(context, viewModel, it) },
+                                            onUninstall = launchUninstall,
+                                            onReview = { viewModel.reviewExtension(candidate) },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -486,7 +475,7 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                         item(key = "installed-empty") {
                             TankobunEmptyState(title = tankobunString(R.string.sources_empty_installed))
                         }
-                    } else if (state.allInstalledSources.isNotEmpty() && sourceGroups.isEmpty()) {
+                    } else if (sourceGroups.isEmpty() && pendingReviews.isEmpty()) {
                         item(key = "installed-filter-empty") {
                             TankobunEmptyState(title = tankobunString(R.string.sources_empty_installed_filter))
                         }
@@ -533,6 +522,8 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                                 installing = state.installingExtensionPackageName == extension.packageName,
                                 onInstall = { requestExtensionInstall(context, viewModel, extension) },
                                 onUninstall = { launchUninstall(extension.packageName) },
+                                onReview = state.untrustedExtensions.firstOrNull { it.descriptor.packageName == extension.packageName }
+                                    ?.let { candidate -> { viewModel.reviewExtension(candidate) } },
                             )
                         }
                     }
@@ -553,7 +544,7 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                 Spacer(Modifier.height(SourceSettingsContentPadding))
                 SourceSettingsHeader(
                     activeInstalledCount = state.installedSources.size,
-                    visibleInstalledCount = visibleInstalledSourceList.size,
+                    visibleInstalledCount = visibleInstalledSourceList.size + pendingReviews.size,
                     query = sourceSettingsQuery,
                     selectedTab = currentPage,
                     onQueryChange = { sourceSettingsQuery = it },
@@ -572,7 +563,7 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
             ) {
                 SourceSettingsTabRow(
                     selectedTab = currentPage,
-                    installedCount = visibleInstalledSourceList.size,
+                    installedCount = visibleInstalledSourceList.size + pendingReviews.size,
                     repositoryCount = visibleRepositoryEntries.size,
                     onSelectTab = { index ->
                         if (currentHeaderIsPinned) {
@@ -806,6 +797,7 @@ internal fun SourceSettingsRow(
     onEnabledChange: (Boolean) -> Unit,
     onInstall: (ExtensionIndexEntry) -> Unit,
     onUninstall: (String) -> Unit,
+    onReview: (() -> Unit)? = null,
 ) {
     val displayName = source.name.extensionDisplayName()
     Row(
@@ -830,6 +822,9 @@ internal fun SourceSettingsRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (onReview != null) {
+                Text(tankobunString(R.string.sources_trust_status), style = MaterialTheme.typography.bodySmall, color = LocalTankobunStyle.current.colors.accent)
+            }
         }
         val updateAvailable = extension?.let { entry ->
             source.versionCode?.let { installedVersion -> entry.versionCode > installedVersion } == true
@@ -847,10 +842,13 @@ internal fun SourceSettingsRow(
             contentDescription = tankobunString(R.string.sources_uninstall_cd, displayName),
             onClick = { onUninstall(source.packageName) },
         )
-        Switch(
-            checked = active,
-            onCheckedChange = onEnabledChange,
-        )
+        if (onReview != null) {
+            OutlinedButton(onClick = onReview, shape = LocalTankobunStyle.current.themeShapes.control, contentPadding = PaddingValues(horizontal = 10.dp)) {
+                Text(tankobunString(R.string.sources_trust_action), maxLines = 1)
+            }
+        } else {
+            Switch(checked = active, onCheckedChange = onEnabledChange)
+        }
     }
 }
 
@@ -894,6 +892,7 @@ internal fun ExtensionRepositoryRow(
     installing: Boolean,
     onInstall: () -> Unit,
     onUninstall: () -> Unit,
+    onReview: (() -> Unit)? = null,
 ) {
     val displayName = extension.name.extensionDisplayName()
     val installedVersionCode = installedSources.mapNotNull { it.versionCode }.maxOrNull()
@@ -937,6 +936,11 @@ internal fun ExtensionRepositoryRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                }
+                if (onReview != null) {
+                    OutlinedButton(onClick = onReview, shape = LocalTankobunStyle.current.themeShapes.control) {
+                        Text(tankobunString(R.string.sources_trust_action))
+                    }
                 }
                 if (showInstallAction) {
                     Button(

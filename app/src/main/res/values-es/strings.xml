@@ -1147,4 +1147,14 @@
     <string name="about_changelog_v42_chapters">La comprobación diaria de capítulos ahora incluye solo Leyendo. Abrir los detalles actualiza las listas de más de un día; la recarga manual sigue disponible.</string>
     <string name="about_changelog_v42_security">Mayor protección en la confianza de extensiones, importación de copias de seguridad y recomendaciones, validación del inicio de sesión y sincronización de cambios pendientes entre cuentas.</string>
     <string name="about_changelog_v42_interface">Navegación de la biblioteca y conservación del estado de las pantallas mejoradas, con todos los mensajes nuevos traducidos a los cuatro idiomas disponibles.</string>
+    <string name="sources_trust_section">Revisión pendiente</string>
+    <string name="sources_trust_group_hint">Revisa estas extensiones instaladas antes de activarlas. Se conservan las fuentes seleccionadas para tus mangas.</string>
+    <string name="sources_trust_status">Revisión necesaria</string>
+    <string name="sources_trust_action">Revisar</string>
+    <string name="source_trust_required">Esta fuente está instalada y necesita tu aprobación. Se ha conservado tu selección.</string>
+    <string name="source_trust_chapters_pending">Revisa esta extensión para volver a cargar los capítulos.</string>
+    <plurals name="sources_trust_pending_count">
+        <item quantity="one">%1$d extensión necesita revisión</item>
+        <item quantity="other">%1$d extensiones necesitan revisión</item>
+    </plurals>
 </resources>

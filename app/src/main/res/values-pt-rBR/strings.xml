@@ -1147,4 +1147,14 @@
     <string name="about_changelog_v42_chapters">A checagem diária de capítulos agora inclui apenas Lendo. Abrir os detalhes atualiza listas de capítulos com mais de um dia; o recarregamento manual continua disponível.</string>
     <string name="about_changelog_v42_security">Mais proteção na confiança em extensões, importação de backups e recomendações, validação do login e envio de alterações pendentes entre contas.</string>
     <string name="about_changelog_v42_interface">Navegação da biblioteca e preservação do estado das telas refinadas, com todas as novas mensagens traduzidas nos quatro idiomas suportados.</string>
+    <string name="sources_trust_section">Revisão pendente</string>
+    <string name="sources_trust_group_hint">Revise estas extensões instaladas antes de ativá-las. As fontes selecionadas nos mangás são mantidas.</string>
+    <string name="sources_trust_status">Revisão necessária</string>
+    <string name="sources_trust_action">Revisar</string>
+    <string name="source_trust_required">Esta fonte está instalada e precisa da sua aprovação. Sua seleção foi mantida.</string>
+    <string name="source_trust_chapters_pending">Revise esta extensão para voltar a carregar os capítulos.</string>
+    <plurals name="sources_trust_pending_count">
+        <item quantity="one">%1$d extensão precisa de revisão</item>
+        <item quantity="other">%1$d extensões precisam de revisão</item>
+    </plurals>
 </resources>

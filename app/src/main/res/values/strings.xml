@@ -1146,4 +1146,14 @@
     <string name="about_changelog_v42_chapters">Daily chapter checks now include only Reading. Opening manga details refreshes chapter lists older than one day; manual reload remains available.</string>
     <string name="about_changelog_v42_security">Strengthened extension trust, backup and recommendation imports, login validation, and protection against syncing pending changes with another account.</string>
     <string name="about_changelog_v42_interface">Refined library navigation and screen-state preservation, with all new interface messages translated into the four supported languages.</string>
+    <string name="sources_trust_section">Awaiting review</string>
+    <string name="sources_trust_group_hint">Review these installed extensions before enabling them. Saved source selections are kept.</string>
+    <string name="sources_trust_status">Review required</string>
+    <string name="sources_trust_action">Review</string>
+    <string name="source_trust_required">This source is installed and needs your approval. Your saved selection has been kept.</string>
+    <string name="source_trust_chapters_pending">Review this extension to load chapters again.</string>
+    <plurals name="sources_trust_pending_count">
+        <item quantity="one">%1$d extension needs review</item>
+        <item quantity="other">%1$d extensions need review</item>
+    </plurals>
 </resources>

@@ -1051,6 +1051,13 @@ internal fun TankobunScaffold(
                             .graphicsLayer { translationX = overlayDrawerTranslationPx },
                     )
                 }
+                state.extensionTrustReview?.let { candidate ->
+                    ExtensionTrustDialog(
+                        candidate = candidate,
+                        onDismiss = viewModel::dismissExtensionTrustReview,
+                        onConfirm = { viewModel.trustExtension(candidate) },
+                    )
+                }
                 if (state.recommendationImportPreview != null) {
                     RecommendationImportDialog(state = state, viewModel = viewModel)
                 }

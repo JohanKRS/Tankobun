@@ -69,6 +69,8 @@ Any source extension used with Tankobun must be added and installed by the user.
 
 Before loading an installed extension, Tankobun asks the user to trust its package and current signing identity. Existing extensions also need this initial approval; updates signed by the same identity retain it. A changed signer requires a new review. Extensions execute inside Tankobun's process: this approval is not a sandbox or a guarantee that an extension is safe.
 
+Extensions awaiting approval stay visible in the extension manager. A manga with a saved source shows a review action while keeping its source selection and cached chapter list; approving the extension restores the existing connection.
+
 Tankobun is only a reader/tracking client. It does not grant permission to access, copy, download, or redistribute any third-party content.
 
 Recommendation sharing files contain manga metadata and recommendation list names only. They do not include manga content, chapter URLs, source links, downloaded files, source repositories, source APKs, notes, scores, private flags, or tokens.

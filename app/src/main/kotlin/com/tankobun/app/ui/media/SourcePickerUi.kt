@@ -44,12 +44,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import com.tankobun.app.ui.settings.SourceSettingsRow
+import com.tankobun.app.ui.settings.requestExtensionUninstall
+import com.tankobun.app.ui.settings.extensionDisplayName
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -85,10 +88,19 @@ internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewMod
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         DetailSectionTitle(tankobunString(R.string.common_source))
-        if (selectedManga == null) {
+        val pending = state.selectedSourceAwaitingTrust
+        if (pending != null) {
+            SourceTrustNotice(
+                candidate = pending,
+                onReview = { viewModel.reviewExtension(pending) },
+                onChange = viewModel::openSourcePicker,
+            )
+        } else if (selectedManga == null) {
             SourceActionCard(
                 title = tankobunString(R.string.source_none_selected),
-                subtitle = if (state.allInstalledSources.isEmpty()) {
+                subtitle = if (state.untrustedExtensions.isNotEmpty() && state.allInstalledSources.isEmpty()) {
+                    tankobunString(R.string.sources_trust_group_hint)
+                } else if (state.allInstalledSources.isEmpty()) {
                     tankobunString(R.string.source_install_in_settings)
                 } else {
                     tankobunString(R.string.source_choose_to_read)
@@ -108,6 +120,51 @@ internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewMod
                 onChange = viewModel::openSourcePicker,
             )
         }
+    }
+}
+
+@Composable
+internal fun SourceTrustNotice(
+    candidate: com.tankobun.core.extensions.UntrustedExtension,
+    onReview: () -> Unit,
+    onChange: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
+        color = mediaDetailPanelColor(),
+        contentColor = mediaDetailForegroundColor(),
+    ) {
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp)) {
+            val compact = maxWidth < 430.dp
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ExtensionIcon(candidate.descriptor.packageName, candidate.descriptor.name.extensionDisplayName(), null, Modifier.size(42.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(candidate.descriptor.name.extensionDisplayName(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(tankobunString(R.string.source_trust_required), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (!compact) SourceTrustActions(onReview, onChange)
+                }
+                if (compact) {
+                    Box(Modifier.align(Alignment.End)) { SourceTrustActions(onReview, onChange) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceTrustActions(onReview: () -> Unit, onChange: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = onReview, shape = LocalTankobunStyle.current.themeShapes.control) {
+            Text(tankobunString(R.string.sources_trust_action))
+        }
+        TankobunIconActionButton(
+            icon = TankobunIcons.SwapHoriz,
+            contentDescription = tankobunString(R.string.source_change_source),
+            onClick = onChange,
+        )
     }
 }
 
@@ -303,7 +360,9 @@ private fun Bitmap.visibleAlphaBounds(alphaThreshold: Int = 8): Rect? {
 
 @Composable
 internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
+    val context = LocalContext.current
     val matches = state.sourceMatches.filter { match ->
+        match.source.installed && state.untrustedExtensions.none { it.descriptor.packageName == match.source.packageName } &&
         state.sourceMatchChapterCounts[match.source.sourceMatchKey(match.manga.url)] != null
     }
     val availableSources = remember(state.installedSources, state.selectedSourceId, state.selectedSourcePackageName) {
@@ -372,7 +431,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                 )
             }
 
-            if (matches.isEmpty() && availableSources.isEmpty() && !state.sourcePickerLoading) {
+            if (matches.isEmpty() && availableSources.isEmpty() && state.untrustedExtensions.isEmpty() && !state.sourcePickerLoading) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(tankobunString(R.string.source_no_enabled), style = MaterialTheme.typography.titleMedium)
@@ -388,6 +447,29 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    if (state.untrustedExtensions.isNotEmpty()) {
+                        item(key = "pending-review-title") {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(tankobunString(R.string.sources_trust_section), style = MaterialTheme.typography.titleMedium)
+                                Text(tankobunString(R.string.sources_trust_group_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        items(state.untrustedExtensions, key = { "review:${it.descriptor.packageName}" }) { candidate ->
+                            Surface(shape = LocalTankobunStyle.current.themeShapes.panel, color = LocalTankobunStyle.current.colors.panel) {
+                                SourceSettingsRow(
+                                    source = candidate.descriptor,
+                                    active = false,
+                                    extension = null,
+                                    iconUrl = null,
+                                    installing = false,
+                                    onEnabledChange = {},
+                                    onInstall = {},
+                                    onUninstall = { requestExtensionUninstall(context, it) },
+                                    onReview = { viewModel.reviewExtension(candidate) },
+                                )
+                            }
+                        }
+                    }
                     if (matches.isNotEmpty()) {
                         item {
                             Text(tankobunString(R.string.source_readable_matches), style = MaterialTheme.typography.titleMedium)

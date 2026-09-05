@@ -138,9 +138,10 @@ internal class SourceDataSource(
                 status = null,
             )
         }
-        val chapterRows = if (boundSource != null && boundManga != null) {
+        val boundChapterSourceId = boundSource?.id ?: binding?.sourceId
+        val chapterRows = if (boundChapterSourceId != null && boundManga != null) {
             container.database.chapterDao()
-                .cachedChapters(boundSource.id, boundManga.url)
+                .cachedChapters(boundChapterSourceId, boundManga.url)
         } else {
             emptyList()
         }
@@ -576,30 +577,6 @@ internal class SourceDataSource(
             reasons = reasons,
             searchedAtEpochMillis = searchedAtEpochMillis,
         )
-
-    private fun List<SourceDescriptor>.sourceFor(
-        sourceId: Long,
-        packageName: String,
-        sourceName: String? = null,
-        sourceLang: String? = null,
-    ): SourceDescriptor? =
-        firstOrNull { source ->
-            source.id == sourceId && source.packageName == packageName
-        } ?: firstOrNull { source ->
-            source.packageName == packageName &&
-                sourceName != null &&
-                sourceLang != null &&
-                source.name.equals(sourceName, ignoreCase = true) &&
-                source.lang.equals(sourceLang, ignoreCase = true)
-        } ?: filter { source ->
-            source.packageName == packageName
-        }.singleOrNull() ?: firstOrNull { source ->
-            source.id == sourceId &&
-                sourceName != null &&
-                source.name.equals(sourceName, ignoreCase = true)
-        } ?: firstOrNull { source ->
-            source.id == sourceId
-        }
 
     private companion object {
         private const val TAG = "TankobunSourceData"

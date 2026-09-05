@@ -94,7 +94,9 @@ internal fun TankobunUiState.withSourcePickerOpened(media: AnilistMedia): Tankob
     )
 
 internal fun TankobunUiState.withSourcePickerNoSources(context: Context): TankobunUiState =
-    context.getString(R.string.source_picker_no_sources).let { pickerMessage ->
+    if (sourcePickerOpen && untrustedExtensions.isNotEmpty()) {
+        copy(sourcePickerMessage = null)
+    } else context.getString(R.string.source_picker_no_sources).let { pickerMessage ->
         copy(
             sourcePickerMessage = pickerMessage,
             message = if (sourcePickerOpen) message else pickerMessage,
@@ -102,7 +104,9 @@ internal fun TankobunUiState.withSourcePickerNoSources(context: Context): Tankob
     }
 
 internal fun TankobunUiState.withSourcePickerNoSources(): TankobunUiState =
-    copy(
+    if (sourcePickerOpen && untrustedExtensions.isNotEmpty()) {
+        copy(sourcePickerMessage = null)
+    } else copy(
         sourcePickerMessage = SOURCE_PICKER_NO_SOURCES_MESSAGE,
         message = if (sourcePickerOpen) message else SOURCE_PICKER_NO_SOURCES_MESSAGE,
     )

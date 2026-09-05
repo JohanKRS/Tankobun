@@ -1145,4 +1145,14 @@
     <string name="about_changelog_v42_chapters">每日章节检查仅包含“阅读中”的作品。打开漫画详情时会更新超过一天的章节列表，也可随时手动重新加载。</string>
     <string name="about_changelog_v42_security">加强扩展信任、备份与推荐导入、登录验证，以及防止待同步更改被发送到其他账号的保护。</string>
     <string name="about_changelog_v42_interface">优化书架导航和页面状态保留，所有新增界面消息均已翻译为四种支持的语言。</string>
+    <string name="sources_trust_section">待审核</string>
+    <string name="sources_trust_group_hint">启用前请审核这些已安装的扩展。漫画已选择的来源会予以保留。</string>
+    <string name="sources_trust_status">需要审核</string>
+    <string name="sources_trust_action">审核</string>
+    <string name="source_trust_required">此来源已安装，需要你的批准。原来的来源选择已保留。</string>
+    <string name="source_trust_chapters_pending">审核此扩展后即可重新加载章节。</string>
+    <plurals name="sources_trust_pending_count">
+        <item quantity="one">%1$d 个扩展需要审核</item>
+        <item quantity="other">%1$d 个扩展需要审核</item>
+    </plurals>
 </resources>

@@ -669,6 +669,12 @@ class MainViewModel(
                         ?: selectedSourcePackageName.takeIf { keepMissingBoundSource },
                 )
             }
+            if (requestId == installedSourcesRefreshId) {
+                val snapshot = _state.value
+                if (snapshot.selectedMedia != null && !snapshot.sourcePickerOpen && snapshot.activeChapter == null) {
+                    loadCachedSourceState(snapshot.selectedMedia.id)
+                }
+            }
         }
     }
 
@@ -677,7 +683,23 @@ class MainViewModel(
         _state.update { it.copy(extensionRepositoryUrl = url) }
     }
 
+    fun reviewExtension(candidate: com.tankobun.core.extensions.UntrustedExtension) {
+        closeSourcePicker()
+        _state.update { it.copy(extensionTrustReview = candidate, message = null) }
+    }
+
+    fun dismissExtensionTrustReview() {
+        _state.update { it.copy(extensionTrustReview = null) }
+    }
+
+    private fun reviewSelectedSourceIfNeeded(): Boolean {
+        val candidate = _state.value.selectedSourceAwaitingTrust ?: return false
+        reviewExtension(candidate)
+        return true
+    }
+
     fun trustExtension(candidate: com.tankobun.core.extensions.UntrustedExtension) {
+        dismissExtensionTrustReview()
         viewModelScope.launch {
             val approved = withContext(Dispatchers.IO) { container.extensionTrustStore.approve(candidate) }
             if (approved) {
@@ -3893,6 +3915,7 @@ class MainViewModel(
     }
 
     fun loadChaptersForCurrentMatch() {
+        if (reviewSelectedSourceIfNeeded()) return
         val selection = _state.value.selectedSourceChapterSelection()
         if (selection == null) {
             _state.update { it.withSourceChapterSelectionMissing(localizedContext()) }
@@ -3985,6 +4008,12 @@ class MainViewModel(
                 readerDataSource.loadPagesForChapter(media.id, chapter, source)
             }.onSuccess { pages ->
                 if (pages.isEmpty() && source == null) {
+                    val pending = _state.value.selectedSourceAwaitingTrust
+                    if (pending != null && _state.value.selectedMedia?.id == media.id) {
+                        _state.update { it.copy(activeChapter = null, busy = false) }
+                        reviewExtension(pending)
+                        return@onSuccess
+                    }
                     val readerError = ReaderLoadError(
                         title = string(R.string.msg_source_not_installed_title),
                         message = string(R.string.msg_source_not_installed_reader),
@@ -4561,6 +4590,7 @@ class MainViewModel(
     }
 
     fun enqueueDownload(chapter: SourceChapter) {
+        if (reviewSelectedSourceIfNeeded()) return
         viewModelScope.launch {
             val media = _state.value.selectedMedia ?: return@launch
             val result = enqueueChapterDownloads(media.id, listOf(chapter))
@@ -4664,6 +4694,7 @@ class MainViewModel(
         @StringRes labelRes: Int,
         stateAfterMessage: (TankobunUiState) -> TankobunUiState = { it },
     ) {
+        if (reviewSelectedSourceIfNeeded()) return
         viewModelScope.launch {
             val media = _state.value.selectedMedia ?: return@launch
             val distinctChapters = chapters.distinctBy { "${it.sourceId}:${it.url}" }

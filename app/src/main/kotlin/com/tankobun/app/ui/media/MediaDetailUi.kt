@@ -347,6 +347,14 @@ internal fun MangaDetailScreen(
                     }
                 }
 
+                if (state.selectedSourceAwaitingTrust != null) {
+                    item(key = "source-review-required") {
+                        Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
+                            SourceSummarySection(state, viewModel)
+                        }
+                    }
+                }
+
                 if (state.selectedRecommendations.isNotEmpty()) {
                     item {
                         RecommendationsSection(
@@ -370,7 +378,7 @@ internal fun MangaDetailScreen(
 
                 item {
                     Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                        SourceSummarySection(state, viewModel)
+                        if (state.selectedSourceAwaitingTrust == null) SourceSummarySection(state, viewModel)
                     }
                 }
 
@@ -384,6 +392,12 @@ internal fun MangaDetailScreen(
                                     icon = TankobunIcons.MenuBook,
                                     title = tankobunString(R.string.detail_chapters_empty_title),
                                     subtitle = tankobunString(R.string.detail_chapters_empty_select_source),
+                                )
+                            } else if (state.selectedSourceAwaitingTrust != null && state.sourceChapters.isEmpty()) {
+                                DetailPlaceholderCard(
+                                    icon = TankobunIcons.Lock,
+                                    title = tankobunString(R.string.sources_trust_status),
+                                    subtitle = tankobunString(R.string.source_trust_chapters_pending),
                                 )
                             } else {
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -433,7 +447,7 @@ internal fun MangaDetailScreen(
                     }
                 }
 
-                if (state.selectedSourceManga != null && state.sourceChapters.isEmpty()) {
+                if (state.selectedSourceManga != null && state.sourceChapters.isEmpty() && state.selectedSourceAwaitingTrust == null) {
                     item {
                         Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
                             DetailPlaceholderCard(

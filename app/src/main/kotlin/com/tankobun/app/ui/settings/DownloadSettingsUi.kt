@@ -883,7 +883,9 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
             state.libraryItems.size,
         )
         SettingsRoute.ABOUT -> tankobunString(R.string.about_summary)
-        SettingsRoute.SOURCES -> tankobunString(
+        SettingsRoute.SOURCES -> if (state.untrustedExtensions.isNotEmpty()) {
+            tankobunQuantityString(R.plurals.sources_trust_pending_count, state.untrustedExtensions.size, state.untrustedExtensions.size)
+        } else tankobunString(
             R.string.sources_active_installed_count,
             state.installedSources.size,
             state.visibleInstalledSourceCount(),

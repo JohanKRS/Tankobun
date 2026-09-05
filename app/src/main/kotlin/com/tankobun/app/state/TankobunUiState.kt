@@ -128,6 +128,7 @@ data class TankobunUiState(
     val trackingSaveFailed: Boolean = false,
     val allInstalledSources: List<SourceDescriptor> = emptyList(),
     val untrustedExtensions: List<com.tankobun.core.extensions.UntrustedExtension> = emptyList(),
+    val extensionTrustReview: com.tankobun.core.extensions.UntrustedExtension? = null,
     val installedSources: List<SourceDescriptor> = emptyList(),
     val sourceLanguages: Set<String> = defaultSourceLanguages(),
     val disabledSourceKeys: Set<String> = emptySet(),
@@ -197,13 +198,17 @@ data class TankobunUiState(
     val busy: Boolean = false,
     val message: String? = null,
 ) {
+    val selectedSourceAwaitingTrust: com.tankobun.core.extensions.UntrustedExtension?
+        get() = untrustedExtensions.firstOrNull {
+            selectedSourceManga != null && it.descriptor.packageName == selectedSourcePackageName
+        }
+
     val selectedSource: SourceDescriptor?
         get() {
             val sourceId = selectedSourceId ?: return null
+            if (selectedSourceAwaitingTrust != null) return null
             return installedSources.firstOrNull { it.matchesSelectedSource(sourceId, selectedSourcePackageName) }
                 ?: allInstalledSources.firstOrNull { it.matchesSelectedSource(sourceId, selectedSourcePackageName) }
-                ?: installedSources.firstOrNull { it.id == sourceId }
-                ?: allInstalledSources.firstOrNull { it.id == sourceId }
         }
 
     val librarySections: List<LibrarySection>
