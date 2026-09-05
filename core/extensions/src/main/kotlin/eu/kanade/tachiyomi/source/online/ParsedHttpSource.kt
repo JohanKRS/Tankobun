@@ -14,19 +14,25 @@ abstract class ParsedHttpSource : HttpSource() {
     override fun popularMangaParse(response: Response): MangasPage {
         val document = response.asJsoup()
         val mangas = document.select(popularMangaSelector()).map(::popularMangaFromElement)
-        return MangasPage(mangas, document.selectFirst(popularMangaNextPageSelector()) != null)
+        val hasNext = popularMangaNextPageSelector()?.takeIf { it.isNotBlank() }
+            ?.let { document.selectFirst(it) != null } ?: false
+        return MangasPage(mangas, hasNext)
     }
 
     override fun searchMangaParse(response: Response): MangasPage {
         val document = response.asJsoup()
         val mangas = document.select(searchMangaSelector()).map(::searchMangaFromElement)
-        return MangasPage(mangas, document.selectFirst(searchMangaNextPageSelector()) != null)
+        val hasNext = searchMangaNextPageSelector()?.takeIf { it.isNotBlank() }
+            ?.let { document.selectFirst(it) != null } ?: false
+        return MangasPage(mangas, hasNext)
     }
 
     override fun latestUpdatesParse(response: Response): MangasPage {
         val document = response.asJsoup()
         val mangas = document.select(latestUpdatesSelector()).map(::latestUpdatesFromElement)
-        return MangasPage(mangas, document.selectFirst(latestUpdatesNextPageSelector()) != null)
+        val hasNext = latestUpdatesNextPageSelector()?.takeIf { it.isNotBlank() }
+            ?.let { document.selectFirst(it) != null } ?: false
+        return MangasPage(mangas, hasNext)
     }
 
     override fun mangaDetailsParse(response: Response): SManga = mangaDetailsParse(response.asJsoup())
@@ -41,13 +47,13 @@ abstract class ParsedHttpSource : HttpSource() {
 
     protected open fun popularMangaSelector(): String = throw UnsupportedOperationException()
     protected open fun popularMangaFromElement(element: Element): SManga = throw UnsupportedOperationException()
-    protected open fun popularMangaNextPageSelector(): String = throw UnsupportedOperationException()
+    protected open fun popularMangaNextPageSelector(): String? = null
     protected open fun searchMangaSelector(): String = popularMangaSelector()
     protected open fun searchMangaFromElement(element: Element): SManga = popularMangaFromElement(element)
-    protected open fun searchMangaNextPageSelector(): String = popularMangaNextPageSelector()
+    protected open fun searchMangaNextPageSelector(): String? = popularMangaNextPageSelector()
     protected open fun latestUpdatesSelector(): String = popularMangaSelector()
     protected open fun latestUpdatesFromElement(element: Element): SManga = popularMangaFromElement(element)
-    protected open fun latestUpdatesNextPageSelector(): String = popularMangaNextPageSelector()
+    protected open fun latestUpdatesNextPageSelector(): String? = popularMangaNextPageSelector()
     protected open fun mangaDetailsParse(document: Document): SManga = throw UnsupportedOperationException()
     protected open fun chapterListSelector(): String = throw UnsupportedOperationException()
     protected open fun chapterFromElement(element: Element): SChapter = throw UnsupportedOperationException()

@@ -6,13 +6,13 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaUpdate
 import eu.kanade.tachiyomi.source.model.Page
-import kotlinx.coroutines.runBlocking
+import com.tankobun.core.extensions.awaitSourceValue
 import rx.Observable
 
 interface Source {
     val id: Long
     val name: String
-    val lang: String
+    val lang: String get() = ""
     val supportsLatest: Boolean
         get() = false
 
@@ -33,30 +33,22 @@ interface Source {
         fetchDetails: Boolean,
         fetchChapters: Boolean,
     ): SMangaUpdate {
-        val details = if (fetchDetails) fetchMangaDetails(manga).toBlocking().first() else manga
-        val nextChapters = if (fetchChapters) fetchChapterList(manga).toBlocking().first() else chapters
+        val details = if (fetchDetails) fetchMangaDetails(manga).awaitSourceValue() else manga
+        val nextChapters = if (fetchChapters) fetchChapterList(manga).awaitSourceValue() else chapters
         return SMangaUpdate(details, nextChapters)
     }
 
     suspend fun getPageList(chapter: SChapter): List<Page> =
-        fetchPageList(chapter).toBlocking().first()
+        fetchPageList(chapter).awaitSourceValue()
 
     fun fetchMangaDetails(manga: SManga): Observable<SManga> =
-        Observable.fromCallable {
-            runBlocking {
-                getMangaUpdate(manga, emptyList(), fetchDetails = true, fetchChapters = false).manga
-            }
-        }
+        throw UnsupportedOperationException()
 
     fun fetchChapterList(manga: SManga): Observable<List<SChapter>> =
-        Observable.fromCallable {
-            runBlocking {
-                getMangaUpdate(manga, emptyList(), fetchDetails = false, fetchChapters = true).chapters
-            }
-        }
+        throw UnsupportedOperationException()
 
     fun fetchPageList(chapter: SChapter): Observable<List<Page>> =
-        Observable.fromCallable { runBlocking { getPageList(chapter) } }
+        throw UnsupportedOperationException()
 }
 
 interface SourceFactory {

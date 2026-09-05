@@ -7,6 +7,9 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaUpdate
+import com.tankobun.core.extensions.awaitSourceValue
+import eu.kanade.tachiyomi.network.asObservable
+import eu.kanade.tachiyomi.network.asObservableSuccess
 import eu.kanade.tachiyomi.network.NetworkHelper
 import okhttp3.Headers
 import okhttp3.OkHttpClient
@@ -24,7 +27,7 @@ abstract class HttpSource : CatalogueSource {
     override val supportsLatest: Boolean = true
 
     open val network: NetworkHelper = NetworkHelper()
-    open val client: OkHttpClient = network.client
+    open val client: OkHttpClient get() = network.client
     open val headers: Headers by lazy {
         ensureHttpAgent()
         headersBuilder().build()
@@ -34,13 +37,13 @@ abstract class HttpSource : CatalogueSource {
         .add("User-Agent", NetworkHelper.defaultUserAgent())
 
     override suspend fun getPopularManga(page: Int): MangasPage =
-        fetchPopularManga(page).toBlocking().first()
+        fetchPopularManga(page).awaitSourceValue()
 
     override suspend fun getSearchManga(page: Int, query: String, filters: FilterList): MangasPage =
-        fetchSearchManga(page, query, filters).toBlocking().first()
+        fetchSearchManga(page, query, filters).awaitSourceValue()
 
     override suspend fun getLatestUpdates(page: Int): MangasPage =
-        fetchLatestUpdates(page).toBlocking().first()
+        fetchLatestUpdates(page).awaitSourceValue()
 
     override suspend fun getMangaUpdate(
         manga: SManga,
@@ -48,55 +51,62 @@ abstract class HttpSource : CatalogueSource {
         fetchDetails: Boolean,
         fetchChapters: Boolean,
     ): SMangaUpdate {
-        val details = if (fetchDetails) fetchMangaDetails(manga).toBlocking().first() else manga
-        val nextChapters = if (fetchChapters) fetchChapterList(manga).toBlocking().first() else chapters
+        val details = if (fetchDetails) fetchMangaDetails(manga).awaitSourceValue() else manga
+        val nextChapters = if (fetchChapters) fetchChapterList(manga).awaitSourceValue() else chapters
         return SMangaUpdate(details, nextChapters)
     }
 
     override suspend fun getPageList(chapter: SChapter): List<Page> =
-        fetchPageList(chapter).toBlocking().first()
+        fetchPageList(chapter).awaitSourceValue()
 
     open suspend fun getImageUrl(page: Page): String =
-        fetchImageUrl(page).toBlocking().first()
+        fetchImageUrl(page).awaitSourceValue()
 
     override fun fetchPopularManga(page: Int): Observable<MangasPage> =
-        Observable.fromCallable {
-            client.newCall(popularMangaRequest(page)).execute().use(::popularMangaParse)
+        Observable.defer {
+            client.newCall(popularMangaRequest(page)).asObservableSuccess()
+                .map { response -> response.use(::popularMangaParse) }
         }
 
     override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<MangasPage> =
-        Observable.fromCallable {
-            client.newCall(searchMangaRequest(page, query, filters)).execute().use(::searchMangaParse)
+        Observable.defer {
+            client.newCall(searchMangaRequest(page, query, filters)).asObservableSuccess()
+                .map { response -> response.use(::searchMangaParse) }
         }
 
     override fun fetchLatestUpdates(page: Int): Observable<MangasPage> =
-        Observable.fromCallable {
-            client.newCall(latestUpdatesRequest(page)).execute().use(::latestUpdatesParse)
+        Observable.defer {
+            client.newCall(latestUpdatesRequest(page)).asObservableSuccess()
+                .map { response -> response.use(::latestUpdatesParse) }
         }
 
     override fun fetchMangaDetails(manga: SManga): Observable<SManga> =
-        Observable.fromCallable {
-            client.newCall(mangaDetailsRequest(manga)).execute().use(::mangaDetailsParse)
+        Observable.defer {
+            client.newCall(mangaDetailsRequest(manga)).asObservableSuccess()
+                .map { response -> response.use(::mangaDetailsParse).apply { initialized = true } }
         }
 
     override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> =
-        Observable.fromCallable {
-            client.newCall(chapterListRequest(manga)).execute().use(::chapterListParse)
+        Observable.defer {
+            client.newCall(chapterListRequest(manga)).asObservableSuccess()
+                .map { response -> response.use(::chapterListParse) }
         }
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> =
-        Observable.fromCallable {
-            client.newCall(pageListRequest(chapter)).execute().use(::pageListParse)
+        Observable.defer {
+            client.newCall(pageListRequest(chapter)).asObservableSuccess()
+                .map { response -> response.use(::pageListParse) }
         }
 
     open fun fetchImageUrl(page: Page): Observable<String> =
-        Observable.fromCallable {
-            client.newCall(imageUrlRequest(page)).execute().use(::imageUrlParse)
+        Observable.defer {
+            client.newCall(imageUrlRequest(page)).asObservableSuccess()
+                .map { response -> response.use(::imageUrlParse) }
         }
 
     open fun fetchImage(page: Page): Observable<Response> =
-        Observable.fromCallable {
-            client.newCall(imageRequest(page)).execute()
+        Observable.defer {
+            client.newCall(imageRequest(page)).asObservable()
         }
 
     open fun popularMangaRequest(page: Int): Request = throw UnsupportedOperationException()

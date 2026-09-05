@@ -13,7 +13,6 @@ import dalvik.system.PathClassLoader
 import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
-import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
@@ -21,18 +20,12 @@ import eu.kanade.tachiyomi.source.online.HttpSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import uy.kohesive.injekt.TankobunInjektRegistry
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ExecutionException
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
-import java.util.concurrent.atomic.AtomicInteger
 
 class TachiyomiSourceHost(
     private val context: Context,
@@ -107,21 +100,8 @@ class TachiyomiSourceHost(
             ?: return@withContext emptyList()
 
         runSourceAction(source, catalogueSource, "search") {
-            val filters = catalogueSource.getFilterList()
-            runCatching {
-                catalogueSource.searchManga(page, query, filters)
-            }.getOrElse { error ->
-                if (filters.isEmpty() || !error.isFilterCompatibilityError()) {
-                    throw error
-                }
-                logSourceFailure(
-                    action = "searchWithDefaultFilters",
-                    packageName = source.packageName,
-                    source = catalogueSource,
-                    error = error,
-                )
-                catalogueSource.searchManga(page, query, FilterList())
-            }
+            catalogueSource.getSearchManga(page, query, catalogueSource.getFilterList())
+                .mangas.map { it.toSourceManga(source.id) }
         }
     }
 
@@ -129,16 +109,12 @@ class TachiyomiSourceHost(
         val sourceInstance = findSource(source) ?: return@withContext null
         runSourceAction(source, sourceInstance, "mangaDetails") {
             val sourceManga = manga.toSManga()
-            val details = runCatching {
-                sourceInstance.fetchMangaDetails(sourceManga).toBlocking().first()
-            }.getOrElse {
-                sourceInstance.getMangaUpdate(
-                    manga = sourceManga,
-                    chapters = emptyList(),
-                    fetchDetails = true,
-                    fetchChapters = false,
-                ).manga
-            }
+            val details = sourceInstance.getMangaUpdate(
+                manga = sourceManga,
+                chapters = emptyList(),
+                fetchDetails = true,
+                fetchChapters = false,
+            ).manga
             details.toSourceManga(sourceInstance.id).let { resolved ->
                 resolved.copy(
                     url = resolved.url.ifBlank { manga.url },
@@ -157,25 +133,12 @@ class TachiyomiSourceHost(
         val sourceInstance = findSource(source) ?: return@withContext emptyList()
         runSourceAction(source, sourceInstance, "chapters") {
             val sourceManga = manga.toSManga()
-            val chapters = runCatching {
-                sourceInstance.fetchChapterList(sourceManga).toBlocking().first()
-            }.getOrElse {
-                sourceInstance.getMangaUpdate(
-                    manga = sourceManga,
-                    chapters = emptyList(),
-                    fetchDetails = false,
-                    fetchChapters = true,
-                ).chapters
-            }.ifEmpty {
-                runCatching {
-                    sourceInstance.getMangaUpdate(
-                        manga = sourceManga,
-                        chapters = emptyList(),
-                        fetchDetails = false,
-                        fetchChapters = true,
-                    ).chapters
-                }.getOrDefault(emptyList())
-            }
+            val chapters = sourceInstance.getMangaUpdate(
+                manga = sourceManga,
+                chapters = emptyList(),
+                fetchDetails = false,
+                fetchChapters = true,
+            ).chapters
             chapters.map { chapter ->
                 chapter.toSourceChapter(sourceInstance.id, manga.url)
             }
@@ -186,7 +149,7 @@ class TachiyomiSourceHost(
         val sourceInstance = findSource(source) ?: return@withContext emptyList()
         runSourceAction(source, sourceInstance, "pages") {
             val sourceChapter = chapter.toSChapter()
-            val pages = sourceInstance.fetchPageListWithTimeout(sourceChapter)
+            val pages = sourceInstance.getPageList(sourceChapter)
             pages.map { page ->
                 val imageRequest = if (sourceInstance is HttpSource && page.imageUrl != null) {
                     runCatching {
@@ -263,15 +226,10 @@ class TachiyomiSourceHost(
                 page.imageUrlResolved || it != sourcePageUrl || it.looksLikeImageUrl()
             },
         )
-        val resolutionError = if (sourcePage.imageUrl == null) {
-            sourceInstance.resolveImageUrl(sourcePage)
-        } else {
-            null
-        }
         if (sourcePage.imageUrl == null) {
-            sourcePage.imageUrl = sourcePageUrl.takeIf { it.isHttpUrl() }
+            sourcePage.imageUrl = sourceInstance.getImageUrl(sourcePage).takeIf { it.isNotBlank() }
+                ?: error("Page ${page.index + 1} has no image URL")
         }
-        val usingDirectFallback = sourcePage.imageUrl == sourcePageUrl && resolutionError != null
         var attempt = 1
         val attempts = maxAttempts.coerceAtLeast(1)
         var delayMillis = SOURCE_IMAGE_RETRY_INITIAL_DELAY_MILLIS
@@ -285,12 +243,8 @@ class TachiyomiSourceHost(
                         sourcePage = sourcePage,
                         page = page,
                         rateLimiter = rateLimiter,
-                        usingDirectFallback = usingDirectFallback,
-                        resolutionError = resolutionError,
                     )
                 }
-            } catch (error: SourceImageTimeoutException) {
-                throw error
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -312,118 +266,29 @@ class TachiyomiSourceHost(
         sourcePage: Page,
         page: ReaderPage,
         rateLimiter: RespectfulRateLimiter,
-        usingDirectFallback: Boolean,
-        resolutionError: Throwable?,
-    ): ByteArray =
-        withContext(Dispatchers.IO) {
-            val future = SOURCE_IMAGE_EXECUTOR.submit<ByteArray> {
-                fetchImageBytesBlocking(
-                    sourceInstance = sourceInstance,
-                    sourcePage = sourcePage,
-                    page = page,
-                    rateLimiter = rateLimiter,
-                    usingDirectFallback = usingDirectFallback,
-                    resolutionError = resolutionError,
-                )
-            }
-            try {
-                future.get(SOURCE_IMAGE_ATTEMPT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
-            } catch (error: TimeoutException) {
-                future.cancel(true)
-                throw SourceImageTimeoutException(page.index, error)
-            } catch (error: ExecutionException) {
-                throw error.cause ?: error
-            } catch (error: InterruptedException) {
-                future.cancel(true)
-                Thread.currentThread().interrupt()
-                throw CancellationException("Image fetch interrupted").apply { initCause(error) }
-            }
-        }
-
-    private fun fetchImageBytesBlocking(
-        sourceInstance: HttpSource,
-        sourcePage: Page,
-        page: ReaderPage,
-        rateLimiter: RespectfulRateLimiter,
-        usingDirectFallback: Boolean,
-        resolutionError: Throwable?,
-    ): ByteArray =
-        runCatching {
-            sourceInstance.fetchImage(sourcePage).toBlocking().first()
-        }.getOrElse { error ->
-            if (usingDirectFallback && resolutionError != null) {
-                error.addSuppressed(resolutionError)
-            }
-            throw error
-        }.use { response ->
-            rateLimiter.recordResponse(response.headers, response.code)
-            if (!response.isSuccessful) {
-                throw SourceImageHttpException(page.index, response.code).also { error ->
-                    if (usingDirectFallback && resolutionError != null) {
-                        error.addSuppressed(resolutionError)
-                    }
-                }
-            }
-            val contentType = response.body.contentType()?.toString().orEmpty()
-            response.body.bytes().also { bytes ->
-                if (!bytes.looksLikeImage() && !contentType.startsWith("image/", ignoreCase = true)) {
-                    throw IllegalStateException("Page ${page.index + 1} did not return an image").also { error ->
-                        if (usingDirectFallback && resolutionError != null) {
-                            error.addSuppressed(resolutionError)
-                        }
-                    }
+    ): ByteArray = sourceInstance.fetchImage(sourcePage).map { response ->
+        // Consume the body within the subscription: cancelling it cancels the
+        // transport even while reading a slow or large image.
+        response.use {
+            rateLimiter.recordResponse(it.headers, it.code)
+            if (!it.isSuccessful) throw SourceImageHttpException(page.index, it.code)
+            val contentType = it.body.contentType()?.toString().orEmpty()
+            it.body.bytes().also { bytes ->
+                check(bytes.looksLikeImage() || contentType.startsWith("image/", ignoreCase = true)) {
+                    "Page ${page.index + 1} did not return an image"
                 }
             }
         }
+    }.awaitSourceValue()
 
     private fun SourceDescriptor.imageFetchKey(): String = "$packageName:$id"
 
-    private fun Source.fetchPageListWithTimeout(sourceChapter: SChapter): List<Page> {
-        val future = SOURCE_PAGE_LIST_EXECUTOR.submit<List<Page>> {
-            runCatching {
-                fetchPageList(sourceChapter).toBlocking().first()
-            }.getOrElse { error ->
-                if (error.isSourcePageListTimeout()) {
-                    throw SourcePageListTimeoutException(name, error)
-                }
-                runBlocking { getPageList(sourceChapter) }
-            }
-        }
-        return try {
-            future.get(SOURCE_PAGE_LIST_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
-        } catch (error: TimeoutException) {
-            future.cancel(true)
-            throw SourcePageListTimeoutException(name, error)
-        } catch (error: ExecutionException) {
-            throw error.cause ?: error
-        } catch (error: InterruptedException) {
-            future.cancel(true)
-            Thread.currentThread().interrupt()
-            throw CancellationException("Page list fetch interrupted").apply { initCause(error) }
-        }
-    }
-
     companion object {
-        private const val TAG = "TankobunSources"
-        private const val SOURCE_PAGE_LIST_TIMEOUT_MILLIS = 8_000L
         private const val SOURCE_IMAGE_FETCH_CONCURRENCY = 5
         private const val SOURCE_IMAGE_REQUEST_SPACING_MILLIS = 200L
         private const val SOURCE_IMAGE_RETRY_ATTEMPTS = 3
-        private const val SOURCE_IMAGE_ATTEMPT_TIMEOUT_MILLIS = 25_000L
         private const val SOURCE_IMAGE_RETRY_INITIAL_DELAY_MILLIS = 2_500L
         private const val SOURCE_IMAGE_RETRY_MAX_DELAY_MILLIS = 15_000L
-        private val SOURCE_PAGE_LIST_THREAD_COUNT = AtomicInteger()
-        private val SOURCE_PAGE_LIST_EXECUTOR = Executors.newCachedThreadPool { runnable ->
-            Thread(runnable, "TankobunSourcePages-${SOURCE_PAGE_LIST_THREAD_COUNT.incrementAndGet()}").apply {
-                isDaemon = true
-            }
-        }
-        private val SOURCE_IMAGE_THREAD_COUNT = AtomicInteger()
-        private val SOURCE_IMAGE_EXECUTOR = Executors.newCachedThreadPool { runnable ->
-            Thread(runnable, "TankobunSourceImage-${SOURCE_IMAGE_THREAD_COUNT.incrementAndGet()}").apply {
-                isDaemon = true
-            }
-        }
     }
 
     private fun findCatalogueSource(source: SourceDescriptor): CatalogueSource? =
@@ -502,23 +367,6 @@ private class SourceImageHttpException(
     val statusCode: Int,
 ) : IllegalStateException("Page ${pageIndex + 1} failed: HTTP $statusCode")
 
-private class SourceImageTimeoutException(
-    pageIndex: Int,
-    cause: Throwable,
-) : IOException("Page ${pageIndex + 1} timed out while loading", cause)
-
-private class SourcePageListTimeoutException(
-    sourceName: String,
-    cause: Throwable,
-) : IOException("$sourceName took too long to open the chapter", cause)
-
-private fun Throwable.isSourcePageListTimeout(): Boolean =
-    causeChain().any { error ->
-        error is TimeoutException ||
-            error.message?.contains("timed out", ignoreCase = true) == true ||
-            error.message?.contains("timeout", ignoreCase = true) == true
-    }
-
 private fun Throwable.isTransientSourceImageFailure(): Boolean {
     var current: Throwable? = this
     while (current != null) {
@@ -579,26 +427,6 @@ private suspend fun <T> runSourceAction(
     }
 }
 
-private fun CatalogueSource.searchManga(
-    page: Int,
-    query: String,
-    filters: FilterList,
-): List<SourceManga> =
-    fetchSearchManga(page, query, filters).toBlocking().first().mangas.map { manga ->
-        manga.toSourceManga(id)
-    }
-
-private fun Throwable.isFilterCompatibilityError(): Boolean {
-    var current: Throwable? = this
-    while (current != null) {
-        if (current.message?.contains("Unknown filter", ignoreCase = true) == true) {
-            return true
-        }
-        current = current.cause
-    }
-    return false
-}
-
 private fun logSourceFailure(
     action: String,
     packageName: String,
@@ -621,19 +449,6 @@ private fun ensureHttpAgent() {
     }
 }
 
-private suspend fun HttpSource.resolveImageUrl(page: Page): Throwable? =
-    runCatching {
-        getImageUrl(page)
-    }.onSuccess { resolvedUrl ->
-        if (resolvedUrl.isNotBlank()) {
-            page.imageUrl = resolvedUrl
-        }
-    }.exceptionOrNull()
-        ?.takeUnless { it.hasUnsupportedOperationCause() }
-
-private fun String.isHttpUrl(): Boolean =
-    startsWith("http://", ignoreCase = true) || startsWith("https://", ignoreCase = true)
-
 private fun String.looksLikeImageUrl(): Boolean {
     val path = substringBefore('#').substringBefore('?').lowercase()
     return path.endsWith(".jpg") ||
@@ -643,17 +458,6 @@ private fun String.looksLikeImageUrl(): Boolean {
         path.endsWith(".gif") ||
         path.endsWith(".avif") ||
         path.endsWith(".bmp")
-}
-
-private fun Throwable.hasUnsupportedOperationCause(): Boolean {
-    var current: Throwable? = this
-    while (current != null) {
-        if (current is UnsupportedOperationException) {
-            return true
-        }
-        current = current.cause
-    }
-    return false
 }
 
 private fun ByteArray.looksLikeImage(): Boolean =

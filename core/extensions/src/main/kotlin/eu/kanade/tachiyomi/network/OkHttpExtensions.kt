@@ -4,7 +4,6 @@ import com.tankobun.core.network.awaitResponse
 
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.CacheControl
 import okhttp3.Call
 import okhttp3.Callback
@@ -18,8 +17,6 @@ import rx.Observable
 import rx.subscriptions.Subscriptions
 import uy.kohesive.injekt.TankobunInjektRegistry
 import java.io.IOException
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 class HttpException(val code: Int) : IllegalStateException("HTTP error $code")
 
