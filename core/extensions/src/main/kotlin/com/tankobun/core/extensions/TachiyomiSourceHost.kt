@@ -153,7 +153,7 @@ class TachiyomiSourceHost(
         maxAttempts: Int = SOURCE_IMAGE_RETRY_ATTEMPTS,
     ): ByteArray = withContext(Dispatchers.IO) {
         val sourceInstance = findSource(source) ?: error("Source is not installed")
-        page.sourcePageUri?.let { uri ->
+        page.sourcePageUri?.takeIf { it.isLocalPageUri() }?.let { uri ->
             return@withContext runInterruptible {
                 appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() }
                     ?: throw java.io.FileNotFoundException(uri)

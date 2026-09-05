@@ -21,6 +21,12 @@ internal fun List<Page>.toReaderPages(headers: Map<String, String> = emptyMap())
 internal fun ReaderPage.toSourcePage(): Page = Page(
     index = sourcePageIndex ?: index,
     url = if (sourcePageIndex != null) sourcePageUrl else sourcePageUrl.ifBlank { imageUrl },
-    imageUrl = imageUrl.takeIf { imageUrlResolved && sourcePageUri == null },
+    imageUrl = imageUrl.takeIf { imageUrlResolved && sourcePageUri?.isLocalPageUri() != true },
     uri = sourcePageUri?.let(Uri::parse),
 )
+
+// Some extensions populate the deprecated URI field with an HTTP address too.
+// Only Android-readable local schemes belong in ContentResolver; remote pages
+// must still use the extension's client, authentication and request builder.
+internal fun String.isLocalPageUri(): Boolean =
+    substringBefore(':', "").lowercase(java.util.Locale.ROOT) in setOf("content", "file", "android.resource")

@@ -13,6 +13,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SourcePageBridgeTest {
+    @Test fun onlyLocalPageUrisUseTheAndroidContentResolver() {
+        assertTrue("content://fixture/page/1".isLocalPageUri())
+        assertTrue("file:///fixture/page.png".isLocalPageUri())
+        assertTrue("android.resource://fixture/drawable/page".isLocalPageUri())
+        assertFalse("http://example.test/page.png".isLocalPageUri())
+        assertFalse("HTTPS://example.test/page.png".isLocalPageUri())
+        assertFalse("/page.png".isLocalPageUri())
+    }
+
     @Test fun imageRetriesRecognizeExtensionHttpErrorsWithoutRetryingParserFailures() {
         assertTrue(eu.kanade.tachiyomi.network.HttpException(429).isTransientSourceImageFailure())
         assertTrue(eu.kanade.tachiyomi.network.HttpException(503).isTransientSourceImageFailure())
