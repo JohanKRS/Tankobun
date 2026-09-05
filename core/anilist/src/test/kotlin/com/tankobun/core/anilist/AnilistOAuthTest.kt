@@ -35,4 +35,19 @@ class AnilistOAuthTest {
     fun returnsNullWhenNoTokenExists() {
         assertNull(AnilistOAuth.parseRedirect("tankobun://auth/anilist?error=access_denied"))
     }
+
+    @Test
+    fun rejectsMalformedOrUnexpectedCallbacksWithoutThrowing() {
+        listOf(
+            "tankobun://auth/anilist#access_token=%",
+            "tankobun://auth/anilist#access_token=%GG",
+            "tankobun://auth/anilist#access_token=",
+            "tankobun://auth/other#access_token=abc&state=csrf-state",
+            "tankobun://other/anilist#access_token=abc&state=csrf-state",
+            "https://auth/anilist#access_token=abc&state=csrf-state",
+            "tankobun://user@auth/anilist#access_token=abc",
+            "tankobun://auth:123/anilist#access_token=abc",
+            "tankobun://auth/anilist#access_token=" + "a".repeat(16 * 1024),
+        ).forEach { assertNull(it, AnilistOAuth.parseRedirect(it)) }
+    }
 }

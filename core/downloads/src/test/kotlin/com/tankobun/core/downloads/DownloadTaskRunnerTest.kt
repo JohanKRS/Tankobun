@@ -13,6 +13,45 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class DownloadTaskRunnerTest {
     @Test
+    fun neverMarksAnEmptyChapterAsDownloaded() = runBlocking {
+        val stateStore = RecordingDownloadStateStore()
+        val fetcher = object : DownloadPageFetcher {
+            override suspend fun pages(job: DownloadJob) = emptyList<ReaderPage>()
+            override suspend fun bytes(page: ReaderPage): ByteArray = error("No pages expected")
+        }
+        runner(fetcher, RecordingPageStorage(), stateStore, 1).run(testJob())
+        assertEquals(DownloadState.FAILED, stateStore.state)
+    }
+
+    @Test
+    fun pauseDuringFetchDoesNotWriteOrMarkComplete() = runBlocking {
+        val stateStore = RecordingDownloadStateStore()
+        val storage = RecordingPageStorage()
+        val fetcher = object : DownloadPageFetcher {
+            override suspend fun pages(job: DownloadJob) = listOf(ReaderPage(0, "https://example.test/page.jpg", null))
+            override suspend fun bytes(page: ReaderPage): ByteArray {
+                stateStore.state = DownloadState.PAUSED
+                return byteArrayOf(1)
+            }
+        }
+        runner(fetcher, storage, stateStore, 1).run(testJob())
+        assertEquals(DownloadState.PAUSED, stateStore.state)
+        assertTrue(storage.writtenPageIndexes.isEmpty())
+    }
+
+    @Test
+    fun progressCannotGoBackwardsWhenPersistenceSuspends() = runBlocking {
+        val stateStore = RecordingDownloadStateStore(delayFirstProgress = true)
+        val fetcher = object : DownloadPageFetcher {
+            override suspend fun pages(job: DownloadJob) = (0 until 12).map { ReaderPage(it, "https://example.test/$it.jpg", null) }
+            override suspend fun bytes(page: ReaderPage) = byteArrayOf(1)
+        }
+        runner(fetcher, RecordingPageStorage(), stateStore, 1).run(testJob())
+        assertEquals((0..12).toList(), stateStore.progress.map { it.first })
+        assertEquals(DownloadState.COMPLETE, stateStore.state)
+    }
+
+    @Test
     fun retriesPageBytesBeforeCompletingDownload() = runBlocking {
         val fetcher = FakePageFetcher(failPageAttempts = 2)
         val storage = RecordingPageStorage()
@@ -152,7 +191,7 @@ class DownloadTaskRunnerTest {
         }
     }
 
-    private class RecordingDownloadStateStore : DownloadStateStore {
+    private class RecordingDownloadStateStore(private val delayFirstProgress: Boolean = false) : DownloadStateStore {
         var state = DownloadState.QUEUED
         val progress = mutableListOf<Pair<Int, Int>>()
         val failedMessages = mutableListOf<String>()
@@ -162,6 +201,7 @@ class DownloadTaskRunnerTest {
         }
 
         override suspend fun markPageComplete(jobId: String, completedPages: Int, pageCount: Int) {
+            if (delayFirstProgress && completedPages == 1) delay(30)
             progress += completedPages to pageCount
         }
 

@@ -303,6 +303,9 @@ interface DownloadDao {
     @Query("UPDATE download_jobs SET state = :state, updatedAtEpochMillis = :updatedAt WHERE id = :id")
     suspend fun updateState(id: String, state: com.tankobun.core.model.DownloadState, updatedAt: Long)
 
+    @Query("UPDATE download_jobs SET state = 'RUNNING', updatedAtEpochMillis = :updatedAt WHERE id = :id AND state IN ('QUEUED', 'RUNNING')")
+    suspend fun markRunningIfActive(id: String, updatedAt: Long): Int
+
     @Query(
         """
         UPDATE download_jobs
@@ -321,7 +324,7 @@ interface DownloadDao {
             pageCount = :pageCount,
             completedPages = :pageCount,
             updatedAtEpochMillis = :updatedAt
-        WHERE id = :id
+        WHERE id = :id AND state IN ('QUEUED', 'RUNNING')
         """,
     )
     suspend fun markComplete(id: String, pageCount: Int, updatedAt: Long)
@@ -332,7 +335,7 @@ interface DownloadDao {
         SET state = 'FAILED',
             retryCount = retryCount + 1,
             updatedAtEpochMillis = :updatedAt
-        WHERE id = :id
+        WHERE id = :id AND state IN ('QUEUED', 'RUNNING')
         """,
     )
     suspend fun markFailed(id: String, updatedAt: Long)

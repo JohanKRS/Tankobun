@@ -1,5 +1,7 @@
 package eu.kanade.tachiyomi.network
 
+import com.tankobun.core.network.awaitResponse
+
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -55,27 +57,7 @@ fun Call.asObservableSuccess(): Observable<Response> =
         }
     }
 
-suspend fun Call.await(): Response =
-    suspendCancellableCoroutine { continuation ->
-        continuation.invokeOnCancellation { cancel() }
-        enqueue(
-            object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    if (!continuation.isCancelled) {
-                        continuation.resumeWithException(e)
-                    }
-                }
-
-                override fun onResponse(call: Call, response: Response) {
-                    if (continuation.isCancelled) {
-                        response.close()
-                    } else {
-                        continuation.resume(response)
-                    }
-                }
-            },
-        )
-    }
+suspend fun Call.await(): Response = awaitResponse()
 
 suspend fun Call.awaitSuccess(): Response {
     val response = await()

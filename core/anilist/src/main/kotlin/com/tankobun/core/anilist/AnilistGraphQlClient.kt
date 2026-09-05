@@ -1,6 +1,7 @@
 package com.tankobun.core.anilist
 
 import com.tankobun.core.network.RespectfulRateLimiter
+import com.tankobun.core.network.awaitResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -50,7 +51,7 @@ class AnilistGraphQlClient(
                 requestBuilder.header("Authorization", "Bearer $accessToken")
             }
 
-            okHttpClient.newCall(requestBuilder.build()).execute().use { response ->
+            okHttpClient.newCall(requestBuilder.build()).awaitResponse().use { response ->
                 rateLimiter.recordResponse(response.headers, response.code)
                 val raw = response.body?.string().orEmpty()
                 val root = json.parseToJsonElement(raw).jsonObject

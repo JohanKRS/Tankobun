@@ -28,9 +28,15 @@ object AnilistOAuth {
     }
 
     fun parseRedirect(uri: String): OAuthToken? {
-        val parsed = URI(uri)
-        val params = parseParams(parsed.rawFragment.orEmpty()) + parseParams(parsed.rawQuery.orEmpty())
-        val token = params["access_token"] ?: return null
+        if (uri.length > MAX_REDIRECT_LENGTH) return null
+        val parsed = runCatching { URI(uri) }.getOrNull() ?: return null
+        if (parsed.scheme != "tankobun" || parsed.rawAuthority != "auth" || parsed.rawPath != "/anilist") {
+            return null
+        }
+        val params = runCatching {
+            parseParams(parsed.rawFragment.orEmpty()) + parseParams(parsed.rawQuery.orEmpty())
+        }.getOrNull() ?: return null
+        val token = params["access_token"]?.takeIf { it.isNotBlank() } ?: return null
         return OAuthToken(
             accessToken = token,
             tokenType = params["token_type"],
@@ -55,4 +61,6 @@ object AnilistOAuth {
 
     private fun String.encodeUrl(): String =
         URLEncoder.encode(this, StandardCharsets.UTF_8.name())
+
+    private const val MAX_REDIRECT_LENGTH = 16 * 1024
 }

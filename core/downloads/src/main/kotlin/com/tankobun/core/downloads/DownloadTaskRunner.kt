@@ -7,8 +7,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicInteger
 
 interface DownloadPageFetcher {
@@ -50,31 +50,42 @@ class DownloadTaskRunner(
             val pages = runWithRetries(job.id, "Chapter pages") {
                 pageFetcher.pages(job)
             }
+            check(pages.isNotEmpty()) { "Chapter returned no pages" }
             val validPageIndexes = pages.asSequence().map { it.index }.toSet()
             val storedPageIndexes = pageStorage.storedPageIndexes(job)
                 .filterTo(mutableSetOf()) { it in validPageIndexes }
-            val completedPages = AtomicInteger(storedPageIndexes.size)
-            stateStore.markPageComplete(job.id, completedPages.get(), pages.size)
+            var completedPages = storedPageIndexes.size
+            stateStore.markPageComplete(job.id, completedPages, pages.size)
 
-            val semaphore = Semaphore(pageConcurrency.coerceAtLeast(1))
+            val pendingPages = pages.filterNot { it.index in storedPageIndexes }
+            val nextPage = AtomicInteger()
+            val progressLock = Mutex()
             coroutineScope {
-                pages.filterNot { it.index in storedPageIndexes }.map { page ->
+                // Keep a bounded set of workers even for very long chapters.
+                List(minOf(pageConcurrency.coerceAtLeast(1), pendingPages.size)) {
                     async {
-                        semaphore.withPermit {
+                        while (true) {
+                            val page = pendingPages.getOrNull(nextPage.getAndIncrement()) ?: break
                             if (!stateStore.shouldContinue(job.id)) throw DownloadStoppedException()
                             val bytes = runWithRetries(job.id, "Page ${page.index + 1}") {
                                 pageFetcher.bytes(page)
                             }
+                            if (!stateStore.shouldContinue(job.id)) throw DownloadStoppedException()
                             pageStorage.writePage(job, page, bytes)
-                            stateStore.markPageComplete(
-                                jobId = job.id,
-                                completedPages = completedPages.incrementAndGet(),
-                                pageCount = pages.size,
-                            )
+                            progressLock.withLock {
+                                if (!stateStore.shouldContinue(job.id)) throw DownloadStoppedException()
+                                completedPages++
+                                stateStore.markPageComplete(
+                                    jobId = job.id,
+                                    completedPages = completedPages,
+                                    pageCount = pages.size,
+                                )
+                            }
                         }
                     }
                 }.awaitAll()
             }
+            if (!stateStore.shouldContinue(job.id)) return
             stateStore.markComplete(job.id, pages.size)
         } catch (_: DownloadStoppedException) {
             return

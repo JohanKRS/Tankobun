@@ -16,8 +16,7 @@ class RoomDownloadStateStore(
     private var continuationCheckedAtMillis: Long = Long.MIN_VALUE
 
     override suspend fun markRunning(jobId: String) {
-        downloadDao.updateState(jobId, DownloadState.RUNNING, nowMillis())
-        cacheContinuation(true)
+        cacheContinuation(downloadDao.markRunningIfActive(jobId, nowMillis()) > 0)
     }
 
     override suspend fun markPageComplete(jobId: String, completedPages: Int, pageCount: Int) {
