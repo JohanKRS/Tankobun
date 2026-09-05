@@ -297,6 +297,7 @@ class MainViewModel(
             sourceLanguages = container.settingsStore.sourceLanguages(),
             disabledSourceKeys = container.settingsStore.disabledSourceKeys(),
             extensionRepositoryUrl = container.settingsStore.extensionRepositoryUrl(),
+            cachePreferences = container.settingsStore.cachePreferences(),
             themePreference = container.settingsStore.themePreference(),
             appLanguage = container.settingsStore.appLanguage(),
             ignoreDisplayCutout = container.settingsStore.ignoreDisplayCutout(),
@@ -1384,7 +1385,7 @@ class MainViewModel(
                     },
                 )
                 refreshInstalledSources()
-                refreshCacheStorageSummary()
+                updateCachePreferences(container.settingsStore.cachePreferences())
                 if (_state.value.extensionRepositoryUrl.isNotBlank()) {
                     refreshExtensionIndex(silent = true)
                 }
@@ -1419,6 +1420,7 @@ class MainViewModel(
                 fallbackToFirst = !keepMissingBoundSource,
             )
             current.copy(
+                cachePreferences = store.cachePreferences(),
                 themePreference = store.themePreference(),
                 appLanguage = store.appLanguage(),
                 ignoreDisplayCutout = store.ignoreDisplayCutout(),
@@ -4716,6 +4718,18 @@ class MainViewModel(
             downloadDataSource.removeAll()
             refreshDownloadState()
             _state.update { it.copy(message = string(R.string.msg_removed_all_downloads)) }
+        }
+    }
+
+    fun updateCachePreferences(preferences: com.tankobun.app.cache.CachePreferences) {
+        val normalized = preferences.normalized()
+        container.settingsStore.saveCachePreferences(normalized)
+        _state.update { it.copy(cachePreferences = normalized) }
+        cancelReaderPageCacheJobs()
+        viewModelScope.launch {
+            runCatching { ReaderPageCache.prune(container.application) }
+                .onFailure { Log.w(TAG, "Cache trim failed", it) }
+            refreshCacheStorageSummary()
         }
     }
 

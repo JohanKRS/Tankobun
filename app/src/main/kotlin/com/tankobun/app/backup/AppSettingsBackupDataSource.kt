@@ -94,6 +94,9 @@ internal class AppSettingsBackupDataSource(
 
     private fun settingsJson(snapshot: TankobunUiState): JSONObject =
         JSONObject()
+            .put("readerCacheLimitMiB", snapshot.cachePreferences.readerLimitMiB)
+            .put("readerPrefetchPages", snapshot.cachePreferences.prefetchPages)
+            .put("readerPrefetchUnmeteredOnly", snapshot.cachePreferences.prefetchUnmeteredOnly)
             .put("themeMode", snapshot.themePreference.toLegacyThemeMode().name)
             .put("themeAutomatic", snapshot.themePreference.automatic)
             .put("themeArtDirection", snapshot.themePreference.direction.name)
@@ -183,6 +186,12 @@ internal class AppSettingsBackupDataSource(
 
     private fun restoreSettings(settings: JSONObject) {
         val store = container.settingsStore
+        val cache = store.cachePreferences()
+        store.saveCachePreferences(cache.copy(
+            readerLimitMiB = settings.optIntOrNull("readerCacheLimitMiB") ?: cache.readerLimitMiB,
+            prefetchPages = settings.optIntOrNull("readerPrefetchPages") ?: cache.prefetchPages,
+            prefetchUnmeteredOnly = settings.optBooleanOrNull("readerPrefetchUnmeteredOnly") ?: cache.prefetchUnmeteredOnly,
+        ))
         val direction = settings.enumOrNull<TankobunArtDirection>("themeArtDirection")
         val palette = settings.enumOrNull<TankobunPaletteId>("themePalette")
         if (direction != null && palette != null) {
@@ -254,6 +263,7 @@ internal class AppSettingsBackupDataSource(
         return TankobunUiState(
             loggedIn = container.tokenStore.accessToken() != null,
             libraryMode = store.libraryMode(),
+            cachePreferences = store.cachePreferences(),
             themePreference = store.themePreference(),
             appLanguage = store.appLanguage(),
             ignoreDisplayCutout = store.ignoreDisplayCutout(),

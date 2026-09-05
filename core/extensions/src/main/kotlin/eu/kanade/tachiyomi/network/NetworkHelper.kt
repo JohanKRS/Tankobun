@@ -34,6 +34,11 @@ class NetworkHelper {
             baseBuilder().build()
         }
 
+        // Extension clients share this Cache instance. Evict through its API so
+        // open editors and the journal stay coherent. Call on an IO dispatcher.
+        fun cacheSizeBytes(): Long = sharedClient.cache?.size() ?: 0L
+        fun clearCache() { sharedClient.cache?.evictAll() }
+
         fun configure(context: Context) {
             appContext = context.applicationContext
             ensureUserAgent()

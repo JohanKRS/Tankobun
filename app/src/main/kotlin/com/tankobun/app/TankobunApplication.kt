@@ -4,6 +4,11 @@ import android.app.Application
 import android.net.Uri
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
+import coil3.disk.DiskCache
+import okio.Path.Companion.toOkioPath
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.annotation.ExperimentalCoilApi
@@ -44,6 +49,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 class TankobunApplication : Application() {
+    private val maintenanceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val container: AppContainer by lazy { AppContainer(this) }
 
     @OptIn(ExperimentalCoilApi::class)
@@ -53,6 +59,7 @@ class TankobunApplication : Application() {
         val appContainer = container
         SingletonImageLoader.setSafe {
             ImageLoader.Builder(it)
+                .diskCache { DiskCache.Builder().directory(File(it.cacheDir, "image_cache").toOkioPath()).maxSizeBytes(128L * 1024L * 1024L).build() }
                 .components {
                     add(ReaderPageFetcher.Factory(appContainer))
                     add(ReaderPageImageModelKeyer())
@@ -66,6 +73,10 @@ class TankobunApplication : Application() {
                     )
                 }
                 .build()
+        }
+        maintenanceScope.launch {
+            runCatching { ReaderPageCache.prune(this@TankobunApplication) }
+                .onFailure { android.util.Log.w("TankobunCache", "Cache maintenance failed", it) }
         }
         ScheduledBackupWork.sync(this, container.settingsStore.backupSchedule())
         NewChapterCheckWork.sync(this, container.settingsStore.newChapterChecksEnabled())

@@ -593,6 +593,18 @@
     <string name="cache_storage_source_network">来源网络缓存</string>
     <string name="cache_storage_reader_pages">阅读器页面缓存</string>
     <string name="cache_storage_temporary">临时 APK 文件</string>
+    <string name="cache_profile_title">阅读缓存</string>
+    <string name="cache_profile_compact">节省空间</string>
+    <string name="cache_profile_balanced">均衡</string>
+    <string name="cache_profile_extensive">大容量</string>
+    <string name="cache_budget_usage">已用 %1$s · 上限 %2$s</string>
+    <string name="cache_reader_limit">页面存储上限</string>
+    <string name="cache_prefetch_title">额外预加载页面</string>
+    <string name="cache_prefetch_off">关闭</string>
+    <string name="cache_prefetch_count">最多 %1$d 页</string>
+    <string name="cache_unmetered_title">仅在非计费网络上预加载</string>
+    <string name="cache_unmetered_desc">可见页面可通过任何网络加载。额外页面在计费网络上暂停预加载。</string>
+    <string name="cache_policy_desc">增加空间可保留更多页面，不会推迟更新。空间不足时会删除较少使用的页面。下载内容单独保存；图片和网络响应使用独立的小型缓存。</string>
     <string name="cache_clear_all">清除所有缓存</string>
 
     <string name="backup_anilist_manga">AniList 漫画备份</string>

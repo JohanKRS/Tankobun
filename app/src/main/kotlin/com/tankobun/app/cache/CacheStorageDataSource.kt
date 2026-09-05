@@ -1,5 +1,7 @@
 package com.tankobun.app.cache
 
+import coil3.SingletonImageLoader
+import eu.kanade.tachiyomi.network.NetworkHelper
 import com.tankobun.app.AppContainer
 import com.tankobun.app.ReaderPageCache
 import com.tankobun.app.state.CacheStorageSummary
@@ -21,8 +23,8 @@ internal class CacheStorageDataSource(
     suspend fun summary(): CacheStorageSummary = withContext(Dispatchers.IO) {
         val appCache = container.application.cacheDir
         CacheStorageSummary(
-            anilistAndImageBytes = anilistAndImageCacheDirs(appCache).sumOf { it.safeSizeBytes() },
-            sourceNetworkBytes = sourceNetworkCacheDir(appCache).safeSizeBytes(),
+            anilistAndImageBytes = (container.okHttpClient.cache?.size() ?: 0L) + (SingletonImageLoader.get(container.application).diskCache?.size ?: 0L),
+            sourceNetworkBytes = NetworkHelper.cacheSizeBytes(),
             readerPageBytes = ReaderPageCache.sizeBytes(container.application),
             temporaryBytes = temporaryCacheDir(appCache).safeSizeBytes(),
         )
@@ -31,39 +33,30 @@ internal class CacheStorageDataSource(
     suspend fun clear(target: CacheClearTarget) = withContext(Dispatchers.IO) {
         when (target) {
             CacheClearTarget.ANILIST_IMAGES -> {
-                container.okHttpClient.cache?.evictAll()
-                anilistAndImageCacheDirs(container.application.cacheDir).forEach { it.recreate() }
+                clearAnilistAndImages()
             }
 
-            CacheClearTarget.SOURCE_NETWORK -> sourceNetworkCacheDir(container.application.cacheDir).recreate()
+            CacheClearTarget.SOURCE_NETWORK -> NetworkHelper.clearCache()
             CacheClearTarget.READER_PAGES -> ReaderPageCache.clear(container.application)
             CacheClearTarget.TEMPORARY_FILES -> temporaryCacheDir(container.application.cacheDir).recreate()
             CacheClearTarget.ALL -> {
-                container.okHttpClient.cache?.evictAll()
-                anilistAndImageCacheDirs(container.application.cacheDir).forEach { it.recreate() }
-                sourceNetworkCacheDir(container.application.cacheDir).recreate()
+                clearAnilistAndImages()
+                NetworkHelper.clearCache()
                 temporaryCacheDir(container.application.cacheDir).recreate()
                 ReaderPageCache.clear(container.application)
             }
         }
     }
 
-    private fun anilistAndImageCacheDirs(appCache: File): List<File> =
-        appCache.listFiles()
-            .orEmpty()
-            .filter { file -> file.name !in RESERVED_CACHE_DIRS }
-            .plus(File(appCache, "http"))
-            .distinctBy { it.absolutePath }
-
-    private fun sourceNetworkCacheDir(appCache: File): File =
-        File(appCache, "source-http")
-
-    private fun temporaryCacheDir(appCache: File): File =
-        File(appCache, "extension_apks")
-
-    private companion object {
-        val RESERVED_CACHE_DIRS = setOf("source-http", "extension_apks")
+    private fun clearAnilistAndImages() {
+        container.okHttpClient.cache?.evictAll()
+        val images = SingletonImageLoader.get(container.application)
+        images.diskCache?.clear()
+        images.memoryCache?.clear()
     }
+
+    private fun temporaryCacheDir(appCache: File): File = File(appCache, "extension_apks")
+
 }
 
 private fun File.recreate() {

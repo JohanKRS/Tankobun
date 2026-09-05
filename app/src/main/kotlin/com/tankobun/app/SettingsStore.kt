@@ -1,6 +1,7 @@
 package com.tankobun.app
 
 import android.content.Context
+import com.tankobun.app.cache.CachePreferences
 import com.tankobun.core.model.AnilistMangaStats
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistScoreFormat
@@ -14,6 +15,21 @@ import java.util.Locale
 class SettingsStore(context: Context) {
     private val preferences = context.getSharedPreferences("tankobun_settings", Context.MODE_PRIVATE)
     private val resources = context.resources
+
+    fun cachePreferences(): CachePreferences = CachePreferences(
+        readerLimitMiB = preferences.getInt("cache.reader.limit.mib", 2048),
+        prefetchPages = preferences.getInt("cache.reader.prefetch.pages", 6),
+        prefetchUnmeteredOnly = preferences.getBoolean("cache.reader.prefetch.unmetered", true),
+    ).normalized()
+
+    fun saveCachePreferences(value: CachePreferences) {
+        val normalized = value.normalized()
+        preferences.edit()
+            .putInt("cache.reader.limit.mib", normalized.readerLimitMiB)
+            .putInt("cache.reader.prefetch.pages", normalized.prefetchPages)
+            .putBoolean("cache.reader.prefetch.unmetered", normalized.prefetchUnmeteredOnly)
+            .apply()
+    }
 
     fun extensionRepositoryUrl(): String =
         preferences.getString(KEY_EXTENSION_REPOSITORY_URL, "").orEmpty()

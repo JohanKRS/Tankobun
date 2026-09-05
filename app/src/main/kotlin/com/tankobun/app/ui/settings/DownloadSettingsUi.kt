@@ -1,5 +1,9 @@
 package com.tankobun.app.ui.settings
 
+import com.tankobun.app.cache.CachePreferences
+import com.tankobun.app.cache.CacheProfile
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import com.tankobun.app.ui.icons.TankobunIcons
 
 import android.content.Context
@@ -318,6 +322,8 @@ internal fun DownloadsSettingsScreen(
 
         CacheStoragePanel(
             summary = state.cacheStorageSummary,
+            preferences = state.cachePreferences,
+            onPreferencesChange = viewModel::updateCachePreferences,
             onClearAnilistImages = viewModel::clearAnilistAndImageCache,
             onClearSourceNetwork = viewModel::clearSourceNetworkCache,
             onClearReaderPages = viewModel::clearReaderPageCache,
@@ -393,6 +399,8 @@ internal fun DownloadsSettingsScreen(
 @Composable
 internal fun CacheStoragePanel(
     summary: CacheStorageSummary,
+    preferences: CachePreferences,
+    onPreferencesChange: (CachePreferences) -> Unit,
     onClearAnilistImages: () -> Unit,
     onClearSourceNetwork: () -> Unit,
     onClearReaderPages: () -> Unit,
@@ -429,6 +437,7 @@ internal fun CacheStoragePanel(
                     fontWeight = FontWeight.Bold,
                 )
             }
+            CachePreferencesControls(preferences, summary.readerPageBytes, onPreferencesChange)
             CacheStorageRow(
                 label = tankobunString(R.string.cache_storage_anilist_images),
                 bytes = summary.anilistAndImageBytes,
@@ -460,6 +469,74 @@ internal fun CacheStoragePanel(
                     enabled = summary.totalBytes > 0L,
                     filled = false,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CachePreferencesControls(
+    preferences: CachePreferences,
+    usedBytes: Long,
+    onChange: (CachePreferences) -> Unit,
+) {
+    Text(tankobunString(R.string.cache_profile_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+    FlowRowCompat {
+        CacheProfile.entries.forEach { profile ->
+            val label = when (profile) {
+                CacheProfile.COMPACT -> R.string.cache_profile_compact
+                CacheProfile.BALANCED -> R.string.cache_profile_balanced
+                CacheProfile.EXTENSIVE -> R.string.cache_profile_extensive
+            }
+            FilterChip(
+                selected = preferences.profile == profile,
+                onClick = { onChange(preferences.withProfile(profile)) },
+                label = { Text(tankobunString(label)) },
+            )
+        }
+    }
+    Text(
+        tankobunString(R.string.cache_budget_usage, usedBytes.formatFileSize(), preferences.readerLimitBytes.formatFileSize()),
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    CacheValueMenu(
+        label = tankobunString(R.string.cache_reader_limit),
+        value = preferences.readerLimitBytes.formatFileSize(),
+        choices = listOf(128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768).map { it to (it * 1024L * 1024L).formatFileSize() },
+        onSelect = { onChange(preferences.copy(readerLimitMiB = it)) },
+    )
+    val off = tankobunString(R.string.cache_prefetch_off)
+    CacheValueMenu(
+        label = tankobunString(R.string.cache_prefetch_title),
+        value = if (preferences.prefetchPages == 0) off else tankobunString(R.string.cache_prefetch_count, preferences.prefetchPages),
+        choices = listOf(0, 2, 6, 12).map { it to if (it == 0) off else tankobunString(R.string.cache_prefetch_count, it) },
+        onSelect = { onChange(preferences.copy(prefetchPages = it)) },
+    )
+    SettingsToggleRow(
+        title = tankobunString(R.string.cache_unmetered_title),
+        subtitle = tankobunString(R.string.cache_unmetered_desc),
+        checked = preferences.prefetchUnmeteredOnly,
+        onCheckedChange = { onChange(preferences.copy(prefetchUnmeteredOnly = it)) },
+        enabled = preferences.prefetchPages > 0,
+    )
+    Text(
+        tankobunString(R.string.cache_policy_desc),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun CacheValueMenu(label: String, value: String, choices: List<Pair<Int, String>>, onSelect: (Int) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Box {
+            OutlinedButton(onClick = { expanded = true }) { Text(value) }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                choices.forEach { (choice, text) ->
+                    DropdownMenuItem(text = { Text(text) }, onClick = { expanded = false; onSelect(choice) })
+                }
             }
         }
     }

@@ -175,6 +175,7 @@ data class TankobunUiState(
     val currentPageScrollOffset: Int = 0,
     val downloads: List<DownloadJob> = emptyList(),
     val downloadStorageSummary: DownloadStorageSummary = DownloadStorageSummary(),
+    val cachePreferences: com.tankobun.app.cache.CachePreferences = com.tankobun.app.cache.CachePreferences(),
     val cacheStorageSummary: CacheStorageSummary = CacheStorageSummary(),
     val backupMissingSources: List<BackupMissingSource> = emptyList(),
     val keepNextTenDownloads: Boolean = false,

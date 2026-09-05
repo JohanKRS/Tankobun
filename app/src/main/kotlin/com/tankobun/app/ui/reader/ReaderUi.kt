@@ -1761,7 +1761,7 @@ internal fun readerImageRequest(
             }
         }.build()
         val data = when {
-            page.cachedFilePath != null -> page.cachedFilePath
+            page.cachedFilePath?.let { !com.tankobun.app.ReaderPageCache.isManagedPath(context, it) } == true -> page.cachedFilePath
             mediaId != null && source != null -> ReaderPageImageModel(
                 mediaId = mediaId,
                 chapter = chapter,

@@ -589,6 +589,18 @@
     <string name="cache_storage_source_network">Cache de rede das fontes</string>
     <string name="cache_storage_reader_pages">Cache de páginas do leitor</string>
     <string name="cache_storage_temporary">APKs temporários</string>
+    <string name="cache_profile_title">Cache de leitura</string>
+    <string name="cache_profile_compact">Econômico</string>
+    <string name="cache_profile_balanced">Equilibrado</string>
+    <string name="cache_profile_extensive">Amplo</string>
+    <string name="cache_budget_usage">%1$s usados · até %2$s</string>
+    <string name="cache_reader_limit">Limite de espaço para páginas</string>
+    <string name="cache_prefetch_title">Páginas extras antecipadas</string>
+    <string name="cache_prefetch_off">Desativado</string>
+    <string name="cache_prefetch_count">Até %1$d páginas</string>
+    <string name="cache_unmetered_title">Antecipar só em redes sem medição</string>
+    <string name="cache_unmetered_desc">As páginas visíveis carregam em qualquer conexão. As extras aguardam em redes com medição.</string>
+    <string name="cache_policy_desc">Mais espaço guarda mais páginas sem atrasar atualizações. As páginas menos usadas são removidas conforme o espaço acaba. Downloads ficam separados; imagens e respostas de rede têm caches menores próprios.</string>
     <string name="cache_clear_all">Limpar todo o cache</string>
 
     <string name="backup_anilist_manga">Backup de mangás do AniList</string>

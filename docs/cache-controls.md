@@ -1,0 +1,11 @@
+# Cache controls
+
+Downloads settings includes Compact (256 MiB, 2 pages ahead), Balanced (default: 2 GiB, 6 pages ahead), and Extensive (8 GiB, 12 pages ahead) presets. Users can independently choose a page budget from 128 MiB to 32 GiB, turn extra prefetch off, and allow it on metered networks. The default skips speculative page fetches on metered or unknown networks. Visible reader content still loads normally, including the visible/precomposed Webtoon window. Prefetch also retains up to two pages behind the reading direction and up to two at an adjacent chapter boundary.
+
+The budget covers automatic reader page files only; it is a maximum, not a reservation or a request to download the library. Downloads are stored separately and are never removed by cache eviction or clearing. Coil images, API HTTP responses, and source HTTP responses each have a separate 128 MiB limit. Source HTTP caching continues to obey server cache headers and shared rate limits; no source-specific policy is added.
+
+The page store lazily indexes files once per process, tracks reads in memory, persists chapter recency, evicts least-used pages across titles, and reserves at least 256 MiB of free storage when writing. It trims at startup and when the user changes the limit. A page larger than the budget or insufficient free storage skips caching without stopping reading. Cache clearing invalidates pending page writes; network caches are cleared through their owners rather than deleting open journals.
+
+Page byte freshness is seven days from writing, independent of the storage profile. Reads do not extend it. Expired images are fetched again when needed; an existing copy can be used when fetching fails. Cancellation and explicit retries do not silently return stale bytes. Page manifests are still obtained from the extension when opening a chapter so cached storage does not keep expired signed page addresses alive. Page keys include page identity; legacy cache files are reclaimed within the same storage budget as the user reads. Downloads retain their offline behavior.
+
+Settings are persisted and included in settings backups. Older backups keep the current cache preferences. UI copy is present in English, Brazilian Portuguese, Spanish, and Simplified Chinese.

@@ -1,6 +1,7 @@
 package com.tankobun.app.reader
 
 import android.util.Log
+import android.net.ConnectivityManager
 import com.tankobun.app.AppContainer
 import com.tankobun.app.ReaderPageCache
 import com.tankobun.core.database.toEntity
@@ -49,15 +50,22 @@ internal class ReaderDataSource(
         )
     }
 
+    private fun prefetchAllowed(): Boolean {
+        val preferences = container.settingsStore.cachePreferences()
+        val network = container.application.getSystemService(ConnectivityManager::class.java)
+        return preferences.allowsPrefetch(isMetered = network?.isActiveNetworkMetered != false)
+    }
+
     fun cacheWindowPages(
         pages: List<ReaderPage>,
         pageIndex: Int,
         preferredDirection: Int,
     ): List<ReaderPage> {
-        if (pages.isEmpty()) return emptyList()
+        if (pages.isEmpty() || !prefetchAllowed()) return emptyList()
+        val count = container.settingsStore.cachePreferences().prefetchPages
         val normalizedPageIndex = pageIndex.coerceIn(0, pages.lastIndex)
-        val start = (normalizedPageIndex - READER_CACHE_BACK_PAGES).coerceAtLeast(0)
-        val end = (normalizedPageIndex + READER_CACHE_FORWARD_PAGES).coerceAtMost(pages.lastIndex)
+        val start = (normalizedPageIndex - if (preferredDirection < 0) count else minOf(2, count)).coerceAtLeast(0)
+        val end = (normalizedPageIndex + if (preferredDirection >= 0) count else minOf(2, count)).coerceAtMost(pages.lastIndex)
         return orderedCacheWindow(
             pages = pages,
             pageIndex = normalizedPageIndex,
@@ -68,10 +76,10 @@ internal class ReaderDataSource(
     }
 
     fun adjacentTailPages(pages: List<ReaderPage>): List<ReaderPage> =
-        pages.takeLast(READER_ADJACENT_CACHE_PAGE_COUNT)
+        if (prefetchAllowed()) pages.takeLast(minOf(2, container.settingsStore.cachePreferences().prefetchPages)) else emptyList()
 
     fun adjacentHeadPages(pages: List<ReaderPage>): List<ReaderPage> =
-        pages.take(READER_ADJACENT_CACHE_PAGE_COUNT)
+        if (prefetchAllowed()) pages.take(minOf(2, container.settingsStore.cachePreferences().prefetchPages)) else emptyList()
 
     suspend fun cachePages(
         source: SourceDescriptor,
@@ -80,6 +88,7 @@ internal class ReaderDataSource(
         pages: List<ReaderPage>,
         initialDelayMillis: Long,
     ) {
+        if (!prefetchAllowed()) return
         val pagesToCache = pages.filter { it.cachedFilePath == null }
         if (pagesToCache.isEmpty()) return
         if (initialDelayMillis > 0L) {
@@ -90,6 +99,7 @@ internal class ReaderDataSource(
             pagesToCache.map { page ->
                 async {
                     semaphore.withPermit {
+                        if (!prefetchAllowed()) return@withPermit
                         try {
                             ReaderPageCache.cachedOrFetch(
                                 context = container.application,
@@ -221,9 +231,6 @@ internal class ReaderDataSource(
         const val ADJACENT_CACHE_INITIAL_DELAY_MILLIS = 12_000L
 
         private const val TAG = "TankobunReaderData"
-        private const val READER_CACHE_BACK_PAGES = 5
-        private const val READER_CACHE_FORWARD_PAGES = 10
-        private const val READER_ADJACENT_CACHE_PAGE_COUNT = 2
-        private const val READER_CACHE_CONCURRENCY = 3
+        private const val READER_CACHE_CONCURRENCY = 2
     }
 }
