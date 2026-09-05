@@ -19,7 +19,7 @@ class SpecificHostRateLimitInterceptor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         if (chain.request().url.host == httpUrl.host) {
-            throttle.awaitTurn()
+            throttle.awaitTurn(chain.call())
         }
         return chain.proceed(chain.request())
     }
@@ -35,7 +35,7 @@ fun OkHttpClient.Builder.rateLimitHost(
     httpUrl: HttpUrl,
     permits: Int,
     period: Duration = 1.seconds,
-): OkHttpClient.Builder = addInterceptor(
+): OkHttpClient.Builder = addNetworkInterceptor(
     SpecificHostRateLimitInterceptor(httpUrl, permits, period.inWholeMilliseconds, TimeUnit.MILLISECONDS),
 )
 
@@ -44,4 +44,4 @@ fun OkHttpClient.Builder.rateLimitHost(
     permits: Int,
     period: Long = 1,
     unit: TimeUnit = TimeUnit.SECONDS,
-): OkHttpClient.Builder = addInterceptor(SpecificHostRateLimitInterceptor(httpUrl, permits, period, unit))
+): OkHttpClient.Builder = addNetworkInterceptor(SpecificHostRateLimitInterceptor(httpUrl, permits, period, unit))
