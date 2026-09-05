@@ -20,11 +20,15 @@ class SettingsStore(context: Context) {
         readerLimitMiB = preferences.getInt("cache.reader.limit.mib", 2048),
         prefetchPages = preferences.getInt("cache.reader.prefetch.pages", 6),
         prefetchUnmeteredOnly = preferences.getBoolean("cache.reader.prefetch.unmetered", true),
+        imageLimitMiB = preferences.getInt("cache.images.limit.mib", 512),
+        navigationRetentionDays = preferences.getInt("cache.navigation.retention.days", 30),
     ).normalized()
 
     fun saveCachePreferences(value: CachePreferences) {
         val normalized = value.normalized()
         preferences.edit()
+            .putInt("cache.images.limit.mib", normalized.imageLimitMiB)
+            .putInt("cache.navigation.retention.days", normalized.navigationRetentionDays)
             .putInt("cache.reader.limit.mib", normalized.readerLimitMiB)
             .putInt("cache.reader.prefetch.pages", normalized.prefetchPages)
             .putBoolean("cache.reader.prefetch.unmetered", normalized.prefetchUnmeteredOnly)

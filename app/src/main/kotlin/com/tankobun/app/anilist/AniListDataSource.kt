@@ -262,8 +262,10 @@ internal class AniListDataSource(
             updatedAtEpochSeconds = now / 1000L,
             hiddenFromStatusLists = hiddenFromStatusLists ?: existing?.hiddenFromStatusLists ?: false,
         )
-        container.database.mediaDao().upsertMedia(media.toEntity(now))
-        container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+        container.database.withTransaction {
+            container.database.mediaDao().upsertMedia(media.toEntity(now))
+            container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+        }
         container.settingsStore.saveAnilistCustomLists(nextKnownCustomLists)
         container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
         return SavedTrackingData(
@@ -302,8 +304,10 @@ internal class AniListDataSource(
             updatedAtEpochSeconds = now / 1000L,
             hiddenFromStatusLists = nextHiddenFromStatusLists,
         )
-        container.database.mediaDao().upsertMedia(media.toEntity(now))
-        container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+        container.database.withTransaction {
+            container.database.mediaDao().upsertMedia(media.toEntity(now))
+            container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+        }
         container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
         return SyncedListEntryData(media = media, entry = entry)
     }
@@ -392,8 +396,10 @@ internal class AniListDataSource(
                     updatedAtEpochSeconds = now / 1000L,
                 )
             }
-            container.database.mediaDao().upsertMedia(recommendation.toEntity(now))
-            container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+            container.database.withTransaction {
+                container.database.mediaDao().upsertMedia(recommendation.toEntity(now))
+                container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+            }
             val syncedEntry = syncOrQueueListEntry(
                 token = token.takeIf { syncRemote },
                 syncRemote = syncRemote,
@@ -435,8 +441,10 @@ internal class AniListDataSource(
                 hiddenFromStatusLists = false,
                 updatedAtEpochSeconds = now / 1000L,
             )
-            container.database.mediaDao().upsertMedia(item.media.toEntity(now))
-            container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+            container.database.withTransaction {
+                container.database.mediaDao().upsertMedia(item.media.toEntity(now))
+                container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+            }
             val syncedEntry = syncOrQueueListEntry(
                 token = token.takeIf { syncRemote },
                 syncRemote = syncRemote,
@@ -481,8 +489,10 @@ internal class AniListDataSource(
                 customLists = (item.entry.customLists + requestedList).normalizedCustomLists(),
                 updatedAtEpochSeconds = now / 1000L,
             )
-            container.database.mediaDao().upsertMedia(item.media.toEntity(now))
-            container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+            container.database.withTransaction {
+                container.database.mediaDao().upsertMedia(item.media.toEntity(now))
+                container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+            }
             val syncedEntry = syncOrQueueListEntry(
                 token = token.takeIf { syncRemote },
                 syncRemote = syncRemote,
@@ -635,8 +645,10 @@ internal class AniListDataSource(
             scoreFormat = scoreFormat,
         )
         val now = System.currentTimeMillis()
-        container.database.mediaDao().upsertMedia(media.toEntity(now))
-        container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+        container.database.withTransaction {
+            container.database.mediaDao().upsertMedia(media.toEntity(now))
+            container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+        }
         container.settingsStore.saveAnilistCustomLists(nextKnownCustomLists)
         return SavedTrackingData(
             knownCustomLists = nextKnownCustomLists,
@@ -927,14 +939,16 @@ internal class AniListDataSource(
             recommendation.copy(media = recommendation.media.withTitleLanguage(titleLanguage))
         }
         val listEntry = result.listEntry
-        container.database.mediaDao().upsertMedia(details.toEntity(now))
-        container.database.mediaDao().upsertMedia(recommendations.map { it.media.toEntity(now) })
-        container.database.recommendationDao().deleteForMedia(mediaId)
-        container.database.recommendationDao().upsertRecommendations(
-            recommendations.map { it.toEntity(mediaId, now) },
-        )
-        if (listEntry != null) {
-            container.database.listEntryDao().upsertEntry(listEntry.toEntity(now))
+        container.database.withTransaction {
+            container.database.mediaDao().upsertMedia(details.toEntity(now))
+            container.database.mediaDao().upsertMedia(recommendations.map { it.media.toEntity(now) })
+            container.database.recommendationDao().deleteForMedia(mediaId)
+            container.database.recommendationDao().upsertRecommendations(
+                recommendations.map { it.toEntity(mediaId, now) },
+            )
+            if (listEntry != null) {
+                container.database.listEntryDao().upsertEntry(listEntry.toEntity(now))
+            }
         }
         return MediaDetailsData(
             media = details,
@@ -1001,10 +1015,12 @@ internal class AniListDataSource(
         val recommendations = recommendationPage.recommendations.map { recommendation ->
             recommendation.copy(media = recommendation.media.withTitleLanguage(titleLanguage))
         }
-        container.database.mediaDao().upsertMedia(recommendations.map { it.media.toEntity(now) })
-        container.database.recommendationDao().upsertRecommendations(
-            recommendations.map { it.toEntity(mediaId, now) },
-        )
+        container.database.withTransaction {
+            container.database.mediaDao().upsertMedia(recommendations.map { it.media.toEntity(now) })
+            container.database.recommendationDao().upsertRecommendations(
+                recommendations.map { it.toEntity(mediaId, now) },
+            )
+        }
         return RecommendationPageData(
             recommendations = recommendations,
             currentPage = recommendationPage.currentPage,

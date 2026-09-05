@@ -26,20 +26,27 @@ class SourceThumbnailFetcher(
     private val options: Options,
 ) : Fetcher {
     override suspend fun fetch(): FetchResult {
-        val bytes = container.sourceHost.imageBytes(
-            source = data.source,
-            page = ReaderPage(
-                index = 0,
-                imageUrl = data.imageUrl,
-                cachedFilePath = null,
-                sourcePageUrl = data.imageUrl,
-                imageUrlResolved = true,
-            ),
-        )
+        val result = container.sourceCoverCache.load(
+            key = data.cacheKey,
+            readEnabled = options.diskCachePolicy.readEnabled,
+            writeEnabled = options.diskCachePolicy.writeEnabled,
+            networkEnabled = options.networkCachePolicy.readEnabled,
+        ) {
+            container.sourceHost.imageBytes(
+                source = data.source,
+                page = ReaderPage(
+                    index = 0,
+                    imageUrl = data.imageUrl,
+                    cachedFilePath = null,
+                    sourcePageUrl = data.imageUrl,
+                    imageUrlResolved = true,
+                ),
+            )
+        }
         return SourceFetchResult(
-            source = ImageSource(Buffer().write(bytes), options.fileSystem),
+            source = ImageSource(Buffer().write(result.bytes), options.fileSystem),
             mimeType = null,
-            dataSource = DataSource.NETWORK,
+            dataSource = if (result.fromCache) DataSource.DISK else DataSource.NETWORK,
         )
     }
 

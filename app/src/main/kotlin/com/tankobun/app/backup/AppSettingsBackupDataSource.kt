@@ -94,6 +94,8 @@ internal class AppSettingsBackupDataSource(
 
     private fun settingsJson(snapshot: TankobunUiState): JSONObject =
         JSONObject()
+            .put("imageCacheLimitMiB", snapshot.cachePreferences.imageLimitMiB)
+            .put("navigationCacheRetentionDays", snapshot.cachePreferences.navigationRetentionDays)
             .put("readerCacheLimitMiB", snapshot.cachePreferences.readerLimitMiB)
             .put("readerPrefetchPages", snapshot.cachePreferences.prefetchPages)
             .put("readerPrefetchUnmeteredOnly", snapshot.cachePreferences.prefetchUnmeteredOnly)
@@ -188,6 +190,8 @@ internal class AppSettingsBackupDataSource(
         val store = container.settingsStore
         val cache = store.cachePreferences()
         store.saveCachePreferences(cache.copy(
+            imageLimitMiB = settings.optIntOrNull("imageCacheLimitMiB") ?: cache.imageLimitMiB,
+            navigationRetentionDays = settings.optIntOrNull("navigationCacheRetentionDays") ?: cache.navigationRetentionDays,
             readerLimitMiB = settings.optIntOrNull("readerCacheLimitMiB") ?: cache.readerLimitMiB,
             prefetchPages = settings.optIntOrNull("readerPrefetchPages") ?: cache.prefetchPages,
             prefetchUnmeteredOnly = settings.optBooleanOrNull("readerPrefetchUnmeteredOnly") ?: cache.prefetchUnmeteredOnly,

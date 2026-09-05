@@ -1,5 +1,6 @@
 package com.tankobun.app.backup
 
+import androidx.room.withTransaction
 import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
@@ -100,8 +101,10 @@ internal class AniListBackupService(
                     customLists = entry.customLists,
                     scoreFormat = scoreFormat,
                 )
-                container.database.mediaDao().upsertMedia(media.toEntity(now))
-                container.database.listEntryDao().upsertEntry(savedEntry.toEntity(now))
+                container.database.withTransaction {
+                    container.database.mediaDao().upsertMedia(media.toEntity(now))
+                    container.database.listEntryDao().upsertEntry(savedEntry.toEntity(now))
+                }
                 restored += 1
                 delay(350L)
             }

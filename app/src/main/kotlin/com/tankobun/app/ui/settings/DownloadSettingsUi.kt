@@ -325,6 +325,7 @@ internal fun DownloadsSettingsScreen(
             preferences = state.cachePreferences,
             onPreferencesChange = viewModel::updateCachePreferences,
             onClearAnilistImages = viewModel::clearAnilistAndImageCache,
+            onClearNavigation = viewModel::clearNavigationCache,
             onClearSourceNetwork = viewModel::clearSourceNetworkCache,
             onClearReaderPages = viewModel::clearReaderPageCache,
             onClearTemporary = viewModel::clearTemporaryCache,
@@ -403,6 +404,7 @@ internal fun CacheStoragePanel(
     onPreferencesChange: (CachePreferences) -> Unit,
     onClearAnilistImages: () -> Unit,
     onClearSourceNetwork: () -> Unit,
+    onClearNavigation: () -> Unit,
     onClearReaderPages: () -> Unit,
     onClearTemporary: () -> Unit,
     onClearAll: () -> Unit,
@@ -437,7 +439,7 @@ internal fun CacheStoragePanel(
                     fontWeight = FontWeight.Bold,
                 )
             }
-            CachePreferencesControls(preferences, summary.readerPageBytes, onPreferencesChange)
+            CachePreferencesControls(preferences, summary.readerPageBytes, summary.imageBytes, onPreferencesChange)
             CacheStorageRow(
                 label = tankobunString(R.string.cache_storage_anilist_images),
                 bytes = summary.anilistAndImageBytes,
@@ -453,6 +455,13 @@ internal fun CacheStoragePanel(
                 bytes = summary.readerPageBytes,
                 onClear = onClearReaderPages,
             )
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(tankobunString(R.string.cache_navigation_data), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(tankobunString(R.string.cache_navigation_records, summary.navigationRecords), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TextButton(onClick = onClearNavigation, enabled = summary.navigationRecords > 0) { Text(tankobunString(R.string.common_clear)) }
+            }
             CacheStorageRow(
                 label = tankobunString(R.string.cache_storage_temporary),
                 bytes = summary.temporaryBytes,
@@ -466,7 +475,7 @@ internal fun CacheStoragePanel(
                     label = tankobunString(R.string.cache_clear_all),
                     icon = TankobunIcons.Delete,
                     onClick = onClearAll,
-                    enabled = summary.totalBytes > 0L,
+                    enabled = summary.totalBytes > 0L || summary.navigationRecords > 0,
                     filled = false,
                 )
             }
@@ -478,6 +487,7 @@ internal fun CacheStoragePanel(
 private fun CachePreferencesControls(
     preferences: CachePreferences,
     usedBytes: Long,
+    imageBytes: Long,
     onChange: (CachePreferences) -> Unit,
 ) {
     Text(tankobunString(R.string.cache_profile_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
@@ -495,6 +505,22 @@ private fun CachePreferencesControls(
             )
         }
     }
+    Text(tankobunString(R.string.cache_navigation_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+    Text(tankobunString(R.string.cache_budget_usage, imageBytes.formatFileSize(), preferences.imageLimitBytes.formatFileSize()), style = MaterialTheme.typography.bodyMedium)
+    CacheValueMenu(
+        label = tankobunString(R.string.cache_image_limit),
+        value = preferences.imageLimitBytes.formatFileSize(),
+        choices = listOf(32, 64, 128, 256, 512, 1024, 2048, 4096, 8192).map { it to (it * 1024L * 1024L).formatFileSize() },
+        onSelect = { onChange(preferences.copy(imageLimitMiB = it)) },
+    )
+    CacheValueMenu(
+        label = tankobunString(R.string.cache_navigation_retention),
+        value = tankobunString(R.string.cache_retention_days, preferences.navigationRetentionDays),
+        choices = listOf(7, 30, 90, 180, 365).map { it to tankobunString(R.string.cache_retention_days, it) },
+        onSelect = { onChange(preferences.copy(navigationRetentionDays = it)) },
+    )
+    Text(tankobunString(R.string.cache_navigation_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(tankobunString(R.string.cache_storage_reader_pages), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
     Text(
         tankobunString(R.string.cache_budget_usage, usedBytes.formatFileSize(), preferences.readerLimitBytes.formatFileSize()),
         style = MaterialTheme.typography.bodyMedium,

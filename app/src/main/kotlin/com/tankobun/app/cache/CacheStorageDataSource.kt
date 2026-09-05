@@ -11,6 +11,7 @@ import java.io.File
 
 internal enum class CacheClearTarget {
     ANILIST_IMAGES,
+    NAVIGATION_DATA,
     SOURCE_NETWORK,
     READER_PAGES,
     TEMPORARY_FILES,
@@ -23,6 +24,8 @@ internal class CacheStorageDataSource(
     suspend fun summary(): CacheStorageSummary = withContext(Dispatchers.IO) {
         val appCache = container.application.cacheDir
         CacheStorageSummary(
+            imageBytes = container.imageDiskCache.size,
+            navigationRecords = container.database.navigationCacheDao().recordCount(),
             anilistAndImageBytes = (container.okHttpClient.cache?.size() ?: 0L) + (SingletonImageLoader.get(container.application).diskCache?.size ?: 0L),
             sourceNetworkBytes = NetworkHelper.cacheSizeBytes(),
             readerPageBytes = ReaderPageCache.sizeBytes(container.application),
@@ -37,10 +40,12 @@ internal class CacheStorageDataSource(
             }
 
             CacheClearTarget.SOURCE_NETWORK -> NetworkHelper.clearCache()
+            CacheClearTarget.NAVIGATION_DATA -> container.database.navigationCacheDao().prune(Long.MAX_VALUE)
             CacheClearTarget.READER_PAGES -> ReaderPageCache.clear(container.application)
             CacheClearTarget.TEMPORARY_FILES -> temporaryCacheDir(container.application.cacheDir).recreate()
             CacheClearTarget.ALL -> {
                 clearAnilistAndImages()
+                container.database.navigationCacheDao().prune(Long.MAX_VALUE)
                 NetworkHelper.clearCache()
                 temporaryCacheDir(container.application.cacheDir).recreate()
                 ReaderPageCache.clear(container.application)

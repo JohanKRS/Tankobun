@@ -23,6 +23,7 @@ import androidx.room.TypeConverters
 )
 @TypeConverters(TankobunTypeConverters::class)
 abstract class TankobunDatabase : RoomDatabase() {
+    abstract fun navigationCacheDao(): NavigationCacheDao
     abstract fun mediaDao(): MediaDao
     abstract fun listEntryDao(): ListEntryDao
     abstract fun recommendationDao(): RecommendationDao

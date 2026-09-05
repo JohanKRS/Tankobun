@@ -4727,7 +4727,11 @@ class MainViewModel(
         _state.update { it.copy(cachePreferences = normalized) }
         cancelReaderPageCacheJobs()
         viewModelScope.launch {
-            runCatching { ReaderPageCache.prune(container.application) }
+            runCatching {
+                withContext(Dispatchers.IO) { container.imageDiskCache.resize(normalized.imageLimitBytes) }
+                ReaderPageCache.prune(container.application)
+                container.database.navigationCacheDao().prune(System.currentTimeMillis() - normalized.navigationRetentionDays * 86_400_000L)
+            }
                 .onFailure { Log.w(TAG, "Cache trim failed", it) }
             refreshCacheStorageSummary()
         }
@@ -4747,6 +4751,10 @@ class MainViewModel(
 
     fun clearAnilistAndImageCache() {
         clearCacheStorage(CacheClearTarget.ANILIST_IMAGES)
+    }
+
+    fun clearNavigationCache() {
+        clearCacheStorage(CacheClearTarget.NAVIGATION_DATA)
     }
 
     fun clearSourceNetworkCache() {

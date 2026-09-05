@@ -1,5 +1,6 @@
 package com.tankobun.app.home
 
+import androidx.room.withTransaction
 import com.tankobun.app.AppContainer
 import com.tankobun.core.database.AnilistSearchResultEntity
 import com.tankobun.core.database.toEntity
@@ -52,26 +53,28 @@ internal class HomeDataSource(
     suspend fun saveHomeFeed(feed: AnilistHomeFeed, includeAdult: Boolean) {
         val now = System.currentTimeMillis()
         val media = (feed.trending + feed.genreHighlights.map { it.media }).distinctBy(AnilistMedia::id)
-        container.database.mediaDao().upsertMedia(media.map { item -> item.toEntity(now) })
-        val resultsByKey = buildMap {
-            put(trendingKey(includeAdult), feed.trending)
-            feed.genreHighlights.forEach { highlight ->
-                put(genreKey(highlight.genre, includeAdult), listOf(highlight.media))
-            }
-        }
-        container.database.searchResultDao().replaceResults(
-            queries = resultsByKey.keys.toList(),
-            results = resultsByKey.flatMap { (key, items) ->
-                items.mapIndexed { index, item ->
-                    AnilistSearchResultEntity(
-                        query = key,
-                        mediaId = item.id,
-                        orderIndex = index,
-                        fetchedAtEpochMillis = now,
-                    )
+        container.database.withTransaction {
+            container.database.mediaDao().upsertMedia(media.map { item -> item.toEntity(now) })
+            val resultsByKey = buildMap {
+                put(trendingKey(includeAdult), feed.trending)
+                feed.genreHighlights.forEach { highlight ->
+                    put(genreKey(highlight.genre, includeAdult), listOf(highlight.media))
                 }
-            },
-        )
+            }
+            container.database.searchResultDao().replaceResults(
+                queries = resultsByKey.keys.toList(),
+                results = resultsByKey.flatMap { (key, items) ->
+                    items.mapIndexed { index, item ->
+                        AnilistSearchResultEntity(
+                            query = key,
+                            mediaId = item.id,
+                            orderIndex = index,
+                            fetchedAtEpochMillis = now,
+                        )
+                    }
+                },
+            )
+        }
         container.settingsStore.saveHomeFeedCachedAtEpochMillis(includeAdult, now)
     }
 

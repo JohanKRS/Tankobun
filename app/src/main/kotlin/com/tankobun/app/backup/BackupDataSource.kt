@@ -1,5 +1,6 @@
 package com.tankobun.app.backup
 
+import androidx.room.withTransaction
 import android.content.Intent
 import android.net.Uri
 import com.tankobun.app.AppContainer
@@ -101,8 +102,10 @@ internal class BackupDataSource(
         val entries = backup.items.map { item ->
             item.entry.copy(id = item.entry.id.takeIf { it != 0 } ?: -item.media.id).toEntity(now)
         }
-        container.database.mediaDao().upsertMedia(media)
-        container.database.listEntryDao().upsertEntries(entries)
+        container.database.withTransaction {
+            container.database.mediaDao().upsertMedia(media)
+            container.database.listEntryDao().upsertEntries(entries)
+        }
         backup.items.mapNotNull { it.sourceBinding?.toEntity() }.forEach { binding ->
             container.database.sourceBindingDao().upsertBinding(binding)
         }
@@ -155,8 +158,10 @@ internal class BackupDataSource(
                     customLists = entry.customLists,
                     updatedAtEpochSeconds = now / 1000L,
                 )
-                container.database.mediaDao().upsertMedia(media.toEntity(now))
-                container.database.listEntryDao().upsertEntry(localEntry.toEntity(now))
+                container.database.withTransaction {
+                    container.database.mediaDao().upsertMedia(media.toEntity(now))
+                    container.database.listEntryDao().upsertEntry(localEntry.toEntity(now))
+                }
                 restored += 1
             }
         }

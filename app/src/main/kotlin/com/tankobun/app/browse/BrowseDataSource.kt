@@ -1,5 +1,7 @@
 package com.tankobun.app.browse
 
+import androidx.room.withTransaction
+import kotlinx.coroutines.CancellationException
 import com.tankobun.app.AppContainer
 import com.tankobun.app.logic.BROWSE_RESULTS_PAGE_SIZE
 import com.tankobun.app.logic.BROWSE_SORT_SEARCH_MATCH
@@ -70,6 +72,7 @@ internal class BrowseDataSource(
         val page = runCatching {
             fetch()
         }.getOrElse { error ->
+            if (error is CancellationException) throw error
             if (cachedRows.isNotEmpty()) {
                 return cachedBrowsePageFromMedia(cachedBrowseMedia(cacheKey))
             }
@@ -126,7 +129,7 @@ internal class BrowseDataSource(
             .cachedSearchMedia(cacheKey)
             .map { it.toModel(titleLanguage()) }
 
-    private suspend fun cacheBrowseMedia(cacheKey: String, media: List<AnilistMedia>, now: Long) {
+    private suspend fun cacheBrowseMedia(cacheKey: String, media: List<AnilistMedia>, now: Long) = container.database.withTransaction {
         container.database.mediaDao().upsertMedia(media.map { it.toEntity(now) })
         container.database.searchResultDao().deleteForQuery(cacheKey)
         container.database.searchResultDao().upsertResults(

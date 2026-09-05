@@ -4,7 +4,8 @@ import android.app.Application
 import android.net.Uri
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
-import coil3.disk.DiskCache
+import com.tankobun.app.cache.AdjustableDiskCache
+import coil3.network.cachecontrol.CacheControlCacheStrategy
 import okio.Path.Companion.toOkioPath
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -59,7 +60,7 @@ class TankobunApplication : Application() {
         val appContainer = container
         SingletonImageLoader.setSafe {
             ImageLoader.Builder(it)
-                .diskCache { DiskCache.Builder().directory(File(it.cacheDir, "image_cache").toOkioPath()).maxSizeBytes(128L * 1024L * 1024L).build() }
+                .diskCache { appContainer.imageDiskCache }
                 .components {
                     add(ReaderPageFetcher.Factory(appContainer))
                     add(ReaderPageImageModelKeyer())
@@ -68,6 +69,7 @@ class TankobunApplication : Application() {
                     add(
                         OkHttpNetworkFetcherFactory(
                             callFactory = { appContainer.imageOkHttpClient },
+                            cacheStrategy = { CacheControlCacheStrategy() },
                             concurrentRequestStrategy = { DeDupeConcurrentRequestStrategy() },
                         ),
                     )
@@ -75,7 +77,12 @@ class TankobunApplication : Application() {
                 .build()
         }
         maintenanceScope.launch {
-            runCatching { ReaderPageCache.prune(this@TankobunApplication) }
+            runCatching {
+                container.imageDiskCache.resize(container.settingsStore.cachePreferences().imageLimitBytes)
+                ReaderPageCache.prune(this@TankobunApplication)
+                val cutoff = System.currentTimeMillis() - container.settingsStore.cachePreferences().navigationRetentionDays * 86_400_000L
+                container.database.navigationCacheDao().prune(cutoff)
+            }
                 .onFailure { android.util.Log.w("TankobunCache", "Cache maintenance failed", it) }
         }
         ScheduledBackupWork.sync(this, container.settingsStore.backupSchedule())
@@ -103,6 +110,11 @@ class AppContainer(application: Application) {
 
     val tokenStore = SecureTokenStore(application)
     val settingsStore = SettingsStore(application)
+    internal val imageDiskCache by lazy {
+        AdjustableDiskCache(File(application.cacheDir, "image_cache").toOkioPath(), settingsStore.cachePreferences().imageLimitBytes)
+    }
+
+    internal val sourceCoverCache by lazy { com.tankobun.app.cache.SourceCoverCache(imageDiskCache) }
 
     fun string(@StringRes id: Int, vararg args: Any): String =
         application.getAppString(settingsStore.appLanguage(), id, *args)

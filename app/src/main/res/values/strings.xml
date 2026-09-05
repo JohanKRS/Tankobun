@@ -594,7 +594,7 @@
     <string name="cache_storage_source_network">Source network cache</string>
     <string name="cache_storage_reader_pages">Reader page cache</string>
     <string name="cache_storage_temporary">Temporary APK files</string>
-    <string name="cache_profile_title">Reading cache</string>
+    <string name="cache_profile_title">Cache profile</string>
     <string name="cache_profile_compact">Compact</string>
     <string name="cache_profile_balanced">Balanced</string>
     <string name="cache_profile_extensive">Extensive</string>
@@ -605,7 +605,14 @@
     <string name="cache_prefetch_count">Up to %1$d pages</string>
     <string name="cache_unmetered_title">Prefetch on unmetered networks only</string>
     <string name="cache_unmetered_desc">Visible pages load on any connection. Extra pages wait on metered networks.</string>
-    <string name="cache_policy_desc">More space keeps more pages without delaying updates. Least-used pages are removed as space fills up. Downloads stay separate; images and network responses have their own smaller caches.</string>
+    <string name="cache_policy_desc">More space keeps more images and pages without delaying updates. Least-used files are removed as space fills up. Downloads stay separate; network responses have their own smaller caches.</string>
+    <string name="cache_navigation_title">Covers and browsing</string>
+    <string name="cache_image_limit">Image storage limit</string>
+    <string name="cache_navigation_retention">Keep browsing data</string>
+    <string name="cache_retention_days">%1$d days</string>
+    <string name="cache_navigation_desc">Stores descriptions, authors, and search results for this period after fetching them. Library data, reading history, and downloads are preserved. Updates keep their usual schedule.</string>
+    <string name="cache_navigation_data">Browsing data</string>
+    <string name="cache_navigation_records">Saved records: %1$d</string>
     <string name="cache_clear_all">Clear all cache</string>
 
     <string name="backup_anilist_manga">AniList manga backup</string>

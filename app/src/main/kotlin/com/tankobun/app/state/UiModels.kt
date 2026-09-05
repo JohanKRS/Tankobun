@@ -63,6 +63,8 @@ data class DownloadStorageItem(
 )
 
 data class CacheStorageSummary(
+    val imageBytes: Long = 0L,
+    val navigationRecords: Long = 0L,
     val anilistAndImageBytes: Long = 0L,
     val sourceNetworkBytes: Long = 0L,
     val readerPageBytes: Long = 0L,
