@@ -15,6 +15,9 @@ interface MediaDao {
     @Query("SELECT m.* FROM anilist_media m INNER JOIN anilist_list_entries e ON e.mediaId = m.id")
     suspend fun libraryMedia(): List<AnilistMediaEntity>
 
+    @Query("SELECT m.* FROM anilist_media m INNER JOIN anilist_list_entries e ON e.mediaId = m.id WHERE e.status = 'CURRENT'")
+    suspend fun currentlyReadingMedia(): List<AnilistMediaEntity>
+
     @Query("SELECT * FROM anilist_media ORDER BY titleUserPreferred COLLATE NOCASE")
     fun observeMedia(): Flow<List<AnilistMediaEntity>>
 

@@ -6,6 +6,6 @@ class CacheFreshness(
     fun isFresh(fetchedAtEpochMillis: Long?, ttlMillis: Long): Boolean {
         if (fetchedAtEpochMillis == null) return false
         if (ttlMillis <= 0L) return false
-        return timeSource.nowMillis() - fetchedAtEpochMillis < ttlMillis
+        return timeSource.nowMillis() - fetchedAtEpochMillis in 0 until ttlMillis
     }
 }

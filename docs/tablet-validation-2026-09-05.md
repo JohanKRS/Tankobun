@@ -32,3 +32,16 @@ Fourteen assertions passed against the actual Android database and ViewModel wit
 A separate public API contract check received a 403 response stating that the service was temporarily disabled for stability issues. Live account reconciliation was therefore not verified. The cache-preservation behavior for that failure was verified locally.
 
 The new setting and incomplete-response message have translations in all four supported locales. Final validation passed 228 distinct unit tests, debug/release builds, release lint and whitespace checks. Normal build outputs were restored to the production application ID after producing the separate test APK.
+
+## Cache controls and chapter freshness
+
+The separate installation passed 47 additional on-device assertions using original fixtures and local HTTP responses:
+
+- 18 reader/network checks: cache identity, cold/warm reads, expiry, stale fallback, cancellation, explicit retry, eviction recovery, concurrent fetch sharing, clearing during a fetch, retained downloads and reuse after HTTP-cache clearing.
+- 15 navigation checks: retention and explicit clearing remove unused browsing data while preserving library, binding, progress, download and pending-sync metadata; recent result sets remain complete and bound chapters remain available.
+- 6 cover checks through Coil: image decoding, warm reads without another request, resizing without losing a retained cover, `no-store` responses and ETag/304 revalidation.
+- 8 chapter checks through the production source host and database: 24-hour freshness, cold load, zero extension calls on a warm detail load (including metadata), forced reload, chapter removal/replacement, refresh at expiry, preservation after failure, clock rollback and Reading-only daily selection, including finished-publication works. Related behaviors share assertions.
+
+The source implementation for chapter fixtures existed only in the instrumentation process. No test source, repository URL, artwork or chapter data was added to the application. Cache profiles and independent limits were also exercised in the rendered tablet settings, including preference persistence and restoring the Balanced profile.
+
+Final cache/chapter validation passed 246 distinct unit tests, debug/release builds, release lint and whitespace checks. The optimized test build was installed and its Library settings text inspected on the tablet. All new or changed UI messages have English, Brazilian Portuguese, Spanish and Simplified Chinese translations. Production debug/release artifacts were restored to the normal application ID; only the separate test package was installed.

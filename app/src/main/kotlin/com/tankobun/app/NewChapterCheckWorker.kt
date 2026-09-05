@@ -27,7 +27,6 @@ import com.tankobun.core.database.SourceChapterEntity
 import com.tankobun.core.database.toModel
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.CachePolicy
-import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.SourceBinding
 import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
@@ -78,6 +77,7 @@ object NewChapterCheckWork {
     fun sync(context: Context, enabled: Boolean) {
         if (!enabled) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NAME)
+            WorkManager.getInstance(context).cancelUniqueWork(RUN_NOW_UNIQUE_NAME)
             return
         }
         enqueue(context, ExistingPeriodicWorkPolicy.KEEP)
@@ -86,6 +86,7 @@ object NewChapterCheckWork {
     fun update(context: Context, enabled: Boolean) {
         if (!enabled) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NAME)
+            WorkManager.getInstance(context).cancelUniqueWork(RUN_NOW_UNIQUE_NAME)
             return
         }
         enqueue(context, ExistingPeriodicWorkPolicy.UPDATE)
@@ -140,8 +141,11 @@ internal class NewChapterChecker(
         var skippedManga = 0
         val updates = mutableListOf<NewChapterUpdate>()
         val sourceCache = mutableMapOf<String, SourceDescriptor?>()
+        val installedExtensions by lazy { container.extensionScanner.installedExtensions() }
+        val freshness = com.tankobun.core.network.CacheFreshness { checkedAt }
 
         for (candidate in candidates) {
+            if (!container.settingsStore.newChapterChecksEnabled()) break
             val bindingRow = container.database.sourceBindingDao().bindingForMedia(candidate.media.id)
             val binding = bindingRow?.toModel()
             if (binding == null) {
@@ -149,15 +153,20 @@ internal class NewChapterChecker(
                 continue
             }
 
+            val cachedRows = container.database.chapterDao().cachedChapters(binding.sourceId, binding.mangaUrl)
+            if (cachedRows.isNotEmpty() && cachedRows.all { freshness.isFresh(it.fetchedAtEpochMillis, CachePolicy().sourceChapterTtlMillis) }) {
+                skippedManga += 1
+                continue
+            }
+
             val source = sourceCache.getOrPut(binding.sourceCacheKey()) {
-                resolveInstalledSource(bindingRow)
+                resolveInstalledSource(bindingRow, installedExtensions)
             }
             if (source == null) {
                 skippedManga += 1
                 continue
             }
 
-            val cachedRows = container.database.chapterDao().cachedChapters(source.id, binding.mangaUrl)
             val manga = binding.toSourceManga(source)
             val fetched = runCatching {
                 sourceLimiters.getOrPut(source.id) {
@@ -195,20 +204,13 @@ internal class NewChapterChecker(
 
     private suspend fun readingCandidates(): List<ReadingCandidate> {
         val titleLanguage = container.settingsStore.anilistTitleLanguage()
-        val mediaById = container.database.mediaDao().cachedMedia().associateBy { it.id }
-        return container.database.listEntryDao().cachedEntries()
-            .mapNotNull { entry ->
-                if (entry.status != MediaStatus.CURRENT) return@mapNotNull null
-                val media = mediaById[entry.mediaId]?.toModel(titleLanguage) ?: return@mapNotNull null
-                if (media.isFinishedPublishing()) return@mapNotNull null
-                ReadingCandidate(media)
-            }
-            .distinctBy { it.media.id }
+        return container.database.mediaDao().currentlyReadingMedia()
+            .map { ReadingCandidate(it.toModel(titleLanguage)) }
             .sortedBy { it.media.title.userPreferred.lowercase(Locale.ROOT) }
     }
 
-    private fun resolveInstalledSource(binding: SourceBindingEntity): SourceDescriptor? {
-        val extensions = container.extensionScanner.installedExtensions()
+    private fun resolveInstalledSource(binding: SourceBindingEntity, installedExtensions: List<SourceDescriptor>): SourceDescriptor? {
+        val extensions = installedExtensions
             .sortedBy { descriptor ->
                 if (descriptor.packageName == binding.sourcePackageName) 0 else 1
             }
@@ -235,9 +237,6 @@ internal class NewChapterChecker(
                     .thenBy { it.name.lowercase(Locale.ROOT) },
             )
     }
-
-    private fun AnilistMedia.isFinishedPublishing(): Boolean =
-        status.equals("FINISHED", ignoreCase = true)
 
     private fun SourceBinding.toSourceManga(source: SourceDescriptor): SourceManga =
         SourceManga(

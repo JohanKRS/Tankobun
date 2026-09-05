@@ -8,6 +8,12 @@ class CacheFreshnessTest {
     private val cacheFreshness = CacheFreshness { 10_000L }
 
     @Test
+    fun futureTimestampsAndExactExpiryAreStale() {
+        assertFalse(cacheFreshness.isFresh(fetchedAtEpochMillis = 10_001L, ttlMillis = 2_000L))
+        assertFalse(cacheFreshness.isFresh(fetchedAtEpochMillis = 8_000L, ttlMillis = 2_000L))
+    }
+
+    @Test
     fun freshWhenWithinTtl() {
         assertTrue(cacheFreshness.isFresh(fetchedAtEpochMillis = 9_000L, ttlMillis = 2_000L))
     }

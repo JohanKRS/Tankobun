@@ -154,8 +154,9 @@
     <string name="settings_ignore_camera_cutout_desc">Permite que el contenido use todo el ancho de la pantalla como si esta tablet no tuviera notch.</string>
     <string name="settings_library_view">Vista de biblioteca</string>
     <string name="settings_library_updates">Actualizaciones de capítulos</string>
+    <string name="settings_chapter_refresh_on_open_desc">Al abrir un manga, los capítulos guardados aparecen de inmediato. Las listas de más de un día se actualizan en segundo plano. Usa recargar para comprobarlas en cualquier momento. La app avisa cuando encuentra capítulos nuevos.</string>
     <string name="settings_daily_chapter_check">Buscar capítulos nuevos a diario</string>
-    <string name="settings_daily_chapter_check_desc">Revisa manga en Reading que todavía no está finalizado y ya tiene una fuente vinculada. Tankobun actualiza listas de capítulos una por una para no saturar las fuentes.</string>
+    <string name="settings_daily_chapter_check_desc">Comprueba una vez al día solo los mangas en Leyendo con una fuente vinculada. Los títulos de otras listas se comprueban al abrir el manga. Las consultas se realizan una a una y reutilizan las listas de capítulos actualizadas durante el último día.</string>
     <string name="settings_daily_chapter_check_last">Última revisión: %1$s</string>
     <string name="settings_daily_chapter_check_short">revisión de capítulos</string>
     <string name="settings_browse_view">Vista de exploración</string>

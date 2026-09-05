@@ -24,6 +24,14 @@ Metadata needed by list entries, source bindings, reading progress, download job
 
 API HTTP responses and source HTTP responses each retain their separate, fixed 128 MiB limits. They continue to follow server headers. Users can inspect and clear these caches; the storage profiles do not replace extension-specific transport or throttle behavior.
 
+## Chapter updates
+
+Chapter lists are fresh for 24 hours, independently of storage profiles. Opening manga details immediately displays the saved list and, for an installed linked source, refreshes it in the background when stale. This applies to every library status. Rapid repeated navigation has a two-minute attempt cooldown; manual reload bypasses both freshness and that cooldown. Concurrent foreground loads for the same selection coalesce. Results from a previous selection cannot overwrite the current manga.
+
+The existing optional daily check in Library settings uses a 24-hour WorkManager interval, subject to Android scheduling, network availability and battery constraints. It selects only entries whose library status is Reading (`CURRENT`), including works whose publication is finished. Planned, completed, paused, dropped and rereading entries do not participate. The worker reuses lists refreshed in the last day before loading extensions, processes titles sequentially, and preserves source throttles/backoff. Disabling the setting cancels both periodic and pending immediate work.
+
+Successful refreshes atomically replace the saved list, including chapter removals. Failed refreshes preserve the last successful list. Newly found chapter URLs are announced in the app on detail refresh and by the existing daily notification when enabled; an initial fetch without a saved baseline is not announced as an entire catalog of new chapters. Chapter lists and publication status come from user-configured sources; the app does not infer release schedules.
+
 ## Reader pages
 
 The page store lazily indexes files once per process, tracks reads in memory, persists chapter recency, evicts least-used pages across titles, and reserves at least 256 MiB of free storage when writing. It trims at startup and when the user changes the limit. A page larger than the budget or insufficient free storage skips caching without stopping reading. Cache clearing invalidates pending page writes; network caches are cleared through their owners.

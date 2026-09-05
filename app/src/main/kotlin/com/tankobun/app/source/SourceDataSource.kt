@@ -50,6 +50,7 @@ internal data class CachedSourceState(
     val boundSource: SourceDescriptor?,
     val boundManga: SourceManga?,
     val sourceChapters: List<SourceChapter>,
+    val chaptersFresh: Boolean,
     val latestProgress: ReadingProgress?,
     val chapterProgress: Map<String, ReadingProgress>,
 )
@@ -137,13 +138,16 @@ internal class SourceDataSource(
                 status = null,
             )
         }
-        val chapters = if (boundSource != null && boundManga != null) {
+        val chapterRows = if (boundSource != null && boundManga != null) {
             container.database.chapterDao()
                 .cachedChapters(boundSource.id, boundManga.url)
-                .map { it.toModel() }
         } else {
             emptyList()
         }
+
+        val chapters = chapterRows.map { it.toModel() }
+        val freshness = com.tankobun.core.network.CacheFreshness()
+        val chaptersFresh = chapterRows.isNotEmpty() && chapterRows.all { freshness.isFresh(it.fetchedAtEpochMillis, cachePolicy.sourceChapterTtlMillis) }
 
         val visibleMatches = matches.toMutableList()
         if (binding != null && boundSource != null && boundManga != null && chapters.isNotEmpty()) {
@@ -175,6 +179,7 @@ internal class SourceDataSource(
             boundSource = boundSource,
             boundManga = boundManga,
             sourceChapters = chapters,
+            chaptersFresh = chaptersFresh,
             latestProgress = container.database.progressDao().latestProgress(mediaId)?.toModel(),
             chapterProgress = progressByChapter(mediaId),
         )
@@ -445,8 +450,8 @@ internal class SourceDataSource(
     ): List<SourceChapter>? {
         val cached = container.database.chapterDao().cachedChapters(source.id, manga.url)
         if (cached.isEmpty()) return null
-        val freshest = cached.maxOf { it.fetchedAtEpochMillis }
-        if (requireFresh && now - freshest > cachePolicy.sourceChapterTtlMillis) return null
+        val freshness = com.tankobun.core.network.CacheFreshness { now }
+        if (requireFresh && cached.any { !freshness.isFresh(it.fetchedAtEpochMillis, cachePolicy.sourceChapterTtlMillis) }) return null
         return cached.map { it.toModel() }
     }
 
@@ -464,9 +469,10 @@ internal class SourceDataSource(
     ): SourceMangaUpdate {
         val existing = container.database.chapterDao().cachedChapters(source.id, manga.url).map { it.toModel() }
         val update = container.sourceHost.mangaUpdate(source, manga, existing, fetchDetails, fetchChapters = true)
-            ?: return SourceMangaUpdate(manga, emptyList())
+            ?: error(container.string(com.tankobun.app.R.string.source_picker_chapter_load_failed))
         container.database.withTransaction {
-            container.database.chapterDao().upsertChapters(update.chapters.map { it.toEntity(now) })
+            container.database.chapterDao().deleteChaptersForSourceManga(source.id, manga.url)
+            container.database.chapterDao().upsertChapters(update.chapters.map { it.toEntity(now).copy(mangaUrl = manga.url) })
             container.database.sourceBindingDao().updateMemo(source.id, manga.url, update.manga.memoJson)
             container.database.sourceSearchDao().updateMemo(source.id, manga.url, update.manga.memoJson)
         }
@@ -492,10 +498,11 @@ internal class SourceDataSource(
         manga: SourceManga,
         mediaId: Int?,
         now: Long,
+        forceRefresh: Boolean = false,
     ): LoadedSourceChapters {
-        val cached = cachedChapters(source, manga, now, requireFresh = false)
+        val cached = if (forceRefresh) null else cachedChapters(source, manga, now, requireFresh = true)
         val update = if (cached != null) {
-            SourceMangaUpdate(resolveMangaDetails(source, manga), cached)
+            SourceMangaUpdate(manga, cached)
         } else {
             fetchAndCacheUpdate(source, manga, now, fetchDetails = true)
         }

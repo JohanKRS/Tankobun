@@ -155,8 +155,9 @@
     <string name="settings_ignore_camera_cutout_desc">允许内容使用完整屏幕宽度，就像这台平板没有刘海或挖孔。</string>
     <string name="settings_library_view">书架视图</string>
     <string name="settings_library_updates">章节更新</string>
+    <string name="settings_chapter_refresh_on_open_desc">打开漫画时会立即显示已保存的章节。超过一天的列表会在后台更新，也可随时手动重新加载。发现新章节时，应用内会显示提示。</string>
     <string name="settings_daily_chapter_check">每天检查新章节</string>
-    <string name="settings_daily_chapter_check_desc">检查仍在连载且已经绑定来源的“阅读中”漫画。Tankobun 会逐个刷新章节列表，避免给来源造成压力。</string>
+    <string name="settings_daily_chapter_check_desc">每天仅检查“阅读中”列表中已关联来源的漫画。其他列表中的作品仅在打开漫画详情时检查。检查逐一进行，并复用过去一天内更新的章节列表。</string>
     <string name="settings_daily_chapter_check_last">上次检查：%1$s</string>
     <string name="settings_daily_chapter_check_short">章节检查</string>
     <string name="settings_browse_view">浏览视图</string>

@@ -533,6 +533,11 @@ private fun LibraryNewChapterChecksToggle(
             append(tankobunString(R.string.settings_daily_chapter_check_last, cacheAgeLabel(lastCheck)))
         }
     }
+    Text(
+        tankobunString(R.string.settings_chapter_refresh_on_open_desc),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
     SettingsToggleRow(
         title = tankobunString(R.string.settings_daily_chapter_check),
         subtitle = subtitle,

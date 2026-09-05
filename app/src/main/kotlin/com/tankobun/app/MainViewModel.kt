@@ -88,6 +88,7 @@ import com.tankobun.app.logic.withSourcePickerSearchTitle
 import com.tankobun.app.logic.withSourcePickerSourceSearchStarted
 import com.tankobun.app.logic.withSourcePickerSourceSelected
 import com.tankobun.app.logic.withSourceChapterSelectionMissing
+import com.tankobun.app.logic.sourceMatchKey
 import com.tankobun.app.logic.withSourceChaptersLoaded
 import com.tankobun.app.logic.withSourceChaptersLoadFailed
 import com.tankobun.app.logic.withSourceChaptersLoading
@@ -253,6 +254,9 @@ class MainViewModel(
     private var readerPreviousAdjacentLoadJob: ReaderAdjacentLoadJob? = null
     private var readerNextAdjacentLoadJob: ReaderAdjacentLoadJob? = null
     private var sourcePickerJob: Job? = null
+    private var sourceChapterLoadJob: Job? = null
+    private var sourceChapterLoadKey: String? = null
+    private val chapterRefreshGate = com.tankobun.app.cache.ChapterRefreshGate()
     private var installedSourcesRefreshJob: Job? = null
     private var installedSourcesRefreshId = 0L
     private var sourcePickerRequestId: Long = 0L
@@ -3682,6 +3686,11 @@ class MainViewModel(
                     )
                 }
             }
+            val source = cached.boundSource
+            val manga = cached.boundManga
+            if (_state.value.selectedMedia?.id == mediaId && source?.installed == true && manga != null && !cached.chaptersFresh) {
+                loadChapters(source, manga, silent = true)
+            }
         }
     }
 
@@ -3889,37 +3898,74 @@ class MainViewModel(
             _state.update { it.withSourceChapterSelectionMissing(localizedContext()) }
             return
         }
-        loadChapters(selection.source, selection.manga)
+        loadChapters(selection.source, selection.manga, forceRefresh = true)
     }
 
-    private fun loadChapters(source: SourceDescriptor, manga: com.tankobun.core.model.SourceManga) {
-        viewModelScope.launch {
-            _state.update { it.withSourceChaptersLoading() }
-            runCatching {
-                val now = System.currentTimeMillis()
-                sourceDataSource.loadChapters(
+    private fun loadChapters(
+        source: SourceDescriptor,
+        manga: com.tankobun.core.model.SourceManga,
+        forceRefresh: Boolean = false,
+        silent: Boolean = false,
+    ) {
+        val mediaId = _state.value.selectedMedia?.id ?: return
+        val key = "$mediaId:${source.packageName}:${source.id}:${manga.url}"
+        if (sourceChapterLoadKey == key && sourceChapterLoadJob?.isActive == true) return
+        val previousUrls = _state.value.sourceChapters
+            .filter { it.sourceId == source.id && it.mangaUrl == manga.url }
+            .mapTo(hashSetOf()) { it.url }
+        val now = System.currentTimeMillis()
+        if (!chapterRefreshGate.allow(key, now, manual = !silent)) return
+        fun isCurrentSelection(state: TankobunUiState): Boolean =
+            state.selectedMedia?.id == mediaId && state.selectedSourceId == source.id &&
+                state.selectedSourcePackageName == source.packageName && state.selectedSourceManga?.url == manga.url
+        sourceChapterLoadJob?.cancel()
+        sourceChapterLoadKey = key
+        val job = viewModelScope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+            if (!silent) _state.update { if (isCurrentSelection(it)) it.withSourceChaptersLoading() else it }
+            try {
+                val (detailedManga, chapters, chapterProgress) = sourceDataSource.loadChapters(
                     source = source,
                     manga = manga,
-                    mediaId = _state.value.selectedMedia?.id,
+                    mediaId = mediaId,
                     now = now,
+                    forceRefresh = forceRefresh,
                 )
-            }.onSuccess { (detailedManga, chapters, chapterProgress) ->
-                if (BuildConfig.DEBUG) {
-                    Log.i(TAG, "Chapter load ${source.name}/${detailedManga.title}: chapters=${chapters.size}")
-                }
-                _state.update { it.withSourceChaptersLoaded(localizedContext(), source, detailedManga, chapters, chapterProgress) }
-                loadRecentReadingProgress()
-                if (_state.value.keepNextTenDownloads) {
-                    val result = ensureNextTenDownloads()
-                    if (result.changed > 0) {
-                        _state.update { it.copy(message = string(R.string.msg_queued_next_chapters, result.changed)) }
+                if (!isCurrentSelection(_state.value)) return@launch
+                val newCount = if (previousUrls.isEmpty()) 0 else chapters.count { it.url !in previousUrls }
+                val updateMessage = if (newCount > 0) quantityString(R.plurals.new_chapter_count, newCount, newCount) else null
+                _state.update {
+                    if (!isCurrentSelection(it)) it
+                    else if (silent) it.copy(
+                        selectedSourceManga = detailedManga,
+                        sourceChapters = chapters,
+                        chapterProgress = chapterProgress,
+                        message = it.message ?: updateMessage,
+                        sourceMatchChapterCounts = it.sourceMatchChapterCounts + (source.sourceMatchKey(detailedManga.url) to chapters.size),
+                    )
+                    else it.withSourceChaptersLoaded(localizedContext(), source, detailedManga, chapters, chapterProgress).let { loaded ->
+                        if (updateMessage != null) loaded.copy(message = updateMessage) else loaded
                     }
                 }
-            }.onFailure { error ->
+                if (_state.value.selectedMedia?.id != mediaId) return@launch
+                loadRecentReadingProgress()
+                if (!silent && _state.value.keepNextTenDownloads) {
+                    val result = ensureNextTenDownloads()
+                    if (result.changed > 0) _state.update { it.copy(message = string(R.string.msg_queued_next_chapters, result.changed)) }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
                 Log.w(TAG, "Chapter load failed for ${source.name}/${manga.title}", error)
-                _state.update { it.withSourceChaptersLoadFailed(localizedContext(), error) }
+                if (!silent) _state.update { if (isCurrentSelection(it)) it.withSourceChaptersLoadFailed(localizedContext(), error) else it }
+            } finally {
+                if (sourceChapterLoadJob === coroutineContext[Job]) {
+                    sourceChapterLoadJob = null
+                    sourceChapterLoadKey = null
+                }
             }
         }
+        sourceChapterLoadJob = job
+        job.start()
     }
 
     fun openChapter(
