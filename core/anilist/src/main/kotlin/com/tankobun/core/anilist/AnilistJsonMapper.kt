@@ -109,20 +109,53 @@ object AnilistJsonMapper {
         return recommendationPage(mediaObj)
     }
 
-    fun listCollection(data: JsonObject): List<Pair<AnilistMedia, AnilistListEntry>> {
-        val lists = data["MediaListCollection"]
-            ?.jsonObject
-            ?.get("lists")
-            ?.jsonArray
-            ?: JsonArray(emptyList())
+    fun listCollection(data: JsonObject): List<Pair<AnilistMedia, AnilistListEntry>> = completeLibrary {
+        completeCollectionEntries(data).map { entry ->
+            val media = requireNotNull(entry["media"] as? JsonObject) { "Incomplete AniList media" }
+            require(media.int("id") == entry.int("mediaId")) { "Mismatched AniList media" }
+            media(media) to listEntry(entry)
+        }
+    }
 
-        return lists.flatMap { list ->
-            list.jsonObject["entries"]?.jsonArray.orEmpty().mapNotNull { entry ->
-                val entryObj = entry.jsonObject
-                val media = entryObj["media"] ?: return@mapNotNull null
-                media(media) to listEntry(entry)
+    fun librarySnapshot(data: JsonObject): List<AnilistListEntry> = completeLibrary {
+        completeCollectionEntries(data).map(::listEntry)
+    }
+
+    private inline fun <T> completeLibrary(parse: () -> T): T = try {
+        parse()
+    } catch (error: IllegalArgumentException) {
+        throw IncompleteAniListLibraryException(error)
+    }
+
+    private fun completeCollectionEntries(data: JsonObject): List<JsonObject> {
+        val collection = requireNotNull(data["MediaListCollection"] as? JsonObject) {
+            "Missing AniList library collection"
+        }
+        // The field is nullable for an unchunked collection. Only an explicit
+        // end (false/null) is accepted; missing fields and further chunks fail.
+        require(collection["hasNextChunk"] == JsonNull ||
+            collection["hasNextChunk"]?.jsonPrimitive?.booleanOrNull == false) {
+            "Incomplete AniList library collection"
+        }
+        val lists = requireNotNull(collection["lists"] as? JsonArray) { "Missing AniList lists" }
+        val entries = lists.flatMap { list ->
+            requireNotNull(list.jsonObject["entries"] as? JsonArray) { "Missing AniList entries" }
+                .map { it.jsonObject }
+        }
+        entries.forEach {
+            require(it.int("id") > 0 && it.int("mediaId") > 0) { "Invalid AniList entry id" }
+            require(it.stringOrNull("status") in MediaStatus.entries.filterNot { it == MediaStatus.UNKNOWN }.map { status -> status.name }) {
+                "Invalid AniList entry status"
+            }
+            require(it["progress"]?.jsonPrimitive?.intOrNull != null && it.containsKey("updatedAt")) {
+                "Incomplete AniList entry"
             }
         }
+        val unique = entries.distinctBy { it.int("mediaId") }
+        // AniList silently caps collections at 11,000 unique entries. A capped
+        // response must never be used to infer deletions from the local library.
+        require(unique.size < 11_000) { "AniList collection may be truncated" }
+        return unique
     }
 
     fun searchPage(data: JsonObject): List<AnilistMedia> {

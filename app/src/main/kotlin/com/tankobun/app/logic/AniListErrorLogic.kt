@@ -8,6 +8,7 @@ import com.tankobun.app.backup.ImportReadTimeoutException
 import com.tankobun.app.backup.ImportDocumentReadException
 
 internal fun Throwable.userMessage(context: Context, fallback: String): String = when (this) {
+    is com.tankobun.core.anilist.IncompleteAniListLibraryException -> context.getString(R.string.msg_library_sync_incomplete)
     is InputLimitExceededException -> context.getString(R.string.import_file_too_large, maxBytes / (1024 * 1024))
     is ImportReadTimeoutException -> context.getString(R.string.import_file_timeout)
     is ImportDocumentReadException -> context.getString(R.string.import_file_unreadable)

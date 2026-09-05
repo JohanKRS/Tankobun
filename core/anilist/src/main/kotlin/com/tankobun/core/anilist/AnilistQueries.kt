@@ -609,9 +609,34 @@ object AnilistQueries {
         }
     """
 
+    // Membership is fetched in full so remote removals are observable. Media metadata
+    // is deliberately omitted: the host only fetches metadata missing from its cache.
+    const val MangaLibrarySnapshot = """
+        query MangaLibrarySnapshot(${'$'}userId: Int!, ${'$'}scoreFormat: ScoreFormat) {
+          MediaListCollection(userId: ${'$'}userId, type: MANGA) {
+            hasNextChunk
+            lists {
+              entries {
+                id
+                mediaId
+                status
+                progress
+                score(format: ${'$'}scoreFormat)
+                notes
+                private
+                customLists(asArray: true)
+                hiddenFromStatusLists
+                updatedAt
+              }
+            }
+          }
+        }
+    """
+
     const val MangaListCollectionByUserId = """
         query MangaListCollectionByUserId(${'$'}userId: Int!, ${'$'}scoreFormat: ScoreFormat) {
           MediaListCollection(userId: ${'$'}userId, type: MANGA) {
+            hasNextChunk
             lists {
               name
               status
@@ -663,6 +688,7 @@ object AnilistQueries {
     const val MangaListCollectionByUserName = """
         query MangaListCollectionByUserName(${'$'}userName: String!, ${'$'}scoreFormat: ScoreFormat) {
           MediaListCollection(userName: ${'$'}userName, type: MANGA) {
+            hasNextChunk
             lists {
               name
               status

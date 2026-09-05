@@ -694,6 +694,13 @@ internal fun AniListSettingsScreen(
         )
         Text(tankobunString(R.string.settings_sync_behavior), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         SettingsToggleRow(
+            title = tankobunString(R.string.settings_refresh_library_on_open),
+            subtitle = tankobunString(R.string.settings_refresh_library_on_open_desc),
+            checked = state.anilistRefreshLibraryOnOpen,
+            onCheckedChange = viewModel::setAnilistRefreshLibraryOnOpen,
+            enabled = state.libraryMode == LibraryMode.ANILIST && state.loggedIn,
+        )
+        SettingsToggleRow(
             title = tankobunString(R.string.settings_auto_save_tracking_edits),
             subtitle = tankobunString(R.string.settings_auto_save_tracking_edits_desc),
             checked = state.anilistAutoSaveTrackingChanges,

@@ -476,6 +476,21 @@ class AnilistRepository(
         return AnilistJsonMapper.mediaRecommendations(data)
     }
 
+    suspend fun mangaLibrarySnapshot(
+        accessToken: String,
+        userId: Int,
+        scoreFormat: AnilistScoreFormat,
+    ): List<AnilistListEntry> = AnilistJsonMapper.librarySnapshot(
+        graphQlClient.execute(
+            query = AnilistQueries.MangaLibrarySnapshot,
+            variables = buildJsonObject {
+                put("userId", userId)
+                put("scoreFormat", scoreFormat.name)
+            },
+            accessToken = accessToken,
+        ),
+    )
+
     suspend fun mangaList(
         accessToken: String,
         userId: Int? = null,

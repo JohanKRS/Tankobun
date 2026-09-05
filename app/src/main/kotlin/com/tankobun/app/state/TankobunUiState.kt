@@ -182,6 +182,7 @@ data class TankobunUiState(
     val lastNewChapterCheckAtEpochMillis: Long = 0L,
     val anilistAutoSaveTrackingChanges: Boolean = false,
     val anilistAutoSyncReaderProgress: Boolean = true,
+    val anilistRefreshLibraryOnOpen: Boolean = true,
     val anilistSyncManualReadProgress: Boolean = true,
     val autoUpdateStatusFromReading: Boolean = true,
     val selectingDownloadChapters: Boolean = false,

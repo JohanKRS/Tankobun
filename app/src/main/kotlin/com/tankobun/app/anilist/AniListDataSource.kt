@@ -7,6 +7,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
 import android.util.Log
+import androidx.room.withTransaction
+import com.tankobun.app.logic.reconcileLibrarySnapshot
 import com.tankobun.app.AppContainer
 import com.tankobun.app.logic.isInReadingCategory
 import com.tankobun.app.logic.nullableBoolean
@@ -41,6 +43,10 @@ import com.tankobun.core.sync.SyncBackoff
 import com.tankobun.core.sync.SyncMutationFactory
 import org.json.JSONObject
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 internal data class CachedLibraryData(
     val items: List<LibraryItem>,
@@ -105,11 +111,22 @@ internal class AniListDataSource(
 ) {
     private val syncMutationFactory = SyncMutationFactory()
     private val syncBackoff = SyncBackoff()
+    private val librarySyncMutex = Mutex()
+    private val viewerMutex = Mutex()
+    private var libraryViewer: Pair<String, AnilistViewer>? = null
 
-    suspend fun refreshViewer(token: String): AnilistViewer {
+    suspend fun refreshViewer(token: String, force: Boolean = false): AnilistViewer = viewerMutex.withLock {
+        if (!force) libraryViewer?.takeIf { it.first == token }?.let { return@withLock it.second }
         val viewer = container.anilistRepository.viewer(token)
+        ensureSession(token)
+        libraryViewer = token to viewer
         saveViewerSettings(viewer)
-        return viewer
+        viewer
+    }
+
+    private suspend fun ensureSession(token: String) {
+        currentCoroutineContext().ensureActive()
+        if (container.tokenStore.accessToken() != token) throw CancellationException("AniList session changed")
     }
 
     fun saveViewerSettings(viewer: AnilistViewer) {
@@ -127,6 +144,8 @@ internal class AniListDataSource(
             accessToken = token,
             titleLanguage = titleLanguage,
         )
+        ensureSession(token)
+        libraryViewer = token to viewer
         saveViewerSettings(viewer)
         return viewer
     }
@@ -136,6 +155,8 @@ internal class AniListDataSource(
             accessToken = token,
             scoreFormat = scoreFormat,
         )
+        ensureSession(token)
+        libraryViewer = token to viewer
         saveViewerSettings(viewer)
         return viewer
     }
@@ -703,7 +724,7 @@ internal class AniListDataSource(
     }
 
     suspend fun cachedLibrary(titleLanguage: AnilistTitleLanguage): CachedLibraryData {
-        val media = container.database.mediaDao().cachedMedia().associateBy { it.id }
+        val media = container.database.mediaDao().libraryMedia().associateBy { it.id }
         val items = container.database.listEntryDao().cachedEntries()
             .mapNotNull { entry ->
                 media[entry.mediaId]?.toModel(titleLanguage)?.let { cachedMedia ->
@@ -718,33 +739,60 @@ internal class AniListDataSource(
         )
     }
 
-    suspend fun syncLibrary(token: String): SyncedLibraryData {
-        val viewer = container.anilistRepository.viewer(token)
-        val entries = container.anilistRepository.mangaList(
-            accessToken = token,
-            userId = viewer.id,
-            scoreFormat = viewer.scoreFormat,
-        )
-        val preferredEntries = entries.map { (media, entry) ->
-            media.withTitleLanguage(viewer.titleLanguage) to entry
+    suspend fun syncLibrary(token: String, lightweight: Boolean = false): SyncedLibraryData =
+        librarySyncMutex.withLock {
+            withContext(Dispatchers.IO) {
+                val expectedMode = container.settingsStore.libraryMode()
+                val database = container.database
+                val before = database.listEntryDao().cachedEntries().associateBy { it.mediaId }
+                val viewer = refreshViewer(token, force = !lightweight)
+                val remoteEntries: List<AnilistListEntry>
+                val fetchedMedia: List<AnilistMedia>
+                if (lightweight) {
+                    remoteEntries = container.anilistRepository.mangaLibrarySnapshot(token, viewer.id, viewer.scoreFormat)
+                    val cachedIds = database.mediaDao().cachedMediaIds().toHashSet()
+                    val missingIds = remoteEntries.map { it.mediaId }.filterNot { it in cachedIds }
+                    fetchedMedia = container.anilistRepository.mangaByIds(missingIds, token)
+                    if (fetchedMedia.map { it.id }.toSet() != missingIds.toSet()) {
+                        throw com.tankobun.core.anilist.IncompleteAniListLibraryException()
+                    }
+                } else {
+                    val entries = container.anilistRepository.mangaList(token, userId = viewer.id, scoreFormat = viewer.scoreFormat)
+                    remoteEntries = entries.map { it.second }
+                    fetchedMedia = entries.map { it.first }
+                }
+                val now = System.currentTimeMillis()
+                val items = database.withTransaction {
+                    ensureSession(token)
+                    if (container.settingsStore.libraryMode() != expectedMode) throw CancellationException("Library mode changed")
+                    val current = database.listEntryDao().cachedEntries().associateBy { it.mediaId }
+                    // Include delayed, legacy and other-session rows: they must stay local
+                    // until explicitly resolved, never be lost to an automatic refresh.
+                    val pendingIds = database.syncMutationDao().pendingMutations().mapTo(hashSetOf()) { it.mediaId }
+                    val reconciled = reconcileLibrarySnapshot(
+                        before = before,
+                        current = current,
+                        remote = remoteEntries.associate { it.mediaId to it.toEntity(now) },
+                        pendingMediaIds = pendingIds,
+                    )
+                    database.mediaDao().upsertMedia(fetchedMedia.map { it.toEntity(now) })
+                    database.listEntryDao().upsertEntries(reconciled.values.toList())
+                    // Delete only membership rows; reading files, bindings and history remain available.
+                    val removedIds = current.keys - reconciled.keys
+                    removedIds.chunked(500).forEach { database.listEntryDao().deleteEntriesForMedia(it) }
+                    ensureSession(token)
+                    if (container.settingsStore.libraryMode() != expectedMode) throw CancellationException("Library mode changed")
+                    cachedLibrary(viewer.titleLanguage).items
+                }
+                ensureSession(token)
+                container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
+                val currentViewer = if (lightweight) viewer.copy(
+                    mangaCustomLists = (container.settingsStore.anilistCustomLists() +
+                        remoteEntries.flatMap { it.customLists }).normalizedCustomLists(),
+                ) else viewer
+                SyncedLibraryData(viewer = currentViewer, items = items, syncedAtEpochMillis = now)
+            }
         }
-        val now = System.currentTimeMillis()
-        container.database.mediaDao().upsertMedia(preferredEntries.map { it.first.toEntity(now) })
-        container.database.listEntryDao().upsertEntries(preferredEntries.map { it.second.toEntity(now) })
-        val mediaIds = preferredEntries.map { it.second.mediaId }
-        if (mediaIds.isEmpty()) {
-            container.database.listEntryDao().deleteAllEntries()
-        } else {
-            container.database.listEntryDao().deleteEntriesNotIn(mediaIds)
-        }
-        saveViewerSettings(viewer)
-        container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
-        return SyncedLibraryData(
-            viewer = viewer,
-            items = preferredEntries.map { (media, entry) -> LibraryItem(media, entry) }.sortedByTitle(),
-            syncedAtEpochMillis = now,
-        )
-    }
 
     suspend fun mergeLocalLibraryToAniList(
         token: String,

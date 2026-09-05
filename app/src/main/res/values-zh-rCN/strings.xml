@@ -1,4 +1,7 @@
 <resources>
+    <string name="msg_library_sync_incomplete">AniList 返回的书库不完整。已保留本地书库，请稍后重试同步。</string>
+    <string name="settings_refresh_library_on_open">打开应用时更新书库</string>
+    <string name="settings_refresh_library_on_open_desc">在后台检查 AniList 中的新增、修改和移除，每两分钟最多检查一次。复用缓存数据并遵守服务器的请求限制。</string>
     <string name="app_name">Tankobun</string>
 
     <string name="common_about">关于</string>

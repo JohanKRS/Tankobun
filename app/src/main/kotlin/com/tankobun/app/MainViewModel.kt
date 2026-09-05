@@ -243,6 +243,9 @@ class MainViewModel(
     private val readerDataSource = ReaderDataSource(container)
     private var trackingAutoSaveJob: Job? = null
     private var pendingAniListSyncJob: Job? = null
+    private var libraryRefreshJob: Job? = null
+    private var cachedLibraryJob: Job? = null
+    private var automaticLibraryRefresh = false
     private var scheduledBackupJob: Job? = null
     private var browseLandingJob: Job? = null
     private var homeFeedJob: Job? = null
@@ -320,6 +323,7 @@ class MainViewModel(
             showNsfwContent = container.settingsStore.showNsfwContent(),
             anilistAutoSaveTrackingChanges = container.settingsStore.anilistAutoSaveTrackingChanges(),
             anilistAutoSyncReaderProgress = container.settingsStore.anilistAutoSyncReaderProgress(),
+            anilistRefreshLibraryOnOpen = container.settingsStore.anilistRefreshLibraryOnOpen(),
             anilistSyncManualReadProgress = container.settingsStore.anilistSyncManualReadProgress(),
             autoUpdateStatusFromReading = container.settingsStore.autoUpdateStatusFromReading(),
         ),
@@ -361,7 +365,8 @@ class MainViewModel(
         refreshLocalReadingActivity()
         loadHomeFeed()
         if (_state.value.libraryMode == LibraryMode.LOCAL || _state.value.loggedIn) {
-            loadCachedLibrary(syncIfEmpty = _state.value.libraryMode == LibraryMode.ANILIST && _state.value.loggedIn)
+            loadCachedLibrary(syncIfEmpty = _state.value.libraryMode == LibraryMode.ANILIST &&
+                _state.value.loggedIn && !_state.value.anilistRefreshLibraryOnOpen)
         }
         if (_state.value.loggedIn) {
             refreshAniListViewer()
@@ -389,6 +394,7 @@ class MainViewModel(
             return
         }
         container.settingsStore.savePendingAnilistOAuthState(null)
+        libraryRefreshJob?.cancel()
         pendingAniListSyncJob?.cancel()
         container.tokenStore.saveAccessToken(token.accessToken)
         val shouldGuideMerge = _state.value.libraryMode == LibraryMode.LOCAL && _state.value.libraryItems.isNotEmpty()
@@ -413,6 +419,7 @@ class MainViewModel(
     }
 
     fun signOut() {
+        libraryRefreshJob?.cancel()
         pendingAniListSyncJob?.cancel()
         trackingAutoSaveJob?.cancel()
         container.tokenStore.clear()
@@ -484,6 +491,7 @@ class MainViewModel(
 
     fun setLibraryMode(mode: LibraryMode) {
         if (_state.value.libraryMode == mode) return
+        libraryRefreshJob?.cancel()
         container.settingsStore.saveLibraryMode(mode)
         _state.update { it.copy(libraryMode = mode) }
         if (mode == LibraryMode.LOCAL) {
@@ -1113,10 +1121,11 @@ class MainViewModel(
     }
 
     private fun loadCachedLibrary(syncIfEmpty: Boolean = false) {
-        viewModelScope.launch {
+        cachedLibraryJob?.cancel()
+        cachedLibraryJob = viewModelScope.launch {
             val cached = aniListDataSource.cachedLibrary(_state.value.anilistTitleLanguage)
             val items = cached.items
-            if (items.isNotEmpty()) {
+            if (items.isNotEmpty() || !syncIfEmpty) {
                 _state.update {
                     val updated = it.copy(
                         library = items.map { item -> item.media },
@@ -1152,22 +1161,53 @@ class MainViewModel(
     }
 
     fun refreshLibrary() {
+        requestLibraryRefresh(automatic = false)
+    }
+
+    fun onAppForegrounded() {
+        if (_state.value.anilistRefreshLibraryOnOpen) requestLibraryRefresh(automatic = true)
+    }
+
+    fun setAnilistRefreshLibraryOnOpen(enabled: Boolean) {
+        container.settingsStore.saveAnilistRefreshLibraryOnOpen(enabled)
+        _state.update { it.copy(anilistRefreshLibraryOnOpen = enabled) }
+        if (enabled) onAppForegrounded()
+        else if (automaticLibraryRefresh) libraryRefreshJob?.cancel()
+    }
+
+    private fun requestLibraryRefresh(automatic: Boolean) {
+        if (automatic && (_state.value.busy || _state.value.anilistMergePromptVisible)) return
         if (_state.value.libraryMode == LibraryMode.LOCAL) {
+            if (automatic) return
             loadCachedLibrary()
             _state.update { it.copy(message = string(R.string.msg_library_loaded)) }
             return
         }
         val token = container.tokenStore.accessToken()
         if (token == null) {
+            if (automatic) return
             _state.update { it.copy(message = string(R.string.msg_connect_anilist_sync_library)) }
             return
         }
 
-        viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
+        if (libraryRefreshJob?.isActive == true) return
+        val sessionKey = com.tankobun.core.sync.syncSessionKey(token) ?: return
+        val now = System.currentTimeMillis()
+        if (automatic && !com.tankobun.app.logic.shouldRefreshLibraryOnOpen(
+                now, container.settingsStore.libraryRefreshAttemptMillis(sessionKey),
+            )) return
+        container.settingsStore.saveLibraryRefreshAttempt(sessionKey, now)
+        automaticLibraryRefresh = automatic
+        libraryRefreshJob = viewModelScope.launch {
+            cachedLibraryJob?.join()
+            if (!automatic) _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                aniListDataSource.syncLibrary(token)
+                // Finish already-running queued edits before taking the remote snapshot.
+                // Delayed or failed edits remain protected by the database reconciliation.
+                pendingAniListSyncJob?.join()
+                aniListDataSource.syncLibrary(token, lightweight = automatic)
             }.onSuccess { synced ->
+                if (container.tokenStore.accessToken() != token || _state.value.libraryMode != LibraryMode.ANILIST) return@onSuccess
                 val viewer = synced.viewer
                 val items = synced.items
                 _state.update {
@@ -1182,8 +1222,8 @@ class MainViewModel(
                         library = items.map { item -> item.media },
                         libraryItems = items,
                         librarySyncedAtEpochMillis = synced.syncedAtEpochMillis,
-                        busy = false,
-                        message = string(R.string.msg_library_synced),
+                        busy = if (automatic) it.busy else false,
+                        message = if (automatic) it.message else string(R.string.msg_library_synced),
                     )
                     val selectedId = updated.selectedMedia?.id
                     if (selectedId == null) {
@@ -1199,8 +1239,12 @@ class MainViewModel(
                 processPendingAniListSync()
                 runScheduledAniListBackupIfDue()
             }.onFailure { error ->
+                if (error is CancellationException) {
+                    if (!automatic) _state.update { it.copy(busy = false) }
+                    throw error
+                }
                 Log.e(TAG, "AniList library sync failed", error)
-                _state.update {
+                if (!automatic) _state.update {
                     it.copy(busy = false, message = error.userMessage(localizedContext(), string(R.string.msg_library_sync_failed)))
                 }
             }
@@ -1401,6 +1445,7 @@ class MainViewModel(
                 anilistTitleLanguage = store.anilistTitleLanguage(),
                 anilistAutoSaveTrackingChanges = store.anilistAutoSaveTrackingChanges(),
                 anilistAutoSyncReaderProgress = store.anilistAutoSyncReaderProgress(),
+                anilistRefreshLibraryOnOpen = store.anilistRefreshLibraryOnOpen(),
                 anilistSyncManualReadProgress = store.anilistSyncManualReadProgress(),
                 autoUpdateStatusFromReading = store.autoUpdateStatusFromReading(),
                 anilistCustomLists = store.anilistCustomLists(),

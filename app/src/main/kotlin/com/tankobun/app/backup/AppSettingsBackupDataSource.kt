@@ -122,6 +122,7 @@ internal class AppSettingsBackupDataSource(
             .put("anilistTitleLanguage", snapshot.anilistTitleLanguage.name)
             .put("anilistAutoSaveTrackingChanges", snapshot.anilistAutoSaveTrackingChanges)
             .put("anilistAutoSyncReaderProgress", snapshot.anilistAutoSyncReaderProgress)
+            .put("anilistRefreshLibraryOnOpen", snapshot.anilistRefreshLibraryOnOpen)
             .put("anilistSyncManualReadProgress", snapshot.anilistSyncManualReadProgress)
             .put("autoUpdateStatusFromReading", snapshot.autoUpdateStatusFromReading)
             .put("anilistCustomLists", snapshot.anilistCustomLists.toJsonArray())
@@ -221,6 +222,7 @@ internal class AppSettingsBackupDataSource(
         settings.enumOrNull<AnilistTitleLanguage>("anilistTitleLanguage")?.let(store::saveAnilistTitleLanguage)
         settings.optBooleanOrNull("anilistAutoSaveTrackingChanges")?.let(store::saveAnilistAutoSaveTrackingChanges)
         settings.optBooleanOrNull("anilistAutoSyncReaderProgress")?.let(store::saveAnilistAutoSyncReaderProgress)
+        settings.optBooleanOrNull("anilistRefreshLibraryOnOpen")?.let(store::saveAnilistRefreshLibraryOnOpen)
         settings.optBooleanOrNull("anilistSyncManualReadProgress")?.let(store::saveAnilistSyncManualReadProgress)
         settings.optBooleanOrNull("autoUpdateStatusFromReading")?.let(store::saveAutoUpdateStatusFromReading)
         settings.optJSONArray("anilistCustomLists")?.stringValues()?.let(store::saveAnilistCustomLists)
@@ -277,6 +279,7 @@ internal class AppSettingsBackupDataSource(
             anilistTitleLanguage = store.anilistTitleLanguage(),
             anilistAutoSaveTrackingChanges = store.anilistAutoSaveTrackingChanges(),
             anilistAutoSyncReaderProgress = store.anilistAutoSyncReaderProgress(),
+            anilistRefreshLibraryOnOpen = store.anilistRefreshLibraryOnOpen(),
             anilistSyncManualReadProgress = store.anilistSyncManualReadProgress(),
             autoUpdateStatusFromReading = store.autoUpdateStatusFromReading(),
             anilistCustomLists = store.anilistCustomLists(),

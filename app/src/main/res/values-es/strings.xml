@@ -1,4 +1,7 @@
 <resources>
+    <string name="msg_library_sync_incomplete">AniList devolvió una biblioteca incompleta. Se conservó tu biblioteca guardada. Intenta sincronizar de nuevo más tarde.</string>
+    <string name="settings_refresh_library_on_open">Actualizar biblioteca al abrir</string>
+    <string name="settings_refresh_library_on_open_desc">Comprueba adiciones, cambios y eliminaciones en AniList en segundo plano, como máximo una vez cada dos minutos. Reutiliza la caché y respeta los límites del servidor.</string>
     <string name="app_name">Tankobun</string>
 
     <string name="common_about">Acerca de</string>

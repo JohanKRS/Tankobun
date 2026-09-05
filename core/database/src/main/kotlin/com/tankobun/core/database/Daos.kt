@@ -9,6 +9,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MediaDao {
+    @Query("SELECT id FROM anilist_media")
+    suspend fun cachedMediaIds(): List<Int>
+
+    @Query("SELECT m.* FROM anilist_media m INNER JOIN anilist_list_entries e ON e.mediaId = m.id")
+    suspend fun libraryMedia(): List<AnilistMediaEntity>
+
     @Query("SELECT * FROM anilist_media ORDER BY titleUserPreferred COLLATE NOCASE")
     fun observeMedia(): Flow<List<AnilistMediaEntity>>
 
@@ -400,6 +406,9 @@ interface DownloadPageDao {
 
 @Dao
 interface SyncMutationDao {
+    @Query("SELECT * FROM sync_mutations ORDER BY createdAtEpochMillis ASC")
+    suspend fun pendingMutations(): List<SyncMutationEntity>
+
     @Query("SELECT * FROM sync_mutations WHERE nextAttemptAtEpochMillis <= :nowMillis ORDER BY createdAtEpochMillis ASC")
     suspend fun dueMutations(nowMillis: Long): List<SyncMutationEntity>
 
