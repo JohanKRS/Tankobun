@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.settings
 
+import androidx.compose.material3.AlertDialog
+
 import com.tankobun.app.ui.icons.TankobunIcons
 
 import android.content.Context
@@ -215,6 +217,39 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
     val context = LocalContext.current
     val chromeInsets = LocalTankobunChromeInsets.current
     var sourceSettingsQuery by remember { mutableStateOf("") }
+    var trustCandidate by remember { mutableStateOf<com.tankobun.core.extensions.UntrustedExtension?>(null) }
+    trustCandidate?.let { candidate ->
+        AlertDialog(
+            shape = LocalTankobunStyle.current.themeShapes.dialog,
+            containerColor = LocalTankobunStyle.current.colors.panel,
+            titleContentColor = LocalTankobunStyle.current.colors.panelContent,
+            textContentColor = LocalTankobunStyle.current.colors.mutedContent,
+            tonalElevation = 0.dp,
+            onDismissRequest = { trustCandidate = null },
+            title = { Text(tankobunString(R.string.sources_trust_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(tankobunString(R.string.sources_trust_explanation, candidate.descriptor.name))
+                    Text(candidate.descriptor.packageName, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "SHA-256\n" + candidate.signerFingerprints.sorted().joinToString("\n"),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    trustCandidate = null
+                    viewModel.trustExtension(candidate)
+                }, enabled = candidate.signerFingerprints.isNotEmpty()) {
+                    Text(tankobunString(R.string.sources_trust_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { trustCandidate = null }) { Text(tankobunString(R.string.common_cancel)) }
+            },
+        )
+    }
     var launchedInstallRequest by remember { mutableStateOf<ExtensionInstallRequest?>(null) }
     val installLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         launchedInstallRequest?.let(viewModel::refreshInstalledSourcesAfterExtensionInstall)
@@ -436,11 +471,22 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (page == 0) {
-                    if (state.allInstalledSources.isEmpty()) {
+                    items(state.untrustedExtensions, key = { "trust:${it.descriptor.packageName}" }) { candidate ->
+                        TankobunPanel(modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(candidate.descriptor.name, style = MaterialTheme.typography.titleMedium)
+                                Text(tankobunString(R.string.sources_trust_pending), style = MaterialTheme.typography.bodySmall)
+                                TextButton(onClick = { trustCandidate = candidate }) {
+                                    Text(tankobunString(R.string.sources_trust_review))
+                                }
+                            }
+                        }
+                    }
+                    if (state.allInstalledSources.isEmpty() && state.untrustedExtensions.isEmpty()) {
                         item(key = "installed-empty") {
                             TankobunEmptyState(title = tankobunString(R.string.sources_empty_installed))
                         }
-                    } else if (sourceGroups.isEmpty()) {
+                    } else if (state.allInstalledSources.isNotEmpty() && sourceGroups.isEmpty()) {
                         item(key = "installed-filter-empty") {
                             TankobunEmptyState(title = tankobunString(R.string.sources_empty_installed_filter))
                         }

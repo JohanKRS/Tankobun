@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class TachiyomiSourceHost(
     private val context: Context,
+    private val trustStore: ExtensionTrustStore = ExtensionTrustStore(context),
 ) {
     private val appContext = context.applicationContext
     private val sourceCache = mutableMapOf<String, CachedSources>()
@@ -52,12 +53,14 @@ class TachiyomiSourceHost(
     fun loadSources(packageName: String): List<Source> {
         ensureHttpAgent()
         val packageInfo = packageInfo(packageName) ?: return emptyList()
+        // Gate every entrypoint, including background work and cached source instances.
+        if (!trustStore.isTrusted(packageInfo)) return emptyList()
         val key = packageInfo.cacheKey()
         synchronized(sourceCache) {
             sourceCache[packageName]?.takeIf { it.cacheKey == key }?.let { return it.sources }
         }
 
-        val sources = loadDeclaredSourceClasses(packageName).flatMap { instance ->
+        val sources = loadDeclaredSourceClasses(packageInfo).flatMap { instance ->
             runCatching {
                 when (instance) {
                     is SourceFactory -> instance.createSources()
@@ -432,16 +435,13 @@ class TachiyomiSourceHost(
         loadSources(source.packageName)
             .bestMatch(source)
 
-    private fun loadDeclaredSourceClasses(packageName: String): List<Any> {
+    private fun loadDeclaredSourceClasses(packageInfo: PackageInfo): List<Any> {
         ensureHttpAgent()
-        val extensionContext = appContext.createPackageContext(
-            packageName,
-            Context.CONTEXT_INCLUDE_CODE or Context.CONTEXT_IGNORE_SECURITY,
-        )
-        val classLoader = PathClassLoader(extensionContext.applicationInfo.sourceDir, appContext.classLoader)
-        val metadata = extensionContext.packageManager
-            .getApplicationInfo(packageName, android.content.pm.PackageManager.GET_META_DATA)
-            .metaData
+        val packageName = packageInfo.packageName
+        val appInfo = packageInfo.applicationInfo ?: return emptyList()
+        // Use the same package snapshot that passed the signer check.
+        val classLoader = PathClassLoader(appInfo.sourceDir, appContext.classLoader)
+        val metadata = appInfo.metaData
 
         val declared = metadata?.getString("tachiyomi.extension.class")
             ?.split(';', ',')
@@ -467,7 +467,7 @@ class TachiyomiSourceHost(
     private fun packageInfo(packageName: String): PackageInfo? =
         runCatching {
             @Suppress("DEPRECATION")
-            appContext.packageManager.getPackageInfo(packageName, PackageManager.GET_META_DATA)
+            appContext.packageManager.getPackageInfo(packageName, EXTENSION_PACKAGE_FLAGS)
         }.onFailure { error ->
             logSourceFailure(
                 action = "packageInfo",

@@ -440,7 +440,7 @@
     <string name="library_anilist_setup_needed">需要设置 AniList</string>
     <string name="library_sign_in_desc">登录后可在这里显示你的列表。</string>
     <string name="library_credentials_desc">连接前请先在设置中添加 AniList 凭据。</string>
-    <string name="library_empty">你的书架里还没有漫画。打开“浏览”添加已匹配 AniList 的漫画。</string>
+    <string name="library_empty">从这里开始建立你的书架</string>
     <string name="library_filter_empty">没有标题符合这些书架筛选条件。</string>
     <string name="library_list_empty">这个列表里还没有漫画。</string>
     <string name="library_tags_after_sync">书架数据加载后，标签会显示在这里。</string>
@@ -1105,4 +1105,15 @@
     <string name="home_chapter">第 %1$s 话</string>
     <string name="home_trending_empty">暂时无法加载热门漫画。</string>
     <string name="home_genres_empty">暂时无法加载分类热门。</string>
+    <string name="sources_trust_title">信任此扩展？</string>
+    <string name="sources_trust_explanation">%1$s 将在 Tankobun 内运行代码，并可访问应用数据。请仅在信任作者时继续。</string>
+    <string name="sources_trust_confirm">信任并启用</string>
+    <string name="sources_trust_pending">已安装，等待确认信任。尚未加载扩展代码。</string>
+    <string name="sources_trust_review">检查扩展</string>
+    <string name="sources_trust_changed">扩展已更改。请检查当前版本后再确认信任。</string>
+    <string name="import_file_too_large">此文件过大。请选择不超过 %1$d MB 的文件。</string>
+    <string name="import_file_timeout">文件提供方响应超时。请先将文件下载到设备后重试。</string>
+    <string name="library_empty_description">在“浏览”中找到漫画，并将它添加到书架。</string>
+    <string name="library_empty_action">浏览漫画</string>
+    <string name="import_file_unreadable">无法读取此文件。请选择已保存到设备上的副本。</string>
 </resources>

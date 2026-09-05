@@ -52,6 +52,7 @@ import com.tankobun.app.logic.sourcePickerDiagnosticDetail
 import com.tankobun.app.logic.sourcePickerSources
 import com.tankobun.app.logic.toAniListScore
 import com.tankobun.app.logic.toLocalReadingActivity
+import com.tankobun.app.logic.importUserMessage
 import com.tankobun.app.logic.userMessage
 import com.tankobun.app.logic.visibleSources
 import com.tankobun.app.logic.withDeletedAniListCustomList
@@ -249,8 +250,11 @@ class MainViewModel(
     private var readerPreviousAdjacentLoadJob: ReaderAdjacentLoadJob? = null
     private var readerNextAdjacentLoadJob: ReaderAdjacentLoadJob? = null
     private var sourcePickerJob: Job? = null
+    private var installedSourcesRefreshJob: Job? = null
+    private var installedSourcesRefreshId = 0L
     private var sourcePickerRequestId: Long = 0L
     private var recommendationImportRequestId: Long = 0L
+    private var recommendationImportJob: Job? = null
     private var browseBackStack: List<BrowseCriteria> = emptyList()
     private var committedBrowseCriteria: BrowseCriteria = BrowseCriteria()
     private var lastReaderProgressSavedAtEpochMillis: Long = 0L
@@ -385,6 +389,7 @@ class MainViewModel(
             return
         }
         container.settingsStore.savePendingAnilistOAuthState(null)
+        pendingAniListSyncJob?.cancel()
         container.tokenStore.saveAccessToken(token.accessToken)
         val shouldGuideMerge = _state.value.libraryMode == LibraryMode.LOCAL && _state.value.libraryItems.isNotEmpty()
         _state.update {
@@ -408,6 +413,8 @@ class MainViewModel(
     }
 
     fun signOut() {
+        pendingAniListSyncJob?.cancel()
+        trackingAutoSaveJob?.cancel()
         container.tokenStore.clear()
         container.settingsStore.saveLibraryMode(LibraryMode.LOCAL)
         container.settingsStore.savePendingAnilistOAuthState(null)
@@ -620,7 +627,9 @@ class MainViewModel(
     }
 
     fun refreshInstalledSources() {
-        viewModelScope.launch {
+        val requestId = ++installedSourcesRefreshId
+        installedSourcesRefreshJob?.cancel()
+        installedSourcesRefreshJob = viewModelScope.launch {
             val sourceState = extensionDataSource.installedSourceState(
                 preferredLanguages = _state.value.sourceLanguages,
                 disabledSourceKeys = _state.value.disabledSourceKeys,
@@ -628,17 +637,20 @@ class MainViewModel(
             val selectedSourceId = _state.value.selectedSourceId
             val selectedSourcePackageName = _state.value.selectedSourcePackageName
             _state.update {
+                if (requestId != installedSourcesRefreshId) return@update it
+                val preferredSources = sourceState.allSources.preferredVisibleSources(it.sourceLanguages, it.disabledSourceKeys)
                 val keepMissingBoundSource = it.selectedSourceManga != null
                 val selectedSource = preserveSelectedSourceOrFirst(
                     selectedSourceId = selectedSourceId,
                     selectedSourcePackageName = selectedSourcePackageName,
-                    visibleSources = sourceState.preferredSources,
+                    visibleSources = preferredSources,
                     allSources = sourceState.allSources,
                     fallbackToFirst = !keepMissingBoundSource,
                 )
                 it.copy(
                     allInstalledSources = sourceState.allSources,
-                    installedSources = sourceState.preferredSources,
+                    untrustedExtensions = sourceState.untrustedExtensions,
+                    installedSources = preferredSources,
                     selectedSourceId = selectedSource?.id ?: selectedSourceId.takeIf { keepMissingBoundSource },
                     selectedSourcePackageName = selectedSource?.packageName
                         ?: selectedSourcePackageName.takeIf { keepMissingBoundSource },
@@ -650,6 +662,18 @@ class MainViewModel(
     fun setExtensionRepositoryUrl(url: String) {
         container.settingsStore.saveExtensionRepositoryUrl(url)
         _state.update { it.copy(extensionRepositoryUrl = url) }
+    }
+
+    fun trustExtension(candidate: com.tankobun.core.extensions.UntrustedExtension) {
+        viewModelScope.launch {
+            val approved = withContext(Dispatchers.IO) { container.extensionTrustStore.approve(candidate) }
+            if (approved) {
+                refreshInstalledSources()
+            } else {
+                _state.update { it.copy(message = string(R.string.sources_trust_changed)) }
+                refreshInstalledSources()
+            }
+        }
     }
 
     fun setThemePreference(preference: TankobunThemePreference) {
@@ -1584,6 +1608,7 @@ class MainViewModel(
     }
 
     private fun processPendingAniListSync() {
+        if (_state.value.libraryMode != LibraryMode.ANILIST) return
         val token = container.tokenStore.accessToken() ?: return
         if (!_state.value.anilistAutoSyncReaderProgress) return
         if (pendingAniListSyncJob?.isActive == true) return
@@ -2972,10 +2997,13 @@ class MainViewModel(
 
     fun openRecommendationImport(uri: Uri) {
         val requestId = ++recommendationImportRequestId
-        viewModelScope.launch {
+        recommendationImportJob?.cancel()
+        recommendationImportJob = viewModelScope.launch {
             _state.update {
                 it.copy(
                     busy = true,
+                    recommendationImportError = null,
+                    recommendationImportPreview = null,
                     message = null,
                     recommendationImportLoadingDetails = false,
                 )
@@ -3003,14 +3031,18 @@ class MainViewModel(
                         current
                     } else {
                         current.copy(
-                        busy = false,
-                        recommendationImportLoadingDetails = false,
-                        message = error.userMessage(localizedContext(), string(R.string.msg_recommendations_import_failed)),
-                    )
+                            busy = false,
+                            recommendationImportLoadingDetails = false,
+                            recommendationImportError = error.importUserMessage(localizedContext(), string(R.string.msg_recommendations_import_failed)),
+                        )
                     }
                 }
             }
         }
+    }
+
+    fun dismissRecommendationImportError() {
+        _state.update { it.copy(recommendationImportError = null) }
     }
 
     private suspend fun enrichRecommendationImportPreview(
@@ -3052,8 +3084,11 @@ class MainViewModel(
 
     fun dismissRecommendationImport() {
         recommendationImportRequestId++
+        recommendationImportJob?.cancel()
+        recommendationImportJob = null
         _state.update {
             it.copy(
+                busy = false,
                 recommendationImportPreview = null,
                 recommendationImportLoadingDetails = false,
                 selectedRecommendationImportMediaIds = emptySet(),

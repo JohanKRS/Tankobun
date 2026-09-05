@@ -11,4 +11,5 @@ dependencies {
     implementation(project(":core:anilist"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.junit)
 }

@@ -1,5 +1,8 @@
 package com.tankobun.app.ui.library
 
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+
 import com.tankobun.app.ui.icons.TankobunIcons
 import com.tankobun.app.ui.icons.genreIcon
 
@@ -203,7 +206,6 @@ import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-
 import com.tankobun.app.*
 import com.tankobun.app.logic.*
 import com.tankobun.app.state.*
@@ -216,10 +218,16 @@ import com.tankobun.app.ui.reader.*
 import com.tankobun.app.ui.settings.*
 import com.tankobun.app.ui.shell.*
 
+private val LibraryFilterSetSaver = listSaver<Set<String>, String>(
+    save = { it.toList() },
+    restore = { it.toSet() },
+)
+
 @Composable
 internal fun LibraryScreen(
     state: TankobunUiState,
     viewModel: MainViewModel,
+    onOpenBrowse: () -> Unit,
     onSelectMedia: (AnilistMedia) -> Unit,
 ) {
     val context = LocalContext.current
@@ -227,17 +235,17 @@ internal fun LibraryScreen(
         viewModel.loadBrowseTags()
     }
 
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     var picker by remember { mutableStateOf<LibraryPicker?>(null) }
     var genresOpen by remember { mutableStateOf(false) }
     var tagsOpen by remember { mutableStateOf(false) }
-    var genres by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var tags by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var format by remember { mutableStateOf<String?>(null) }
-    var publishingStatus by remember { mutableStateOf<String?>(null) }
-    var countryOfOrigin by remember { mutableStateOf<String?>(null) }
-    var year by remember { mutableStateOf<String?>(null) }
-    var sort by remember { mutableStateOf(LIBRARY_SORT_LIST_ORDER) }
+    var genres by rememberSaveable(stateSaver = LibraryFilterSetSaver) { mutableStateOf<Set<String>>(emptySet()) }
+    var tags by rememberSaveable(stateSaver = LibraryFilterSetSaver) { mutableStateOf<Set<String>>(emptySet()) }
+    var format by rememberSaveable { mutableStateOf<String?>(null) }
+    var publishingStatus by rememberSaveable { mutableStateOf<String?>(null) }
+    var countryOfOrigin by rememberSaveable { mutableStateOf<String?>(null) }
+    var year by rememberSaveable { mutableStateOf<String?>(null) }
+    var sort by rememberSaveable { mutableStateOf(LIBRARY_SORT_LIST_ORDER) }
     var optionsOpen by remember { mutableStateOf(false) }
     val sections = state.librarySections
     val tagOptions = remember(sections, state.browseAvailableTags) { libraryTagOptions(sections, state.browseAvailableTags) }
@@ -311,6 +319,7 @@ internal fun LibraryScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         val chromeInsets = LocalTankobunChromeInsets.current
         LibraryPager(
+            onOpenBrowse = onOpenBrowse,
             sections = sections,
             query = query,
             genres = genres,
@@ -621,6 +630,7 @@ internal fun LibraryConnectPrompt(
 
 @Composable
 internal fun LibraryPager(
+    onOpenBrowse: () -> Unit,
     sections: List<LibrarySection>,
     query: String,
     genres: Set<String>,
@@ -656,7 +666,25 @@ internal fun LibraryPager(
             }
             item(key = "library-empty") {
                 Box(Modifier.padding(horizontal = LibraryContentPadding)) {
-                    TankobunEmptyState(title = tankobunString(R.string.library_empty))
+                    TankobunPanel(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Icon(TankobunIcons.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Text(tankobunString(R.string.library_empty), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                tankobunString(R.string.library_empty_description),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            TankobunActionButton(
+                                label = tankobunString(R.string.library_empty_action),
+                                onClick = onOpenBrowse,
+                                icon = TankobunIcons.Explore,
+                            )
+                        }
+                    }
                 }
             }
         }

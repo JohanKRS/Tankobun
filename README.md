@@ -67,9 +67,15 @@ Tankobun does not include a default extension repository. It does not recommend 
 
 Any source extension used with Tankobun must be added and installed by the user. The user is solely responsible for choosing which extensions, repositories, websites, or services they use, and for making sure their use complies with applicable laws, site terms, publisher rights, and creator rights.
 
+Before loading an installed extension, Tankobun asks the user to trust its package and current signing identity. Existing extensions also need this initial approval; updates signed by the same identity retain it. A changed signer requires a new review. Extensions execute inside Tankobun's process: this approval is not a sandbox or a guarantee that an extension is safe.
+
 Tankobun is only a reader/tracking client. It does not grant permission to access, copy, download, or redistribute any third-party content.
 
 Recommendation sharing files contain manga metadata and recommendation list names only. They do not include manga content, chapter URLs, source links, downloaded files, source repositories, source APKs, notes, scores, private flags, or tokens.
+
+Personal library/settings backups are different from recommendation files: they can preserve source bindings and repository addresses configured by the user. They are intended for personal restoration and do not add built-in source recommendations.
+
+Import reads are limited to 4 MiB for recommendation files and 32 MiB for backups. Cancelled recommendation previews do not persist file-provided metadata. Deferred AniList mutations are bound to their original login session; legacy or different-session rows are retained locally and are not automatically submitted with another login. Cross-account transfer remains an explicit library merge action.
 
 ## APK Releases
 

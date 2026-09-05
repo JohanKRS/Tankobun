@@ -441,7 +441,7 @@
     <string name="library_anilist_setup_needed">AniList setup needed</string>
     <string name="library_sign_in_desc">Sign in to show your lists here.</string>
     <string name="library_credentials_desc">Add AniList credentials in settings before connecting.</string>
-    <string name="library_empty">No manga in your library yet. Open Browse to add AniList-matched manga.</string>
+    <string name="library_empty">Your library starts here</string>
     <string name="library_filter_empty">No titles match these library filters.</string>
     <string name="library_list_empty">No manga in this list yet.</string>
     <string name="library_tags_after_sync">Tags will appear here after library data loads.</string>
@@ -1106,4 +1106,15 @@
     <string name="home_chapter">Ch. %1$s</string>
     <string name="home_trending_empty">Trending manga are unavailable right now.</string>
     <string name="home_genres_empty">Genre highlights are unavailable right now.</string>
+    <string name="sources_trust_title">Trust this extension?</string>
+    <string name="sources_trust_explanation">%1$s will run code inside Tankobun and can access its app data. Continue only if you trust its author.</string>
+    <string name="sources_trust_confirm">Trust and enable</string>
+    <string name="sources_trust_pending">Installed, awaiting your trust decision. No extension code has been loaded.</string>
+    <string name="sources_trust_review">Review extension</string>
+    <string name="sources_trust_changed">The extension changed. Review its current version before trusting it.</string>
+    <string name="import_file_too_large">This file is too large. Choose a file up to %1$d MB.</string>
+    <string name="import_file_timeout">The file provider took too long to respond. Try downloading the file to your device first.</string>
+    <string name="library_empty_description">Find a manga in Browse and add it to your library.</string>
+    <string name="library_empty_action">Explore manga</string>
+    <string name="import_file_unreadable">Could not read this file. Select a copy saved on your device.</string>
 </resources>

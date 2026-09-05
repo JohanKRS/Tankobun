@@ -12,8 +12,8 @@ class InstalledExtensionScanner(
     fun installedExtensions(): List<SourceDescriptor> {
         val packageManager = context.packageManager
         @Suppress("DEPRECATION")
-        return packageManager.getInstalledPackages(PackageManager.GET_META_DATA)
-            .filter { it.packageName.startsWith(TACHIYOMI_EXTENSION_PREFIX) }
+        return packageManager.getInstalledPackages(EXTENSION_PACKAGE_FLAGS)
+            .filter { it.isExtensionPackage() }
             .map { pkg ->
                 val appInfo = pkg.applicationInfo
                 val label = appInfo?.loadLabel(packageManager)?.toString()

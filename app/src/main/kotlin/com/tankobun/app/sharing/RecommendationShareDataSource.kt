@@ -3,6 +3,8 @@ package com.tankobun.app.sharing
 import android.net.Uri
 import androidx.core.content.FileProvider
 import com.tankobun.app.AppContainer
+import com.tankobun.app.backup.MAX_RECOMMENDATION_BYTES
+import com.tankobun.app.backup.readImportBytes
 import com.tankobun.app.state.LibraryItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -38,10 +40,8 @@ internal class RecommendationShareDataSource(
     }
 
     suspend fun readShareFile(uri: Uri): RecommendationSharePayload = withContext(Dispatchers.IO) {
-        val text = container.application.contentResolver.openInputStream(uri).use { input ->
-            checkNotNull(input) { "Could not open recommendations file" }
-            input.reader(Charsets.UTF_8).readText()
-        }
+        val text = container.application.contentResolver
+            .readImportBytes(uri, MAX_RECOMMENDATION_BYTES).toString(Charsets.UTF_8)
         parseRecommendationShareJson(text)
     }
 }

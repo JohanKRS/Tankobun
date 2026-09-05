@@ -117,7 +117,8 @@ class AppContainer(application: Application) {
     )
 
     val extensionScanner = InstalledExtensionScanner(application)
-    val sourceHost = TachiyomiSourceHost(application)
+    val extensionTrustStore = com.tankobun.core.extensions.ExtensionTrustStore(application)
+    val sourceHost = TachiyomiSourceHost(application, extensionTrustStore)
     val sourceMatcher = SourceMatcher()
 
     val downloadCoordinator = DownloadCoordinator(

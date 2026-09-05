@@ -69,11 +69,8 @@ internal class AniListBackupService(
         knownCustomLists: List<String>,
     ): AniListBackupRestoreResult {
         val entries = withContext(Dispatchers.IO) {
-            val input = container.application.contentResolver.openInputStream(uri)
-                ?: error("Could not open backup file")
-            input.use { stream ->
-                parseMyAnimeListBackupXml(stream, scoreFormat)
-            }
+            val bytes = container.application.contentResolver.readImportBytes(uri, MAX_BACKUP_BYTES)
+            parseMyAnimeListBackupXml(bytes.inputStream(), scoreFormat)
         }
         check(entries.isNotEmpty()) { "No manga found in backup" }
 

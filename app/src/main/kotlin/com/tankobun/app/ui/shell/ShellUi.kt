@@ -1,5 +1,10 @@
 package com.tankobun.app.ui.shell
 
+import androidx.compose.material3.AlertDialog
+
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+
 import com.tankobun.app.ui.icons.TankobunIcons
 
 import android.content.Context
@@ -392,8 +397,8 @@ private fun TankobunAppRootContent(
     val context = LocalContext.current
     val readerBackToast = tankobunString(R.string.toast_back_exit_reader)
     val appBackToast = tankobunString(R.string.toast_back_exit)
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var settingsRoute by remember { mutableStateOf(SettingsRoute.MAIN) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var settingsRoute by rememberSaveable { mutableStateOf(SettingsRoute.MAIN) }
     var quickDrawerMode by remember { mutableStateOf(QuickDrawerMode.CLOSED) }
     var routeHistory by remember { mutableStateOf<List<TankobunRoute>>(emptyList()) }
     var lastHomeBackPressAt by remember { mutableLongStateOf(0L) }
@@ -822,6 +827,7 @@ internal fun TankobunScaffold(
     val drawerScrimAlpha = QuickDrawerScrimAlpha * quickDrawerBackdropRevealFraction
     val drawerBackdropBlur = (QuickDrawerBackdropBlurDp * quickDrawerBackdropRevealFraction).dp
     val mediaDetailActive = selectedMedia != null
+    val tabStateHolder = rememberSaveableStateHolder()
     val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
     val routeBackdropColor = LocalTankobunTokens.current.appBackdrop
     val routeContentColor = MaterialTheme.colorScheme.onSurface
@@ -967,23 +973,25 @@ internal fun TankobunScaffold(
                 ) {
                     Row(Modifier.fillMaxSize()) {
                         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            when (selectedTab) {
-                                0 -> HomeScreen(
-                                    state = state,
-                                    onSelectMedia = onSelectMedia,
-                                    onOpenRecentProgress = onOpenRecentProgress,
-                                    onOpenLibrary = { onSelectTab(1) },
-                                    onOpenBrowse = { onSelectTab(2) },
-                                )
-                                1 -> LibraryScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                                2 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                                3 -> ProfileScreen(state = state, viewModel = viewModel)
-                                4 -> SettingsScreen(
-                                    state = state,
-                                    viewModel = viewModel,
-                                    route = settingsRoute,
-                                    onOpenRoute = onOpenSettingsRoute,
-                                )
+                            tabStateHolder.SaveableStateProvider(selectedTab) {
+                                when (selectedTab) {
+                                    0 -> HomeScreen(
+                                        state = state,
+                                        onSelectMedia = onSelectMedia,
+                                        onOpenRecentProgress = onOpenRecentProgress,
+                                        onOpenLibrary = { onSelectTab(1) },
+                                        onOpenBrowse = { onSelectTab(2) },
+                                    )
+                                    1 -> LibraryScreen(state, viewModel, onOpenBrowse = { onSelectTab(2) }, onSelectMedia = onSelectMedia)
+                                    2 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
+                                    3 -> ProfileScreen(state = state, viewModel = viewModel)
+                                    4 -> SettingsScreen(
+                                        state = state,
+                                        viewModel = viewModel,
+                                        route = settingsRoute,
+                                        onOpenRoute = onOpenSettingsRoute,
+                                    )
+                                }
                             }
                             selectedMedia?.let { media ->
                                 MangaDetailScreen(
@@ -1045,6 +1053,23 @@ internal fun TankobunScaffold(
                 }
                 if (state.recommendationImportPreview != null) {
                     RecommendationImportDialog(state = state, viewModel = viewModel)
+                }
+                state.recommendationImportError?.let { error ->
+                    AlertDialog(
+                        shape = LocalTankobunStyle.current.themeShapes.dialog,
+                        containerColor = LocalTankobunStyle.current.colors.panel,
+                        titleContentColor = LocalTankobunStyle.current.colors.panelContent,
+                        textContentColor = LocalTankobunStyle.current.colors.mutedContent,
+                        tonalElevation = 0.dp,
+                        onDismissRequest = viewModel::dismissRecommendationImportError,
+                        title = { Text(tankobunString(R.string.msg_recommendations_import_failed)) },
+                        text = { Text(error) },
+                        confirmButton = {
+                            TextButton(onClick = viewModel::dismissRecommendationImportError) {
+                                Text(tankobunString(R.string.common_close))
+                            }
+                        },
+                    )
                 }
                 if (state.busy && !(state.sourcePickerOpen && state.sourcePickerLoading)) {
                     LinearProgressIndicator(

@@ -21,8 +21,10 @@ class SyncMutationFactory {
         customLists: List<String>? = null,
         hiddenFromStatusLists: Boolean? = null,
         nowMillis: Long,
+        sessionKey: String? = null,
     ): SyncMutation {
         val payload = buildJsonObject {
+            sessionKey?.let { put("sessionKey", it) }
             if (status != null) put("status", status.name) else put("status", JsonNull)
             if (progress != null) put("progress", progress) else put("progress", JsonNull)
             if (score != null) put("score", score) else put("score", JsonNull)
@@ -54,12 +56,16 @@ class SyncMutationFactory {
         mediaId: Int,
         entryId: Int,
         nowMillis: Long,
+        sessionKey: String? = null,
     ): SyncMutation =
         SyncMutation(
             id = UUID.randomUUID().toString(),
             type = SyncMutationType.DELETE_MEDIA_LIST_ENTRY,
             mediaId = mediaId,
-            payloadJson = buildJsonObject { put("entryId", entryId) }.toString(),
+            payloadJson = buildJsonObject {
+                put("entryId", entryId)
+                sessionKey?.let { put("sessionKey", it) }
+            }.toString(),
             attempts = 0,
             nextAttemptAtEpochMillis = nowMillis,
             createdAtEpochMillis = nowMillis,

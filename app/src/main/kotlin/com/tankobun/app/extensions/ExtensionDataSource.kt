@@ -21,6 +21,7 @@ internal data class InstalledExtensionVersion(
 internal data class InstalledSourceState(
     val allSources: List<SourceDescriptor>,
     val preferredSources: List<SourceDescriptor>,
+    val untrustedExtensions: List<com.tankobun.core.extensions.UntrustedExtension>,
 )
 
 internal class ExtensionDataSource(
@@ -31,10 +32,12 @@ internal class ExtensionDataSource(
     suspend fun installedSourceState(
         preferredLanguages: Set<String>,
         disabledSourceKeys: Set<String>,
-    ): InstalledSourceState {
+    ): InstalledSourceState = withContext(Dispatchers.IO) {
         val packages = container.extensionScanner.installedExtensions()
+        val untrusted = packages.mapNotNull(container.extensionTrustStore::untrustedExtension)
+        val untrustedPackages = untrusted.mapTo(mutableSetOf()) { it.descriptor.packageName }
         container.sourceHost.retainInstalledPackages(packages.map { it.packageName }.toSet())
-        val discoveredSources = packages.flatMap { descriptor ->
+        val discoveredSources = packages.filterNot { it.packageName in untrustedPackages }.flatMap { descriptor ->
             runCatching {
                 container.sourceHost.loadSources(descriptor.packageName).map { source ->
                     descriptor.copy(
@@ -46,8 +49,9 @@ internal class ExtensionDataSource(
             }.getOrDefault(emptyList()).ifEmpty { listOf(descriptor) }
         }
         val allSources = discoveredSources.visibleSources()
-        return InstalledSourceState(
+        InstalledSourceState(
             allSources = allSources,
+            untrustedExtensions = untrusted,
             preferredSources = allSources.preferredVisibleSources(
                 preferredLanguages = preferredLanguages,
                 disabledSourceKeys = disabledSourceKeys,

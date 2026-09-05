@@ -1,5 +1,11 @@
 package com.tankobun.app.anilist
 
+import com.tankobun.core.sync.belongsToSyncSession
+import com.tankobun.core.sync.syncSessionKey
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+
 import android.util.Log
 import com.tankobun.app.AppContainer
 import com.tankobun.app.logic.isInReadingCategory
@@ -624,8 +630,15 @@ internal class AniListDataSource(
     ): List<SyncedListEntryData> {
         val dao = container.database.syncMutationDao()
         val syncedEntries = mutableListOf<SyncedListEntryData>()
+        val sessionKey = syncSessionKey(token) ?: return emptyList()
+        // Preserve legacy/unowned rows locally; never assign them to a new login.
         val mutations = dao.dueMutations(System.currentTimeMillis())
+            .filter { belongsToSyncSession(it.payloadJson, sessionKey) }
         mutations.forEach { mutation ->
+            currentCoroutineContext().ensureActive()
+            if (container.tokenStore.accessToken() != token ||
+                container.settingsStore.libraryMode() != com.tankobun.app.LibraryMode.ANILIST
+            ) return syncedEntries
             runCatching {
                 processSyncMutation(
                     token = token,
@@ -637,6 +650,7 @@ internal class AniListDataSource(
                 dao.deleteMutation(mutation)
                 if (synced != null) syncedEntries += synced
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 Log.w(TAG, "Queued AniList sync failed for ${mutation.mediaId}", error)
                 val now = System.currentTimeMillis()
                 dao.upsertMutation(
@@ -661,7 +675,7 @@ internal class AniListDataSource(
         val progress = chapterProgress.takeIf { it > 0 }
         if (progress == null && status == null) return null
         if (token == null) {
-            queueProgressMutation(media.id, progress, status, now)
+            queueProgressMutation(media.id, progress, status, now, token)
             return null
         }
 
@@ -682,8 +696,9 @@ internal class AniListDataSource(
             container.database.listEntryDao().upsertEntry(entry.toEntity(now))
             SyncedListEntryData(media = media, entry = entry)
         }.onFailure { error ->
+            if (error is CancellationException) throw error
             Log.w(TAG, "AniList progress sync failed for ${media.id}", error)
-            queueProgressMutation(media.id, progress, status, now)
+            queueProgressMutation(media.id, progress, status, now, token)
         }.getOrNull()
     }
 
@@ -906,18 +921,19 @@ internal class AniListDataSource(
         titleLanguage: AnilistTitleLanguage,
     ): List<AnilistMedia> {
         if (media.isEmpty()) return emptyList()
-        val now = System.currentTimeMillis()
         val originals = media.distinctBy { it.id }
         val fetchedById = runCatching {
             container.anilistRepository.mangaByIds(originals.map { it.id }, accessToken)
                 .associateBy { it.id }
         }.onFailure { error ->
+            if (error is kotlinx.coroutines.CancellationException) throw error
             Log.w(TAG, "Failed to batch-enrich recommendation media", error)
         }.getOrDefault(emptyMap())
         val enriched = originals.map { original ->
             (fetchedById[original.id] ?: original).withTitleLanguage(titleLanguage)
         }
-        container.database.mediaDao().upsertMedia(enriched.map { it.toEntity(now) })
+        // Preview is read-only. File-derived fallbacks must never overwrite the library
+        // before the user confirms the import, including when enrichment is offline.
         return enriched
     }
 
@@ -1046,6 +1062,7 @@ internal class AniListDataSource(
         progress: Int?,
         status: MediaStatus?,
         nowMillis: Long,
+        token: String?,
     ) {
         val mutation = syncMutationFactory.saveMediaListEntry(
             mediaId = mediaId,
@@ -1053,6 +1070,7 @@ internal class AniListDataSource(
             progress = progress,
             hiddenFromStatusLists = status?.let { false },
             nowMillis = nowMillis,
+            sessionKey = syncSessionKey(token),
         )
         container.database.syncMutationDao().upsertMutation(mutation.toEntity())
     }
@@ -1103,6 +1121,7 @@ internal class AniListDataSource(
             }.onSuccess { entry ->
                 return SyncedOrQueuedEntry(entry = entry, queued = false)
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 Log.w(TAG, "AniList batch save failed for $mediaId; queued", error)
             }
         }
@@ -1117,6 +1136,7 @@ internal class AniListDataSource(
                 customLists = customLists,
                 hiddenFromStatusLists = hiddenFromStatusLists,
                 nowMillis = nowMillis,
+                sessionKey = syncSessionKey(token),
             ).toEntity(),
         )
         return SyncedOrQueuedEntry(entry = fallbackEntry, queued = true)
@@ -1137,6 +1157,7 @@ internal class AniListDataSource(
             }.onSuccess {
                 return false
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 Log.w(TAG, "AniList batch delete failed for ${entry.mediaId}; queued", error)
             }
         }
@@ -1145,6 +1166,7 @@ internal class AniListDataSource(
                 mediaId = entry.mediaId,
                 entryId = entry.id,
                 nowMillis = nowMillis,
+                sessionKey = syncSessionKey(token),
             ).toEntity(),
         )
         return true

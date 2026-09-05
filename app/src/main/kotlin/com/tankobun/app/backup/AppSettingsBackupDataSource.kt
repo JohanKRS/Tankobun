@@ -70,10 +70,8 @@ internal class AppSettingsBackupDataSource(
     }
 
     suspend fun restoreBackup(uri: Uri): AppSettingsBackupRestoreResult = withContext(Dispatchers.IO) {
-        val text = container.application.contentResolver.openInputStream(uri).use { input ->
-            checkNotNull(input) { "Could not open backup file" }
-            input.reader(Charsets.UTF_8).readText()
-        }
+        val text = container.application.contentResolver
+            .readImportBytes(uri, MAX_BACKUP_BYTES).toString(Charsets.UTF_8)
         val root = JSONObject(text)
         check(root.optString("type") == BACKUP_TYPE) { "Unsupported Tankobun settings backup" }
         val settings = root.optJSONObject("settings") ?: JSONObject()

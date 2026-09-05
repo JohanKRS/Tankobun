@@ -437,7 +437,7 @@
     <string name="library_anilist_setup_needed">Configuração do AniList necessária</string>
     <string name="library_sign_in_desc">Entre para mostrar suas listas aqui.</string>
     <string name="library_credentials_desc">Adicione as credenciais do AniList nas configurações antes de conectar.</string>
-    <string name="library_empty">Ainda não há mangás na sua biblioteca. Abra Explorar para adicionar mangás correspondidos ao AniList.</string>
+    <string name="library_empty">Sua biblioteca começa aqui</string>
     <string name="library_filter_empty">Nenhum título corresponde a estes filtros da biblioteca.</string>
     <string name="library_list_empty">Ainda não há mangás nesta lista.</string>
     <string name="library_tags_after_sync">As tags aparecerão aqui depois que os dados da biblioteca carregarem.</string>
@@ -1107,4 +1107,15 @@
     <string name="home_chapter">Cap. %1$s</string>
     <string name="home_trending_empty">Os mangás em alta não estão disponíveis agora.</string>
     <string name="home_genres_empty">Os destaques por gênero não estão disponíveis agora.</string>
+    <string name="sources_trust_title">Confiar nesta extensão?</string>
+    <string name="sources_trust_explanation">%1$s executará código dentro do Tankobun e poderá acessar os dados do app. Continue apenas se você confia no autor.</string>
+    <string name="sources_trust_confirm">Confiar e ativar</string>
+    <string name="sources_trust_pending">Instalada, aguardando sua confirmação de confiança. Nenhum código da extensão foi carregado.</string>
+    <string name="sources_trust_review">Revisar extensão</string>
+    <string name="sources_trust_changed">A extensão mudou. Revise a versão atual antes de confiar.</string>
+    <string name="import_file_too_large">Este arquivo é grande demais. Escolha um arquivo de até %1$d MB.</string>
+    <string name="import_file_timeout">O provedor do arquivo demorou para responder. Tente baixar o arquivo para o dispositivo primeiro.</string>
+    <string name="library_empty_description">Encontre um mangá em Explorar e adicione à sua biblioteca.</string>
+    <string name="library_empty_action">Explorar mangás</string>
+    <string name="import_file_unreadable">Não foi possível ler este arquivo. Selecione uma cópia salva no dispositivo.</string>
 </resources>
