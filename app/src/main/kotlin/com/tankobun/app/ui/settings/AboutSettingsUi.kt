@@ -457,13 +457,12 @@ private fun ChangelogList(title: String, items: List<String>) {
 private fun currentVersionChangelog(context: Context, language: AppLanguage): List<String> {
     val localized = context.withAppLanguage(language)
     return listOf(
-        localized.getString(R.string.about_changelog_v41_network),
-        localized.getString(R.string.about_changelog_v41_sources),
-        localized.getString(R.string.about_changelog_v41_downloads),
-        localized.getString(R.string.about_changelog_v41_continue_reading),
-        localized.getString(R.string.about_changelog_v41_genres),
-        localized.getString(R.string.about_changelog_v411_extension_validation),
-        localized.getString(R.string.about_changelog_v412_install_compatibility),
+        localized.getString(R.string.about_changelog_v42_extensions),
+        localized.getString(R.string.about_changelog_v42_cache),
+        localized.getString(R.string.about_changelog_v42_anilist),
+        localized.getString(R.string.about_changelog_v42_chapters),
+        localized.getString(R.string.about_changelog_v42_security),
+        localized.getString(R.string.about_changelog_v42_interface),
     )
 }
 

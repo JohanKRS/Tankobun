@@ -1139,4 +1139,10 @@
     <string name="library_empty_description">在“浏览”中找到漫画，并将它添加到书架。</string>
     <string name="library_empty_action">浏览漫画</string>
     <string name="import_file_unreadable">无法读取此文件。请选择已保存到设备上的副本。</string>
+    <string name="about_changelog_v42_extensions">改进对用户安装的扩展的兼容性，包括章节与卷信息、页面加载和下载续传，并遵守来源的请求频率限制。</string>
+    <string name="about_changelog_v42_cache">新增节省空间、均衡和大容量缓存预设，可分别控制封面、浏览数据、阅读器页面和预加载。</string>
+    <string name="about_changelog_v42_anilist">新增打开应用时更新 AniList 书架的可选功能，保留待同步的本地更改，并遵守服务器限制。</string>
+    <string name="about_changelog_v42_chapters">每日章节检查仅包含“阅读中”的作品。打开漫画详情时会更新超过一天的章节列表，也可随时手动重新加载。</string>
+    <string name="about_changelog_v42_security">加强扩展信任、备份与推荐导入、登录验证，以及防止待同步更改被发送到其他账号的保护。</string>
+    <string name="about_changelog_v42_interface">优化书架导航和页面状态保留，所有新增界面消息均已翻译为四种支持的语言。</string>
 </resources>

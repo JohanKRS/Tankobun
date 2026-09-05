@@ -1140,4 +1140,10 @@
     <string name="library_empty_description">Find a manga in Browse and add it to your library.</string>
     <string name="library_empty_action">Explore manga</string>
     <string name="import_file_unreadable">Could not read this file. Select a copy saved on your device.</string>
+    <string name="about_changelog_v42_extensions">Improved compatibility with user-installed extensions, chapter and volume metadata, page loading, and resumed downloads while respecting source rate limits.</string>
+    <string name="about_changelog_v42_cache">Added Compact, Balanced, and Extensive cache profiles, with separate controls for covers, navigation data, reader pages, and prefetching.</string>
+    <string name="about_changelog_v42_anilist">Added an optional AniList library refresh when opening the app, preserving pending local changes and respecting server limits.</string>
+    <string name="about_changelog_v42_chapters">Daily chapter checks now include only Reading. Opening manga details refreshes chapter lists older than one day; manual reload remains available.</string>
+    <string name="about_changelog_v42_security">Strengthened extension trust, backup and recommendation imports, login validation, and protection against syncing pending changes with another account.</string>
+    <string name="about_changelog_v42_interface">Refined library navigation and screen-state preservation, with all new interface messages translated into the four supported languages.</string>
 </resources>

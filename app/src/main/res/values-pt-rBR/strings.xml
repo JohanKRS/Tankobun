@@ -1141,4 +1141,10 @@
     <string name="library_empty_description">Encontre um mangá em Explorar e adicione à sua biblioteca.</string>
     <string name="library_empty_action">Explorar mangás</string>
     <string name="import_file_unreadable">Não foi possível ler este arquivo. Selecione uma cópia salva no dispositivo.</string>
+    <string name="about_changelog_v42_extensions">Melhor compatibilidade com extensões instaladas pelo usuário, dados de capítulos e volumes, carregamento de páginas e retomada de downloads, respeitando os limites das fontes.</string>
+    <string name="about_changelog_v42_cache">Novos perfis de cache Econômico, Equilibrado e Amplo, com controles separados para capas, dados de navegação, páginas do leitor e pré-carregamento.</string>
+    <string name="about_changelog_v42_anilist">Nova atualização opcional da biblioteca do AniList ao abrir o app, preservando alterações locais pendentes e respeitando os limites do servidor.</string>
+    <string name="about_changelog_v42_chapters">A checagem diária de capítulos agora inclui apenas Lendo. Abrir os detalhes atualiza listas de capítulos com mais de um dia; o recarregamento manual continua disponível.</string>
+    <string name="about_changelog_v42_security">Mais proteção na confiança em extensões, importação de backups e recomendações, validação do login e envio de alterações pendentes entre contas.</string>
+    <string name="about_changelog_v42_interface">Navegação da biblioteca e preservação do estado das telas refinadas, com todas as novas mensagens traduzidas nos quatro idiomas suportados.</string>
 </resources>
