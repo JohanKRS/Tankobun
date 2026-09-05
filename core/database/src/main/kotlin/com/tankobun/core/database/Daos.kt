@@ -382,6 +382,9 @@ interface DownloadPageDao {
     @Upsert
     suspend fun upsertPage(page: DownloadPageEntity)
 
+    @Query("DELETE FROM download_pages WHERE jobId = :jobId AND pageIndex NOT IN (:indexes)")
+    suspend fun deletePagesOutsideIndexes(jobId: String, indexes: List<Int>)
+
     @Query("DELETE FROM download_pages WHERE jobId = :jobId")
     suspend fun deletePagesForJob(jobId: String)
 

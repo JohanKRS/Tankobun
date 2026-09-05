@@ -251,6 +251,8 @@ data class ReaderPage(
     val imageUrlResolved: Boolean = true,
     val imageWidth: Int? = null,
     val imageHeight: Int? = null,
+    val sourcePageIndex: Int? = null,
+    val sourcePageUri: String? = null,
 )
 
 data class SourceBinding(

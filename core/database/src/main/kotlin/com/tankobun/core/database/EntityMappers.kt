@@ -184,6 +184,7 @@ fun ReaderPage.toDownloadPageEntity(job: DownloadJob, filePath: String, updatedA
         imageUrl = imageUrl,
         filePath = filePath,
         updatedAtEpochMillis = updatedAtEpochMillis,
+        indexIsPosition = sourcePageIndex != null,
     )
 
 fun DownloadPageEntity.toReaderPage(): ReaderPage =

@@ -183,13 +183,19 @@ class AppContainer(application: Application) {
 
     private fun filePageStorage(): DownloadPageStorage =
         object : DownloadPageStorage {
-            override suspend fun storedPageIndexes(job: DownloadJob): Set<Int> =
-                database.downloadPageDao()
-                    .pagesForJob(job.id)
-                    .asSequence()
+            override suspend fun storedPageIndexes(job: DownloadJob, pages: List<ReaderPage>): Set<Int> {
+                val saved = database.downloadPageDao().pagesForJob(job.id)
                     .filter { File(it.filePath).let { file -> file.isFile && file.length() > 0L } }
-                    .map { it.pageIndex }
-                    .toSet()
+                    .map { com.tankobun.core.downloads.SavedPageIndex(it.pageIndex, it.imageUrl, it.indexIsPosition) }
+                return com.tankobun.core.downloads.reusablePageIndexes(pages, saved)
+            }
+
+            override suspend fun finish(job: DownloadJob, pages: List<ReaderPage>) {
+                val indexes = pages.map { it.index }
+                val obsolete = database.downloadPageDao().pagesForJob(job.id).filter { it.pageIndex !in indexes }
+                database.downloadPageDao().deletePagesOutsideIndexes(job.id, indexes)
+                deleteDownloadedFiles(obsolete.map { it.filePath })
+            }
 
             override suspend fun writePage(job: DownloadJob, page: ReaderPage, bytes: ByteArray): String =
                 writeDownloadedPage(job, page, bytes)

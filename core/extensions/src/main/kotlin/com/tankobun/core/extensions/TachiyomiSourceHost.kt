@@ -1,5 +1,6 @@
 package com.tankobun.core.extensions
 
+import android.net.Uri
 import android.content.Context
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
@@ -20,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import uy.kohesive.injekt.TankobunInjektRegistry
 import java.io.IOException
@@ -136,38 +138,12 @@ class TachiyomiSourceHost(
         runSourceAction(source, sourceInstance, "pages") {
             val sourceChapter = chapter.toSChapter()
             val pages = sourceInstance.getPageList(sourceChapter)
-            pages.map { page ->
-                val imageRequest = if (sourceInstance is HttpSource && page.imageUrl != null) {
-                    runCatching {
-                        sourceInstance.imageRequest(page)
-                    }.onFailure { error ->
-                        logSourceFailure(
-                            action = "imageRequest",
-                            packageName = source.packageName,
-                            source = sourceInstance,
-                            error = error,
-                        )
-                    }.getOrNull()
-                } else {
-                    null
-                }
-                val imageUrl = imageRequest?.url?.toString()
-                    ?: page.imageUrl
-                    ?: page.uri?.toString()
-                    ?: page.url
-                val imageUrlResolved = imageRequest != null || page.imageUrl != null || page.uri != null
-                val headers = imageRequest?.headers?.names()
-                    ?.associateWith { name -> imageRequest.headers[name].orEmpty() }
-                    .orEmpty()
-                ReaderPage(
-                    index = page.index,
-                    imageUrl = imageUrl,
-                    cachedFilePath = null,
-                    headers = headers,
-                    sourcePageUrl = page.url,
-                    imageUrlResolved = imageUrlResolved,
-                )
-            }
+            val headers = (sourceInstance as? HttpSource)?.headers?.let { values ->
+                values.names().associateWith { values[it].orEmpty() }
+            }.orEmpty()
+            // Preserve extension page data; construct its image request only when
+            // fetching, so signatures, POST bodies and URL transforms run once.
+            pages.toReaderPages(headers)
         }
     }
 
@@ -177,6 +153,12 @@ class TachiyomiSourceHost(
         maxAttempts: Int = SOURCE_IMAGE_RETRY_ATTEMPTS,
     ): ByteArray = withContext(Dispatchers.IO) {
         val sourceInstance = findSource(source) ?: error("Source is not installed")
+        page.sourcePageUri?.let { uri ->
+            return@withContext runInterruptible {
+                appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() }
+                    ?: throw java.io.FileNotFoundException(uri)
+            }
+        }
         if (sourceInstance !is HttpSource) {
             error("${sourceInstance.name} does not support HTTP image loading")
         }
@@ -203,15 +185,7 @@ class TachiyomiSourceHost(
         rateLimiter: RespectfulRateLimiter,
         maxAttempts: Int,
     ): ByteArray {
-        val sourcePageUrl = page.sourcePageUrl.ifBlank { page.imageUrl }
-        val imageUrlCandidate = page.imageUrl.takeIf { it.isNotBlank() }
-        val sourcePage = Page(
-            index = page.index,
-            url = sourcePageUrl,
-            imageUrl = imageUrlCandidate.takeIf {
-                page.imageUrlResolved || it != sourcePageUrl || it.looksLikeImageUrl()
-            },
-        )
+        val sourcePage = page.toSourcePage()
         if (sourcePage.imageUrl == null) {
             sourcePage.imageUrl = sourceInstance.getImageUrl(sourcePage).takeIf { it.isNotBlank() }
                 ?: error("Page ${page.index + 1} did not return an image")
@@ -348,17 +322,15 @@ private class SourceImageHttpException(
     val statusCode: Int,
 ) : IllegalStateException("Page ${pageIndex + 1} failed: HTTP $statusCode")
 
-private fun Throwable.isTransientSourceImageFailure(): Boolean {
-    var current: Throwable? = this
-    while (current != null) {
-        when (current) {
-            is SourceImageHttpException -> return current.statusCode in TRANSIENT_SOURCE_IMAGE_STATUS_CODES
-            is IOException -> return true
+internal fun Throwable.isTransientSourceImageFailure(): Boolean =
+    causeChain().firstNotNullOfOrNull { error ->
+        when (error) {
+            is SourceImageHttpException -> error.statusCode in TRANSIENT_SOURCE_IMAGE_STATUS_CODES
+            is eu.kanade.tachiyomi.network.HttpException -> error.code in TRANSIENT_SOURCE_IMAGE_STATUS_CODES
+            is IOException -> true
+            else -> null
         }
-        current = current.cause
-    }
-    return false
-}
+    } ?: false
 
 private val TRANSIENT_SOURCE_IMAGE_STATUS_CODES = setOf(
     408,
@@ -428,17 +400,6 @@ private fun ensureHttpAgent() {
     if (System.getProperty("http.agent").isNullOrBlank()) {
         System.setProperty("http.agent", eu.kanade.tachiyomi.network.NetworkHelper.defaultUserAgent())
     }
-}
-
-private fun String.looksLikeImageUrl(): Boolean {
-    val path = substringBefore('#').substringBefore('?').lowercase()
-    return path.endsWith(".jpg") ||
-        path.endsWith(".jpeg") ||
-        path.endsWith(".png") ||
-        path.endsWith(".webp") ||
-        path.endsWith(".gif") ||
-        path.endsWith(".avif") ||
-        path.endsWith(".bmp")
 }
 
 private fun ByteArray.looksLikeImage(): Boolean =

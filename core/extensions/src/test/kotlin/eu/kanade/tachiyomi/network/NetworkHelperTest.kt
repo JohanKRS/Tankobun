@@ -39,7 +39,7 @@ class NetworkHelperTest {
     }
 
     @Test
-    fun defaultClientMatchesModernKeiyoushiInterceptorContract() {
+    fun defaultClientMatchesBundledSourceInterceptorContract() {
         val client = NetworkHelper().client
         val applicationInterceptors = client.interceptors.mapNotNull { it::class.simpleName }
         val networkInterceptors = client.networkInterceptors.mapNotNull { it::class.simpleName }

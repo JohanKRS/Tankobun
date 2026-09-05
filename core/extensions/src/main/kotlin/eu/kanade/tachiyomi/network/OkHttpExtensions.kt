@@ -68,14 +68,14 @@ suspend fun Call.awaitSuccess(): Response {
 suspend fun OkHttpClient.get(
     url: String,
     headers: Headers = Headers.headersOf(),
-    cache: CacheControl = CacheControl.FORCE_NETWORK,
+    cache: CacheControl = DEFAULT_SOURCE_CACHE_CONTROL,
 ): Response =
     newCall(GET(url, headers, cache)).await()
 
 suspend fun OkHttpClient.get(
     url: HttpUrl,
     headers: Headers = Headers.headersOf(),
-    cache: CacheControl = CacheControl.FORCE_NETWORK,
+    cache: CacheControl = DEFAULT_SOURCE_CACHE_CONTROL,
 ): Response =
     newCall(GET(url, headers, cache)).await()
 
@@ -83,7 +83,7 @@ suspend fun OkHttpClient.post(
     url: String,
     headers: Headers = Headers.headersOf(),
     body: RequestBody = ByteArray(0).toRequestBody(),
-    cache: CacheControl = CacheControl.FORCE_NETWORK,
+    cache: CacheControl = DEFAULT_SOURCE_CACHE_CONTROL,
 ): Response =
     newCall(POST(url, headers, body, cache)).await()
 
@@ -91,7 +91,7 @@ suspend fun OkHttpClient.post(
     url: HttpUrl,
     headers: Headers = Headers.headersOf(),
     body: RequestBody = ByteArray(0).toRequestBody(),
-    cache: CacheControl = CacheControl.FORCE_NETWORK,
+    cache: CacheControl = DEFAULT_SOURCE_CACHE_CONTROL,
 ): Response =
     newCall(POST(url, headers, body, cache)).await()
 

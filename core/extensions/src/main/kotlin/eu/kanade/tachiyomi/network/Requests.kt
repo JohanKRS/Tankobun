@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.network
 
+import java.util.concurrent.TimeUnit
 import okhttp3.CacheControl
 import okhttp3.Headers
 import okhttp3.HttpUrl
@@ -7,20 +8,22 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Request
 import okhttp3.RequestBody
 
+internal val DEFAULT_SOURCE_CACHE_CONTROL: CacheControl = CacheControl.Builder().maxAge(10, TimeUnit.MINUTES).build()
+
 fun GET(url: String, headers: Headers = Headers.headersOf()): Request =
-    Request.Builder().url(url).headers(headers).get().build()
+    Request.Builder().url(url).headers(headers).cacheControl(DEFAULT_SOURCE_CACHE_CONTROL).get().build()
 
 fun GET(
     url: String,
     headers: Headers = Headers.headersOf(),
-    cache: CacheControl = CacheControl.FORCE_NETWORK,
+    cache: CacheControl = DEFAULT_SOURCE_CACHE_CONTROL,
 ): Request =
     Request.Builder().url(url).headers(headers).cacheControl(cache).get().build()
 
 fun GET(
     url: HttpUrl,
     headers: Headers = Headers.headersOf(),
-    cache: CacheControl = CacheControl.FORCE_NETWORK,
+    cache: CacheControl = DEFAULT_SOURCE_CACHE_CONTROL,
 ): Request =
     Request.Builder().url(url).headers(headers).cacheControl(cache).get().build()
 
@@ -38,7 +41,7 @@ fun POST(
     url: String,
     headers: Headers = Headers.headersOf(),
     body: RequestBody = ByteArray(0).toRequestBody(),
-    cache: CacheControl = CacheControl.FORCE_NETWORK,
+    cache: CacheControl = DEFAULT_SOURCE_CACHE_CONTROL,
 ): Request =
     Request.Builder().url(url).headers(headers).cacheControl(cache).post(body).build()
 
@@ -53,7 +56,7 @@ fun POST(
     url: HttpUrl,
     headers: Headers = Headers.headersOf(),
     body: RequestBody = ByteArray(0).toRequestBody(),
-    cache: CacheControl = CacheControl.FORCE_NETWORK,
+    cache: CacheControl = DEFAULT_SOURCE_CACHE_CONTROL,
 ): Request =
     Request.Builder().url(url).headers(headers).cacheControl(cache).post(body).build()
 
@@ -110,3 +113,17 @@ fun HEAD(url: String, headers: Headers = Headers.headersOf()): Request =
 
 fun HEAD(url: HttpUrl, headers: Headers = Headers.headersOf()): Request =
     Request.Builder().url(url).headers(headers).head().build()
+
+fun PUT(
+    url: String,
+    headers: Headers = Headers.headersOf(),
+    body: RequestBody = ByteArray(0).toRequestBody(),
+    cache: CacheControl = DEFAULT_SOURCE_CACHE_CONTROL,
+): Request = Request.Builder().url(url).headers(headers).cacheControl(cache).put(body).build()
+
+fun DELETE(
+    url: String,
+    headers: Headers = Headers.headersOf(),
+    body: RequestBody = ByteArray(0).toRequestBody(),
+    cache: CacheControl = DEFAULT_SOURCE_CACHE_CONTROL,
+): Request = Request.Builder().url(url).headers(headers).cacheControl(cache).delete(body).build()

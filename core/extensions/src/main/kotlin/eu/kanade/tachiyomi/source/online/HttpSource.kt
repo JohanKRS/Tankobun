@@ -11,6 +11,7 @@ import com.tankobun.core.extensions.awaitSourceValue
 import eu.kanade.tachiyomi.network.asObservable
 import eu.kanade.tachiyomi.network.asObservableSuccess
 import eu.kanade.tachiyomi.network.NetworkHelper
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Headers
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -115,20 +116,20 @@ abstract class HttpSource : CatalogueSource {
     open fun searchMangaParse(response: Response): MangasPage = throw UnsupportedOperationException()
     open fun latestUpdatesRequest(page: Int): Request = throw UnsupportedOperationException()
     open fun latestUpdatesParse(response: Response): MangasPage = throw UnsupportedOperationException()
-    open fun mangaDetailsRequest(manga: SManga): Request = eu.kanade.tachiyomi.network.GET(getMangaUrl(manga), headers)
+    open fun mangaDetailsRequest(manga: SManga): Request = eu.kanade.tachiyomi.network.GET(absoluteUrl(manga.url), headers)
     open fun mangaDetailsParse(response: Response): SManga = throw UnsupportedOperationException()
-    open fun chapterListRequest(manga: SManga): Request = eu.kanade.tachiyomi.network.GET(getMangaUrl(manga), headers)
+    open fun chapterListRequest(manga: SManga): Request = eu.kanade.tachiyomi.network.GET(absoluteUrl(manga.url), headers)
     open fun chapterListParse(response: Response): List<SChapter> = throw UnsupportedOperationException()
-    open fun pageListRequest(chapter: SChapter): Request = eu.kanade.tachiyomi.network.GET(getChapterUrl(chapter), headers)
+    open fun pageListRequest(chapter: SChapter): Request = eu.kanade.tachiyomi.network.GET(absoluteUrl(chapter.url), headers)
     open fun pageListParse(response: Response): List<Page> = throw UnsupportedOperationException()
-    open fun imageUrlRequest(page: Page): Request = eu.kanade.tachiyomi.network.GET(page.url, headers)
+    open fun imageUrlRequest(page: Page): Request = eu.kanade.tachiyomi.network.GET(absoluteUrl(page.url), headers)
     open fun imageUrlParse(response: Response): String = throw UnsupportedOperationException()
-    open fun imageRequest(page: Page): Request = eu.kanade.tachiyomi.network.GET(page.imageUrl ?: page.url, headers)
+    open fun imageRequest(page: Page): Request = eu.kanade.tachiyomi.network.GET(absoluteUrl(page.imageUrl ?: page.url), headers)
     override fun getFilterList(): FilterList = FilterList()
 
-    open fun getMangaUrl(manga: SManga): String = absoluteUrl(manga.url)
+    open fun getMangaUrl(manga: SManga): String = mangaDetailsRequest(manga).url.toString()
 
-    open fun getChapterUrl(chapter: SChapter): String = absoluteUrl(chapter.url)
+    open fun getChapterUrl(chapter: SChapter): String = pageListRequest(chapter).url.toString()
 
     open fun prepareNewChapter(chapter: SChapter, manga: SManga) = Unit
 
@@ -143,11 +144,15 @@ abstract class HttpSource : CatalogueSource {
     override fun toString(): String = name
 
     private fun absoluteUrl(url: String): String =
-        if (url.startsWith("http://") || url.startsWith("https://")) {
-            url
-        } else {
-            baseUrl.trimEnd('/') + "/" + url.trimStart('/')
-        }
+        url.toHttpUrlOrNull()?.toString()
+            ?: baseUrl.toHttpUrlOrNull()?.resolve(url)?.toString()
+            ?: url
+
+    // Extensions may use this ABI helper for explicit IDs. Keep the historical
+    // default ID above stable for libraries created with older Tankobun builds.
+    protected fun generateId(name: String, lang: String, versionId: Int): Long =
+        generatedSourceId(name.lowercase(java.util.Locale.ROOT), lang, versionId)
+
 }
 
 private fun generatedSourceId(name: String, lang: String, versionId: Int): Long {

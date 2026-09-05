@@ -127,10 +127,7 @@ private data class SMangaImpl(
     }
 
     override fun setUrlWithoutDomain(url: String) {
-        this.url = url.substringAfter("://").substringAfter('/')
-        if (!this.url.startsWith("/")) {
-            this.url = "/${this.url}"
-        }
+        this.url = sourceUrlWithoutDomain(url)
     }
 }
 
@@ -166,14 +163,11 @@ private data class SChapterImpl(
     override var memo: JsonObject = JsonObject(emptyMap()),
 ) : SChapter {
     override fun setUrlWithoutDomain(url: String) {
-        this.url = url.substringAfter("://").substringAfter('/')
-        if (!this.url.startsWith("/")) {
-            this.url = "/${this.url}"
-        }
+        this.url = sourceUrlWithoutDomain(url)
     }
 }
 
-data class Page @JvmOverloads constructor(
+open class Page @JvmOverloads constructor(
     val index: Int,
     val url: String = "",
     var imageUrl: String? = null,

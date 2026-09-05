@@ -183,7 +183,7 @@ class DownloadTaskRunnerTest {
     ) : DownloadPageStorage {
         val writtenPageIndexes = Collections.synchronizedList(mutableListOf<Int>())
 
-        override suspend fun storedPageIndexes(job: DownloadJob): Set<Int> = storedIndexes
+        override suspend fun storedPageIndexes(job: DownloadJob, pages: List<ReaderPage>): Set<Int> = storedIndexes
 
         override suspend fun writePage(job: DownloadJob, page: ReaderPage, bytes: ByteArray): String {
             writtenPageIndexes += page.index

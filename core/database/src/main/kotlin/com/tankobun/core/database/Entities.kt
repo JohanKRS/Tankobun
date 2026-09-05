@@ -180,6 +180,7 @@ data class DownloadPageEntity(
     val imageUrl: String,
     val filePath: String,
     val updatedAtEpochMillis: Long,
+    @androidx.room.ColumnInfo(defaultValue = "0") val indexIsPosition: Boolean = false,
 )
 
 @Entity(tableName = "sync_mutations")

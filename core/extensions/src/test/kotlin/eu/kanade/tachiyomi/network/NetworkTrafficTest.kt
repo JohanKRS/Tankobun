@@ -51,7 +51,7 @@ class NetworkTrafficTest {
                     .rateLimit(1, 60, TimeUnit.SECONDS).build()
                 server.enqueue(MockResponse.Builder().addHeader("Cache-Control", "public, max-age=3600")
                     .addHeader("Retry-After", "60").body("cached fixture").build())
-                val request = Request.Builder().url(server.url("/cached")).build()
+                val request = GET(server.url("/cached"))
                 client.newCall(request).awaitResponse().use { assertEquals("cached fixture", it.body.string()) }
                 withTimeout(2_000) {
                     client.newCall(request).awaitResponse().use {

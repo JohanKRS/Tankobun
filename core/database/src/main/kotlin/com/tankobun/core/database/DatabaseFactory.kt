@@ -24,6 +24,7 @@ object DatabaseFactory {
                 MIGRATION_9_10,
                 MIGRATION_10_11,
                 MIGRATION_11_12,
+                MIGRATION_12_13,
             )
             .build()
     }
@@ -188,6 +189,12 @@ object DatabaseFactory {
             db.execSQL("ALTER TABLE `source_bindings` ADD COLUMN `memoJson` TEXT")
             db.execSQL("ALTER TABLE `source_search_results` ADD COLUMN `memoJson` TEXT")
             db.execSQL("ALTER TABLE `source_chapters` ADD COLUMN `memoJson` TEXT")
+        }
+    }
+
+    internal val MIGRATION_12_13 = object : Migration(12, 13) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `download_pages` ADD COLUMN `indexIsPosition` INTEGER NOT NULL DEFAULT 0")
         }
     }
 

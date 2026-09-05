@@ -17,7 +17,8 @@ interface DownloadPageFetcher {
 }
 
 interface DownloadPageStorage {
-    suspend fun storedPageIndexes(job: DownloadJob): Set<Int> = emptySet()
+    suspend fun storedPageIndexes(job: DownloadJob, pages: List<ReaderPage>): Set<Int> = emptySet()
+    suspend fun finish(job: DownloadJob, pages: List<ReaderPage>) = Unit
     suspend fun writePage(job: DownloadJob, page: ReaderPage, bytes: ByteArray): String
 }
 
@@ -52,7 +53,7 @@ class DownloadTaskRunner(
             }
             check(pages.isNotEmpty()) { "Chapter returned no pages" }
             val validPageIndexes = pages.asSequence().map { it.index }.toSet()
-            val storedPageIndexes = pageStorage.storedPageIndexes(job)
+            val storedPageIndexes = pageStorage.storedPageIndexes(job, pages)
                 .filterTo(mutableSetOf()) { it in validPageIndexes }
             var completedPages = storedPageIndexes.size
             stateStore.markPageComplete(job.id, completedPages, pages.size)
@@ -85,6 +86,8 @@ class DownloadTaskRunner(
                     }
                 }.awaitAll()
             }
+            if (!stateStore.shouldContinue(job.id)) return
+            pageStorage.finish(job, pages)
             if (!stateStore.shouldContinue(job.id)) return
             stateStore.markComplete(job.id, pages.size)
         } catch (_: DownloadStoppedException) {
