@@ -91,6 +91,7 @@ data class SourceBindingEntity(
     val mangaTitle: String,
     val thumbnailUrl: String?,
     val selectedAtEpochMillis: Long,
+    val memoJson: String? = null,
 )
 
 @Entity(
@@ -109,6 +110,7 @@ data class SourceSearchResultEntity(
     val score: Double,
     val reasons: List<String>,
     val searchedAtEpochMillis: Long,
+    val memoJson: String? = null,
 )
 
 @Entity(
@@ -125,6 +127,7 @@ data class SourceChapterEntity(
     val scanlator: String?,
     val uploadedAtEpochMillis: Long?,
     val fetchedAtEpochMillis: Long,
+    val memoJson: String? = null,
 )
 
 @Entity(

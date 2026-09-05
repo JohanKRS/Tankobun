@@ -25,6 +25,8 @@ import com.tankobun.core.model.SourceBinding
 import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceManga
+import com.tankobun.core.model.SourceMangaUpdate
+import androidx.room.withTransaction
 import com.tankobun.core.model.SourceSearchResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -128,6 +130,7 @@ internal class SourceDataSource(
                 url = cached.mangaUrl,
                 title = cached.mangaTitle,
                 thumbnailUrl = cached.thumbnailUrl,
+                memoJson = cached.memoJson,
                 description = null,
                 author = null,
                 artist = null,
@@ -430,6 +433,7 @@ internal class SourceDataSource(
         runCatching {
             container.sourceHost.mangaDetails(source, manga)
         }.onFailure { error ->
+            if (error is CancellationException) throw error
             Log.w(TAG, "Manga details failed for ${source.name}/${manga.title}; using search result", error)
         }.getOrNull() ?: manga
 
@@ -450,10 +454,23 @@ internal class SourceDataSource(
         source: SourceDescriptor,
         manga: SourceManga,
         now: Long,
-    ): List<SourceChapter> {
-        val chapters = container.sourceHost.chapters(source, manga)
-        container.database.chapterDao().upsertChapters(chapters.map { it.toEntity(now) })
-        return chapters
+    ): List<SourceChapter> = fetchAndCacheUpdate(source, manga, now).chapters
+
+    private suspend fun fetchAndCacheUpdate(
+        source: SourceDescriptor,
+        manga: SourceManga,
+        now: Long,
+        fetchDetails: Boolean = false,
+    ): SourceMangaUpdate {
+        val existing = container.database.chapterDao().cachedChapters(source.id, manga.url).map { it.toModel() }
+        val update = container.sourceHost.mangaUpdate(source, manga, existing, fetchDetails, fetchChapters = true)
+            ?: return SourceMangaUpdate(manga, emptyList())
+        container.database.withTransaction {
+            container.database.chapterDao().upsertChapters(update.chapters.map { it.toEntity(now) })
+            container.database.sourceBindingDao().updateMemo(source.id, manga.url, update.manga.memoJson)
+            container.database.sourceSearchDao().updateMemo(source.id, manga.url, update.manga.memoJson)
+        }
+        return update
     }
 
     suspend fun saveSourceBinding(match: SourceSearchResult) {
@@ -464,6 +481,7 @@ internal class SourceDataSource(
             mangaUrl = match.manga.url,
             mangaTitle = match.manga.title,
             thumbnailUrl = match.manga.thumbnailUrl,
+            memoJson = match.manga.memoJson,
             selectedAtEpochMillis = System.currentTimeMillis(),
         )
         container.database.sourceBindingDao().upsertBinding(binding.toEntity())
@@ -475,13 +493,16 @@ internal class SourceDataSource(
         mediaId: Int?,
         now: Long,
     ): LoadedSourceChapters {
-        val detailedManga = resolveMangaDetails(source, manga)
-        val chapters = cachedChapters(source, detailedManga, now, requireFresh = false)
-            ?: fetchAndCacheChapters(source, detailedManga, now)
+        val cached = cachedChapters(source, manga, now, requireFresh = false)
+        val update = if (cached != null) {
+            SourceMangaUpdate(resolveMangaDetails(source, manga), cached)
+        } else {
+            fetchAndCacheUpdate(source, manga, now, fetchDetails = true)
+        }
         val chapterProgress = mediaId?.let { progressByChapter(it) }.orEmpty()
         return LoadedSourceChapters(
-            manga = detailedManga,
-            chapters = chapters,
+            manga = update.manga,
+            chapters = update.chapters,
             chapterProgress = chapterProgress,
         )
     }
@@ -491,18 +512,20 @@ internal class SourceDataSource(
         candidate: SourceSearchResult,
         now: Long,
     ): VerifiedReadableMatch? {
-        readableChaptersForVerification(source, candidate, now)?.let { chapterCount ->
-            return VerifiedReadableMatch(candidate, chapterCount)
+        readableChaptersForVerification(source, candidate, now)?.let { (manga, chapterCount) ->
+            return VerifiedReadableMatch(candidate.copy(manga = manga), chapterCount)
         }
 
         val resolved = withTimeoutOrNull(SOURCE_DETAILS_TIMEOUT_MILLIS) {
             resolveMangaDetails(candidate)
         } ?: return null
-        if (resolved.manga.url == candidate.manga.url && resolved.manga.title == candidate.manga.title) {
+        if (resolved.manga.url == candidate.manga.url && resolved.manga.title == candidate.manga.title &&
+            resolved.manga.memoJson == candidate.manga.memoJson
+        ) {
             return null
         }
-        return readableChaptersForVerification(source, resolved, now)?.let { chapterCount ->
-            VerifiedReadableMatch(resolved, chapterCount)
+        return readableChaptersForVerification(source, resolved, now)?.let { (manga, chapterCount) ->
+            VerifiedReadableMatch(resolved.copy(manga = manga), chapterCount)
         }
     }
 
@@ -510,13 +533,15 @@ internal class SourceDataSource(
         source: SourceDescriptor,
         match: SourceSearchResult,
         now: Long,
-    ): Int? {
+    ): Pair<SourceManga, Int>? {
         if (match.manga.url.isBlank()) return null
         return try {
             withTimeoutOrNull(SOURCE_CHAPTER_TIMEOUT_MILLIS) {
-                cachedChapters(source, match.manga, now, requireFresh = false)
-                    ?: fetchAndCacheChapters(source, match.manga, now)
-            }?.size?.takeIf { it > 0 }
+                val cached = cachedChapters(source, match.manga, now, requireFresh = false)
+                val update = if (cached != null) SourceMangaUpdate(match.manga, cached)
+                    else fetchAndCacheUpdate(source, match.manga, now)
+                update.takeIf { it.chapters.isNotEmpty() }?.let { it.manga to it.chapters.size }
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
@@ -534,6 +559,7 @@ internal class SourceDataSource(
                 url = mangaUrl,
                 title = mangaTitle,
                 thumbnailUrl = mangaThumbnailUrl,
+                memoJson = memoJson,
                 description = null,
                 author = null,
                 artist = null,

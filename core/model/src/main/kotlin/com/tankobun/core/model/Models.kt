@@ -223,6 +223,12 @@ data class SourceManga(
     val author: String?,
     val artist: String?,
     val status: String?,
+    val memoJson: String? = null,
+)
+
+data class SourceMangaUpdate(
+    val manga: SourceManga,
+    val chapters: List<SourceChapter>,
 )
 
 data class SourceChapter(
@@ -233,6 +239,7 @@ data class SourceChapter(
     val chapterNumber: Float,
     val scanlator: String?,
     val uploadedAtEpochMillis: Long?,
+    val memoJson: String? = null,
 )
 
 data class ReaderPage(
@@ -254,6 +261,7 @@ data class SourceBinding(
     val mangaTitle: String,
     val thumbnailUrl: String?,
     val selectedAtEpochMillis: Long,
+    val memoJson: String? = null,
 )
 
 data class SourceSearchResult(

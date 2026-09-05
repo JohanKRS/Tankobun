@@ -23,6 +23,7 @@ object DatabaseFactory {
                 MIGRATION_8_9,
                 MIGRATION_9_10,
                 MIGRATION_10_11,
+                MIGRATION_11_12,
             )
             .build()
     }
@@ -181,4 +182,13 @@ object DatabaseFactory {
             db.execSQL("UPDATE `anilist_media` SET `characterImages` = `mainCharacterImage` WHERE `mainCharacterImage` IS NOT NULL")
         }
     }
+
+    internal val MIGRATION_11_12 = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `source_bindings` ADD COLUMN `memoJson` TEXT")
+            db.execSQL("ALTER TABLE `source_search_results` ADD COLUMN `memoJson` TEXT")
+            db.execSQL("ALTER TABLE `source_chapters` ADD COLUMN `memoJson` TEXT")
+        }
+    }
+
 }

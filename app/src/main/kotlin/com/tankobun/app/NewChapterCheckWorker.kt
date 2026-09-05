@@ -245,6 +245,7 @@ internal class NewChapterChecker(
             url = mangaUrl,
             title = mangaTitle,
             thumbnailUrl = thumbnailUrl,
+            memoJson = memoJson,
             description = null,
             author = null,
             artist = null,

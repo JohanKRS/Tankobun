@@ -188,6 +188,7 @@ private fun SourceBinding.toJson(): JSONObject =
         .put("mangaTitle", mangaTitle)
         .putNullable("thumbnailUrl", thumbnailUrl)
         .put("selectedAtEpochMillis", selectedAtEpochMillis)
+        .putNullable("memoJson", memoJson)
 
 private fun JSONObject.toSourceBinding(): SourceBinding =
     SourceBinding(
@@ -198,6 +199,7 @@ private fun JSONObject.toSourceBinding(): SourceBinding =
         mangaTitle = optString("mangaTitle"),
         thumbnailUrl = optStringOrNull("thumbnailUrl"),
         selectedAtEpochMillis = optLong("selectedAtEpochMillis", 0L),
+        memoJson = optStringOrNull("memoJson"),
     )
 
 private fun ReadingProgress.toJson(): JSONObject =

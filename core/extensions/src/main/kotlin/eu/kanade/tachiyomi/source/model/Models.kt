@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.source.model
 
 import android.net.Uri
+import kotlinx.serialization.json.JsonObject
 
 data class MangasPage(
     val mangas: List<SManga>,
@@ -57,7 +58,7 @@ interface SManga {
     var banner: String?
     var readingMode: ReadingMode?
     var update_strategy: UpdateStrategy
-    var memo: Map<String, String>
+    var memo: JsonObject
     var initialized: Boolean
 
     fun copyFrom(other: SManga)
@@ -104,7 +105,7 @@ private data class SMangaImpl(
     override var banner: String? = null,
     override var readingMode: SManga.ReadingMode? = null,
     override var update_strategy: UpdateStrategy = UpdateStrategy.ALWAYS_UPDATE,
-    override var memo: Map<String, String> = emptyMap(),
+    override var memo: JsonObject = JsonObject(emptyMap()),
     override var initialized: Boolean = false,
 ) : SManga {
     override fun copyFrom(other: SManga) {
@@ -143,7 +144,7 @@ interface SChapter {
     var scanlator: String?
     var scanlators: List<String>
     var note: String?
-    var memo: Map<String, String>
+    var memo: JsonObject
 
     fun setUrlWithoutDomain(url: String)
 
@@ -162,7 +163,7 @@ private data class SChapterImpl(
     override var scanlator: String? = null,
     override var scanlators: List<String> = emptyList(),
     override var note: String? = null,
-    override var memo: Map<String, String> = emptyMap(),
+    override var memo: JsonObject = JsonObject(emptyMap()),
 ) : SChapter {
     override fun setUrlWithoutDomain(url: String) {
         this.url = url.substringAfter("://").substringAfter('/')

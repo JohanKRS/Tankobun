@@ -115,10 +115,10 @@ fun AnilistRecommendation.toEntity(mediaId: Int, fetchedAtEpochMillis: Long): An
     )
 
 fun SourceBinding.toEntity(): SourceBindingEntity =
-    SourceBindingEntity(mediaId, sourceId, sourcePackageName, mangaUrl, mangaTitle, thumbnailUrl, selectedAtEpochMillis)
+    SourceBindingEntity(mediaId, sourceId, sourcePackageName, mangaUrl, mangaTitle, thumbnailUrl, selectedAtEpochMillis, memoJson)
 
 fun SourceBindingEntity.toModel(): SourceBinding =
-    SourceBinding(mediaId, sourceId, sourcePackageName, mangaUrl, mangaTitle, thumbnailUrl, selectedAtEpochMillis)
+    SourceBinding(mediaId, sourceId, sourcePackageName, mangaUrl, mangaTitle, thumbnailUrl, selectedAtEpochMillis, memoJson)
 
 fun SourceSearchResult.toEntity(): SourceSearchResultEntity =
     SourceSearchResultEntity(
@@ -133,6 +133,7 @@ fun SourceSearchResult.toEntity(): SourceSearchResultEntity =
         score = score,
         reasons = reasons,
         searchedAtEpochMillis = searchedAtEpochMillis,
+        memoJson = manga.memoJson,
     )
 
 fun SourceChapter.toEntity(fetchedAtEpochMillis: Long): SourceChapterEntity =
@@ -144,6 +145,7 @@ fun SourceChapter.toEntity(fetchedAtEpochMillis: Long): SourceChapterEntity =
         chapterNumber = chapterNumber,
         scanlator = scanlator,
         uploadedAtEpochMillis = uploadedAtEpochMillis,
+        memoJson = memoJson,
         fetchedAtEpochMillis = fetchedAtEpochMillis,
     )
 
@@ -156,6 +158,7 @@ fun SourceChapterEntity.toModel(): SourceChapter =
         chapterNumber = chapterNumber,
         scanlator = scanlator,
         uploadedAtEpochMillis = uploadedAtEpochMillis,
+        memoJson = memoJson,
     )
 
 fun ReadingProgress.toEntity(): ReadingProgressEntity =

@@ -31,6 +31,8 @@
 -keep interface okhttp3.** { *; }
 -keep class okio.** { *; }
 -keep interface okio.** { *; }
+-keep class com.squareup.zstd.** { *; }
+-keep interface com.squareup.zstd.** { *; }
 -keep class rx.** { *; }
 -keep interface rx.** { *; }
 -keep class org.jsoup.** { *; }

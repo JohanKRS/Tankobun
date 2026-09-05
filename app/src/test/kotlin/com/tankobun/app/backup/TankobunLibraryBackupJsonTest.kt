@@ -40,6 +40,7 @@ class TankobunLibraryBackupJsonTest {
             mangaTitle = "Sample",
             thumbnailUrl = "https://example.test/cover.jpg",
             selectedAtEpochMillis = 55L,
+            memoJson = """{"cursor":[1,"two"],"config":{"enabled":true}}""",
         )
         val progress = ReadingProgress(
             mediaId = 42,

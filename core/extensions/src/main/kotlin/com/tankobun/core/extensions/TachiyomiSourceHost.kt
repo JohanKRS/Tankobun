@@ -9,13 +9,11 @@ import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceManga
+import com.tankobun.core.model.SourceMangaUpdate
 import dalvik.system.PathClassLoader
-import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
 import eu.kanade.tachiyomi.source.model.Page
-import eu.kanade.tachiyomi.source.model.SChapter
-import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +31,8 @@ class TachiyomiSourceHost(
 ) {
     private val appContext = context.applicationContext
     private val sourceCache = mutableMapOf<String, CachedSources>()
+    private val sourceLoadLocks = Array(32) { Any() }
+    private val updateGate = SourceUpdateGate()
     private val imageFetchSemaphores = ConcurrentHashMap<String, Semaphore>()
     private val imageFetchRateLimiters = ConcurrentHashMap<String, RespectfulRateLimiter>()
 
@@ -43,7 +43,12 @@ class TachiyomiSourceHost(
         ensureHttpAgent()
     }
 
-    fun loadSources(packageName: String): List<Source> {
+    fun loadSources(packageName: String): List<Source> =
+        synchronized(sourceLoadLocks[(packageName.hashCode() and Int.MAX_VALUE) % sourceLoadLocks.size]) {
+            loadSourcesLocked(packageName)
+        }
+
+    private fun loadSourcesLocked(packageName: String): List<Source> {
         ensureHttpAgent()
         val packageInfo = packageInfo(packageName) ?: return emptyList()
         // Gate every entrypoint, including background work and cached source instances.
@@ -96,7 +101,7 @@ class TachiyomiSourceHost(
         query: String,
         page: Int = 1,
     ): List<SourceManga> = withContext(Dispatchers.IO) {
-        val catalogueSource = findCatalogueSource(source)
+        val catalogueSource = findSource(source)
             ?: return@withContext emptyList()
 
         runSourceAction(source, catalogueSource, "search") {
@@ -105,42 +110,23 @@ class TachiyomiSourceHost(
         }
     }
 
-    suspend fun mangaDetails(source: SourceDescriptor, manga: SourceManga): SourceManga? = withContext(Dispatchers.IO) {
-        val sourceInstance = findSource(source) ?: return@withContext null
-        runSourceAction(source, sourceInstance, "mangaDetails") {
-            val sourceManga = manga.toSManga()
-            val details = sourceInstance.getMangaUpdate(
-                manga = sourceManga,
-                chapters = emptyList(),
-                fetchDetails = true,
-                fetchChapters = false,
-            ).manga
-            details.toSourceManga(sourceInstance.id).let { resolved ->
-                resolved.copy(
-                    url = resolved.url.ifBlank { manga.url },
-                    title = resolved.title.ifBlank { manga.title },
-                    thumbnailUrl = resolved.thumbnailUrl ?: manga.thumbnailUrl,
-                    description = resolved.description ?: manga.description,
-                    author = resolved.author ?: manga.author,
-                    artist = resolved.artist ?: manga.artist,
-                    status = resolved.status ?: manga.status,
-                )
-            }
-        }
-    }
+    suspend fun mangaDetails(source: SourceDescriptor, manga: SourceManga): SourceManga? =
+        mangaUpdate(source, manga, fetchDetails = true, fetchChapters = false)?.manga
 
-    suspend fun chapters(source: SourceDescriptor, manga: SourceManga): List<SourceChapter> = withContext(Dispatchers.IO) {
-        val sourceInstance = findSource(source) ?: return@withContext emptyList()
-        runSourceAction(source, sourceInstance, "chapters") {
-            val sourceManga = manga.toSManga()
-            val chapters = sourceInstance.getMangaUpdate(
-                manga = sourceManga,
-                chapters = emptyList(),
-                fetchDetails = false,
-                fetchChapters = true,
-            ).chapters
-            chapters.map { chapter ->
-                chapter.toSourceChapter(sourceInstance.id, manga.url)
+    suspend fun chapters(source: SourceDescriptor, manga: SourceManga): List<SourceChapter> =
+        mangaUpdate(source, manga, fetchDetails = false, fetchChapters = true)?.chapters.orEmpty()
+
+    suspend fun mangaUpdate(
+        source: SourceDescriptor,
+        manga: SourceManga,
+        chapters: List<SourceChapter> = emptyList(),
+        fetchDetails: Boolean,
+        fetchChapters: Boolean,
+    ): SourceMangaUpdate? = withContext(Dispatchers.IO) {
+        val instance = findSource(source) ?: return@withContext null
+        updateGate.run(instance, manga.url) {
+            runSourceAction(source, instance, "mangaUpdate") {
+                instance.updateManga(manga.copy(sourceId = source.id), chapters, fetchDetails, fetchChapters)
             }
         }
     }
@@ -195,8 +181,8 @@ class TachiyomiSourceHost(
             error("${sourceInstance.name} does not support HTTP image loading")
         }
         val fetchKey = source.imageFetchKey()
-        val semaphore = imageFetchSemaphores.getOrPut(fetchKey) { Semaphore(SOURCE_IMAGE_FETCH_CONCURRENCY) }
-        val rateLimiter = imageFetchRateLimiters.getOrPut(fetchKey) {
+        val semaphore = imageFetchSemaphores.computeIfAbsent(fetchKey) { Semaphore(SOURCE_IMAGE_FETCH_CONCURRENCY) }
+        val rateLimiter = imageFetchRateLimiters.computeIfAbsent(fetchKey) {
             RespectfulRateLimiter(minSpacingMillis = SOURCE_IMAGE_REQUEST_SPACING_MILLIS)
         }
         semaphore.withPermit {
@@ -228,7 +214,7 @@ class TachiyomiSourceHost(
         )
         if (sourcePage.imageUrl == null) {
             sourcePage.imageUrl = sourceInstance.getImageUrl(sourcePage).takeIf { it.isNotBlank() }
-                ?: error("Page ${page.index + 1} has no image URL")
+                ?: error("Page ${page.index + 1} did not return an image")
         }
         var attempt = 1
         val attempts = maxAttempts.coerceAtLeast(1)
@@ -290,11 +276,6 @@ class TachiyomiSourceHost(
         private const val SOURCE_IMAGE_RETRY_INITIAL_DELAY_MILLIS = 2_500L
         private const val SOURCE_IMAGE_RETRY_MAX_DELAY_MILLIS = 15_000L
     }
-
-    private fun findCatalogueSource(source: SourceDescriptor): CatalogueSource? =
-        loadSources(source.packageName)
-            .filterIsInstance<CatalogueSource>()
-            .bestMatch(source)
 
     private fun findSource(source: SourceDescriptor): Source? =
         loadSources(source.packageName)
@@ -496,46 +477,4 @@ internal fun String.toFullyQualifiedSourceClassName(packageName: String): String
         startsWith('.') -> packageName + this
         '.' in this -> this
         else -> "$packageName.$this"
-    }
-
-private fun SourceManga.toSManga(): SManga =
-    SManga.create().also {
-        it.url = url
-        it.title = title
-        it.thumbnail_url = thumbnailUrl
-        it.description = description
-        it.author = author
-        it.artist = artist
-    }
-
-private fun SManga.toSourceManga(sourceId: Long): SourceManga =
-    SourceManga(
-        sourceId = sourceId,
-        url = url,
-        title = title,
-        thumbnailUrl = thumbnail_url,
-        description = description,
-        author = author,
-        artist = artist,
-        status = status.toString(),
-    )
-
-private fun SChapter.toSourceChapter(sourceId: Long, mangaUrl: String): SourceChapter =
-    SourceChapter(
-        sourceId = sourceId,
-        mangaUrl = mangaUrl,
-        url = url,
-        name = name,
-        chapterNumber = chapter_number,
-        scanlator = scanlator,
-        uploadedAtEpochMillis = date_upload.takeIf { it > 0 },
-    )
-
-private fun SourceChapter.toSChapter(): SChapter =
-    SChapter.create().also {
-        it.url = url
-        it.name = name
-        it.chapter_number = chapterNumber
-        it.scanlator = scanlator
-        it.date_upload = uploadedAtEpochMillis ?: 0L
     }

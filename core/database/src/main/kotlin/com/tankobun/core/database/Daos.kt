@@ -178,6 +178,9 @@ interface SourceBindingDao {
     @Upsert
     suspend fun upsertBinding(binding: SourceBindingEntity)
 
+    @Query("UPDATE source_bindings SET memoJson = :memoJson WHERE sourceId = :sourceId AND mangaUrl = :mangaUrl")
+    suspend fun updateMemo(sourceId: Long, mangaUrl: String, memoJson: String?)
+
     @Delete
     suspend fun deleteBinding(binding: SourceBindingEntity)
 
@@ -202,6 +205,9 @@ interface SourceSearchDao {
     @Query("DELETE FROM source_search_results WHERE mediaId IN (:mediaIds)")
     suspend fun clearForMedia(mediaIds: List<Int>)
 
+    @Query("UPDATE source_search_results SET memoJson = :memoJson WHERE sourceId = :sourceId AND mangaUrl = :mangaUrl")
+    suspend fun updateMemo(sourceId: Long, mangaUrl: String, memoJson: String?)
+
     @Upsert
     suspend fun upsertResults(results: List<SourceSearchResultEntity>)
 }
@@ -216,6 +222,9 @@ interface ChapterDao {
 
     @Query("SELECT * FROM source_chapters WHERE chapterUrl = :chapterUrl LIMIT 1")
     suspend fun cachedChapterByUrl(chapterUrl: String): SourceChapterEntity?
+
+    @Query("SELECT * FROM source_chapters WHERE sourceId = :sourceId AND chapterUrl = :chapterUrl LIMIT 1")
+    suspend fun cachedChapterByUrl(sourceId: Long, chapterUrl: String): SourceChapterEntity?
 
     @Upsert
     suspend fun upsertChapters(chapters: List<SourceChapterEntity>)

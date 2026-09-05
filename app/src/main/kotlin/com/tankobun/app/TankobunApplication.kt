@@ -147,7 +147,7 @@ class AppContainer(application: Application) {
             RoomDownloadStateStore(database.downloadDao()).markFailed(job.id, "Source is not installed")
             return true
         }
-        val chapter = database.chapterDao().cachedChapterByUrl(job.chapterUrl)?.toModel()
+        val chapter = database.chapterDao().cachedChapterByUrl(job.sourceId, job.chapterUrl)?.toModel()
             ?: SourceChapter(
                 sourceId = job.sourceId,
                 mangaUrl = job.mangaUrl,
