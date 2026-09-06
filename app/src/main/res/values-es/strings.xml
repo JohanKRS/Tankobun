@@ -1157,4 +1157,5 @@
         <item quantity="one">%1$d extensión necesita revisión</item>
         <item quantity="other">%1$d extensiones necesitan revisión</item>
     </plurals>
+    <string name="home_continue_reading_more">Ver mi biblioteca</string>
 </resources>

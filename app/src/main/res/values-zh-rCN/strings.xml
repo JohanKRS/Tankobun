@@ -1155,4 +1155,5 @@
         <item quantity="one">%1$d 个扩展需要审核</item>
         <item quantity="other">%1$d 个扩展需要审核</item>
     </plurals>
+    <string name="home_continue_reading_more">查看我的书库</string>
 </resources>

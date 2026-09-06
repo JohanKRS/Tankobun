@@ -5125,7 +5125,7 @@ class MainViewModel(
     companion object {
         private const val TAG = "TankobunMain"
         private const val OAUTH_STATE_BYTES = 24
-        private const val RECENT_READING_LIMIT = 3
+        private const val RECENT_READING_LIMIT = 10
         private const val TRACKING_AUTO_SAVE_DELAY_MILLIS = 1_200L
         private const val APP_UPDATE_CHECK_INTERVAL_MILLIS = 24L * 60L * 60L * 1_000L
         private val secureRandom = SecureRandom()

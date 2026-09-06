@@ -691,7 +691,10 @@ internal fun LibraryPager(
         return
     }
 
-    val pagerState = rememberPagerState(pageCount = { sections.size })
+    val pagerState = rememberPagerState(
+        initialPage = sections.indexOfFirst { it.status == MediaStatus.CURRENT }.coerceAtLeast(0),
+        pageCount = { sections.size },
+    )
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current

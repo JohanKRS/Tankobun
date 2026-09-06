@@ -979,7 +979,12 @@ internal fun TankobunScaffold(
                                         state = state,
                                         onSelectMedia = onSelectMedia,
                                         onOpenRecentProgress = onOpenRecentProgress,
-                                        onOpenLibrary = { onSelectTab(1) },
+                                        onOpenLibrary = {
+                                            // Explicitly opening the reading list must not restore an old category or filters.
+                                            tabStateHolder.removeState(1)
+                                            viewModel.clearLibraryBatchSelection()
+                                            onSelectTab(1)
+                                        },
                                         onOpenBrowse = { onSelectTab(2) },
                                     )
                                     1 -> LibraryScreen(state, viewModel, onOpenBrowse = { onSelectTab(2) }, onSelectMedia = onSelectMedia)
@@ -1903,7 +1908,7 @@ internal fun QuickDrawer(
                             icon = TankobunIcons.MenuBook,
                         ) {
                             if (state.recentReadingProgress.isNotEmpty()) {
-                                state.recentReadingProgress.forEach { item ->
+                                state.recentReadingProgress.take(3).forEach { item ->
                                     RecentReadingAction(item = item, onClick = { onOpenRecentProgress(item) })
                                 }
                             } else {

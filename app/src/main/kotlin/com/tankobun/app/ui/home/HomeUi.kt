@@ -97,6 +97,7 @@ import com.tankobun.app.ui.browse.browseGenreLabel
 import com.tankobun.app.ui.components.TankobunHeadingLead
 import com.tankobun.app.ui.components.TankobunMediaStatusLabel
 import com.tankobun.app.ui.shell.LocalTankobunChromeInsets
+import com.tankobun.app.ui.media.LoadMoreRecommendationsTile
 import com.tankobun.app.ui.media.AutoResizingMangaTitle
 import com.tankobun.core.model.AnilistGenreHighlight
 import com.tankobun.core.model.AnilistMedia
@@ -197,6 +198,7 @@ internal fun HomeScreen(
                         items = continueReadingItems,
                         horizontalPadding = horizontalPadding,
                         onOpen = onOpenRecentProgress,
+                        onViewMore = onOpenLibrary,
                     )
                 }
             }
@@ -803,6 +805,7 @@ private fun ContinueReadingRow(
     items: List<RecentReadingProgress>,
     horizontalPadding: androidx.compose.ui.unit.Dp,
     onOpen: (RecentReadingProgress) -> Unit,
+    onViewMore: () -> Unit,
 ) {
     LazyRow(
         contentPadding = PaddingValues(horizontal = horizontalPadding),
@@ -810,6 +813,17 @@ private fun ContinueReadingRow(
     ) {
         items(items, key = { it.media.id }) { item ->
             ContinueReadingCard(item = item, width = 190.dp, onClick = { onOpen(item) })
+        }
+        item(key = "view-reading-library") {
+            LoadMoreRecommendationsTile(
+                loading = false,
+                onClick = onViewMore,
+                modifier = Modifier.width(190.dp),
+                label = tankobunString(R.string.home_continue_reading_more),
+                icon = TankobunIcons.MenuBook,
+                iconSize = 40.dp,
+                labelStyle = MaterialTheme.typography.titleLarge,
+            )
         }
     }
 }

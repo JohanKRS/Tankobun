@@ -1859,11 +1859,15 @@ internal fun LoadMoreRecommendationsTile(
     loading: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    label: String = tankobunString(R.string.detail_load_more),
+    icon: androidx.compose.ui.graphics.vector.ImageVector = TankobunIcons.Refresh,
+    iconSize: androidx.compose.ui.unit.Dp = 24.dp,
+    labelStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.labelMedium,
 ) {
     Surface(
         modifier = modifier
             .aspectRatio(2f / 3f)
-            .clickable(enabled = !loading, onClick = onClick),
+            .clickable(enabled = !loading, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick),
         shape = LocalTankobunStyle.current.themeShapes.panel,
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -1878,10 +1882,10 @@ internal fun LoadMoreRecommendationsTile(
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 Text(tankobunString(R.string.common_loading), style = MaterialTheme.typography.labelMedium)
             } else {
-                Icon(TankobunIcons.Refresh, contentDescription = null)
+                Icon(icon, contentDescription = null, modifier = Modifier.size(iconSize))
                 Text(
-                    tankobunString(R.string.detail_load_more),
-                    style = MaterialTheme.typography.labelMedium,
+                    label,
+                    style = labelStyle,
                     fontWeight = FontWeight.Bold,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )

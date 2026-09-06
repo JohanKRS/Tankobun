@@ -1156,4 +1156,5 @@
         <item quantity="one">%1$d extension needs review</item>
         <item quantity="other">%1$d extensions need review</item>
     </plurals>
+    <string name="home_continue_reading_more">View my library</string>
 </resources>
