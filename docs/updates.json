@@ -2,50 +2,38 @@
   "type": "tankobun.update-manifest",
   "version": 1,
   "stable": {
-    "versionCode": 47,
-    "versionName": "4.2",
-    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v4.2/tankobun-4.2.apk",
-    "apkSha256": "AB41BFA2FFD907762A225285854233DFA24300117E79C1003C0D294AA8D185B7",
-    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v4.2",
-    "publishedAt": "2026-09-06T21:04:47Z",
-    "sizeBytes": 14168492,
+    "versionCode": 49,
+    "versionName": "4.2.1",
+    "apkUrl": "https://github.com/JohanKRS/Tankobun/releases/download/v4.2.1/tankobun-4.2.1.apk",
+    "apkSha256": "64A3009558AE65F33C6B9592C84F92A15739276539384033377176D7D4698FD5",
+    "releaseUrl": "https://github.com/JohanKRS/Tankobun/releases/tag/v4.2.1",
+    "publishedAt": "2026-09-07T14:33:45Z",
+    "sizeBytes": 14170992,
     "mandatory": false,
     "changelog": {
       "en": [
-        "Improved compatibility with user-installed extensions, chapter and volume metadata, page loading, and resumed downloads while respecting source rate limits.",
-        "Added Compact, Balanced, and Extensive cache profiles, with separate controls for covers, navigation data, reader pages, and prefetching.",
-        "Added an optional AniList library refresh when opening the app, preserving pending local changes and respecting server limits.",
-        "Daily chapter checks now include only Reading. Opening manga details refreshes chapter lists older than one day; manual reload remains available.",
-        "Strengthened extension trust, backup and recommendation imports, login validation, and protection against syncing pending changes with another account.",
-        "Refined library navigation and screen-state preservation, with all new interface messages translated into the four supported languages.",
-        "Extension review now matches the installed-extension list and is available directly from manga details. Saved source selections and cached chapters remain available while approval is pending."
+        "Continue Reading now shows up to ten recent manga, preserving the original cover size.",
+        "When more than ten titles are available, a larger View my library card opens the Reading list directly. The card stays hidden when all titles fit.",
+        "Automatic AniList library refresh now runs when starting the app or returning after at least two hours away. No periodic checks while the app stays open; manual sync remains available.",
+        "Updated interface text in English, Brazilian Portuguese, Spanish, and Simplified Chinese."
       ],
       "pt-BR": [
-        "Melhor compatibilidade com extensões instaladas pelo usuário, dados de capítulos e volumes, carregamento de páginas e retomada de downloads, respeitando os limites das fontes.",
-        "Novos perfis de cache Econômico, Equilibrado e Amplo, com controles separados para capas, dados de navegação, páginas do leitor e pré-carregamento.",
-        "Nova atualização opcional da biblioteca do AniList ao abrir o app, preservando alterações locais pendentes e respeitando os limites do servidor.",
-        "A checagem diária de capítulos agora inclui apenas Lendo. Abrir os detalhes atualiza listas de capítulos com mais de um dia; o recarregamento manual continua disponível.",
-        "Mais proteção na confiança em extensões, importação de backups e recomendações, validação do login e envio de alterações pendentes entre contas.",
-        "Navegação da biblioteca e preservação do estado das telas refinadas, com todas as novas mensagens traduzidas nos quatro idiomas suportados.",
-        "A revisão de extensões agora acompanha o visual da lista de extensões instaladas e pode ser aberta diretamente nos detalhes do mangá. A fonte selecionada e os capítulos em cache são mantidos enquanto a aprovação está pendente."
+        "O Continuar lendo agora mostra até dez mangás recentes, mantendo o tamanho original das capas.",
+        "Quando há mais de dez títulos disponíveis, o cartão Ver minha biblioteca abre diretamente a lista Lendo. O cartão fica oculto quando todos os títulos cabem na faixa.",
+        "A atualização automática da biblioteca do AniList agora acontece ao iniciar o app ou voltar após pelo menos duas horas fora dele. Sem verificações periódicas enquanto o app está aberto; a sincronização manual continua disponível.",
+        "Textos da interface atualizados em inglês, português brasileiro, espanhol e chinês simplificado."
       ],
       "es": [
-        "Mejor compatibilidad con extensiones instaladas por el usuario, datos de capítulos y volúmenes, carga de páginas y reanudación de descargas, respetando los límites de las fuentes.",
-        "Nuevos perfiles de caché Económico, Equilibrado y Amplio, con controles separados para portadas, datos de navegación, páginas del lector y precarga.",
-        "Nueva actualización opcional de la biblioteca de AniList al abrir la app, conservando los cambios locales pendientes y respetando los límites del servidor.",
-        "La comprobación diaria de capítulos ahora incluye solo Leyendo. Abrir los detalles actualiza las listas de más de un día; la recarga manual sigue disponible.",
-        "Mayor protección en la confianza de extensiones, importación de copias de seguridad y recomendaciones, validación del inicio de sesión y sincronización de cambios pendientes entre cuentas.",
-        "Navegación de la biblioteca y conservación del estado de las pantallas mejoradas, con todos los mensajes nuevos traducidos a los cuatro idiomas disponibles.",
-        "La revisión de extensiones ahora sigue el diseño de la lista de extensiones instaladas y puede abrirse desde los detalles del manga. Se conservan la fuente seleccionada y los capítulos en caché mientras la aprobación está pendiente."
+        "Continuar leyendo ahora muestra hasta diez mangas recientes, conservando el tamaño original de las portadas.",
+        "Cuando hay más de diez títulos disponibles, la tarjeta Ver mi biblioteca abre directamente la lista Leyendo. La tarjeta permanece oculta cuando todos los títulos caben en la fila.",
+        "La actualización automática de la biblioteca de AniList ahora se realiza al iniciar la app o volver tras al menos dos horas sin usarla. No hay comprobaciones periódicas mientras la app sigue abierta; la sincronización manual continúa disponible.",
+        "Textos de la interfaz actualizados en inglés, portugués brasileño, español y chino simplificado."
       ],
       "zh-CN": [
-        "改进对用户安装的扩展的兼容性，包括章节与卷信息、页面加载和下载续传，并遵守来源的请求频率限制。",
-        "新增节省空间、均衡和大容量缓存预设，可分别控制封面、浏览数据、阅读器页面和预加载。",
-        "新增打开应用时更新 AniList 书架的可选功能，保留待同步的本地更改，并遵守服务器限制。",
-        "每日章节检查仅包含“阅读中”的作品。打开漫画详情时会更新超过一天的章节列表，也可随时手动重新加载。",
-        "加强扩展信任、备份与推荐导入、登录验证，以及防止待同步更改被发送到其他账号的保护。",
-        "优化书架导航和页面状态保留，所有新增界面消息均已翻译为四种支持的语言。",
-        "扩展审核现与已安装扩展列表保持一致，也可直接从漫画详情打开。等待批准期间，已选择的来源和缓存章节都会保留。"
+        "继续阅读现可显示最多十部最近阅读的漫画，并保留原有封面尺寸。",
+        "仅在有超过十部作品时显示更醒目的“查看我的书库”卡片，直接打开“阅读中”列表。所有作品均可显示时，该卡片会隐藏。",
+        "AniList 书库现在仅在启动应用或离开应用至少两小时后返回时自动更新。持续使用应用期间不会定期检查，仍可随时手动同步。",
+        "已更新英语、巴西葡萄牙语、西班牙语和简体中文的界面文本。"
       ]
     }
   }
