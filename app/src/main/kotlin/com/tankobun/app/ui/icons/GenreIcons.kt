@@ -24,10 +24,12 @@ internal fun genreIcon(name: String): ImageVector =
         "sports" -> TankobunIcons.GenreSports
         "supernatural" -> TankobunIcons.GenreSupernatural
         "thriller" -> TankobunIcons.GenreThriller
-        "martial arts" -> TankobunIcons.GenreAction
+        "martial arts" -> TankobunIcons.GenreMartialArts
         "historical" -> TankobunIcons.CalendarMonth
-        "boys love", "boys' love", "girls love", "girls' love" -> TankobunIcons.GenreRomance
-        "adult", "smut" -> TankobunIcons.GenreHentai
-        "tragedy" -> TankobunIcons.GenreDrama
+        "boys love", "boys' love" -> TankobunIcons.GenreBoysLove
+        "girls love", "girls' love" -> TankobunIcons.GenreGirlsLove
+        "adult" -> TankobunIcons.GenreAdult
+        "smut" -> TankobunIcons.GenreSmut
+        "tragedy" -> TankobunIcons.GenreTragedy
         else -> TankobunIcons.Category
     }

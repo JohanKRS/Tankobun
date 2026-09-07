@@ -1,7 +1,6 @@
 package com.tankobun.app.ui.filters
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -25,7 +25,6 @@ import com.tankobun.app.ui.browse.*
 import com.tankobun.app.ui.components.*
 import com.tankobun.app.ui.icons.TankobunIcons
 import com.tankobun.app.ui.icons.genreIcon
-import kotlinx.coroutines.launch
 import com.tankobun.core.model.CatalogTag
 import com.tankobun.core.model.CatalogTaxonomy
 import java.text.Normalizer
@@ -42,15 +41,20 @@ internal fun FilterDialogFrame(
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         BoxWithConstraints(Modifier.imePadding(), contentAlignment = Alignment.Center) {
-            val heightLimit = if (fitContent) (maxHeight - 32.dp).coerceAtLeast(240.dp) else 720.dp
+            // Base the options height on the screen, not the dialog's own wrap-content measurement.
+            val heightLimit = if (fitContent) minOf((LocalConfiguration.current.screenHeightDp.dp - 48.dp).coerceAtLeast(240.dp), 720.dp) else 720.dp
             val widthLimit = if (fitContent) 820.dp else 620.dp
             val size = Modifier.widthIn(max = widthLimit).then(
-                if (expanded) Modifier.height(minOf(maxHeight * 0.82f, 720.dp)) else Modifier,
+                when {
+                    fitContent -> Modifier.height(heightLimit)
+                    expanded -> Modifier.height(minOf(maxHeight * 0.82f, 720.dp))
+                    else -> Modifier
+                },
             )
             TankobunDialogSurface(modifier = size, maxWidth = widthLimit, maxHeight = heightLimit, scrollable = false) {
                 TankobunDialogHeader(title, onDismiss)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
-                Column(Modifier.weight(1f, fill = expanded), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+                Column(Modifier.weight(1f, fill = expanded || fitContent), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
                 if (footer != null) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
                     footer()
@@ -267,50 +271,38 @@ internal fun MediaFilterOptionsDialog(
     onDismiss: () -> Unit,
 ) {
     val scroll = rememberScrollState()
-    val scope = rememberCoroutineScope()
     FilterDialogFrame(title, onDismiss, fitContent = true, footer = {
         FilterDialogActions(onClear = onReset, onApply = onApply)
     }) {
-        Box(Modifier.weight(1f, fill = false)) {
-            Column(Modifier.verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                FilterOptionsSection(tankobunString(R.string.browse_sort)) {
-                    BoxWithConstraints {
-                        val columns = if (maxWidth >= 500.dp) 2 else 1
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            sortOptions.chunked(columns).forEach { options ->
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    options.forEach { option ->
-                                        Surface(shape = LocalTankobunStyle.current.themeShapes.control,
-                                            color = if (selectedSort == option.value) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0f),
-                                            modifier = Modifier.weight(1f).clickable { onSortChange(option.value) }) {
-                                            Row(Modifier.padding(horizontal = 12.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                                Icon(sortIcon(option), null, Modifier.size(20.dp))
-                                                Text(option.labelText(), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                                                RadioButton(selected = selectedSort == option.value, onClick = null)
-                                            }
+        Column(Modifier.weight(1f, fill = false).verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            FilterOptionsSection(tankobunString(R.string.browse_sort)) {
+                BoxWithConstraints {
+                    val columns = if (maxWidth >= 500.dp) 2 else 1
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        sortOptions.chunked(columns).forEach { options ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                options.forEach { option ->
+                                    Surface(shape = LocalTankobunStyle.current.themeShapes.control,
+                                        color = if (selectedSort == option.value) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0f),
+                                        modifier = Modifier.weight(1f).clickable { onSortChange(option.value) }) {
+                                        Row(Modifier.padding(horizontal = 12.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            Icon(sortIcon(option), null, Modifier.size(20.dp))
+                                            Text(option.labelText(), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                            RadioButton(selected = selectedSort == option.value, onClick = null)
                                         }
                                     }
-                                    if (options.size < columns) Spacer(Modifier.weight(1f))
                                 }
+                                if (options.size < columns) Spacer(Modifier.weight(1f))
                             }
                         }
                     }
                 }
+            }
 
-                FilterOptionsSection(tankobunString(R.string.common_view)) { MediaViewModeRow(viewMode, onViewMode) }
-                FilterOptionsSection(tankobunString(R.string.settings_covers_per_row)) { CoverColumnsRow(coverColumns, onCoverColumns) }
-                FilterOptionsSection(tankobunString(R.string.settings_cover_framing)) { CoverFramingRow(showWholeCovers, onWholeCovers) }
-            }
-            if (scroll.canScrollForward) {
-                Surface(Modifier.align(Alignment.BottomCenter), shape = LocalTankobunStyle.current.themeShapes.control,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh, shadowElevation = 2.dp) {
-                    TextButton(onClick = { scope.launch { scroll.animateScrollBy(scroll.viewportSize * 0.7f) } }) {
-                        Text(tankobunString(R.string.filters_more_options))
-                        Icon(TankobunIcons.ExpandMore, null, Modifier.padding(start = 6.dp).size(18.dp))
-                    }
-                }
-            }
+            FilterOptionsSection(tankobunString(R.string.common_view)) { MediaViewModeRow(viewMode, onViewMode) }
+            FilterOptionsSection(tankobunString(R.string.settings_covers_per_row)) { CoverColumnsRow(coverColumns, onCoverColumns) }
+            FilterOptionsSection(tankobunString(R.string.settings_cover_framing)) { CoverFramingRow(showWholeCovers, onWholeCovers) }
         }
     }
 }

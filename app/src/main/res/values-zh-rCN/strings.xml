@@ -1220,5 +1220,4 @@
     <string name="filters_year_until">截至 %1$d 年</string>
     <string name="filters_year_since">自 %1$d 年起</string>
     <string name="filters_year_unlimited">不限</string>
-    <string name="filters_more_options">下方还有更多选项</string>
 </resources>

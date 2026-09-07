@@ -64,7 +64,7 @@ internal fun FilterChoiceDialog(title: String, options: List<BrowseOption>, sele
 private fun filterChoiceIcon(value: String?) = when (value) {
     "MANGA" -> TankobunIcons.MenuBook
     "NOVEL" -> TankobunIcons.Pencil
-    "ONE_SHOT" -> TankobunIcons.Photo
+    "ONE_SHOT" -> TankobunIcons.OneShot
     "RELEASING" -> TankobunIcons.PlayArrow
     "FINISHED" -> TankobunIcons.Check
     "NOT_YET_RELEASED" -> TankobunIcons.CalendarMonth
@@ -75,26 +75,26 @@ private fun filterChoiceIcon(value: String?) = when (value) {
 }
 
 private const val FIRST_PUBLICATION_YEAR = 1679
-private const val LAST_PUBLICATION_YEAR = 2262
+private const val MAX_SUPPORTED_PUBLICATION_YEAR = 2262
 
 /** Read the centered row directly, so Apply never relies on a delayed scroll callback. */
-private fun LazyListState.centeredYear(): Int {
+private fun LazyListState.centeredYear(lastYear: Int): Int {
     val layout = layoutInfo
     val center = (layout.viewportStartOffset + layout.viewportEndOffset) / 2
     val index = layout.visibleItemsInfo.minByOrNull { abs(it.offset + it.size / 2 - center) }?.index
         ?: firstVisibleItemIndex
-    return (FIRST_PUBLICATION_YEAR + index).coerceIn(FIRST_PUBLICATION_YEAR, LAST_PUBLICATION_YEAR)
+    return (FIRST_PUBLICATION_YEAR + index).coerceIn(FIRST_PUBLICATION_YEAR, lastYear)
 }
 
 @Composable
 internal fun FilterYearDialog(selected: PublicationYears?, onApply: (PublicationYears?) -> Unit, onDismiss: () -> Unit) {
-    val currentYear = remember { Year.now().value.coerceIn(FIRST_PUBLICATION_YEAR, LAST_PUBLICATION_YEAR) }
-    val fromState = rememberLazyListState((selected?.from ?: currentYear) - FIRST_PUBLICATION_YEAR)
-    val toState = rememberLazyListState((selected?.to ?: currentYear) - FIRST_PUBLICATION_YEAR)
+    val currentYear = remember { Year.now().value.coerceIn(FIRST_PUBLICATION_YEAR, MAX_SUPPORTED_PUBLICATION_YEAR) }
+    val fromState = rememberLazyListState((selected?.from ?: currentYear).coerceIn(FIRST_PUBLICATION_YEAR, currentYear) - FIRST_PUBLICATION_YEAR)
+    val toState = rememberLazyListState((selected?.to ?: currentYear).coerceIn(FIRST_PUBLICATION_YEAR, currentYear) - FIRST_PUBLICATION_YEAR)
     var fromUnlimited by remember { mutableStateOf(selected?.from == null) }
     var toUnlimited by remember { mutableStateOf(selected?.to == null) }
-    val lower by remember { derivedStateOf { if (fromUnlimited) null else fromState.centeredYear() } }
-    val upper by remember { derivedStateOf { if (toUnlimited) null else toState.centeredYear() } }
+    val lower by remember { derivedStateOf { if (fromUnlimited) null else fromState.centeredYear(currentYear) } }
+    val upper by remember { derivedStateOf { if (toUnlimited) null else toState.centeredYear(currentYear) } }
     val valid = lower == null || upper == null || lower!! <= upper!!
     val scrolling = fromState.isScrollInProgress || toState.isScrollInProgress
     FilterDialogFrame(tankobunString(R.string.filters_year_range), onDismiss, footer = {
@@ -105,9 +105,9 @@ internal fun FilterYearDialog(selected: PublicationYears?, onApply: (Publication
     }) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             FilterYearWheel(tankobunString(R.string.filters_year_from), fromState, fromUnlimited,
-                { fromUnlimited = it }, Modifier.weight(1f))
+                { fromUnlimited = it }, currentYear, Modifier.weight(1f))
             FilterYearWheel(tankobunString(R.string.filters_year_to), toState, toUnlimited,
-                { toUnlimited = it }, Modifier.weight(1f))
+                { toUnlimited = it }, currentYear, Modifier.weight(1f))
         }
         Text(tankobunString(if (valid) R.string.filters_year_hint else R.string.filters_year_invalid), minLines = 2,
             style = MaterialTheme.typography.bodySmall,
@@ -117,11 +117,11 @@ internal fun FilterYearDialog(selected: PublicationYears?, onApply: (Publication
 }
 
 @Composable
-private fun FilterYearWheel(label: String, state: LazyListState, unlimited: Boolean, onUnlimited: (Boolean) -> Unit, modifier: Modifier) {
+private fun FilterYearWheel(label: String, state: LazyListState, unlimited: Boolean, onUnlimited: (Boolean) -> Unit, lastYear: Int, modifier: Modifier) {
     val scope = rememberCoroutineScope()
     val dragging by state.interactionSource.collectIsDraggedAsState()
     LaunchedEffect(dragging) { if (dragging) onUnlimited(false) }
-    val centered by remember(state) { derivedStateOf { state.centeredYear() } }
+    val centered by remember(state, lastYear) { derivedStateOf { state.centeredYear(lastYear) } }
     val rowHeight = 44.dp
     val noLimitLabel = tankobunString(R.string.filters_year_unlimited)
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -136,7 +136,7 @@ private fun FilterYearWheel(label: String, state: LazyListState, unlimited: Bool
             LazyColumn(state = state, flingBehavior = rememberSnapFlingBehavior(state),
                 contentPadding = PaddingValues(vertical = rowHeight * 2),
                 modifier = Modifier.fillMaxSize().semantics { contentDescription = label; stateDescription = if (unlimited) noLimitLabel else centered.toString() }) {
-                items(LAST_PUBLICATION_YEAR - FIRST_PUBLICATION_YEAR + 1, key = { it }) { index ->
+                items(lastYear - FIRST_PUBLICATION_YEAR + 1, key = { it }) { index ->
                     val year = FIRST_PUBLICATION_YEAR + index
                     val focused = year == centered
                     Box(Modifier.fillMaxWidth().height(rowHeight).semantics { selected = focused && !unlimited }.alpha(if (unlimited) 0.38f else if (focused) 1f else 0.55f)

@@ -1222,5 +1222,4 @@
     <string name="filters_year_until">Hasta %1$d</string>
     <string name="filters_year_since">Desde %1$d</string>
     <string name="filters_year_unlimited">Sin límite</string>
-    <string name="filters_more_options">Más opciones abajo</string>
 </resources>
