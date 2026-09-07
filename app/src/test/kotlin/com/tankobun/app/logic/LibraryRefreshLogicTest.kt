@@ -4,11 +4,51 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LibraryRefreshLogicTest {
-    @Test fun refreshCooldownSurvivesQuickReopensAndAllowsClockCorrections() {
-        assertTrue(shouldRefreshLibraryOnOpen(1_000, 0))
-        assertFalse(shouldRefreshLibraryOnOpen(120_999, 1_000))
-        assertTrue(shouldRefreshLibraryOnOpen(121_000, 1_000))
-        assertTrue(shouldRefreshLibraryOnOpen(500, 1_000))
+    @Test fun freshSessionChecksOnceEvenWithRepeatedForegroundCallbacks() {
+        val gate = LibraryRefreshGate()
+        assertTrue(gate.onForeground(1_000))
+        assertFalse(gate.onForeground(1_001))
+        // Keeping the app open for hours must not create periodic requests.
+        assertFalse(gate.onForeground(1_000 + LIBRARY_REFRESH_INTERVAL_MILLIS))
+    }
+
+    @Test fun shortAbsencesDoNotRefreshEvenWhenTheLastCheckWasHoursAgo() {
+        val gate = LibraryRefreshGate()
+        gate.onForeground(1_000)
+        gate.onBackground(1_000 + LIBRARY_REFRESH_INTERVAL_MILLIS)
+        assertFalse(gate.onForeground(121_000 + LIBRARY_REFRESH_INTERVAL_MILLIS))
+    }
+
+    @Test fun returnAfterTwoHoursChecksOnce() {
+        val gate = LibraryRefreshGate()
+        gate.onForeground(1_000)
+        gate.onBackground(2_000)
+        assertTrue(gate.onForeground(2_000 + LIBRARY_REFRESH_INTERVAL_MILLIS))
+        assertFalse(gate.onForeground(2_001 + LIBRARY_REFRESH_INTERVAL_MILLIS))
+    }
+
+    @Test fun returningJustBeforeTwoHoursStartsANewAbsence() {
+        val gate = LibraryRefreshGate()
+        gate.onForeground(1_000)
+        gate.onBackground(2_000)
+        assertFalse(gate.onForeground(1_999 + LIBRARY_REFRESH_INTERVAL_MILLIS))
+        gate.onBackground(3_000 + LIBRARY_REFRESH_INTERVAL_MILLIS)
+        assertFalse(gate.onForeground(4_000 + LIBRARY_REFRESH_INTERVAL_MILLIS))
+    }
+
+    @Test fun repeatedBackgroundCallbacksPreserveTheStartOfTheAbsence() {
+        val gate = LibraryRefreshGate()
+        gate.onForeground(1_000)
+        gate.onBackground(2_000)
+        gate.onBackground(3_000)
+        assertTrue(gate.onForeground(2_000 + LIBRARY_REFRESH_INTERVAL_MILLIS))
+    }
+
+    @Test fun startingANewSessionChecksWithoutWaitingForTheOldSession() {
+        val oldSession = LibraryRefreshGate()
+        assertTrue(oldSession.onForeground(1_000))
+        oldSession.onBackground(2_000)
+        assertTrue(LibraryRefreshGate().onForeground(3_000))
     }
 
     @Test fun reconcilesRemoteAddsEditsAndRemovals() {

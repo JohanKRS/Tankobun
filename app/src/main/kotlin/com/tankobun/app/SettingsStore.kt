@@ -266,18 +266,6 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean("anilist.refresh.library.on.open", enabled).apply()
     }
 
-    fun libraryRefreshAttemptMillis(sessionKey: String): Long =
-        if (preferences.getString("anilist.library.refresh.session", null) == sessionKey) {
-            preferences.getLong("anilist.library.refresh.attempt", 0L)
-        } else 0L
-
-    fun saveLibraryRefreshAttempt(sessionKey: String, nowMillis: Long) {
-        preferences.edit()
-            .putString("anilist.library.refresh.session", sessionKey)
-            .putLong("anilist.library.refresh.attempt", nowMillis)
-            .apply()
-    }
-
     fun saveAnilistAutoSyncReaderProgress(enabled: Boolean) {
         preferences.edit().putBoolean(KEY_ANILIST_AUTO_SYNC_READER_PROGRESS, enabled).apply()
     }

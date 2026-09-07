@@ -38,13 +38,18 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
-    override fun onResume() {
-        super.onResume()
-        viewModel.refreshInstalledSources()
+    override fun onStart() {
+        super.onStart()
         viewModel.onAppForegrounded()
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshInstalledSources()
+    }
+
     override fun onStop() {
+        if (!isChangingConfigurations) viewModel.onAppBackgrounded()
         viewModel.persistReaderProgress()
         super.onStop()
     }

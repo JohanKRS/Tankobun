@@ -246,6 +246,7 @@ class MainViewModel(
     private var pendingAniListSyncJob: Job? = null
     private var libraryRefreshJob: Job? = null
     private var cachedLibraryJob: Job? = null
+    private val libraryRefreshGate = com.tankobun.app.logic.LibraryRefreshGate()
     private var automaticLibraryRefresh = false
     private var scheduledBackupJob: Job? = null
     private var browseLandingJob: Job? = null
@@ -1192,13 +1193,18 @@ class MainViewModel(
     }
 
     fun onAppForegrounded() {
-        if (_state.value.anilistRefreshLibraryOnOpen) requestLibraryRefresh(automatic = true)
+        val due = libraryRefreshGate.onForeground(android.os.SystemClock.elapsedRealtime())
+        if (due && _state.value.anilistRefreshLibraryOnOpen) requestLibraryRefresh(automatic = true)
+    }
+
+    fun onAppBackgrounded() {
+        libraryRefreshGate.onBackground(android.os.SystemClock.elapsedRealtime())
     }
 
     fun setAnilistRefreshLibraryOnOpen(enabled: Boolean) {
         container.settingsStore.saveAnilistRefreshLibraryOnOpen(enabled)
         _state.update { it.copy(anilistRefreshLibraryOnOpen = enabled) }
-        if (enabled) onAppForegrounded()
+        if (enabled) requestLibraryRefresh(automatic = true)
         else if (automaticLibraryRefresh) libraryRefreshJob?.cancel()
     }
 
@@ -1218,12 +1224,6 @@ class MainViewModel(
         }
 
         if (libraryRefreshJob?.isActive == true) return
-        val sessionKey = com.tankobun.core.sync.syncSessionKey(token) ?: return
-        val now = System.currentTimeMillis()
-        if (automatic && !com.tankobun.app.logic.shouldRefreshLibraryOnOpen(
-                now, container.settingsStore.libraryRefreshAttemptMillis(sessionKey),
-            )) return
-        container.settingsStore.saveLibraryRefreshAttempt(sessionKey, now)
         automaticLibraryRefresh = automatic
         libraryRefreshJob = viewModelScope.launch {
             cachedLibraryJob?.join()

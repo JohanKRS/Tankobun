@@ -1,10 +1,26 @@
 package com.tankobun.app.logic
 
-internal const val LIBRARY_REFRESH_INTERVAL_MILLIS = 2 * 60 * 1000L
+internal const val LIBRARY_REFRESH_INTERVAL_MILLIS = 2 * 60 * 60 * 1000L
 
-internal fun shouldRefreshLibraryOnOpen(nowMillis: Long, lastAttemptMillis: Long): Boolean =
-    lastAttemptMillis <= 0L || nowMillis < lastAttemptMillis ||
-        nowMillis - lastAttemptMillis >= LIBRARY_REFRESH_INTERVAL_MILLIS
+/** Checks only on a fresh app session or after a long absence; never polls. */
+internal class LibraryRefreshGate {
+    private var opened = false
+    private var backgroundedAtMillis: Long? = null
+
+    fun onForeground(nowMillis: Long): Boolean {
+        val due = !opened || backgroundedAtMillis?.let {
+            nowMillis - it >= LIBRARY_REFRESH_INTERVAL_MILLIS
+        } == true
+        opened = true
+        backgroundedAtMillis = null
+        return due
+    }
+
+    fun onBackground(nowMillis: Long) {
+        // Repeated lifecycle callbacks must not shorten an existing absence.
+        if (backgroundedAtMillis == null) backgroundedAtMillis = nowMillis
+    }
+}
 
 /** Keep edits, additions and tombstones that appeared while the request was in flight. */
 internal fun <T> reconcileLibrarySnapshot(
