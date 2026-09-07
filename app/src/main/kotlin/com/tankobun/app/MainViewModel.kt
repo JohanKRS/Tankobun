@@ -1190,11 +1190,44 @@ class MainViewModel(
         }
     }
 
+    fun connectMangaBaka(token: String) {
+        if (_state.value.mangaBakaBusy || token.isBlank()) return
+        viewModelScope.launch {
+            _state.update { it.copy(mangaBakaBusy = true) }
+            runCatching { container.mangaBakaRepository.profile(token.trim()) }
+                .onSuccess { profile ->
+                    container.tokenStore.saveMangaBaka(token.trim(), profile.id, profile.name)
+                    _state.update { it.copy(mangaBakaAccountName = profile.name) }
+                }
+                .onFailure { error -> if (error is CancellationException) throw error; _state.update { it.copy(message = string(R.string.catalog_connect_failed)) } }
+            _state.update { it.copy(mangaBakaBusy = false) }
+        }
+    }
+
+    fun disconnectMangaBaka() {
+        container.tokenStore.clearMangaBaka()
+        _state.update { it.copy(mangaBakaAccountName = null) }
+    }
+
+    fun syncMangaBaka() {
+        if (_state.value.mangaBakaBusy) return
+        viewModelScope.launch {
+            _state.update { it.copy(mangaBakaBusy = true) }
+            runCatching { container.mangaBakaTracking.sync() }
+                .onSuccess { loadCachedLibrary(); _state.update { it.copy(message = string(R.string.catalog_sync_done)) } }
+                .onFailure { error -> if (error is CancellationException) throw error; _state.update { it.copy(message = string(R.string.catalog_sync_failed)) } }
+            _state.update { it.copy(mangaBakaBusy = false) }
+        }
+    }
+
     fun refreshLibrary() {
+        container.mangaBakaTracking.schedule()
         requestLibraryRefresh(automatic = false)
     }
 
     fun onAppForegrounded() {
+        _state.update { it.copy(mangaBakaAccountName = container.tokenStore.mangaBakaName()) }
+        container.mangaBakaTracking.schedule()
         val due = libraryRefreshGate.onForeground(android.os.SystemClock.elapsedRealtime())
         if (due && _state.value.anilistRefreshLibraryOnOpen) requestLibraryRefresh(automatic = true)
     }
@@ -1291,16 +1324,7 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                if (snapshot.libraryMode == LibraryMode.LOCAL) {
-                    backupDataSource.saveLocalLibraryBackup(uri = uri, snapshot = snapshot)
-                } else {
-                    backupDataSource.saveBackup(
-                        uri = uri,
-                        items = items,
-                        viewerName = snapshot.viewerName,
-                        scoreFormat = snapshot.anilistScoreFormat,
-                    )
-                }
+                backupDataSource.saveLocalLibraryBackup(uri = uri, snapshot = snapshot)
             }.onSuccess {
                 _state.update {
                     it.copy(
@@ -1322,31 +1346,23 @@ class MainViewModel(
         }
     }
 
+    fun exportAniListXml(uri: Uri) {
+        val snapshot = _state.value
+        viewModelScope.launch {
+            runCatching { backupDataSource.saveBackup(uri, snapshot.libraryItems.filter { it.media.anilistId != null }, snapshot.viewerName, snapshot.anilistScoreFormat) }
+                .onSuccess { _state.update { it.copy(message = string(R.string.msg_backup_saved, quantityString(R.plurals.manga_count, it.libraryItems.size, it.libraryItems.size))) } }
+                .onFailure { error -> _state.update { it.copy(message = error.userMessage(localizedContext(), string(R.string.msg_backup_failed))) } }
+        }
+    }
+
     fun restoreAniListBackup(uri: Uri) {
         val snapshot = _state.value
         val token = container.tokenStore.accessToken()
-        if (snapshot.libraryMode == LibraryMode.ANILIST && token == null) {
-            _state.update { it.copy(message = string(R.string.msg_connect_before_restore)) }
-            return
-        }
 
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                if (snapshot.libraryMode == LibraryMode.LOCAL) {
-                    backupDataSource.restoreLocalLibraryBackup(
-                        uri = uri,
-                        scoreFormat = snapshot.anilistScoreFormat,
-                        knownCustomLists = snapshot.anilistCustomLists,
-                    )
-                } else {
-                    backupDataSource.restoreBackup(
-                        uri = uri,
-                        accessToken = requireNotNull(token),
-                        scoreFormat = snapshot.anilistScoreFormat,
-                        knownCustomLists = snapshot.anilistCustomLists,
-                    )
-                }
+                backupDataSource.restoreLocalLibraryBackup(uri, snapshot.anilistScoreFormat, snapshot.anilistCustomLists)
             }.onSuccess { result ->
                 container.settingsStore.saveAnilistCustomLists(result.customLists)
                 loadCachedLibrary()
@@ -1613,11 +1629,7 @@ class MainViewModel(
                         snapshot.libraryItems
                             .takeIf { it.isNotEmpty() }
                             ?.let {
-                                if (snapshot.libraryMode == LibraryMode.LOCAL) {
-                                    backupDataSource.writeScheduledLocalLibraryBackup(folderUri = folderUri, snapshot = snapshot)
-                                } else {
-                                    backupDataSource.writeScheduledBackup(folderUri = folderUri, snapshot = snapshot)
-                                }
+                                backupDataSource.writeScheduledLocalLibraryBackup(folderUri = folderUri, snapshot = snapshot)
                             }
                     } else {
                         null
@@ -1845,6 +1857,10 @@ class MainViewModel(
     }
 
     fun navigateBrowseBack(): Boolean {
+        if (_state.value.browseForYouOpen) {
+            closeBrowseForYou()
+            return true
+        }
         val currentCriteria = _state.value.toBrowseCriteria()
         if (currentCriteria != committedBrowseCriteria) {
             restoreBrowseCriteria(committedBrowseCriteria)
@@ -1976,7 +1992,58 @@ class MainViewModel(
         searchAniList()
     }
 
+    private var browseMixJob: Job? = null
+
+    fun viewAllBrowseForYou() {
+        _state.update { it.copy(browseForYouOpen = true) }
+    }
+
+    fun closeBrowseForYou() {
+        _state.update { it.copy(browseForYouOpen = false) }
+    }
+
+    fun refreshBrowseForYou() {
+        if (browseMixJob?.isActive != true) loadBrowseMix(force = true)
+    }
+
+    private fun loadBrowseMix(force: Boolean) {
+        if (browseMixJob?.isActive == true && !force) return
+        browseMixJob?.cancel()
+        browseMixJob = viewModelScope.launch {
+            val adult = _state.value.showNsfwContent
+            _state.update { it.copy(browseForYouRefreshing = true) }
+            try {
+                runCatching {
+                    val seeds = container.catalog.mixSeeds()
+                    if (seeds.isEmpty()) return@runCatching emptyList<AnilistMedia>()
+                    val key = "mangabaka:mix:${seeds.joinToString(",")}:$adult"
+                    browseDataSource.cachedAnilistBrowseMediaPage(key, forceRefresh = force) {
+                        com.tankobun.core.model.AnilistMediaPage(
+                            container.mangaBakaRepository.mix(seeds, adult, forceRefresh = force), 1, false,
+                        )
+                    }.media
+                }.onSuccess { media ->
+                    _state.update { current ->
+                        if (current.showNsfwContent != adult) current else {
+                            val owned = current.libraryItems.mapTo(hashSetOf()) { it.media.id }
+                            current.copy(browseForYou = media.filter { it.id !in owned && (adult || !it.isAdult) }
+                                .map { it.withTitleLanguage(current.anilistTitleLanguage) })
+                        }
+                    }
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                    Log.w(TAG, "MangaBaka Mix unavailable; keeping current shelves", error)
+                }
+            } finally {
+                if (_state.value.showNsfwContent == adult) {
+                    _state.update { it.copy(browseForYouRefreshing = false) }
+                }
+            }
+        }
+    }
+
     fun loadBrowseLanding(force: Boolean = false) {
+        loadBrowseMix(force)
         if (!force && browseLandingJob?.isActive == true) return
         browseLandingJob = viewModelScope.launch {
             val snapshot = _state.value
@@ -1986,9 +2053,9 @@ class MainViewModel(
             val manhwaKey = snapshot.browseLandingCacheKey(BROWSE_MANHWA_CACHE_KEY)
             val topMangaKey = snapshot.browseLandingCacheKey(BROWSE_TOP_MANGA_CACHE_KEY)
             val cachedLanding = BrowseLandingData(
-                trending = browseDataSource.cachedBrowseMedia(trendingKey),
-                popular = browseDataSource.cachedBrowseMedia(popularKey),
-                popularManhwa = browseDataSource.cachedBrowseMedia(manhwaKey),
+                trending = browseDataSource.cachedBrowseMedia(trendingKey).take(BROWSE_LANDING_SECTION_SIZE),
+                popular = browseDataSource.cachedBrowseMedia(popularKey).take(BROWSE_LANDING_SECTION_SIZE),
+                popularManhwa = browseDataSource.cachedBrowseMedia(manhwaKey).take(BROWSE_LANDING_SECTION_SIZE),
                 topManga = browseDataSource.cachedBrowseMedia(topMangaKey).take(BROWSE_LANDING_SECTION_SIZE),
             )
             val hasCachedLanding = cachedLanding.hasContent()
@@ -2023,7 +2090,7 @@ class MainViewModel(
             }
             runCatching {
                 val accessToken = container.tokenStore.accessToken()
-                val remote = container.anilistRepository.browseLanding(
+                val remote = container.catalog.browseLanding(
                     perPage = BROWSE_LANDING_SECTION_SIZE,
                     accessToken = accessToken,
                     includeAdult = includeAdult,
@@ -2106,7 +2173,7 @@ class MainViewModel(
             _state.update { it.withHomeFeedRefreshStarted(includeAdult, genres) }
 
             try {
-                val feed = container.anilistRepository.homeFeed(
+                val feed = container.catalog.homeFeed(
                     genres = genres,
                     accessToken = container.tokenStore.accessToken(),
                     includeAdult = includeAdult,
@@ -2172,8 +2239,9 @@ class MainViewModel(
     }
 
     private fun cachedHomeGenres(includeAdult: Boolean): List<String> =
-        container.settingsStore.anilistGenres()
-            .ifEmpty { FALLBACK_HOME_GENRES }
+        (container.settingsStore.anilistGenres().ifEmpty { FALLBACK_HOME_GENRES } +
+            com.tankobun.core.model.SUPPLEMENTAL_HOME_GENRES)
+            .distinct()
             .filter { genre -> includeAdult || !genre.equals("Hentai", ignoreCase = true) }
 
     private suspend fun refreshHomeGenresIfStale(force: Boolean) {
@@ -2277,6 +2345,7 @@ class MainViewModel(
         forceRefresh: Boolean = false,
         recordHistory: Boolean = true,
     ) {
+        _state.update { it.copy(browseForYouOpen = false) }
         val snapshot = _state.value
         val query = snapshot.searchQuery.trim()
         val criteria = snapshot.toBrowseCriteria()
@@ -2515,6 +2584,8 @@ class MainViewModel(
     }
 
     fun setShowNsfwContent(enabled: Boolean) {
+        browseMixJob?.cancel()
+        browseLandingJob?.cancel()
         homeFeedJob?.cancel()
         homeFeedJob = null
         homeFeedRefreshJob?.cancel()
@@ -2523,6 +2594,13 @@ class MainViewModel(
         _state.update {
             it.copy(
                 showNsfwContent = enabled,
+                browseForYou = emptyList(),
+                browseForYouOpen = false,
+                browseForYouRefreshing = false,
+                browseTrending = emptyList(),
+                browsePopular = emptyList(),
+                browsePopularManhwa = emptyList(),
+                browseTopManga = emptyList(),
                 homeTrending = emptyList(),
                 homeGenreHighlights = emptyList(),
                 homeLoaded = false,
@@ -3022,7 +3100,7 @@ class MainViewModel(
         val entry = snapshot.selectedListEntry
             ?.takeIf { it.mediaId == media.id }
             ?: AnilistListEntry(
-                id = -media.id,
+                id = -kotlin.math.abs(media.id),
                 mediaId = media.id,
                 status = snapshot.trackingStatus,
                 progress = snapshot.trackingProgress.toIntOrNull()?.coerceAtLeast(0) ?: 0,
@@ -3487,7 +3565,7 @@ class MainViewModel(
         val media = _state.value.selectedMedia ?: return
         val snapshot = _state.value
         val token = container.tokenStore.accessToken()
-        if (snapshot.libraryMode == LibraryMode.ANILIST && token == null) {
+        if (snapshot.libraryMode == LibraryMode.ANILIST && token == null && media.anilistId != null) {
             if (!autoSave) {
                 _state.update { it.copy(message = string(R.string.msg_connect_anilist_track_manga)) }
             }
@@ -3510,7 +3588,7 @@ class MainViewModel(
         }
         val optimisticKnownCustomLists = (knownCustomLists + missingCustomLists).normalizedCustomLists()
         val optimisticEntry = AnilistListEntry(
-            id = snapshot.selectedListEntry?.id ?: -media.id,
+            id = snapshot.selectedListEntry?.id ?: -kotlin.math.abs(media.id),
             mediaId = media.id,
             status = snapshot.trackingStatus,
             progress = progress ?: 0,
@@ -3532,7 +3610,7 @@ class MainViewModel(
                 )
             }
             runCatching {
-                if (snapshot.libraryMode == LibraryMode.LOCAL) {
+                if ((snapshot.libraryMode == LibraryMode.LOCAL || media.anilistId == null)) {
                     aniListDataSource.saveLocalTracking(
                         media = media,
                         status = snapshot.trackingStatus,
@@ -3566,7 +3644,7 @@ class MainViewModel(
                         entry = result.entry,
                         knownCustomLists = result.knownCustomLists,
                         autoSave = autoSave,
-                        successMessage = if (snapshot.libraryMode == LibraryMode.LOCAL) {
+                        successMessage = if ((snapshot.libraryMode == LibraryMode.LOCAL || media.anilistId == null)) {
                             string(R.string.msg_tracking_saved_local)
                         } else {
                             string(R.string.msg_tracking_saved)

@@ -17,8 +17,18 @@ class SecureTokenStore(context: Context) {
         preferences.edit().putString(KEY_ACCESS_TOKEN, token).apply()
     }
 
+    fun mangaBakaToken(): String? = preferences.getString("mangabaka.token", null)
+    fun mangaBakaAccount(): String? = preferences.getString("mangabaka.account", null)
+    fun mangaBakaName(): String? = preferences.getString("mangabaka.name", null)
+    fun saveMangaBaka(token: String, account: String, name: String) {
+        preferences.edit().putString("mangabaka.token", token).putString("mangabaka.account", account).putString("mangabaka.name", name).apply()
+    }
+    fun clearMangaBaka() {
+        preferences.edit().remove("mangabaka.token").remove("mangabaka.account").remove("mangabaka.name").apply()
+    }
+
     fun clear() {
-        preferences.edit().clear().apply()
+        preferences.edit().remove(KEY_ACCESS_TOKEN).apply()
     }
 
     private companion object {

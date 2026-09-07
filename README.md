@@ -38,13 +38,15 @@ Tankobun is an Android reader and tracking client built around an AniList-compat
 
 It is designed as a personal reading shelf: use a local library or sign in with AniList, browse manga metadata, open a manga entry, choose a user-installed source when available, read in paged or webtoon mode, and keep your progress organized.
 
-Local library mode does not require an AniList account. Local entries are still matched to AniList manga metadata and use AniList-compatible statuses, scoring, notes, progress, and custom lists so a user can connect AniList later with cleaner sync/merge behavior.
+Local library mode does not require an account. AniList is the primary catalog; MangaBaka adds titles, metadata, recommendations, and a fallback when AniList is unavailable. Entries keep AniList-compatible statuses, scoring, notes, progress, and custom lists. Titles without an AniList match remain usable locally.
 
 Tankobun is not a content service, content host, extension repository, or manga source.
 
 ## What Tankobun Does
 
-- Local manga library mode with AniList-matched entries.
+- Local manga library with AniList and MangaBaka catalog entries.
+- Combined search, enriched metadata, and MangaBaka Mix discovery in the existing reading flow.
+- Optional MangaBaka tracking through a personal access token.
 - AniList login and user-authorized library sync.
 - Adaptive Home with AniList metadata highlights, Continue Reading, and genre discovery.
 - Profile dashboard with reading activity, library statistics, genre insights, and achievements.
@@ -53,8 +55,8 @@ Tankobun is not a content service, content host, extension repository, or manga 
 - Reader interface with paged and webtoon modes.
 - Local reading state, caching, and optional offline storage for user-selected sources where permitted by the source and applicable law.
 - Source selection through extensions installed by the user.
-- Native Tankobun JSON backup export for local libraries.
-- MyAnimeList-compatible XML backup export for AniList-mode lists.
+- Complete native Tankobun JSON backups for local and synced libraries, including both catalog identities.
+- Additional MyAnimeList-compatible XML export for matched AniList titles.
 - In-app restore tools for supported backup files.
 - Library batch selection for sharing recommendations, changing status, editing custom lists, and removing manga.
 - `.tankobun-recs` recommendation files for sharing selected manga metadata with friends, with import preview and optional import into a named custom list.
@@ -135,6 +137,12 @@ tankobun://auth/anilist
 
 as the redirect URL.
 
+## MangaBaka
+
+[MangaBaka](https://mangabaka.org) supplements the primary AniList catalog without requiring another account. Its [API](https://mangabaka.org/data/api) provides search, metadata, similar works, and Mix suggestions. Optional tracking uses a personal token with `library.read` and `library.write`, created in [API & apps](https://mangabaka.org/my/settings/api-and-apps). Connect it in Settings → Catalogs and accounts.
+
+Thanks to MangaBaka, its contributors, AniList, and the upstream metadata communities. Tankobun is independent and is not affiliated with or endorsed by these services.
+
 ## Extension Compatibility
 
 Tankobun can work with user-installed extensions that follow a compatible extension format used by community manga reader ecosystems.
@@ -160,11 +168,11 @@ anilistClientId=
 
 Tankobun is intended to run as a client-side Android app.
 
-Depending on how you use it, the app may store local app data such as reading progress, cached files, downloads, backup files, preferences, and authentication data required for AniList login.
+Depending on how you use it, the app may store local app data such as reading progress, cached files, downloads, backup files, preferences, and authentication data required for AniList login or optional MangaBaka tracking.
 
 Tankobun does not operate a server controlled by this project for manga hosting, content indexing, analytics, tracking, advertising, or user profiling.
 
-Third-party services, websites, APIs, and user-installed extensions may have their own privacy policies and terms.
+Public catalog searches and the title IDs used for Mix are sent to MangaBaka without requiring a MangaBaka account. If connected, subsequent tracking edits are sent using the personal token, which is stored securely on the device and excluded from backups. See the [MangaBaka privacy policy](https://mangabaka.org/about/privacy) and [terms](https://mangabaka.org/about/terms). Third-party services, image hosts, and user-installed extensions also have their own privacy policies and terms.
 
 ## Disclaimer
 
@@ -182,8 +190,16 @@ If you distribute a modified version, please use a clearly different app name, p
 
 ## License
 
-This project is licensed under the MIT License. See `LICENCE.md` for details.
+Tankobun code is licensed under the [MIT License](LICENCE.md). Catalog data, images, and third-party components retain their own rights and licenses; they are not relicensed under MIT. See [NOTICE.md](NOTICE.md) for attribution.
 
 ## Third-Party Notices
 
 Some extension compatibility behavior is adapted from the Mihon/Tachiyomi-compatible network and extension host ecosystem under the Apache License 2.0. See `NOTICE.md` for attribution and license details.
+
+### Catalog data and acknowledgements
+
+Metadata is provided by [AniList](https://anilist.co) and [MangaBaka](https://mangabaka.org), including upstream data from [MangaUpdates](https://www.mangaupdates.com), [MyAnimeList](https://myanimelist.net), [Kitsu](https://kitsu.app), [Shikimori](https://shikimori.one), [Anime-Planet](https://www.anime-planet.com), and [Anime News Network](https://www.animenewsnetwork.com).
+
+MangaBaka-original data uses [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). Tankobun combines and formats metadata for display; adaptations of MangaBaka-original data retain that license. Third-party data and artwork remain subject to their owners and provider terms. The MangaBaka license does not grant additional redistribution rights to third-party data.
+
+See the [data license](https://mangabaka.org/about/data-license), [noncommercial terms](https://mangabaka.org/about/data-license-noncommercial), and [API attribution guidance](https://mangabaka.org/data/api). Credits and links are available in Settings → About. Native backups and recommendation exports containing MangaBaka entries carry a data attribution notice. Queries and caching are limited to on-demand app use.

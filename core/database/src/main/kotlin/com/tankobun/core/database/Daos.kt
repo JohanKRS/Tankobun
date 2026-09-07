@@ -53,6 +53,8 @@ private fun AnilistMediaEntity.withFallbackDetails(fallback: AnilistMediaEntity?
     if (fallback == null) return this
     return copy(
         idMal = idMal ?: fallback.idMal,
+        anilistId = anilistId ?: fallback.anilistId,
+        mangaBakaId = mangaBakaId ?: fallback.mangaBakaId,
         titleRomaji = titleRomaji ?: fallback.titleRomaji,
         titleEnglish = titleEnglish ?: fallback.titleEnglish,
         titleNative = titleNative ?: fallback.titleNative,
@@ -120,12 +122,12 @@ interface RecommendationDao {
         SELECT media.* FROM anilist_recommendations AS rec
         INNER JOIN anilist_media AS media ON media.id = rec.recommendationMediaId
         WHERE rec.mediaId = :mediaId
-        ORDER BY COALESCE(rec.rating, 0) DESC
+        ORDER BY rec.rowid ASC
         """,
     )
     suspend fun cachedRecommendationMedia(mediaId: Int): List<AnilistMediaEntity>
 
-    @Query("SELECT * FROM anilist_recommendations WHERE mediaId = :mediaId ORDER BY COALESCE(rating, 0) DESC")
+    @Query("SELECT * FROM anilist_recommendations WHERE mediaId = :mediaId ORDER BY rowid ASC")
     suspend fun cachedRecommendations(mediaId: Int): List<AnilistRecommendationEntity>
 
     @Query("DELETE FROM anilist_recommendations WHERE mediaId = :mediaId")

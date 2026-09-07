@@ -244,7 +244,8 @@ internal fun MangaDetailScreen(
 ) {
     val backdrop = mediaDetailBackdropColor()
     val context = LocalContext.current
-    val heroBackdropImage = media.bannerImage ?: media.coverImage
+    var bannerFailed by remember(media.id, media.bannerImage) { mutableStateOf(false) }
+    val heroBackdropImage = media.bannerImage?.takeUnless { bannerFailed } ?: media.coverImage
     val heroBackdropRequest = remember(context, heroBackdropImage) {
         ImageRequest.Builder(context)
             .data(heroBackdropImage)
@@ -287,6 +288,7 @@ internal fun MangaDetailScreen(
         ) {
             AsyncImage(
                 model = heroBackdropRequest,
+                onError = { bannerFailed = true },
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -524,7 +526,7 @@ private fun TankobunUiState.detailShareItem(media: AnilistMedia): LibraryItem {
     val entry = selectedListEntry
         ?.takeIf { it.mediaId == media.id }
         ?: AnilistListEntry(
-            id = -media.id,
+            id = -kotlin.math.abs(media.id),
             mediaId = media.id,
             status = trackingStatus,
             progress = trackingProgress.toIntOrNull()?.coerceAtLeast(0) ?: 0,

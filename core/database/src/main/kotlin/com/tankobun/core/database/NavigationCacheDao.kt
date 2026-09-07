@@ -11,7 +11,8 @@ private const val UNOWNED_MEDIA = """
         UNION SELECT mediaId FROM reader_progress
         UNION SELECT mediaId FROM download_jobs
         UNION SELECT mediaId FROM download_pages
-        UNION SELECT mediaId FROM sync_mutations)
+        UNION SELECT mediaId FROM sync_mutations
+        UNION SELECT mediaId FROM mangabaka_mutations)
 """
 private const val UNBOUND_CHAPTER = """
     NOT EXISTS (SELECT 1 FROM source_bindings b WHERE b.sourceId = source_chapters.sourceId AND b.mangaUrl = source_chapters.mangaUrl)
@@ -43,8 +44,12 @@ interface NavigationCacheDao {
     @Query("SELECT (SELECT COUNT(*) FROM anilist_media WHERE " + UNOWNED_MEDIA + ") + (SELECT COUNT(*) FROM anilist_search_results) + (SELECT COUNT(*) FROM anilist_recommendations) + (SELECT COUNT(*) FROM source_search_results) + (SELECT COUNT(*) FROM source_chapters WHERE " + UNBOUND_CHAPTER + ")")
     suspend fun recordCount(): Long
 
+    @Query("DELETE FROM catalog_pages WHERE fetchedAtEpochMillis < :before")
+    suspend fun deleteOldCatalogPages(before: Long)
+
     @Transaction
     suspend fun prune(before: Long) {
+        deleteOldCatalogPages(before)
         deleteOldSearches(before)
         deleteOldRecommendations(before)
         deleteOldSourceSearches(before)

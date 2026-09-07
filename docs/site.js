@@ -1,6 +1,8 @@
 "use strict";
 const translations = {
   en: {
+    mangaBakaLicense: "MangaBaka data · CC BY-NC-SA 4.0",
+    metadataCredits: "Metadata credits:", dataTerms: "Data terms", providerCredits: "Data providers and attribution",
     lang: "en", title: "Tankobun — Your manga library", description: "An Android app to organize your manga library, read, and sync your progress with AniList.",
     skip: "Skip to content", navigation: "Main navigation", screens: "Screens", features: "Features", language: "Language", apk: "Download APK",
     line1: "Your", line2: "manga", line3: "library.", download: "Download for Android", organization: "Organization", details: "Details", detailsText: "See the synopsis, author and chapters in one place.", openDetails: "View the manga details screen", altDetails: "Manga details with author, synopsis and chapters", reading: "Reading",
@@ -10,6 +12,8 @@ const translations = {
     altTablet: "Tankobun Home on a portrait tablet in the Peach theme", altDark: "Tankobun Home in the Plum theme", altLibrary: "Library with reading statuses, covers and filters", altReader: "The real reader with an original fictional comic page", altTracking: "Tracking controls for progress, score and notes", viewer: "App screen", close: "Close"
   },
   pt: {
+    mangaBakaLicense: "Dados MangaBaka · CC BY-NC-SA 4.0",
+    metadataCredits: "Créditos dos metadados:", dataTerms: "Termos dos dados", providerCredits: "Provedores e atribuição dos dados",
     lang: "pt-BR", title: "Tankobun — Sua biblioteca de mangás", description: "Um aplicativo Android para organizar sua biblioteca de mangás, ler e sincronizar seu progresso com o AniList.",
     skip: "Ir para o conteúdo", navigation: "Navegação principal", screens: "Telas", features: "Recursos", language: "Idioma", apk: "Baixar APK",
     line1: "Sua", line2: "biblioteca", line3: "de mangás.", download: "Baixar para Android", organization: "Organização", details: "Detalhes", detailsText: "Veja sinopse, autor e capítulos no mesmo lugar.", openDetails: "Ampliar a tela de detalhes do mangá", altDetails: "Detalhes do mangá com autor, sinopse e capítulos", reading: "Leitura",
@@ -19,6 +23,8 @@ const translations = {
     altTablet: "Tela inicial do Tankobun no tablet em retrato, com tema Pêssego", altDark: "Tela inicial do Tankobun no tema Ameixa", altLibrary: "Biblioteca com categorias de leitura, capas e filtros", altReader: "Leitor real com uma página de quadrinhos original e fictícia", altTracking: "Controles de acompanhamento com progresso, nota e anotações", viewer: "Tela do aplicativo", close: "Fechar"
   },
   es: {
+    mangaBakaLicense: "Datos MangaBaka · CC BY-NC-SA 4.0",
+    metadataCredits: "Créditos de los metadatos:", dataTerms: "Términos de los datos", providerCredits: "Proveedores y atribución de datos",
     lang: "es", title: "Tankobun — Tu biblioteca de manga", description: "Una aplicación Android para organizar tu biblioteca de manga, leer y sincronizar tu progreso con AniList.",
     skip: "Ir al contenido", navigation: "Navegación principal", screens: "Pantallas", features: "Funciones", language: "Idioma", apk: "Descargar APK",
     line1: "Tu", line2: "biblioteca", line3: "de manga.", download: "Descargar para Android", organization: "Organización", details: "Detalles", detailsText: "Consulta la sinopsis, el autor y los capítulos en un solo lugar.", openDetails: "Ampliar los detalles del manga", altDetails: "Detalles del manga con autor, sinopsis y capítulos", reading: "Lectura",
@@ -28,6 +34,8 @@ const translations = {
     altTablet: "Inicio de Tankobun en una tableta en vertical con el tema Melocotón", altDark: "Inicio de Tankobun con el tema Ciruela", altLibrary: "Biblioteca con estados de lectura, portadas y filtros", altReader: "Lector real con una página de cómic original y ficticia", altTracking: "Controles de seguimiento de progreso, puntuación y notas", viewer: "Pantalla de la aplicación", close: "Cerrar"
   },
   zh: {
+    mangaBakaLicense: "MangaBaka 数据 · CC BY-NC-SA 4.0",
+    metadataCredits: "元数据致谢：", dataTerms: "数据条款", providerCredits: "数据提供方与署名",
     lang: "zh-CN", title: "Tankobun — 你的漫画书架", description: "一款 Android 应用，可整理漫画书库、阅读漫画，并通过 AniList 同步阅读进度。",
     skip: "跳转到正文", navigation: "主导航", screens: "应用界面", features: "功能", language: "语言", apk: "下载 APK",
     line1: "你的", line2: "漫画", line3: "书架。", download: "下载 Android 版", organization: "整理", details: "详情", detailsText: "在同一页面查看简介、作者和章节。", openDetails: "放大漫画详情界面", altDetails: "漫画详情，包含作者、简介和章节", reading: "阅读",

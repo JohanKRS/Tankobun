@@ -47,6 +47,8 @@ data class LocalReadingActivity(
 )
 
 data class TankobunUiState(
+    val mangaBakaAccountName: String? = null,
+    val mangaBakaBusy: Boolean = false,
     val loggedIn: Boolean = false,
     val clientConfigured: Boolean = false,
     val themePreference: TankobunThemePreference = TankobunThemePreference(),
@@ -104,6 +106,9 @@ data class TankobunUiState(
     val browsePopular: List<AnilistMedia> = emptyList(),
     val browsePopularManhwa: List<AnilistMedia> = emptyList(),
     val browseTopManga: List<AnilistMedia> = emptyList(),
+    val browseForYou: List<AnilistMedia> = emptyList(),
+    val browseForYouOpen: Boolean = false,
+    val browseForYouRefreshing: Boolean = false,
     val browseLandingLoaded: Boolean = false,
     val homeTrending: List<AnilistMedia> = emptyList(),
     val homeGenreHighlights: List<AnilistGenreHighlight> = emptyList(),
@@ -227,7 +232,7 @@ private fun AnilistMedia.toHiddenLibraryItem(): LibraryItem =
     LibraryItem(
         media = this,
         entry = AnilistListEntry(
-            id = -id,
+            id = -kotlin.math.abs(id),
             mediaId = id,
             status = MediaStatus.PLANNING,
             progress = 0,

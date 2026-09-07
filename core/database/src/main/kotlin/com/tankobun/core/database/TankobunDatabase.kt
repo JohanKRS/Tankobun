@@ -17,12 +17,16 @@ import androidx.room.TypeConverters
         DownloadJobEntity::class,
         DownloadPageEntity::class,
         SyncMutationEntity::class,
+        CatalogIdentityEntity::class,
+        CatalogPageEntity::class,
+        MangaBakaMutationEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 @TypeConverters(TankobunTypeConverters::class)
 abstract class TankobunDatabase : RoomDatabase() {
+    abstract fun catalogDao(): CatalogDao
     abstract fun navigationCacheDao(): NavigationCacheDao
     abstract fun mediaDao(): MediaDao
     abstract fun listEntryDao(): ListEntryDao

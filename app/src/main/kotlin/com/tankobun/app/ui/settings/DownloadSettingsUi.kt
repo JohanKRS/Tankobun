@@ -877,11 +877,7 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
             state.anilistCustomLists.size,
             state.anilistCustomLists.size,
         )
-        SettingsRoute.BACKUPS -> tankobunString(
-            R.string.backup_mal_matched_summary,
-            state.libraryItems.count { it.media.idMal != null },
-            state.libraryItems.size,
-        )
+        SettingsRoute.BACKUPS -> tankobunQuantityString(R.plurals.manga_count, state.libraryItems.size, state.libraryItems.size)
         SettingsRoute.ABOUT -> tankobunString(R.string.about_summary)
         SettingsRoute.SOURCES -> if (state.untrustedExtensions.isNotEmpty()) {
             tankobunQuantityString(R.plurals.sources_trust_pending_count, state.untrustedExtensions.size, state.untrustedExtensions.size)

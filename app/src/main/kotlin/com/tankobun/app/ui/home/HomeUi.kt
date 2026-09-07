@@ -258,7 +258,6 @@ internal fun HomeScreen(
                             }
                         }
                     }
-                    if (expanded && row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         }

@@ -96,12 +96,17 @@ data class AnilistMedia(
     val countryOfOrigin: String? = null,
     val mainCharacterImage: String? = null,
     val characterImages: List<String> = emptyList(),
+    // id is the stable local key. External catalog IDs must never be used interchangeably.
+    val anilistId: Int? = id.takeIf { it > 0 },
+    val mangaBakaId: Int? = null,
 )
 
 fun AnilistMedia.withFallbackDetails(fallback: AnilistMedia?): AnilistMedia {
     if (fallback == null || fallback.id != id) return this
     return copy(
         idMal = idMal ?: fallback.idMal,
+        anilistId = anilistId ?: fallback.anilistId,
+        mangaBakaId = mangaBakaId ?: fallback.mangaBakaId,
         title = title.copy(
             romaji = title.romaji ?: fallback.title.romaji,
             english = title.english ?: fallback.title.english,

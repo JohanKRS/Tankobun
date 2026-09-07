@@ -334,7 +334,14 @@ internal fun BrowseScreen(
     }
 
     Box(Modifier.fillMaxSize()) {
-        if (controlsActive || state.browseSearched) {
+        if (state.browseForYouOpen) {
+            BrowseForYouResults(
+                state = state,
+                viewModel = viewModel,
+                trackedStatuses = trackedStatuses,
+                onSelectMedia = onSelectMedia,
+            )
+        } else if (controlsActive || state.browseSearched) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -663,6 +670,21 @@ internal fun BrowseLanding(
                 onLongPressMedia = onLongPressMedia,
             )
         }
+        if (state.browseForYou.isNotEmpty()) {
+            item(key = "mangabaka-mix") {
+                BrowseMangaShelf(
+                    title = tankobunString(R.string.catalog_for_you),
+                    media = state.browseForYou,
+                    trackedStatuses = trackedStatuses,
+                    selectedMediaIds = selectedMediaIds,
+                    selectionMode = selectionMode,
+                    onViewAll = viewModel::viewAllBrowseForYou,
+                    onSelectMedia = onSelectMedia,
+                    onToggleMediaSelection = onToggleMediaSelection,
+                    onLongPressMedia = onLongPressMedia,
+                )
+            }
+        }
         item {
             BrowseMangaShelf(
                 title = tankobunString(R.string.browse_all_time_popular),
@@ -724,7 +746,7 @@ internal fun BrowseMangaShelf(
     trackedStatuses: Map<Int, MediaStatus>,
     selectedMediaIds: Set<Int>,
     selectionMode: Boolean,
-    onViewAll: () -> Unit,
+    onViewAll: (() -> Unit)?,
     onSelectMedia: (AnilistMedia) -> Unit,
     onToggleMediaSelection: (AnilistMedia) -> Unit,
     onLongPressMedia: (AnilistMedia) -> Unit,
@@ -733,11 +755,11 @@ internal fun BrowseMangaShelf(
         TankobunSectionHeader(
             title = title,
             modifier = Modifier.padding(horizontal = BrowseLandingContentPadding),
-            actionLabel = tankobunString(R.string.browse_view_all),
+            actionLabel = if (onViewAll != null) tankobunString(R.string.browse_view_all) else null,
             onAction = onViewAll,
         )
         AnimatedContent(
-            targetState = media,
+            targetState = media.take(BROWSE_LANDING_SECTION_SIZE),
             transitionSpec = {
                 fadeIn(animationSpec = tween(durationMillis = 220)) togetherWith
                     fadeOut(animationSpec = tween(durationMillis = 160))
@@ -839,6 +861,58 @@ internal fun BrowseShelfTile(
             TankobunMediaStatusLabel(text = media.status.statusLabel())
         }
     }
+}
+
+@Composable
+private fun BrowseForYouResults(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    trackedStatuses: Map<Int, MediaStatus>,
+    onSelectMedia: (AnilistMedia) -> Unit,
+) {
+    val chromeInsets = LocalTankobunChromeInsets.current
+    MediaCollection(
+        media = state.browseForYou,
+        viewMode = state.browseViewMode,
+        coverColumns = state.browseCoverColumns,
+        showWholeCovers = state.browseShowWholeCovers,
+        trackedStatuses = trackedStatuses,
+        modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
+        contentPadding = PaddingValues(top = chromeInsets.top + 18.dp, bottom = chromeInsets.bottom + 18.dp),
+        header = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        tankobunString(R.string.catalog_for_you),
+                        modifier = Modifier.weight(1f),
+                        style = LocalTankobunStyle.current.typography.sectionLabel,
+                        color = LocalTankobunStyle.current.colors.accent,
+                    )
+                    IconButton(
+                        onClick = viewModel::refreshBrowseForYou,
+                        enabled = !state.browseForYouRefreshing,
+                    ) {
+                        if (state.browseForYouRefreshing) {
+                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(TankobunIcons.Refresh, tankobunString(R.string.catalog_refresh_recommendations))
+                        }
+                    }
+                }
+                Text(
+                    tankobunString(R.string.catalog_for_you_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        onSelectMedia = onSelectMedia,
+        selectedMediaIds = state.selectedLibraryMediaIds,
+        selectionMode = state.selectedLibraryMediaIds.isNotEmpty(),
+        onToggleMediaSelection = viewModel::toggleLibraryBatchSelection,
+        onLongPressMedia = viewModel::startLibraryBatchSelection,
+        emptyMessage = tankobunString(R.string.browse_no_results),
+    )
 }
 
 @Composable
@@ -1379,6 +1453,9 @@ internal fun browseGenreLabel(genre: String): String {
         "Sports" -> R.string.browse_genre_sports
         "Supernatural" -> R.string.browse_genre_supernatural
         "Thriller" -> R.string.browse_genre_thriller
+        "Martial Arts" -> R.string.browse_genre_martial_arts
+        "Historical" -> R.string.browse_genre_historical
+        "Tragedy" -> R.string.browse_genre_tragedy
         else -> null
     }
     return labelRes?.let { tankobunString(it) } ?: genre

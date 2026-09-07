@@ -25,3 +25,5 @@ include(":core:extensions")
 include(":core:reader")
 include(":core:downloads")
 include(":core:sync")
+
+include(":core:mangabaka")

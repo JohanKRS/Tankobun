@@ -27,7 +27,7 @@ internal fun buildMyAnimeListBackupXml(
     viewerName: String?,
     scoreFormat: AnilistScoreFormat,
 ): String {
-    val sortedItems = items.sortedWith(
+    val sortedItems = items.filter { it.media.anilistId != null }.sortedWith(
         compareBy<LibraryItem> { it.entry.status.malSortOrder() }
             .thenBy { it.media.title.userPreferred.lowercase(Locale.ROOT) },
     )
@@ -160,7 +160,7 @@ internal fun Element.childText(tagName: String): String? {
 
 internal fun LibraryItem.toAniListBackupComment(): String =
     buildList {
-        add("AniList media id: ${media.id}")
+        add("AniList media id: ${media.anilistId}")
         add("AniList list entry id: ${entry.id}")
         media.siteUrl?.takeIf { it.isNotBlank() }?.let { add("AniList URL: $it") }
         if (media.idMal == null) add("No MAL id; this entry may need manual matching on import")

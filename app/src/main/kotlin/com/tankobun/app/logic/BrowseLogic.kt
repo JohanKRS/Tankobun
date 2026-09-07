@@ -5,7 +5,7 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistMediaPage
 import java.util.Locale
 
-internal const val BROWSE_LANDING_SECTION_SIZE = 12
+internal const val BROWSE_LANDING_SECTION_SIZE = 10
 internal const val BROWSE_RESULTS_PAGE_SIZE = 50
 internal const val BROWSE_SORT_SEARCH_MATCH = "SEARCH_MATCH"
 internal const val BROWSE_TRENDING_CACHE_KEY = "browse:section:trending"
@@ -78,4 +78,3 @@ internal fun cachedBrowsePageFromMedia(media: List<AnilistMedia>): AnilistMediaP
             (media.size < BROWSE_RESULTS_PAGE_SIZE || media.size % BROWSE_RESULTS_PAGE_SIZE == 0),
     )
 }
-

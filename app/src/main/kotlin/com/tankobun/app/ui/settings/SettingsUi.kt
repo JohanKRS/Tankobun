@@ -562,7 +562,7 @@ internal fun AniListSettingsScreen(
 ) {
     val context = LocalContext.current
     SettingsDetailPanel(
-        title = "AniList",
+        title = tankobunString(R.string.catalog_accounts),
         subtitle = tankobunString(R.string.settings_anilist_subtitle),
         modifier = modifier,
     ) {
@@ -591,6 +591,7 @@ internal fun AniListSettingsScreen(
                 label = { Text(tankobunString(R.string.library_mode_anilist)) },
             )
         }
+        MangaBakaSettings(state, viewModel)
         SettingsGroupDivider(label = "AniList")
         Text(tankobunString(R.string.settings_connection), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         TankobunPanel(

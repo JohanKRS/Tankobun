@@ -95,10 +95,10 @@
     <string name="settings_nsfw_visible">NSFW visible</string>
     <string name="settings_nsfw_hidden">NSFW oculto</string>
     <string name="settings_show_nsfw_content">Mostrar contenido NSFW</string>
-    <string name="settings_show_nsfw_content_desc">Permite que manga adulto de AniList y etiquetas adultas aparezcan en Inicio, exploración, búsqueda y filtros.</string>
+    <string name="settings_show_nsfw_content_desc">Permite mostrar manga y etiquetas para adultos de los catálogos en Inicio, Explorar, búsquedas y filtros.</string>
     <string name="settings_appearance_subtitle">Elige un tema y el comportamiento de diseño para tu forma de leer.</string>
     <string name="settings_library_subtitle">Elige el diseño predeterminado para tus listas de biblioteca.</string>
-    <string name="settings_browse_subtitle">Elige el diseño predeterminado para la búsqueda y el descubrimiento en AniList.</string>
+    <string name="settings_browse_subtitle">Elige el diseño predeterminado para buscar y descubrir manga.</string>
     <string name="settings_reader_subtitle">Ajusta paginación, desplazamiento y espaciado.</string>
     <string name="settings_anilist_subtitle">Gestiona la sincronización y la conexión de la cuenta.</string>
     <string name="settings_custom_lists_subtitle">Crea, renombra y elimina listas personalizadas de manga. Los manga permanecen en sus listas normales de estado.</string>
@@ -379,7 +379,7 @@
     <string name="library_status_other">Otro</string>
     <string name="library_status_tracked">En seguimiento</string>
 
-    <string name="browse_search_placeholder">Buscar manga en AniList</string>
+    <string name="browse_search_placeholder">Buscar manga</string>
     <string name="browse_options">Opciones de exploración</string>
     <string name="browse_library_options">Opciones de biblioteca</string>
     <string name="browse_browse_options">Opciones de exploración</string>
@@ -394,8 +394,8 @@
     <string name="browse_author_results">Resultados de autor</string>
     <string name="browse_manga">Explorar manga</string>
     <string name="browse_search_results">Resultados de búsqueda</string>
-    <string name="browse_searching_anilist">Buscando en AniList...</string>
-    <string name="browse_no_results">No se encontró manga en AniList para estos filtros.</string>
+    <string name="browse_searching_anilist">Buscando manga...</string>
+    <string name="browse_no_results">No se encontraron mangas con estos filtros.</string>
     <string name="browse_find_tag">Buscar una etiqueta</string>
     <string name="browse_tags_empty">Las etiquetas aparecerán aquí después de que AniList responda.</string>
     <string name="browse_refresh_tags">Actualizar etiquetas</string>
@@ -403,7 +403,7 @@
     <string name="browse_summary_search">Búsqueda \"%1$s\"</string>
     <string name="browse_summary_author">Autor: %1$s</string>
     <string name="browse_summary_sort">Orden: %1$s</string>
-    <string name="browse_summary_default">Base de datos de manga de AniList</string>
+    <string name="browse_summary_default">Catálogos AniList y MangaBaka</string>
     <string name="browse_sort_search_match">Coincidencia de búsqueda</string>
     <string name="browse_sort_trending">Tendencias</string>
     <string name="browse_sort_popularity">Popularidad</string>
@@ -585,8 +585,8 @@
     <string name="downloads_storage_detail_complete">%1$d completos</string>
     <string name="downloads_storage_detail_active">%1$d activos</string>
     <string name="cache_storage_title">Caché</string>
-    <string name="cache_storage_desc">Datos temporales de AniList, imágenes, fuentes y páginas del lector.</string>
-    <string name="cache_storage_anilist_images">AniList e imágenes</string>
+    <string name="cache_storage_desc">Datos temporales de catálogos, imágenes, fuentes y páginas del lector.</string>
+    <string name="cache_storage_anilist_images">Catálogos e imágenes</string>
     <string name="cache_storage_source_network">Caché de red de fuentes</string>
     <string name="cache_storage_reader_pages">Caché de páginas del lector</string>
     <string name="cache_storage_temporary">APK temporales</string>
@@ -716,8 +716,8 @@
     <string name="about_changelog_v41_genres">Los filtros de géneros ahora usan los mismos iconos específicos de Perfil, con un icono más claro para Drama.</string>
     <string name="about_changelog_v411_extension_validation">Los paquetes de extensiones ahora se comprueban con los datos de identidad y firma del repositorio antes de que Android abra el instalador.</string>
     <string name="about_changelog_v412_install_compatibility">Mejorada la compatibilidad de instalación en Android, manteniendo intactos el descubrimiento y la gestión de extensiones.</string>
-    <string name="about_unofficial">Tankobun es un lector de manga no oficial y no está afiliado con AniList.</string>
-    <string name="about_anilist_thanks">Gracias a AniList por poner su API a disposición de usuarios y apps de la comunidad.</string>
+    <string name="about_unofficial">Tankobun es un lector independiente, sin afiliación ni respaldo de AniList, MangaBaka u otros proveedores de datos.</string>
+    <string name="about_anilist_thanks">Gracias a AniList, MangaBaka y sus comunidades por las API y los metadatos que hacen posible esta integración.</string>
     <string name="about_anilist_data">AniList es una base de datos y un sitio social de seguimiento de anime y manga. No aloja, sube, comparte, vende ni proporciona manga, capítulos o scanlations. Tankobun accede a metadatos de AniList mediante la API de AniList; la sincronización de cuenta usa autorización del usuario.</string>
     <string name="about_sources">Las fuentes y extensiones son de terceros. Tankobun solo funciona con formatos de extensión compatibles y configuración local del usuario.</string>
 
@@ -999,7 +999,7 @@
     <string name="onboarding_tour_title">Todo listo</string>
     <string name="onboarding_tour_body">Un mapa rápido antes de empezar a leer.</string>
     <string name="onboarding_tour_bullet_library">Biblioteca guarda listas de estado, listas personalizadas, puntuaciones, notas y progreso.</string>
-    <string name="onboarding_tour_bullet_browse">Explorar usa metadatos de AniList para encontrar manga y agregar entradas coincidentes.</string>
+    <string name="onboarding_tour_bullet_browse">Explorar encuentra manga con metadatos de AniList y MangaBaka. Abre un título para elegir una fuente.</string>
     <string name="onboarding_tour_bullet_sources">Las fuentes se gestionan en Ajustes y se eligen por manga cuando vas a leer.</string>
     <string name="onboarding_tour_bullet_reader">El lector admite modos paginado y webtoon, y puede actualizar el progreso al completar capítulos.</string>
     <string name="onboarding_tour_bullet_backups">Las copias mantienen tu biblioteca portátil desde Ajustes &gt; Copias.</string>
@@ -1014,7 +1014,7 @@
     <string name="app_tour_library_point_1">Busca y filtra por género, formato, estado o país.</string>
     <string name="app_tour_library_point_2">Cambia la vista y usa la selección por lotes cuando crezca tu estantería.</string>
     <string name="app_tour_browse_title">Descubre tu próxima lectura</string>
-    <string name="app_tour_browse_body">Explorar usa metadatos de AniList para mostrar manga popular, en tendencia y disponible para búsquedas.</string>
+    <string name="app_tour_browse_body">Explorar usa metadatos de AniList y MangaBaka para mostrar manga popular, en tendencia y disponible en la búsqueda.</string>
     <string name="app_tour_browse_point_1">Busca por título o refina los resultados con los filtros.</string>
     <string name="app_tour_browse_point_2">Abre un manga para ver los detalles y añadirlo a tu biblioteca.</string>
     <string name="app_tour_profile_title">Revisa tu lectura</string>
@@ -1158,4 +1158,33 @@
         <item quantity="other">%1$d extensiones necesitan revisión</item>
     </plurals>
     <string name="home_continue_reading_more">Ver mi biblioteca</string>
+    <string name="catalog_backup_complete">Incluye obras de ambos catálogos, fuentes y progreso de lectura.</string>
+    <string name="catalog_export_xml">Exportar títulos de AniList como XML</string>
+    <string name="catalog_description">MangaBaka reúne títulos y metadatos de distintas bases para ampliar el catálogo. No necesitas una cuenta para explorar.</string>
+    <string name="catalog_tracking_optional">Conectar seguimiento opcional</string>
+    <string name="catalog_tracking_description">Usa un token personal con library.read y library.write. Los próximos cambios se enviarán a MangaBaka; Sincronizar importa su biblioteca. Los registros existentes de AniList mantienen la prioridad.</string>
+    <string name="catalog_token">Token personal</string>
+    <string name="catalog_create_token">Crear token</string>
+    <string name="catalog_connect">Conectar</string>
+    <string name="catalog_connect_failed">No se pudo conectar. Revisa el token y sus permisos de biblioteca.</string>
+    <string name="catalog_sync">Sincronizar MangaBaka</string>
+    <string name="catalog_sync_done">Biblioteca de MangaBaka cargada. Los cambios pendientes se volverán a intentar.</string>
+    <string name="catalog_sync_failed">MangaBaka no está disponible. Tu biblioteca y los cambios pendientes están guardados en este dispositivo.</string>
+    <string name="catalog_accounts">Catálogos y cuentas</string>
+    <string name="catalog_library_backup">Copia de la biblioteca</string>
+    <string name="catalog_for_you">Para ti</string>
+    <string name="about_mangabaka_website">Sitio de MangaBaka</string>
+    <string name="about_catalog_credits">Créditos y licencias de los catálogos</string>
+    <string name="about_mangabaka_data">MangaBaka complementa AniList con metadatos y descubrimiento. Los datos originales de MangaBaka usan la licencia CC BY-NC-SA 4.0. Los datos e imágenes de otros proveedores conservan sus respectivos derechos y términos.</string>
+    <string name="about_data_adaptations">Tankobun combina y formatea metadatos para mostrarlos. Las adaptaciones de datos originales de MangaBaka conservan CC BY-NC-SA 4.0. Créditos a los proveedores de origen:</string>
+    <string name="about_data_terms">Términos de los datos</string>
+    <string name="about_mangabaka_terms">Términos de MangaBaka</string>
+    <string name="about_mangabaka_privacy">Privacidad de MangaBaka</string>
+    <string name="about_code_license">El código de Tankobun usa la licencia MIT. Esta licencia no cubre los datos de los catálogos, las imágenes ni los componentes de terceros, que tienen sus propias licencias.</string>
+    <string name="about_third_party_notices">Avisos de terceros</string>
+    <string name="catalog_for_you_description">Sugerencias de MangaBaka basadas en tus lecturas y valoraciones.</string>
+    <string name="catalog_refresh_recommendations">Actualizar recomendaciones</string>
+    <string name="browse_genre_martial_arts">Artes marciales</string>
+    <string name="browse_genre_historical">Histórico</string>
+    <string name="browse_genre_tragedy">Tragedia</string>
 </resources>

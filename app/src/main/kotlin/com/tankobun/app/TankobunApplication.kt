@@ -122,6 +122,9 @@ class AppContainer(application: Application) {
     fun quantityString(@PluralsRes id: Int, quantity: Int, vararg args: Any): String =
         application.getAppQuantityString(settingsStore.appLanguage(), id, quantity, *args)
 
+    val catalogIdentity = com.tankobun.core.database.DatabaseCatalogIdentity(database)
+    val mangaBakaRepository = com.tankobun.core.mangabaka.MangaBakaRepository(okHttpClient, catalogIdentity)
+
     val anilistRepository = AnilistRepository(
         AnilistGraphQlClient(
             okHttpClient = okHttpClient,
@@ -132,7 +135,11 @@ class AppContainer(application: Application) {
             ),
             userAgent = tankobunAniListUserAgent(),
         ),
+        identity = catalogIdentity,
     )
+
+    internal val mangaBakaTracking = com.tankobun.app.catalog.MangaBakaTracking(this)
+    internal val catalog = com.tankobun.app.catalog.CatalogDataSource(this)
 
     val extensionRepository = ExtensionIndexRepository(
         okHttpClient = okHttpClient,

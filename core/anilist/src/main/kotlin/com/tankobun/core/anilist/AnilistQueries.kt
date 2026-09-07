@@ -40,10 +40,11 @@ object AnilistQueries {
     private fun homeGenrePageFields(genres: List<String>, pages: IntRange, perPage: Int): String =
         genres.flatMapIndexed { index, genre ->
             val safeGenre = genre.replace("\\", "\\\\").replace("\"", "\\\"")
+            val filter = if (genre in com.tankobun.core.model.SUPPLEMENTAL_HOME_GENRES) "tag" else "genre"
             pages.map { page ->
                 """
                   genre${index}Page$page: Page(page: $page, perPage: $perPage) {
-                    media(type: MANGA, genre: "$safeGenre", isAdult: ${'$'}isAdult, sort: TRENDING_DESC) {
+                    media(type: MANGA, $filter: "$safeGenre", isAdult: ${'$'}isAdult, sort: TRENDING_DESC) {
                       id
                       title { romaji english native userPreferred }
                       coverImage { extraLarge large color }

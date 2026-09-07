@@ -97,6 +97,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:network"))
     implementation(project(":core:anilist"))
+    implementation(project(":core:mangabaka"))
     implementation(project(":core:database"))
     implementation(project(":core:extensions"))
     implementation(project(":core:reader"))

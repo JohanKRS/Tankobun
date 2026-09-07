@@ -59,6 +59,18 @@ class AnilistQueriesTest {
     }
 
     @Test
+    fun supplementalHomeGenresUseAniListTagsAndKeepAdultFiltering() {
+        val query = AnilistQueries.homeGenreCandidates(
+            listOf("Action", "Martial Arts", "Historical", "Tragedy"), perPage = 3,
+        )
+        assertTrue(query.contains("genre: \"Action\""))
+        for (genre in listOf("Martial Arts", "Historical", "Tragedy")) {
+            assertTrue(query.contains("tag: \"$genre\", isAdult: ${'$'}isAdult, sort: TRENDING_DESC"))
+            assertFalse(query.contains("genre: \"$genre\""))
+        }
+    }
+
+    @Test
     fun homeGenreCandidatesDoesNotRepeatTrendingPayload() {
         val query = AnilistQueries.homeGenreCandidates(listOf("Fantasy"), perPage = 3)
 
