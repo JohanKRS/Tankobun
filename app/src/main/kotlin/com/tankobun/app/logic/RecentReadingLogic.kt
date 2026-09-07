@@ -7,6 +7,8 @@ import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.SourceChapter
 
+internal const val CONTINUE_READING_LIMIT = 10
+
 internal data class RecentReadingMetrics(
     val currentChapterNumber: Float?,
     val lastAvailableChapterNumber: Float?,

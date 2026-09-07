@@ -15,6 +15,7 @@ import com.tankobun.app.download.DownloadDataSource
 import com.tankobun.app.extensions.ExtensionDataSource
 import com.tankobun.app.extensions.ExtensionApkValidationException
 import com.tankobun.app.extensions.InstalledExtensionVersion
+import com.tankobun.app.logic.CONTINUE_READING_LIMIT
 import com.tankobun.app.logic.BROWSE_LANDING_SECTION_SIZE
 import com.tankobun.app.logic.BROWSE_MANHWA_CACHE_KEY
 import com.tankobun.app.logic.BROWSE_POPULAR_CACHE_KEY
@@ -1182,7 +1183,8 @@ class MainViewModel(
         viewModelScope.launch {
             val items = aniListDataSource.recentReadingProgressItems(
                 titleLanguage = _state.value.anilistTitleLanguage,
-                limit = RECENT_READING_LIMIT,
+                // One extra local item tells Home whether there is anything beyond the strip.
+                limit = CONTINUE_READING_LIMIT + 1,
             )
             _state.update { it.copy(recentReadingProgress = items) }
         }
@@ -5125,7 +5127,6 @@ class MainViewModel(
     companion object {
         private const val TAG = "TankobunMain"
         private const val OAUTH_STATE_BYTES = 24
-        private const val RECENT_READING_LIMIT = 10
         private const val TRACKING_AUTO_SAVE_DELAY_MILLIS = 1_200L
         private const val APP_UPDATE_CHECK_INTERVAL_MILLIS = 24L * 60L * 60L * 1_000L
         private val secureRandom = SecureRandom()

@@ -87,6 +87,7 @@ import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.LocalTankobunTokens
 import com.tankobun.app.R
 import com.tankobun.app.TankobunDisplayFontFamily
+import com.tankobun.app.logic.CONTINUE_READING_LIMIT
 import com.tankobun.app.logic.isInReadingCategory
 import com.tankobun.app.logic.mobileHeroCharacterImages
 import com.tankobun.app.logic.tabletHeroCharacterImages
@@ -811,19 +812,21 @@ private fun ContinueReadingRow(
         contentPadding = PaddingValues(horizontal = horizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(items, key = { it.media.id }) { item ->
+        items(items.take(CONTINUE_READING_LIMIT), key = { it.media.id }) { item ->
             ContinueReadingCard(item = item, width = 190.dp, onClick = { onOpen(item) })
         }
-        item(key = "view-reading-library") {
-            LoadMoreRecommendationsTile(
-                loading = false,
-                onClick = onViewMore,
-                modifier = Modifier.width(190.dp),
-                label = tankobunString(R.string.home_continue_reading_more),
-                icon = TankobunIcons.MenuBook,
-                iconSize = 40.dp,
-                labelStyle = MaterialTheme.typography.titleLarge,
-            )
+        if (items.size > CONTINUE_READING_LIMIT) {
+            item(key = "view-reading-library") {
+                LoadMoreRecommendationsTile(
+                    loading = false,
+                    onClick = onViewMore,
+                    modifier = Modifier.width(190.dp),
+                    label = tankobunString(R.string.home_continue_reading_more),
+                    icon = TankobunIcons.MenuBook,
+                    iconSize = 40.dp,
+                    labelStyle = MaterialTheme.typography.titleLarge,
+                )
+            }
         }
     }
 }
