@@ -90,7 +90,10 @@ internal class BrowseDataSource(
         val query = snapshot.searchQuery.trim()
         val staffName = snapshot.browseStaffName?.trim().orEmpty()
         val accessToken = container.tokenStore.accessToken()
-        return container.catalog.search(primary = { when {
+        val filters = snapshot.catalogTaxonomy.plan(snapshot.browseGenres, snapshot.browseTags)
+        val hasStaffFilters = staffName.isNotBlank() && (snapshot.browseGenres.isNotEmpty() || snapshot.browseTags.isNotEmpty() ||
+            snapshot.browseSelection.isActive)
+        val primary: (suspend () -> AnilistMediaPage)? = if (!filters.canQueryAniList || hasStaffFilters) null else { { when {
             staffName.isNotBlank() -> container.anilistRepository.staffMangaPage(
                 staffName = staffName,
                 sort = snapshot.effectiveBrowseSort(),
@@ -109,23 +112,25 @@ internal class BrowseDataSource(
             }
             else -> container.anilistRepository.browseMangaPage(
                 search = query.takeIf { it.isNotBlank() },
-                genres = snapshot.browseGenres,
-                tags = snapshot.browseTags,
-                format = snapshot.browseFormat,
-                status = snapshot.browsePublishingStatus,
-                countryOfOrigin = snapshot.browseCountryOfOrigin,
-                year = snapshot.browseYear,
+                genres = filters.anilistGenres,
+                tags = filters.anilistTags,
+                selection = snapshot.browseSelection,
                 sort = snapshot.effectiveBrowseSort(),
                 page = page,
                 perPage = BROWSE_RESULTS_PAGE_SIZE,
                 accessToken = accessToken,
                 includeAdult = snapshot.showNsfwContent,
             )
-        } }, secondary = {
+        } } }
+        return container.catalog.search(primary = primary, secondary = {
+            val mbTaxonomyKnown = snapshot.catalogTaxonomy.tags.any { it.mangaBakaId != null }
+            if (!filters.canQueryMangaBaka && mbTaxonomyKnown) return@search AnilistMediaPage(emptyList(), page, false)
             container.mangaBakaRepository.search(query = query, page = page, limit = BROWSE_RESULTS_PAGE_SIZE,
                 includeAdult = snapshot.showNsfwContent, staff = staffName,
-                genres = snapshot.browseGenres, tags = snapshot.browseTags, format = snapshot.browseFormat,
-                status = snapshot.browsePublishingStatus, country = snapshot.browseCountryOfOrigin, year = snapshot.browseYear,
+                tagIds = filters.mangaBakaTagIds, selection = snapshot.browseSelection,
+                oneShotTagId = snapshot.catalogTaxonomy.resolve("One Shot")?.mangaBakaId,
+                genres = if (mbTaxonomyKnown) emptySet() else snapshot.browseGenres.map(snapshot.catalogTaxonomy::label).toSet(),
+                tags = if (mbTaxonomyKnown) emptySet() else snapshot.browseTags.map(snapshot.catalogTaxonomy::label).toSet(),
                 sort = when (snapshot.effectiveBrowseSort()) {
                     "POPULARITY_DESC" -> "popularity_asc"; "SCORE_DESC" -> "score_desc"; "START_DATE_DESC" -> "published_start_date_desc"
                     "TRENDING_DESC" -> "trending_7d"; "ID_DESC" -> "latest"; else -> "relevance_desc"

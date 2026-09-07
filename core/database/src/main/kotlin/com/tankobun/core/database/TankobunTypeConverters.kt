@@ -8,6 +8,12 @@ import com.tankobun.core.model.SyncMutationType
 
 class TankobunTypeConverters {
     @TypeConverter
+    fun intListToDb(value: List<Int>): String = value.joinToString(",")
+
+    @TypeConverter
+    fun intListFromDb(value: String): List<Int> = value.split(',').mapNotNull(String::toIntOrNull)
+
+    @TypeConverter
     fun stringListToDb(value: List<String>): String = value.joinToString(SEPARATOR)
 
     @TypeConverter

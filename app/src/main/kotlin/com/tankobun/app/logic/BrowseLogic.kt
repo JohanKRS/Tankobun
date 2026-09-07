@@ -26,10 +26,7 @@ internal fun BrowseLandingData.hasContent(): Boolean =
 internal fun TankobunUiState.hasBrowseFilters(): Boolean =
     browseGenres.isNotEmpty() ||
         browseTags.isNotEmpty() ||
-        browseFormat != null ||
-        browsePublishingStatus != null ||
-        browseCountryOfOrigin != null ||
-        browseYear != null ||
+        browseSelection.isActive ||
         browseStaffName != null
 
 internal fun TankobunUiState.hasBrowseQueryOrFilters(): Boolean =
@@ -45,18 +42,19 @@ internal fun TankobunUiState.effectiveBrowseSort(): String =
     }
 
 internal fun TankobunUiState.browseCacheKey(): String = buildString {
-    append("browse:")
+    append("browse:v2:")
     append("q=").append(searchQuery.normalizedSearchKey())
     append("|genres=").append(browseGenres.sorted().joinToString(",") { it.normalizedSearchKey() })
     append("|tags=").append(browseTags.sorted().joinToString(",") { it.normalizedSearchKey() })
-    append("|format=").append(browseFormat.orEmpty())
-    append("|status=").append(browsePublishingStatus.orEmpty())
-    append("|country=").append(browseCountryOfOrigin.orEmpty())
-    append("|year=").append(browseYear?.toString().orEmpty())
+    append("|format=").append(browseSelection.formats.sorted().joinToString(","))
+    append("|status=").append(browseSelection.statuses.sorted().joinToString(","))
+    append("|country=").append(browseSelection.countries.sorted().joinToString(","))
+    append("|year=").append(browseSelection.years?.let { "${it.from ?: ""}..${it.to ?: ""}" }.orEmpty())
     append("|staff=").append(browseStaffName.orEmpty().normalizedSearchKey())
     append("|sort=").append(effectiveBrowseSort())
     append("|title=").append(anilistTitleLanguage.name)
     append("|nsfw=").append(showNsfwContent)
+    if (browseGenres.isNotEmpty() || browseTags.isNotEmpty()) append("|taxonomy=v1")
 }
 
 internal fun TankobunUiState.browseLandingCacheKey(baseKey: String): String =

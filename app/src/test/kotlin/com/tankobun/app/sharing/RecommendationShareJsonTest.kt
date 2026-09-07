@@ -50,7 +50,7 @@ class RecommendationShareJsonTest {
 
     @Test
     fun mangaBakaExportCarriesAttributionAndStillRestoresItsIdentity() {
-        val manga = media(-82, "Independent title").copy(anilistId = null, mangaBakaId = 82)
+        val manga = media(-82, "Independent title").copy(anilistId = null, mangaBakaId = 82, mangaBakaTagIds = listOf(29, 45, 515))
         val text = buildRecommendationShareJson("Picks", listOf(RecommendationShareItem(manga)))
         val attribution = org.json.JSONObject(text).getJSONObject("attribution")
         assertEquals("https://creativecommons.org/licenses/by-nc-sa/4.0/", attribution.getString("mangaBakaOriginalDataLicense"))

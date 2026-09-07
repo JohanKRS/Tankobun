@@ -83,30 +83,70 @@ class MangaBakaRepository(
         }
     }
 
+    suspend fun tags(forceRefresh: Boolean = false): List<CatalogTag> = withContext(Dispatchers.Default) {
+        val rows = request("v1/tags", forceRefresh = forceRefresh).array("data").mapNotNull { it as? JsonObject }
+            .filter { it.number("merged_with") == null }
+        val byId = rows.mapNotNull { row -> row.number("id")?.toInt()?.let { it to row } }.toMap()
+        rows.mapNotNull { row ->
+            val id = row.number("id")?.toInt()?.takeIf { it > 0 } ?: return@mapNotNull null
+            val name = row.text("name") ?: return@mapNotNull null
+            val seen = mutableSetOf<Int>()
+            var current: Int? = id
+            var adult = false
+            while (current != null && seen.add(current)) {
+                val ancestor = byId[current] ?: break
+                adult = adult || ancestor.text("content_rating") !in setOf("safe", "suggestive")
+                current = ancestor.number("parent_id")?.toInt()
+            }
+            CatalogTag(
+                key = "mb:$id", name = name,
+                category = row.text("name_path")?.substringBeforeLast(" > ", "")?.takeIf { it.isNotBlank() },
+                isAdult = adult, isGenre = row["is_genre"] == JsonPrimitive(true),
+                mangaBakaId = id, parentId = row.number("parent_id")?.toInt(),
+            )
+        }
+    }
+
     suspend fun search(query: String = "", page: Int = 1, limit: Int = 30, includeAdult: Boolean = false,
         sort: String = "relevance_desc", staff: String? = null, genres: Set<String> = emptySet(), tags: Set<String> = emptySet(),
-        format: String? = null, status: String? = null, country: String? = null, year: Int? = null): AnilistMediaPage {
-        val params = mutableListOf("page" to page.toString(), "limit" to limit.coerceIn(1, 100).toString(), "schema" to "full", "sort_by" to sort)
-        if (query.isNotBlank()) params += "q" to query
-        if (!staff.isNullOrBlank()) params += "staff" to staff
-        if (!includeAdult) { params += "content_rating" to "safe"; params += "content_rating" to "suggestive" }
-        if (format == "NOVEL") params += "type" to "novel"
-        else if (country != null) when (country) { "JP" -> params += "type" to "manga"; "KR" -> params += "type" to "manhwa"; "CN" -> params += "type" to "manhua"; else -> return AnilistMediaPage(emptyList(), page, false) }
-        else if (format != null) params += "type_not" to "novel"
-        status?.let { mapOf("FINISHED" to "completed", "RELEASING" to "releasing", "HIATUS" to "hiatus", "CANCELLED" to "cancelled", "NOT_YET_RELEASED" to "upcoming")[it] }?.let { params += "status" to it }
-        if (year != null) { params += "published_start_date_lower" to "$year-01-01"; params += "published_start_date_upper" to "$year-12-31" }
-        val names = genres + tags + if (format == "ONE_SHOT") setOf("One Shot") else emptySet()
-        if (names.isNotEmpty()) {
-            val available = request("v1/tags").array("data").mapNotNull { it as? JsonObject }
-            for (name in names) {
-                val id = available.firstOrNull { it.text("name").equals(name, ignoreCase = true) }?.text("id")
-                    ?: return AnilistMediaPage(emptyList(), page, false)
-                params += "tag" to id
-            }
-            params += "tag_mode" to "and"
+        format: String? = null, status: String? = null, country: String? = null, year: Int? = null,
+        tagIds: Set<Int> = emptySet(), oneShotTagId: Int? = null,
+        selection: CatalogSearchFilters = CatalogSearchFilters(setOfNotNull(format), setOfNotNull(status), setOfNotNull(country), year?.let { PublicationYears(it, it) }),
+    ): AnilistMediaPage {
+        val branches = selection.mangaBakaBranches()
+        if (branches.isEmpty()) return AnilistMediaPage(emptyList(), page, false)
+        val perBranch = ((limit.coerceIn(1, 100) + branches.size - 1) / branches.size).coerceAtLeast(1)
+        val common = mutableListOf("page" to page.toString(), "limit" to perBranch.toString(), "schema" to "full", "sort_by" to sort)
+        if (query.isNotBlank()) common += "q" to query
+        if (!staff.isNullOrBlank()) common += "staff" to staff
+        if (!includeAdult) { common += "content_rating" to "safe"; common += "content_rating" to "suggestive" }
+        val statuses = mapOf("FINISHED" to "completed", "RELEASING" to "releasing", "HIATUS" to "hiatus", "CANCELLED" to "cancelled", "NOT_YET_RELEASED" to "upcoming")
+        if (selection.statuses.any { it !in statuses }) return AnilistMediaPage(emptyList(), page, false)
+        selection.statuses.sorted().forEach { common += "status" to statuses.getValue(it) }
+        selection.years?.from?.let { common += "published_start_date_lower" to "$it-01-01" }
+        selection.years?.to?.let { common += "published_start_date_upper" to "$it-12-31" }
+        val names = genres + tags
+        val needsOneShot = branches.any { it.oneShot != null }
+        val available = if (names.isNotEmpty() || (needsOneShot && oneShotTagId == null)) this.tags() else emptyList()
+        val resolvedIds = tagIds.toMutableSet()
+        for (name in names) {
+            val matches = available.filter { it.name.catalogNameKey() == name.catalogNameKey() }
+            val tag = matches.singleOrNull() ?: matches.takeIf { it.map(CatalogTag::category).distinct().size == 1 }?.firstOrNull()
+                ?: return AnilistMediaPage(emptyList(), page, false)
+            resolvedIds += tag.mangaBakaId ?: return AnilistMediaPage(emptyList(), page, false)
         }
-        val result = request("v2/series/search", params)
-        return mapPage(result, page, includeAdult)
+        resolvedIds.filter { it > 0 }.sorted().forEach { common += "tag" to it.toString() }
+        if (resolvedIds.isNotEmpty() || needsOneShot) common += "tag_mode" to "and"
+        val oneShotId = oneShotTagId ?: available.singleOrNull { it.name == "One Shot" }?.mangaBakaId
+        if (needsOneShot && oneShotId == null) return AnilistMediaPage(emptyList(), page, false)
+        val results = branches.map { branch ->
+            val params = common.toMutableList()
+            branch.types.sorted().forEach { params += "type" to it }
+            if (branch.excludeNovels) params += "type_not" to "novel"
+            branch.oneShot?.let { params += (if (it) "tag" else "tag_not") to oneShotId.toString() }
+            mapPage(request("v2/series/search", params), page, includeAdult)
+        }
+        return AnilistMediaPage(results.flatMap { it.media }.distinctBy { it.id }, page, results.any { it.hasNextPage })
     }
 
     private suspend fun mapPage(result: JsonObject, page: Int, includeAdult: Boolean): AnilistMediaPage {

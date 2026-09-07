@@ -99,6 +99,7 @@ data class AnilistMedia(
     // id is the stable local key. External catalog IDs must never be used interchangeably.
     val anilistId: Int? = id.takeIf { it > 0 },
     val mangaBakaId: Int? = null,
+    val mangaBakaTagIds: List<Int> = emptyList(),
 )
 
 fun AnilistMedia.withFallbackDetails(fallback: AnilistMedia?): AnilistMedia {
@@ -125,11 +126,12 @@ fun AnilistMedia.withFallbackDetails(fallback: AnilistMedia?): AnilistMedia {
         startDateYear = startDateYear ?: fallback.startDateYear,
         endDateYear = endDateYear ?: fallback.endDateYear,
         siteUrl = siteUrl ?: fallback.siteUrl,
-        genres = genres.ifEmpty { fallback.genres },
+        genres = (genres + fallback.genres).distinctBy(String::catalogNameKey),
         synonyms = synonyms.ifEmpty { fallback.synonyms },
         updatedAtEpochSeconds = updatedAtEpochSeconds ?: fallback.updatedAtEpochSeconds,
         staff = staff.ifEmpty { fallback.staff },
-        tags = tags.ifEmpty { fallback.tags },
+        tags = (tags + fallback.tags).distinctBy(String::catalogNameKey),
+        mangaBakaTagIds = (mangaBakaTagIds + fallback.mangaBakaTagIds).distinct(),
         countryOfOrigin = countryOfOrigin ?: fallback.countryOfOrigin,
         mainCharacterImage = mainCharacterImage ?: fallback.mainCharacterImage,
         characterImages = characterImages.ifEmpty { fallback.characterImages },

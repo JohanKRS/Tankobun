@@ -399,6 +399,36 @@ class SettingsStore(context: Context) {
             }
             .toList()
 
+    fun mangaBakaTags(): List<com.tankobun.core.model.CatalogTag> =
+        preferences.getString("mangabaka.taxonomy", "").orEmpty().lineSequence().mapNotNull { line ->
+            val parts = line.split('|')
+            if (parts.size != 6) return@mapNotNull null
+            runCatching {
+                val id = parts[0].toInt().also { require(it > 0) }
+                com.tankobun.core.model.CatalogTag(
+                    key = "mb:$id", mangaBakaId = id, parentId = parts[1].toIntOrNull(),
+                    name = decodePart(parts[2]), category = parts[3].takeIf(String::isNotBlank)?.let(::decodePart),
+                    isAdult = parts[4].toBooleanStrict(), isGenre = parts[5].toBooleanStrict(),
+                )
+            }.getOrNull()
+        }.toList()
+
+    fun mangaBakaTagsCachedAtEpochMillis(): Long = preferences.getLong("mangabaka.taxonomy.cached.at", 0L)
+
+    fun saveMangaBakaTags(tags: List<com.tankobun.core.model.CatalogTag>, cachedAt: Long) {
+        val payload = tags.joinToString("\n") { tag ->
+            listOf(tag.mangaBakaId.toString(), tag.parentId?.toString().orEmpty(), encodePart(tag.name),
+                tag.category?.let(::encodePart).orEmpty(), tag.isAdult.toString(), tag.isGenre.toString()).joinToString("|")
+        }
+        preferences.edit().putString("mangabaka.taxonomy", payload).putLong("mangabaka.taxonomy.cached.at", cachedAt).apply()
+    }
+
+    fun clearCatalogTaxonomyCache() {
+        preferences.edit().remove("mangabaka.taxonomy").remove("mangabaka.taxonomy.cached.at")
+            .remove(KEY_ANILIST_TAGS).remove(KEY_ANILIST_TAGS_CACHED_AT)
+            .remove(KEY_ANILIST_GENRES).remove(KEY_ANILIST_GENRES_CACHED_AT).apply()
+    }
+
     fun anilistTagsCachedAtEpochMillis(): Long =
         preferences.getLong(KEY_ANILIST_TAGS_CACHED_AT, 0L)
 

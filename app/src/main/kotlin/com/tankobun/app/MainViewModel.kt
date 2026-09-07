@@ -132,6 +132,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tankobun.core.anilist.AnilistOAuth
 import com.tankobun.core.extensions.ExtensionIndexEntry
+import com.tankobun.core.model.CatalogSearchFilters
+import com.tankobun.core.model.PublicationYears
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistScoreFormat
@@ -183,10 +185,7 @@ private data class BrowseCriteria(
     val searchQuery: String = "",
     val genres: Set<String> = emptySet(),
     val tags: Set<String> = emptySet(),
-    val format: String? = null,
-    val publishingStatus: String? = null,
-    val countryOfOrigin: String? = null,
-    val year: Int? = null,
+    val selection: CatalogSearchFilters = CatalogSearchFilters(),
     val staffName: String? = null,
     val sort: String = BROWSE_SORT_SEARCH_MATCH,
 ) {
@@ -194,10 +193,7 @@ private data class BrowseCriteria(
         get() = searchQuery.trim().isNotBlank() ||
             genres.isNotEmpty() ||
             tags.isNotEmpty() ||
-            format != null ||
-            publishingStatus != null ||
-            countryOfOrigin != null ||
-            year != null ||
+            selection.isActive ||
             staffName != null ||
             sort != BROWSE_SORT_SEARCH_MATCH
 }
@@ -300,6 +296,9 @@ class MainViewModel(
             browseCoverColumns = container.settingsStore.browseCoverColumns(),
             browseShowWholeCovers = container.settingsStore.browseShowWholeCovers(),
             browseAvailableTags = container.settingsStore.anilistTags(),
+            catalogTaxonomy = com.tankobun.core.model.CatalogTaxonomy.merge(
+                container.settingsStore.anilistTags(), container.settingsStore.anilistGenres().ifEmpty { FALLBACK_HOME_GENRES }, emptyList(),
+            ),
             sourceLanguages = container.settingsStore.sourceLanguages(),
             disabledSourceKeys = container.settingsStore.disabledSourceKeys(),
             extensionRepositoryUrl = container.settingsStore.extensionRepositoryUrl(),
@@ -1811,24 +1810,34 @@ class MainViewModel(
         }
     }
 
-    fun setBrowseFormat(format: String?) {
-        _state.update { it.copy(browseFormat = format, browseStaffName = null) }
+    fun setBrowseFormats(formats: Set<String>) {
+        _state.update { it.copy(browseSelection = it.browseSelection.copy(formats = formats), browseStaffName = null) }
     }
 
-    fun setBrowsePublishingStatus(status: String?) {
-        _state.update { it.copy(browsePublishingStatus = status, browseStaffName = null) }
+    fun setBrowseStatuses(statuses: Set<String>) {
+        _state.update { it.copy(browseSelection = it.browseSelection.copy(statuses = statuses), browseStaffName = null) }
     }
 
-    fun setBrowseCountryOfOrigin(country: String?) {
-        _state.update { it.copy(browseCountryOfOrigin = country, browseStaffName = null) }
+    fun setBrowseCountries(countries: Set<String>) {
+        _state.update { it.copy(browseSelection = it.browseSelection.copy(countries = countries), browseStaffName = null) }
     }
 
-    fun setBrowseYear(year: Int?) {
-        _state.update { it.copy(browseYear = year, browseStaffName = null) }
+    fun setBrowseYears(years: PublicationYears?) {
+        _state.update { it.copy(browseSelection = it.browseSelection.copy(years = years), browseStaffName = null) }
     }
 
     fun setBrowseSort(sort: String) {
         _state.update { it.copy(browseSort = sort) }
+    }
+
+    fun applyBrowseGenres(selection: Set<String>) {
+        _state.update { it.copy(browseGenres = selection) }
+        searchAniList()
+    }
+
+    fun applyBrowseTags(selection: Set<String>) {
+        _state.update { it.copy(browseTags = selection) }
+        searchAniList()
     }
 
     fun resetBrowseFilters() {
@@ -1844,10 +1853,7 @@ class MainViewModel(
                 browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = emptySet(),
-                browseFormat = null,
-                browsePublishingStatus = null,
-                browseCountryOfOrigin = null,
-                browseYear = null,
+                browseSelection = CatalogSearchFilters(),
                 browseStaffName = null,
                 browseSort = BROWSE_SORT_SEARCH_MATCH,
                 message = null,
@@ -1911,10 +1917,7 @@ class MainViewModel(
                 browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = emptySet(),
-                browseFormat = null,
-                browsePublishingStatus = null,
-                browseCountryOfOrigin = null,
-                browseYear = null,
+                browseSelection = CatalogSearchFilters(),
                 browseStaffName = null,
                 browseSort = sort,
                 message = null,
@@ -1934,10 +1937,7 @@ class MainViewModel(
                 browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = emptySet(),
-                browseFormat = null,
-                browsePublishingStatus = null,
-                browseCountryOfOrigin = "KR",
-                browseYear = null,
+                browseSelection = CatalogSearchFilters(countries = setOf("KR")),
                 browseStaffName = null,
                 browseSort = "POPULARITY_DESC",
                 message = null,
@@ -1957,10 +1957,7 @@ class MainViewModel(
                 browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = setOf(tag),
-                browseFormat = null,
-                browsePublishingStatus = null,
-                browseCountryOfOrigin = null,
-                browseYear = null,
+                browseSelection = CatalogSearchFilters(),
                 browseStaffName = null,
                 browseSort = BROWSE_SORT_SEARCH_MATCH,
                 message = null,
@@ -1980,10 +1977,7 @@ class MainViewModel(
                 browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = emptySet(),
-                browseFormat = null,
-                browsePublishingStatus = null,
-                browseCountryOfOrigin = null,
-                browseYear = null,
+                browseSelection = CatalogSearchFilters(),
                 browseStaffName = author,
                 browseSort = "POPULARITY_DESC",
                 message = null,
@@ -2283,7 +2277,7 @@ class MainViewModel(
     private fun applyHomeFeed(feed: com.tankobun.core.model.AnilistHomeFeed) {
         _state.update {
             it.copy(
-                homeTrending = feed.trending.map { media -> media.withTitleLanguage(it.anilistTitleLanguage) },
+                homeTrending = feed.trending.take(com.tankobun.app.home.HOME_TRENDING_LIMIT).map { media -> media.withTitleLanguage(it.anilistTitleLanguage) },
                 homeGenreHighlights = feed.genreHighlights.map { highlight ->
                     highlight.copy(media = highlight.media.withTitleLanguage(it.anilistTitleLanguage))
                 },
@@ -2298,7 +2292,7 @@ class MainViewModel(
     private fun applyHomeTrending(trending: List<AnilistMedia>) {
         _state.update { state ->
             state.copy(
-                homeTrending = trending.map { media -> media.withTitleLanguage(state.anilistTitleLanguage) },
+                homeTrending = trending.take(com.tankobun.app.home.HOME_TRENDING_LIMIT).map { media -> media.withTitleLanguage(state.anilistTitleLanguage) },
                 homeTrendingRefreshing = false,
             )
         }
@@ -2321,22 +2315,51 @@ class MainViewModel(
         }
     }
 
+    private var catalogTaxonomyJob: Job? = null
+
     fun loadBrowseTags(force: Boolean = false) {
-        val now = System.currentTimeMillis()
-        val cachedTags = container.settingsStore.anilistTags()
-        val cachedAt = container.settingsStore.anilistTagsCachedAtEpochMillis()
-        if (!force && cachedTags.isNotEmpty() && now - cachedAt <= cachePolicy.anilistTagsTtlMillis) {
-            _state.update { it.copy(browseAvailableTags = cachedTags) }
-            return
-        }
-        viewModelScope.launch {
-            runCatching {
-                container.anilistRepository.mediaTags()
-            }.onSuccess { tags ->
-                container.settingsStore.saveAnilistTags(tags, System.currentTimeMillis())
-                _state.update { it.copy(browseAvailableTags = tags) }
-            }.onFailure { error ->
-                Log.w(TAG, "AniList tag collection failed", error)
+        if (catalogTaxonomyJob?.isActive == true) return
+        catalogTaxonomyJob = viewModelScope.launch {
+            _state.update { it.copy(catalogTaxonomyLoading = true) }
+            try {
+                val settings = container.settingsStore
+                var alTags = settings.anilistTags()
+                var mbTags = withContext(Dispatchers.IO) { settings.mangaBakaTags() }
+                var publication = 0
+                suspend fun publish() {
+                    val revision = ++publication
+                    val alSnapshot = alTags
+                    val mbSnapshot = mbTags
+                    val taxonomy = withContext(Dispatchers.Default) {
+                        com.tankobun.core.model.CatalogTaxonomy.merge(alSnapshot, settings.anilistGenres().ifEmpty { FALLBACK_HOME_GENRES }, mbSnapshot)
+                    }
+                    if (publication == revision) _state.update { it.copy(browseAvailableTags = alSnapshot, catalogTaxonomy = taxonomy) }
+                }
+                publish()
+                kotlinx.coroutines.coroutineScope {
+                    launch {
+                        if (!force && alTags.isNotEmpty() && System.currentTimeMillis() - settings.anilistTagsCachedAtEpochMillis() <= cachePolicy.anilistTagsTtlMillis) return@launch
+                        runCatching { container.anilistRepository.mediaTags() }.onSuccess { tags ->
+                            if (tags.isNotEmpty()) {
+                                alTags = tags
+                                settings.saveAnilistTags(tags, System.currentTimeMillis())
+                                publish()
+                            }
+                        }.onFailure { if (it is CancellationException) throw it else Log.w(TAG, "AniList taxonomy unavailable", it) }
+                    }
+                    launch {
+                        if (!force && mbTags.isNotEmpty() && System.currentTimeMillis() - settings.mangaBakaTagsCachedAtEpochMillis() <= cachePolicy.anilistTaxonomyTtlMillis) return@launch
+                        runCatching { container.mangaBakaRepository.tags(forceRefresh = force) }.onSuccess { tags ->
+                            if (tags.isNotEmpty()) {
+                                mbTags = tags
+                                withContext(Dispatchers.IO) { settings.saveMangaBakaTags(tags, System.currentTimeMillis()) }
+                                publish()
+                            }
+                        }.onFailure { if (it is CancellationException) throw it else Log.w(TAG, "MangaBaka taxonomy unavailable", it) }
+                    }
+                }
+            } finally {
+                _state.update { it.copy(catalogTaxonomyLoading = false) }
             }
         }
     }
@@ -2616,12 +2639,9 @@ class MainViewModel(
                 browseTags = if (enabled) {
                     it.browseTags
                 } else {
-                    val adultTagNames = it.browseAvailableTags
-                        .filter { tag -> tag.isAdult }
-                        .map { tag -> tag.name }
-                        .toSet()
-                    it.browseTags - adultTagNames
+                    it.browseTags.filterNot { key -> it.catalogTaxonomy.resolve(key)?.isAdult == true }.toSet()
                 },
+                browseGenres = if (enabled) it.browseGenres else it.browseGenres.filterNot { key -> it.catalogTaxonomy.resolve(key)?.isAdult == true }.toSet(),
             )
         }
         loadHomeFeed()
@@ -4934,6 +4954,10 @@ class MainViewModel(
 
     private fun clearCacheStorage(target: CacheClearTarget) {
         viewModelScope.launch {
+            if (target == CacheClearTarget.NAVIGATION_DATA || target == CacheClearTarget.ALL) {
+                catalogTaxonomyJob?.cancel()
+                catalogTaxonomyJob?.join()
+            }
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
                 cacheStorageDataSource.clear(target)
@@ -5221,10 +5245,7 @@ private fun TankobunUiState.toBrowseCriteria(): BrowseCriteria =
         searchQuery = searchQuery,
         genres = browseGenres,
         tags = browseTags,
-        format = browseFormat,
-        publishingStatus = browsePublishingStatus,
-        countryOfOrigin = browseCountryOfOrigin,
-        year = browseYear,
+        selection = browseSelection,
         staffName = browseStaffName,
         sort = browseSort,
     )
@@ -5239,10 +5260,7 @@ private fun TankobunUiState.withBrowseCriteria(criteria: BrowseCriteria): Tankob
         browseResultsLoadingMore = false,
         browseGenres = criteria.genres,
         browseTags = criteria.tags,
-        browseFormat = criteria.format,
-        browsePublishingStatus = criteria.publishingStatus,
-        browseCountryOfOrigin = criteria.countryOfOrigin,
-        browseYear = criteria.year,
+        browseSelection = criteria.selection,
         browseStaffName = criteria.staffName,
         browseSort = criteria.sort,
         message = null,

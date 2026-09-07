@@ -8,10 +8,84 @@ import mockwebserver3.MockWebServer
 import okhttp3.OkHttpClient
 import org.junit.Assert.*
 import org.junit.Test
+import com.tankobun.core.model.CatalogSearchFilters
+import com.tankobun.core.model.PublicationYears
 
 class MangaBakaRepositoryTest {
     private fun response(body: String) = MockResponse.Builder().code(200).body(body).build()
     private fun repository(server: MockWebServer) = MangaBakaRepository(OkHttpClient(), baseUrl = server.url("/").toString())
+
+    @Test fun multipleCountriesStatusesAndYearsShareOneFilteredPage() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(response("""{"data":[],"pagination":{"next":null}}"""))
+            repository(server).search(selection = CatalogSearchFilters(
+                formats = setOf("MANGA", "ONE_SHOT"), countries = setOf("JP", "KR"),
+                statuses = setOf("FINISHED", "RELEASING"), years = PublicationYears(2000, 2010),
+            ))
+            val target = server.takeRequest().target
+            listOf("type=manga", "type=manhwa", "status=completed", "status=releasing",
+                "published_start_date_lower=2000-01-01", "published_start_date_upper=2010-12-31").forEach { assertTrue(target, target.contains(it)) }
+            assertFalse(target.contains("tag="))
+            assertEquals(1, server.requestCount)
+        }
+    }
+
+    @Test fun novelsOrOneShotsUseTwoBoundedBranchesWithoutIntersectingTheirFormats() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(response("""{"data":[${series(82, "123")}],"pagination":{"next":null}}"""))
+            server.enqueue(response("""{"data":[${series(83, "null")}],"pagination":{"next":"next"}}"""))
+            val page = repository(server).search(limit = 50, oneShotTagId = 110,
+                selection = CatalogSearchFilters(formats = setOf("NOVEL", "ONE_SHOT")))
+            val comics = server.takeRequest().target
+            val novels = server.takeRequest().target
+            assertTrue(comics.contains("tag=110"))
+            assertTrue(comics.contains("type_not=novel"))
+            assertTrue(novels.contains("type=novel"))
+            assertFalse(novels.contains("tag=110"))
+            assertTrue(comics.contains("limit=25") && novels.contains("limit=25"))
+            assertEquals(2, page.media.size)
+            assertTrue(page.hasNextPage)
+            assertTrue(CatalogSearchFilters(formats = setOf("NOVEL"), countries = setOf("JP")).mangaBakaBranches().isEmpty())
+        }
+    }
+
+    @Test fun tagTreeKeepsIdentityHierarchyAndAdultClassification() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(response("""{"data":[
+                {"id":1,"name":"Themes","name_path":"Themes","content_rating":"safe"},
+                {"id":2,"parent_id":1,"name":"Historical","name_path":"Themes > Historical","is_genre":true,"content_rating":"safe"},
+                {"id":3,"name":"Explicit","name_path":"Explicit","content_rating":"pornographic"},
+                {"id":4,"parent_id":3,"name":"Child","name_path":"Explicit > Child","content_rating":"safe"}
+            ]}"""))
+            val repo = repository(server)
+            val tags = repo.tags()
+            assertEquals(4, tags.size)
+            assertEquals("mb:2", tags[1].key)
+            assertEquals("Themes", tags[1].category)
+            assertTrue(tags[1].isGenre)
+            assertTrue(tags[3].isAdult)
+            assertEquals(tags, repo.tags())
+            assertEquals(1, server.requestCount)
+        }
+    }
+
+    @Test fun idFiltersAvoidAmbiguousNamesAndDoNotNeedAnotherTaxonomyRequest() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(response("""{"data":[${series(82, "123")}],"pagination":{"next":null}}"""))
+            val page = repository(server).search(tagIds = setOf(515, 29))
+            assertEquals(123, page.media.single().anilistId)
+            val request = server.takeRequest()
+            assertTrue(request.target.contains("tag=515"))
+            assertTrue(request.target.contains("tag=29"))
+            assertTrue(request.target.contains("tag_mode=and"))
+            assertTrue(request.target.contains("content_rating=safe"))
+            assertEquals(1, server.requestCount)
+        }
+    }
 
     @Test fun independentIdentityAndMissingArtworkArePreserved() {
         val media = MangaBakaMapper.media(Json.parseToJsonElement(series(82, "null")).jsonObject)!!
@@ -28,6 +102,15 @@ class MangaBakaRepositoryTest {
         val media = MangaBakaMapper.media(Json.parseToJsonElement(series(82, "123")).jsonObject)!!
         assertEquals(123, media.id)
         assertEquals(123, media.anilistId)
+    }
+
+    @Test fun serializationTagsIdentifyOneShotsButNovelTypeDoesNotInventCountry() {
+        val raw = Json.parseToJsonElement(series(82, "123")).jsonObject
+        val oneShot = JsonObject(raw + ("tags" to Json.parseToJsonElement("""[{"id":2050,"name":"Promotional Oneshot","name_path":"Work Info > One Shot > Promotional Oneshot"},{"id":9,"name":"Spoiler","is_spoiler":true}]""")))
+        assertEquals("ONE_SHOT", MangaBakaMapper.media(oneShot)?.format)
+        assertEquals(listOf(2050, 9), MangaBakaMapper.media(oneShot)?.mangaBakaTagIds)
+        assertFalse(MangaBakaMapper.media(oneShot)!!.tags.contains("Spoiler"))
+        assertNull(MangaBakaMapper.media(JsonObject(raw + ("type" to JsonPrimitive("novel"))))?.countryOfOrigin)
     }
 
     @Test fun pageMetadataAndSafeFiltersComeFromTheContract() = runTest {

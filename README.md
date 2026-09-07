@@ -46,6 +46,7 @@ Tankobun is not a content service, content host, extension repository, or manga 
 
 - Local manga library with AniList and MangaBaka catalog entries.
 - Combined search, enriched metadata, and MangaBaka Mix discovery in the existing reading flow.
+- Unified genre/tag filters, searchable tag categories, multiple formats/statuses/countries, and publication year ranges in Explore and the library.
 - Optional MangaBaka tracking through a personal access token.
 - AniList login and user-authorized library sync.
 - Adaptive Home with AniList metadata highlights, Continue Reading, and genre discovery.

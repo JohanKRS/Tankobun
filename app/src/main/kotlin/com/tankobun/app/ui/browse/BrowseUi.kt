@@ -1,5 +1,6 @@
 package com.tankobun.app.ui.browse
 
+import com.tankobun.app.ui.filters.*
 import com.tankobun.app.ui.icons.TankobunIcons
 import com.tankobun.app.ui.icons.genreIcon
 
@@ -413,34 +414,34 @@ internal fun BrowseScreen(
             )
         }
 
-                picker?.let { activePicker ->
-            BrowseOptionDialog(
+        picker?.let { activePicker ->
+            if (activePicker == BrowsePicker.YEAR) {
+                FilterYearDialog(selected = state.browseSelection.years, onApply = {
+                    viewModel.setBrowseYears(it)
+                    viewModel.searchAniList()
+                }, onDismiss = { picker = null })
+            } else FilterChoiceDialog(
                 title = when (activePicker) {
                     BrowsePicker.FORMAT -> tankobunString(R.string.common_format)
                     BrowsePicker.STATUS -> tankobunString(R.string.browse_publishing_status)
-                    BrowsePicker.COUNTRY -> tankobunString(R.string.browse_country_of_origin)
-                    BrowsePicker.YEAR -> tankobunString(R.string.common_year)
+                    else -> tankobunString(R.string.browse_country_of_origin)
                 },
                 options = when (activePicker) {
                     BrowsePicker.FORMAT -> BrowseFormatOptions
                     BrowsePicker.STATUS -> BrowseStatusOptions
-                    BrowsePicker.COUNTRY -> BrowseCountryOptions
-                    BrowsePicker.YEAR -> browseYearOptions()
+                    else -> BrowseCountryOptions
                 },
-                selectedValue = when (activePicker) {
-                    BrowsePicker.FORMAT -> state.browseFormat
-                    BrowsePicker.STATUS -> state.browsePublishingStatus
-                    BrowsePicker.COUNTRY -> state.browseCountryOfOrigin
-                    BrowsePicker.YEAR -> state.browseYear?.toString()
+                selected = when (activePicker) {
+                    BrowsePicker.FORMAT -> state.browseSelection.formats
+                    BrowsePicker.STATUS -> state.browseSelection.statuses
+                    else -> state.browseSelection.countries
                 },
-                onSelect = { value ->
+                onApply = { values ->
                     when (activePicker) {
-                        BrowsePicker.FORMAT -> viewModel.setBrowseFormat(value)
-                        BrowsePicker.STATUS -> viewModel.setBrowsePublishingStatus(value)
-                        BrowsePicker.COUNTRY -> viewModel.setBrowseCountryOfOrigin(value)
-                        BrowsePicker.YEAR -> viewModel.setBrowseYear(value?.toIntOrNull())
+                        BrowsePicker.FORMAT -> viewModel.setBrowseFormats(values)
+                        BrowsePicker.STATUS -> viewModel.setBrowseStatuses(values)
+                        else -> viewModel.setBrowseCountries(values)
                     }
-                    picker = null
                     viewModel.searchAniList()
                 },
                 onDismiss = { picker = null },
@@ -543,8 +544,8 @@ internal fun BrowseFilterBar(
             item {
                 BrowseFilterPill(
                     label = tankobunString(R.string.common_format),
-                    value = BrowseFormatOptions.labelFor(state.browseFormat),
-                    selected = state.browseFormat != null,
+                    value = BrowseFormatOptions.selectionLabel(state.browseSelection.formats),
+                    selected = state.browseSelection.formats.isNotEmpty(),
                     icon = TankobunIcons.MenuBook,
                     onClick = { onOpenPicker(BrowsePicker.FORMAT) },
                 )
@@ -552,8 +553,8 @@ internal fun BrowseFilterBar(
             item {
                 BrowseFilterPill(
                     label = tankobunString(R.string.common_status),
-                    value = BrowseStatusOptions.labelFor(state.browsePublishingStatus),
-                    selected = state.browsePublishingStatus != null,
+                    value = BrowseStatusOptions.selectionLabel(state.browseSelection.statuses),
+                    selected = state.browseSelection.statuses.isNotEmpty(),
                     icon = TankobunIcons.Flag,
                     onClick = { onOpenPicker(BrowsePicker.STATUS) },
                 )
@@ -561,8 +562,8 @@ internal fun BrowseFilterBar(
             item {
                 BrowseFilterPill(
                     label = tankobunString(R.string.common_country),
-                    value = BrowseCountryOptions.labelFor(state.browseCountryOfOrigin),
-                    selected = state.browseCountryOfOrigin != null,
+                    value = BrowseCountryOptions.selectionLabel(state.browseSelection.countries),
+                    selected = state.browseSelection.countries.isNotEmpty(),
                     icon = TankobunIcons.Public,
                     onClick = { onOpenPicker(BrowsePicker.COUNTRY) },
                 )
@@ -570,8 +571,8 @@ internal fun BrowseFilterBar(
             item {
                 BrowseFilterPill(
                     label = tankobunString(R.string.common_year),
-                    value = state.browseYear?.toString() ?: tankobunString(R.string.common_any),
-                    selected = state.browseYear != null,
+                    value = state.browseSelection.years.filterLabel(),
+                    selected = state.browseSelection.years != null,
                     icon = TankobunIcons.CalendarMonth,
                     onClick = { onOpenPicker(BrowsePicker.YEAR) },
                 )
@@ -982,257 +983,51 @@ internal fun BrowseResults(
 }
 
 @Composable
-internal fun BrowseGenreDialog(
-    state: TankobunUiState,
-    viewModel: MainViewModel,
-    onDismiss: () -> Unit,
-) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        TankobunDialogSurface(fillMaxHeightFraction = 0.78f, scrollable = false) {
-            TankobunDialogHeader(title = tankobunString(R.string.common_genres), onDismiss = onDismiss)
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                FlowRowCompat {
-                    BrowseGenres.forEach { genre ->
-                        TankobunChip(
-                            selected = genre in state.browseGenres,
-                            onClick = { viewModel.setBrowseGenre(genre, genre !in state.browseGenres) },
-                            leadingIcon = { TankobunChipIcon(genreIcon(genre)) },
-                            label = {
-                                Text(browseGenreLabel(genre), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            },
-                        )
-                    }
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(
-                    onClick = {
-                        state.browseGenres.forEach { viewModel.setBrowseGenre(it, false) }
-                    },
-                ) {
-                    Text(tankobunString(R.string.common_clear))
-                }
-                Spacer(Modifier.weight(1f))
-                TankobunActionButton(
-                    label = tankobunString(R.string.common_apply),
-                    onClick = {
-                        onDismiss()
-                        viewModel.searchAniList()
-                    },
-                )
-            }
-        }
-    }
+internal fun BrowseGenreDialog(state: TankobunUiState, viewModel: MainViewModel, onDismiss: () -> Unit) {
+    CatalogFilterDialog(
+        title = tankobunString(R.string.common_genres), taxonomy = state.catalogTaxonomy,
+        options = state.catalogTaxonomy.tags, selected = state.browseGenres, includeAdult = state.showNsfwContent,
+        genresOnly = true, loading = state.catalogTaxonomyLoading,
+        onRefresh = { viewModel.loadBrowseTags(force = true) },
+        onApply = viewModel::applyBrowseGenres, onDismiss = onDismiss,
+    )
 }
 
 @Composable
-internal fun BrowseTagDialog(
-    state: TankobunUiState,
-    viewModel: MainViewModel,
-    onDismiss: () -> Unit,
-) {
-    var query by remember { mutableStateOf("") }
-    val visibleTags = state.browseAvailableTags.visibleTags(query, includeAdult = state.showNsfwContent)
-
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        TankobunDialogSurface(fillMaxHeightFraction = 0.82f, scrollable = false) {
-            TankobunDialogHeader(title = tankobunString(R.string.common_tags), onDismiss = onDismiss)
-            TankobunSearchField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = tankobunString(R.string.browse_find_tag),
-                showSearchAction = false,
-            )
-            if (state.browseAvailableTags.isEmpty()) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Text(
-                        tankobunString(R.string.browse_tags_empty),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    TankobunActionButton(
-                        label = tankobunString(R.string.browse_refresh_tags),
-                        onClick = { viewModel.loadBrowseTags(force = true) },
-                        filled = false,
-                    )
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    FlowRowCompat {
-                        visibleTags.forEach { tag ->
-                        TankobunChip(
-                            selected = tag.name in state.browseTags,
-                            onClick = { viewModel.setBrowseTag(tag.name, tag.name !in state.browseTags) },
-                            leadingIcon = { TankobunChipIcon(TankobunIcons.LocalOffer) },
-                            label = {
-                                Text(
-                                    tag.name,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                        )
-                        }
-                    }
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(
-                    onClick = {
-                        state.browseTags.forEach { viewModel.setBrowseTag(it, false) }
-                    },
-                ) {
-                    Text(tankobunString(R.string.common_clear))
-                }
-                Spacer(Modifier.weight(1f))
-                TankobunActionButton(
-                    label = tankobunString(R.string.common_apply),
-                    onClick = {
-                        onDismiss()
-                        viewModel.searchAniList()
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun BrowseOptionDialog(
-    title: String,
-    options: List<BrowseOption>,
-    selectedValue: String?,
-    onSelect: (String?) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    TankobunDialog(onDismiss = onDismiss, maxHeight = 640.dp) {
-        TankobunDialogHeader(title = title, onDismiss = onDismiss)
-        options.forEach { option ->
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(LocalTankobunStyle.current.themeShapes.control)
-                    .clickable { onSelect(option.value) },
-                color = if (option.value == selectedValue) {
-                    MaterialTheme.colorScheme.secondaryContainer
-                } else {
-                    Color.Transparent
-                },
-            )
-            {
-                ListItem(
-                    headlineContent = { Text(option.labelText()) },
-                )
-            }
-        }
-    }
+internal fun BrowseTagDialog(state: TankobunUiState, viewModel: MainViewModel, onDismiss: () -> Unit) {
+    CatalogFilterDialog(
+        title = tankobunString(R.string.common_tags), taxonomy = state.catalogTaxonomy,
+        options = state.catalogTaxonomy.tags, selected = state.browseTags, includeAdult = state.showNsfwContent,
+        loading = state.catalogTaxonomyLoading, onRefresh = { viewModel.loadBrowseTags(force = true) },
+        onApply = viewModel::applyBrowseTags, onDismiss = onDismiss,
+    )
 }
 
 @Composable
 internal fun LibraryOptionsDialog(
-    state: TankobunUiState,
-    viewModel: MainViewModel,
-    sort: String,
-    onSortChange: (String?) -> Unit,
-    onReset: () -> Unit,
-    onDismiss: () -> Unit,
+    state: TankobunUiState, viewModel: MainViewModel, sort: String,
+    onSortChange: (String?) -> Unit, onReset: () -> Unit, onDismiss: () -> Unit,
 ) {
-    TankobunDialog(onDismiss = onDismiss, maxHeight = 680.dp) {
-        TankobunDialogHeader(title = tankobunString(R.string.browse_library_options), onDismiss = onDismiss)
-        Text(tankobunString(R.string.browse_sort), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        FlowRowCompat {
-            LibrarySortOptions.forEach { option ->
-                TankobunChip(
-                    selected = sort == option.value,
-                    onClick = { onSortChange(option.value) },
-                    leadingIcon = { TankobunChipIcon(option.librarySortIcon()) },
-                    label = { Text(option.labelText()) },
-                )
-            }
-        }
-        Text(tankobunString(R.string.common_view), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        MediaViewModeRow(
-            selected = state.libraryViewMode,
-            onSelect = viewModel::setLibraryViewMode,
-        )
-        Text(tankobunString(R.string.settings_covers_per_row), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        CoverColumnsRow(
-            selected = state.libraryCoverColumns,
-            onSelect = viewModel::setLibraryCoverColumns,
-        )
-        Text(tankobunString(R.string.settings_cover_framing), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        CoverFramingRow(
-            showWholeCover = state.libraryShowWholeCovers,
-            onShowWholeCoverChange = viewModel::setLibraryShowWholeCovers,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onReset) {
-                Text(tankobunString(R.string.common_clear_filters))
-            }
-            Spacer(Modifier.weight(1f))
-            TankobunActionButton(label = tankobunString(R.string.common_apply), onClick = onDismiss)
-        }
-    }
+    MediaFilterOptionsDialog(
+        title = tankobunString(R.string.browse_library_options), sortOptions = LibrarySortOptions,
+        selectedSort = sort, onSortChange = onSortChange, sortIcon = { it.librarySortIcon() },
+        viewMode = state.libraryViewMode, onViewMode = viewModel::setLibraryViewMode,
+        coverColumns = state.libraryCoverColumns, onCoverColumns = viewModel::setLibraryCoverColumns,
+        showWholeCovers = state.libraryShowWholeCovers, onWholeCovers = viewModel::setLibraryShowWholeCovers,
+        onReset = onReset, onApply = onDismiss, onDismiss = onDismiss,
+    )
 }
 
 @Composable
-internal fun BrowseAdvancedDialog(
-    state: TankobunUiState,
-    viewModel: MainViewModel,
-    onDismiss: () -> Unit,
-) {
-    TankobunDialog(onDismiss = onDismiss, maxHeight = 680.dp) {
-        TankobunDialogHeader(title = tankobunString(R.string.browse_browse_options), onDismiss = onDismiss)
-        Text(tankobunString(R.string.browse_sort), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        FlowRowCompat {
-            BrowseSortOptions.forEach { option ->
-                TankobunChip(
-                    selected = state.browseSort == option.value,
-                    onClick = { option.value?.let(viewModel::setBrowseSort) },
-                    leadingIcon = { TankobunChipIcon(option.browseSortIcon()) },
-                    label = { Text(option.labelText()) },
-                )
-            }
-        }
-        Text(tankobunString(R.string.common_view), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        MediaViewModeRow(
-            selected = state.browseViewMode,
-            onSelect = viewModel::setBrowseViewMode,
-        )
-        Text(tankobunString(R.string.settings_covers_per_row), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        CoverColumnsRow(
-            selected = state.browseCoverColumns,
-            onSelect = viewModel::setBrowseCoverColumns,
-        )
-        Text(tankobunString(R.string.settings_cover_framing), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        CoverFramingRow(
-            showWholeCover = state.browseShowWholeCovers,
-            onShowWholeCoverChange = viewModel::setBrowseShowWholeCovers,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = viewModel::resetBrowseFilters) {
-                Text(tankobunString(R.string.common_clear_filters))
-            }
-            Spacer(Modifier.weight(1f))
-            TankobunActionButton(
-                label = tankobunString(R.string.common_apply),
-                onClick = {
-                    onDismiss()
-                    viewModel.searchAniList()
-                }
-            )
-        }
-    }
+internal fun BrowseAdvancedDialog(state: TankobunUiState, viewModel: MainViewModel, onDismiss: () -> Unit) {
+    MediaFilterOptionsDialog(
+        title = tankobunString(R.string.browse_browse_options), sortOptions = BrowseSortOptions,
+        selectedSort = state.browseSort, onSortChange = { it?.let(viewModel::setBrowseSort) }, sortIcon = { it.browseSortIcon() },
+        viewMode = state.browseViewMode, onViewMode = viewModel::setBrowseViewMode,
+        coverColumns = state.browseCoverColumns, onCoverColumns = viewModel::setBrowseCoverColumns,
+        showWholeCovers = state.browseShowWholeCovers, onWholeCovers = viewModel::setBrowseShowWholeCovers,
+        onReset = viewModel::resetBrowseFilters, onApply = { onDismiss(); viewModel.searchAniList() }, onDismiss = onDismiss,
+    )
 }
 
 @Composable
@@ -1325,22 +1120,13 @@ internal fun List<AnilistMediaTag>.visibleTags(
         .toList()
 }
 
-internal fun browseYearOptions(): List<BrowseOption> {
-    val currentYear = java.time.Year.now().value
-    return listOf(BrowseOption(R.string.common_any, null)) +
-        (currentYear downTo 1970).map { BrowseOption(it.toString(), it.toString()) }
-}
-
 internal fun TankobunUiState.browseControlsActive(): Boolean =
     browseFiltersOrSortActive()
 
 internal fun TankobunUiState.browseFiltersOrSortActive(): Boolean =
     browseGenres.isNotEmpty() ||
         browseTags.isNotEmpty() ||
-        browseFormat != null ||
-        browsePublishingStatus != null ||
-        browseCountryOfOrigin != null ||
-        browseYear != null ||
+        browseSelection.isActive ||
         browseStaffName != null ||
         browseSort != BROWSE_SORT_SEARCH_MATCH_UI
 
@@ -1356,15 +1142,15 @@ internal fun browseSummary(state: TankobunUiState): String {
     if (state.browseGenres.isNotEmpty()) {
         val genreLabels = mutableListOf<String>()
         state.browseGenres.sorted().forEach { genre ->
-            genreLabels += browseGenreLabel(genre)
+            genreLabels += browseGenreLabel(state.catalogTaxonomy.label(genre))
         }
         parts += genreLabels.joinToString(", ")
     }
-    if (state.browseTags.isNotEmpty()) parts += state.browseTags.sorted().joinToString(", ")
-    state.browseFormat?.let { parts += BrowseFormatOptions.labelFor(it) }
-    state.browsePublishingStatus?.let { parts += BrowseStatusOptions.labelFor(it) }
-    state.browseCountryOfOrigin?.let { parts += BrowseCountryOptions.labelFor(it) }
-    state.browseYear?.let { parts += it.toString() }
+    if (state.browseTags.isNotEmpty()) parts += state.browseTags.map(state.catalogTaxonomy::label).sorted().joinToString(", ")
+    state.browseSelection.formats.sorted().forEach { parts += BrowseFormatOptions.labelFor(it) }
+    state.browseSelection.statuses.sorted().forEach { parts += BrowseStatusOptions.labelFor(it) }
+    state.browseSelection.countries.sorted().forEach { parts += BrowseCountryOptions.labelFor(it) }
+    state.browseSelection.years?.let { parts += it.filterLabel() }
     val defaultSortLabel = tankobunString(R.string.browse_sort_search_match)
     val selectedSortLabel = BrowseSortOptions.labelFor(state.browseSort)
     if (selectedSortLabel != defaultSortLabel) {

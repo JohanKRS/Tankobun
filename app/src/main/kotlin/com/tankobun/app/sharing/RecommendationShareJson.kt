@@ -91,6 +91,7 @@ private fun AnilistMedia.toJson(): JSONObject =
         .putNullable("idMal", idMal)
         .putNullable("anilistId", anilistId)
         .putNullable("mangaBakaId", mangaBakaId)
+        .put("mangaBakaTagIds", JSONArray(mangaBakaTagIds))
         .put(
             "title",
             JSONObject()
@@ -131,6 +132,9 @@ private fun JSONObject.toMedia(): AnilistMedia {
         idMal = optIntOrNull("idMal"),
         anilistId = if (has("anilistId")) optIntOrNull("anilistId") else (optInt("mediaId").takeIf { it != 0 } ?: optInt("id")).takeIf { it > 0 },
         mangaBakaId = optIntOrNull("mangaBakaId"),
+        mangaBakaTagIds = optJSONArray("mangaBakaTagIds").let { ids ->
+            if (ids == null) emptyList() else (0 until ids.length()).mapNotNull { ids.optInt(it).takeIf { id -> id > 0 } }.distinct()
+        },
         title = AnilistTitle(
             romaji = title.optStringOrNull("romaji"),
             english = title.optStringOrNull("english"),

@@ -1,6 +1,7 @@
 package com.tankobun.app.catalog
 
 import com.tankobun.app.AppContainer
+import com.tankobun.app.home.withHomeTrendingLimit
 import com.tankobun.core.anilist.AnilistBrowseLanding
 import com.tankobun.core.database.toModel
 import com.tankobun.core.model.*
@@ -16,9 +17,9 @@ internal class CatalogDataSource(private val container: AppContainer) {
         catch (error: Exception) { if (error is CancellationException) throw error; aniListRetryAt = System.currentTimeMillis() + 60_000L; null }
     }
 
-    suspend fun search(primary: suspend () -> AnilistMediaPage, secondary: suspend () -> AnilistMediaPage, page: Int): AnilistMediaPage = coroutineScope {
+    suspend fun search(primary: (suspend () -> AnilistMediaPage)?, secondary: suspend () -> AnilistMediaPage, page: Int): AnilistMediaPage = coroutineScope {
         val extra = async { optional { secondary() } }
-        val main = aniList { primary() }
+        val main = primary?.let { aniList { it() } }
         val additional = try { withTimeoutOrNull(if (main != null) 4_000L else 12_000L) { extra.await() } } finally { extra.cancel() }
         check(main != null || additional != null) { "Catalogs unavailable" }
         val combined = LinkedHashMap<Int, AnilistMedia>()
@@ -87,10 +88,11 @@ internal class CatalogDataSource(private val container: AppContainer) {
         onTrendingLoaded: (List<AnilistMedia>) -> Unit = {}, onGenreHighlightsLoaded: (List<AnilistGenreHighlight>) -> Unit = {}): AnilistHomeFeed {
         aniList { container.anilistRepository.homeFeed(genres, accessToken, includeAdult, onTrendingLoaded, onGenreHighlightsLoaded) }?.let { return it }
         val media = container.mangaBakaRepository.search(sort = "trending_7d", includeAdult = includeAdult).media
-        onTrendingLoaded(media)
         val highlights = genres.mapNotNull { genre -> media.firstOrNull { item -> item.genres.any { it.equals(genre, ignoreCase = true) } }?.let { AnilistGenreHighlight(genre, it) } }
+        val feed = AnilistHomeFeed(media, highlights).withHomeTrendingLimit()
+        onTrendingLoaded(feed.trending)
         onGenreHighlightsLoaded(highlights)
-        return AnilistHomeFeed(media, highlights)
+        return feed
     }
 
     suspend fun browseLanding(perPage: Int, accessToken: String?, includeAdult: Boolean): AnilistBrowseLanding {

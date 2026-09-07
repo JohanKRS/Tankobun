@@ -256,15 +256,16 @@ class AnilistRepository(
         perPage: Int = 50,
         accessToken: String? = null,
         includeAdult: Boolean = false,
+        selection: com.tankobun.core.model.CatalogSearchFilters = com.tankobun.core.model.CatalogSearchFilters(
+            formats = setOfNotNull(format), statuses = setOfNotNull(status), countries = setOfNotNull(countryOfOrigin),
+            years = year?.let { com.tankobun.core.model.PublicationYears(it, it) },
+        ),
     ): AnilistMediaPage {
         val normalizedSearch = search?.trim().orEmpty()
         if (
             genres.isEmpty() &&
             tags.isEmpty() &&
-            format == null &&
-            status == null &&
-            countryOfOrigin == null &&
-            year == null
+            !selection.isActive
         ) {
             normalizedSearch.extractAniListMangaId()?.let { mediaId ->
                 val media = runCatching { listOf(mediaDetailsWithEntry(identity.localId(mediaId), accessToken = accessToken).media) }
@@ -286,13 +287,12 @@ class AnilistRepository(
                 if (tags.isNotEmpty()) {
                     put("tags", buildJsonArray { tags.sorted().forEach { add(it) } })
                 }
-                if (!format.isNullOrBlank()) put("format", format)
-                if (!status.isNullOrBlank()) put("status", status)
-                if (!countryOfOrigin.isNullOrBlank()) put("countryOfOrigin", countryOfOrigin)
-                if (year != null) {
-                    put("startDateGreater", year * 10_000 + 101)
-                    put("startDateLesser", year * 10_000 + 12_31)
-                }
+                if (selection.formats.isNotEmpty()) put("formats", buildJsonArray { selection.formats.sorted().forEach { add(it) } })
+                if (selection.statuses.isNotEmpty()) put("statuses", buildJsonArray { selection.statuses.sorted().forEach { add(it) } })
+                if (selection.countries.isNotEmpty()) put("countries", buildJsonArray { selection.countries.sorted().forEach { add(it) } })
+                // Inclusive years also retain entries whose month/day are unknown.
+                selection.years?.from?.let { put("startDateGreater", (it - 1) * 10_000 + 1231) }
+                selection.years?.to?.let { put("startDateLesser", (it + 1) * 10_000) }
                 if (!includeAdult) put("isAdult", false)
                 put("sort", buildJsonArray { add(sort) })
             },

@@ -11,6 +11,11 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.CachePolicy
 
+internal const val HOME_TRENDING_LIMIT = 5
+
+internal fun AnilistHomeFeed.withHomeTrendingLimit(): AnilistHomeFeed =
+    copy(trending = trending.distinctBy(AnilistMedia::id).take(HOME_TRENDING_LIMIT))
+
 internal class HomeDataSource(
     private val container: AppContainer,
     private val cachePolicy: CachePolicy,
@@ -38,7 +43,7 @@ internal class HomeDataSource(
                     .map { entity -> entity.toModel(titleLanguage()) }
                     .filter { media -> includeAdult || !media.isAdult }
             }
-        val trending = mediaByKey[trendingKey].orEmpty()
+        val trending = mediaByKey[trendingKey].orEmpty().take(HOME_TRENDING_LIMIT)
         if (trending.isEmpty()) return null
         val highlights = genres.mapNotNull { genre ->
             mediaByKey[genreKeys.getValue(genre)]
@@ -46,18 +51,20 @@ internal class HomeDataSource(
                 .firstOrNull()
                 ?.let { media -> AnilistGenreHighlight(genre = genre, media = media) }
         }
-        if (highlights.size != genres.size) return null
+        // The fallback can cover only some genres. Its fresh cache is still usable;
+        // missing categories must not trigger the same request on every visit.
         return AnilistHomeFeed(trending = trending, genreHighlights = highlights)
     }
 
     suspend fun saveHomeFeed(feed: AnilistHomeFeed, includeAdult: Boolean) {
         val now = System.currentTimeMillis()
-        val media = (feed.trending + feed.genreHighlights.map { it.media }).distinctBy(AnilistMedia::id)
+        val boundedFeed = feed.withHomeTrendingLimit()
+        val media = (boundedFeed.trending + boundedFeed.genreHighlights.map { it.media }).distinctBy(AnilistMedia::id)
         container.database.withTransaction {
             container.database.mediaDao().upsertMedia(media.map { item -> item.toEntity(now) })
             val resultsByKey = buildMap {
-                put(trendingKey(includeAdult), feed.trending)
-                feed.genreHighlights.forEach { highlight ->
+                put(trendingKey(includeAdult), boundedFeed.trending)
+                boundedFeed.genreHighlights.forEach { highlight ->
                     put(genreKey(highlight.genre, includeAdult), listOf(highlight.media))
                 }
             }

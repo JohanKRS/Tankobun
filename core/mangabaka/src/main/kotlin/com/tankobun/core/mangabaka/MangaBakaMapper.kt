@@ -23,7 +23,8 @@ internal object MangaBakaMapper {
         val romaji = title("ja-Latn", "ko-Latn", "zh-Latn") ?: data.text("romanized_title")
         val native = title("ja", "ko", "zh", "zh-Hant", "zh-Hans") ?: data.text("native_title")
         val preferred = english ?: romaji ?: native ?: titles.firstNotNullOfOrNull { it.text("title") } ?: return null
-        val tags = data.array("tags").mapNotNull { it as? JsonObject }.filter { it["is_spoiler"] != JsonPrimitive(true) }
+        val allTags = data.array("tags").mapNotNull { it as? JsonObject }
+        val tags = allTags.filter { it["is_spoiler"] != JsonPrimitive(true) }
         val type = data.text("type")
         val cover = data.obj("cover")
         val coverUrl = cover.text("x350") ?: cover.obj("x350").text("x2") ?: cover.text("raw") ?: cover.obj("raw").text("url")
@@ -33,8 +34,8 @@ internal object MangaBakaMapper {
             title = AnilistTitle(romaji, english, native, preferred),
             description = data.text("description"), coverImage = coverUrl.imageUrl(), bannerImage = null,
             chapters = data.number("total_chapters")?.toInt(), volumes = data.number("final_volume")?.toInt(),
-            format = if (type == "novel") "NOVEL" else "MANGA",
-            countryOfOrigin = when (type) { "manhwa" -> "KR"; "manhua" -> "CN"; "manga", "novel" -> "JP"; else -> null },
+            format = when { type == "novel" -> "NOVEL"; tags.any { it.text("name_path")?.contains(" > One Shot") == true || it.text("name") == "One Shot" } -> "ONE_SHOT"; else -> "MANGA" },
+            countryOfOrigin = when (type) { "manhwa" -> "KR"; "manhua" -> "CN"; "manga" -> "JP"; else -> null },
             status = when (data.text("status")) { "completed" -> "FINISHED"; "cancelled" -> "CANCELLED"; "releasing" -> "RELEASING"; "hiatus" -> "HIATUS"; "upcoming" -> "NOT_YET_RELEASED"; else -> null },
             averageScore = data.number("rating")?.roundToInt(),
             // MangaBaka popularity is a rank, not AniList's reader count.
@@ -44,6 +45,7 @@ internal object MangaBakaMapper {
             siteUrl = data.text("canonical_url") ?: "https://mangabaka.org/$id",
             genres = tags.filter { it["is_genre"] == JsonPrimitive(true) }.mapNotNull { it.text("name") },
             tags = tags.mapNotNull { it.text("name") },
+            mangaBakaTagIds = allTags.mapNotNull { it.number("id")?.toInt()?.takeIf { id -> id > 0 } }.distinct(),
             staff = (data.strings("authors") + data.strings("artists")).distinct(),
             synonyms = titles.mapNotNull { it.text("title") }.distinct(),
             isAdult = data.text("content_rating") !in setOf("safe", "suggestive"),

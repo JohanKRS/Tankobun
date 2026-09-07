@@ -55,6 +55,7 @@ internal class CacheStorageDataSource(
 
     private suspend fun clearNavigationData() {
         container.mangaBakaRepository.clearCache()
+        container.settingsStore.clearCatalogTaxonomyCache()
         container.database.navigationCacheDao().prune(Long.MAX_VALUE)
     }
 

@@ -6,9 +6,36 @@ import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import com.tankobun.core.model.CatalogSearchFilters
+import com.tankobun.core.model.PublicationYears
+import kotlinx.serialization.json.*
 import org.junit.Test
 
 class AnilistRequestBatchingTest {
+    @Test
+    fun multipleFiltersAndInclusiveYearsUseOneRequestWithNativeArrays() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(response("""{"data":{"Page":{"pageInfo":{"currentPage":2,"hasNextPage":true},"media":[]}}}"""))
+            val page = repository(server).browseMangaPage(page = 2, selection = CatalogSearchFilters(
+                formats = setOf("MANGA", "ONE_SHOT"), statuses = setOf("FINISHED", "RELEASING"),
+                countries = setOf("KR", "JP"), years = PublicationYears(2000, 2010),
+            ))
+            val body = Json.parseToJsonElement(server.takeRequest().body!!.utf8()).jsonObject
+            val variables = body.getValue("variables").jsonObject
+            assertEquals(setOf("MANGA", "ONE_SHOT"), variables.getValue("formats").jsonArray.map { it.jsonPrimitive.content }.toSet())
+            assertEquals(setOf("JP", "KR"), variables.getValue("countries").jsonArray.map { it.jsonPrimitive.content }.toSet())
+            assertEquals(setOf("FINISHED", "RELEASING"), variables.getValue("statuses").jsonArray.map { it.jsonPrimitive.content }.toSet())
+            assertEquals(19991231, variables.getValue("startDateGreater").jsonPrimitive.int)
+            assertEquals(20110000, variables.getValue("startDateLesser").jsonPrimitive.int)
+            assertTrue(body.getValue("query").jsonPrimitive.content.contains("countryOfOrigin_in:"))
+            assertEquals(2, page.currentPage)
+            assertTrue(page.hasNextPage)
+            assertEquals(1, server.requestCount)
+        }
+    }
+
     @Test
     fun browseLandingLoadsFourSectionsInOneRequest() = runTest {
         MockWebServer().use { server ->

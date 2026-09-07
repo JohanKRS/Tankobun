@@ -40,6 +40,7 @@ data class AnilistMediaEntity(
     val fetchedAtEpochMillis: Long,
     val anilistId: Int? = id.takeIf { it > 0 },
     val mangaBakaId: Int? = null,
+    @androidx.room.ColumnInfo(defaultValue = "''") val mangaBakaTagIds: List<Int> = emptyList(),
 )
 
 @Entity(tableName = "catalog_identity", indices = [Index(value = ["anilistId"], unique = true), Index(value = ["mangaBakaId"], unique = true)])

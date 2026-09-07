@@ -75,7 +75,7 @@ class TankobunLibraryBackupJsonTest {
     }
 
     @Test fun mixedCatalogBackupPreservesExternalIdsAndArtwork() {
-        val exclusive = media().copy(id = -81, anilistId = null, mangaBakaId = 81,
+        val exclusive = media().copy(id = -81, anilistId = null, mangaBakaId = 81, mangaBakaTagIds = listOf(29, 45, 515),
             mainCharacterImage = "https://example.test/character", characterImages = listOf("https://example.test/character"))
         val linked = media().copy(mangaBakaId = 15)
         fun entry(id: Int) = AnilistListEntry(-kotlin.math.abs(id), id, MediaStatus.CURRENT, 12, 80.0, "note", true, listOf("Favorites"), 10)

@@ -26,8 +26,15 @@ object DatabaseFactory {
                 MIGRATION_11_12,
                 MIGRATION_12_13,
                 MIGRATION_13_14,
+                MIGRATION_14_15,
             )
             .build()
+    }
+
+    internal val MIGRATION_14_15 = object : Migration(14, 15) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE anilist_media ADD COLUMN mangaBakaTagIds TEXT NOT NULL DEFAULT ''")
+        }
     }
 
     internal val MIGRATION_13_14 = object : Migration(13, 14) {

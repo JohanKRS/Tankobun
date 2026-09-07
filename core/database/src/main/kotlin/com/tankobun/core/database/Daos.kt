@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
+import com.tankobun.core.model.catalogNameKey
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -49,7 +50,7 @@ interface MediaDao {
     }
 }
 
-private fun AnilistMediaEntity.withFallbackDetails(fallback: AnilistMediaEntity?): AnilistMediaEntity {
+internal fun AnilistMediaEntity.withFallbackDetails(fallback: AnilistMediaEntity?): AnilistMediaEntity {
     if (fallback == null) return this
     return copy(
         idMal = idMal ?: fallback.idMal,
@@ -74,10 +75,11 @@ private fun AnilistMediaEntity.withFallbackDetails(fallback: AnilistMediaEntity?
         startDateYear = startDateYear ?: fallback.startDateYear,
         endDateYear = endDateYear ?: fallback.endDateYear,
         siteUrl = siteUrl ?: fallback.siteUrl,
-        genres = genres.ifEmpty { fallback.genres },
+        genres = (genres + fallback.genres).distinctBy(String::catalogNameKey),
         synonyms = synonyms.ifEmpty { fallback.synonyms },
         staff = staff.ifEmpty { fallback.staff },
-        tags = tags.ifEmpty { fallback.tags },
+        tags = (tags + fallback.tags).distinctBy(String::catalogNameKey),
+        mangaBakaTagIds = (mangaBakaTagIds + fallback.mangaBakaTagIds).distinct(),
         updatedAtEpochSeconds = updatedAtEpochSeconds ?: fallback.updatedAtEpochSeconds,
     )
 }

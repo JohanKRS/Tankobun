@@ -21,7 +21,7 @@ import androidx.room.TypeConverters
         CatalogPageEntity::class,
         MangaBakaMutationEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 @TypeConverters(TankobunTypeConverters::class)
