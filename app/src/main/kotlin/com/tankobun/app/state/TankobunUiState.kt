@@ -25,6 +25,7 @@ import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.DownloadJob
 import com.tankobun.core.model.MediaStatus
+import com.tankobun.core.model.CatalogMode
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.ReadingProgress
@@ -57,6 +58,7 @@ data class TankobunUiState(
     val showAppStatusBar: Boolean = true,
     val dockAlignment: DockAlignment = DockAlignment.CENTER,
     val dockIndicatorAnimation: DockIndicatorAnimation = DockIndicatorAnimation.POP,
+    val catalogMode: CatalogMode = CatalogMode.ANILIST,
     val libraryMode: LibraryMode = LibraryMode.LOCAL,
     val onboardingVisible: Boolean = false,
     val appTourVisible: Boolean = false,

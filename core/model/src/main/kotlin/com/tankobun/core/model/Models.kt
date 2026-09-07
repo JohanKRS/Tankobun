@@ -115,7 +115,7 @@ fun AnilistMedia.withFallbackDetails(fallback: AnilistMedia?): AnilistMedia {
             userPreferred = title.userPreferred.ifBlank { fallback.title.userPreferred },
         ),
         description = description ?: fallback.description,
-        coverImage = coverImage ?: fallback.coverImage,
+        coverImage = coverImage.withCoverFallback(fallback.coverImage),
         bannerImage = bannerImage ?: fallback.bannerImage,
         chapters = chapters ?: fallback.chapters,
         volumes = volumes ?: fallback.volumes,

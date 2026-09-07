@@ -101,7 +101,7 @@
     <string name="settings_library_subtitle">选择可滑动书架列表的默认布局。</string>
     <string name="settings_browse_subtitle">选择漫画搜索和作品发现的默认布局。</string>
     <string name="settings_reader_subtitle">调整翻页、滚动和间距。</string>
-    <string name="settings_anilist_subtitle">管理同步和账号连接。</string>
+    <string name="settings_anilist_subtitle">选择浏览目录并管理账号同步。</string>
     <string name="settings_custom_lists_subtitle">创建、重命名和删除漫画自定义列表。漫画仍会保留在正常状态列表中。</string>
     <string name="settings_languages_subtitle">选择应用语言，以及 Tankobun 默认显示哪些来源语言。</string>
     <string name="settings_backups_subtitle">保存和还原你的漫画书架与应用设置。</string>
@@ -1173,7 +1173,7 @@
     <string name="catalog_for_you">为你推荐</string>
     <string name="about_mangabaka_website">MangaBaka 网站</string>
     <string name="about_catalog_credits">目录致谢与许可</string>
-    <string name="about_mangabaka_data">MangaBaka 为 AniList 补充元数据和作品发现。MangaBaka 原创数据采用 CC BY-NC-SA 4.0 许可。其他提供方的数据和图片仍受各自权利和条款约束。</string>
+    <string name="about_mangabaka_data">MangaBaka 提供漫画元数据和作品发现。MangaBaka 原创数据采用 CC BY-NC-SA 4.0 许可。其他提供方的数据和图片仍受各自权利和条款约束。</string>
     <string name="about_data_adaptations">Tankobun 会合并和格式化元数据以供显示。对 MangaBaka 原创数据的改编保留 CC BY-NC-SA 4.0 许可。感谢以下原始数据提供方：</string>
     <string name="about_data_terms">数据条款</string>
     <string name="about_mangabaka_terms">MangaBaka 服务条款</string>
@@ -1220,4 +1220,10 @@
     <string name="filters_year_until">截至 %1$d 年</string>
     <string name="filters_year_since">自 %1$d 年起</string>
     <string name="filters_year_unlimited">不限</string>
+    <string name="catalog_navigation">浏览目录</string>
+    <string name="catalog_navigation_description">选择首页、探索和搜索中的作品排序方式。阅读来源和账号同步单独设置。</string>
+    <string name="catalog_combined">合并</string>
+    <string name="catalog_priority_anilist">优先使用 AniList，MangaBaka 提供补充和备用内容。</string>
+    <string name="catalog_priority_mangabaka">优先使用 MangaBaka，AniList 提供补充和备用内容。</string>
+    <string name="catalog_priority_combined">交替显示两个目录的作品，合并同一作品的结果。</string>
 </resources>

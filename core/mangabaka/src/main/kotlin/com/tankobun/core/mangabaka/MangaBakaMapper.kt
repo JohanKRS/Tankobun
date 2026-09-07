@@ -26,8 +26,7 @@ internal object MangaBakaMapper {
         val allTags = data.array("tags").mapNotNull { it as? JsonObject }
         val tags = allTags.filter { it["is_spoiler"] != JsonPrimitive(true) }
         val type = data.text("type")
-        val cover = data.obj("cover")
-        val coverUrl = cover.text("x350") ?: cover.obj("x350").text("x2") ?: cover.text("raw") ?: cover.obj("raw").text("url")
+        val coverUrl = cover(data)
         return AnilistMedia(
             id = anilist ?: -id, anilistId = anilist, mangaBakaId = id,
             idMal = data.obj("source").obj("my_anime_list").number("id")?.toInt(),
@@ -51,6 +50,16 @@ internal object MangaBakaMapper {
             isAdult = data.text("content_rating") !in setOf("safe", "suggestive"),
             updatedAtEpochSeconds = null,
         )
+    }
+
+    fun cover(data: JsonObject, highResolution: Boolean = false): String? {
+        val cover = data.obj("cover")
+        val thumbnails = listOf(cover.text("x350"), cover.obj("x350").text("x2"))
+        val originals = listOf(cover.text("raw"), cover.obj("raw").text("url"))
+        val candidates = if (highResolution) {
+            listOf(cover.obj("x350").text("x3"), cover.obj("x350").text("x2")) + originals + thumbnails
+        } else thumbnails + originals
+        return candidates.firstNotNullOfOrNull { it.imageUrl() }
     }
 
     fun banner(data: JsonObject, includeAdult: Boolean): String? = data.array("data")

@@ -176,6 +176,19 @@ class MangaBakaRepository(
         return identity.resolve(enriched)
     }
 
+    /** Only Home's five visible works need the larger cover and upstream presentation data. */
+    suspend fun artwork(media: com.tankobun.core.model.AnilistMedia, includeAdult: Boolean): com.tankobun.core.model.AnilistMedia? {
+        val id = media.mangaBakaId ?: return null
+        if (media.isAdult && !includeAdult) return null
+        val full = request("v1/series/$id/full").obj("data")
+        if (full.number("id")?.toInt() != id || (!includeAdult && full.text("content_rating") !in setOf("safe", "suggestive"))) return null
+        val enriched = media.copy(coverImage = MangaBakaMapper.cover(full, highResolution = true) ?: media.coverImage)
+            .withMangaBakaSourceMetadata(full)
+        return if (enriched.bannerImage != null) enriched else enriched.copy(
+            bannerImage = MangaBakaMapper.banner(request("v1/series/$id/images", listOf("type" to "banner", "limit" to "50")), includeAdult),
+        )
+    }
+
     suspend fun recommendations(id: Int, page: Int, includeAdult: Boolean): AnilistRecommendationPage {
         // The similarity endpoint is a bounded list, not a paginated search endpoint.
         if (page != 1) return AnilistRecommendationPage(emptyList(), page, false)

@@ -139,6 +139,8 @@ import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.CatalogMode
+import com.tankobun.app.catalog.withCatalogMode
 import com.tankobun.core.model.CachePolicy
 import com.tankobun.core.model.DownloadState
 import com.tankobun.core.model.MediaStatus
@@ -246,6 +248,8 @@ class MainViewModel(
     private val libraryRefreshGate = com.tankobun.app.logic.LibraryRefreshGate()
     private var automaticLibraryRefresh = false
     private var scheduledBackupJob: Job? = null
+    private var browseSearchJob: Job? = null
+    private var browseMoreJob: Job? = null
     private var browseLandingJob: Job? = null
     private var homeFeedJob: Job? = null
     private var homeFeedRefreshJob: Job? = null
@@ -278,6 +282,7 @@ class MainViewModel(
         TankobunUiState(
             loggedIn = initialAccessToken != null,
             clientConfigured = BuildConfig.ANILIST_CLIENT_ID.isNotBlank(),
+            catalogMode = container.settingsStore.catalogMode(),
             libraryMode = initialLibraryMode,
             viewerName = container.settingsStore.viewerName(),
             anilistScoreFormat = container.settingsStore.anilistScoreFormat(),
@@ -344,6 +349,7 @@ class MainViewModel(
         localizedContext().resources.getQuantityString(id, quantity, *args)
 
     private val browseDataSource = BrowseDataSource(container, cachePolicy) { _state.value.anilistTitleLanguage }
+    private val homeArtworkDataSource = com.tankobun.app.home.HomeArtworkDataSource(container, cachePolicy)
     private val homeDataSource = HomeDataSource(container, cachePolicy) { _state.value.anilistTitleLanguage }
     private val sourceDataSource = SourceDataSource(container, cachePolicy)
     val state: StateFlow<TankobunUiState> = _state
@@ -493,6 +499,26 @@ class MainViewModel(
             container.settingsStore.saveLocalReadingActivity(activity)
             _state.update { it.copy(localReadingActivity = activity) }
         }
+    }
+
+    fun setCatalogMode(mode: CatalogMode) {
+        if (_state.value.catalogMode == mode) return
+        container.settingsStore.saveCatalogMode(mode)
+        reloadCatalogNavigation(mode)
+    }
+
+    private fun reloadCatalogNavigation(mode: CatalogMode) {
+        browseSearchJob?.cancel()
+        browseMoreJob?.cancel()
+        browseLandingJob?.cancel()
+        browseLandingJob = null
+        homeFeedJob?.cancel()
+        homeFeedJob = null
+        homeFeedRefreshJob?.cancel()
+        homeFeedRefreshJob = null
+        _state.update { it.withCatalogMode(mode) }
+        loadHomeFeed()
+        if (_state.value.hasBrowseQueryOrFilters()) searchAniList(recordHistory = false) else loadBrowseLanding()
     }
 
     fun setLibraryMode(mode: LibraryMode) {
@@ -1512,6 +1538,8 @@ class MainViewModel(
                 message = message,
             )
         }
+        reloadCatalogNavigation(store.catalogMode())
+        _state.update { it.copy(message = message) }
         NewChapterCheckWork.update(container.application, store.newChapterChecksEnabled())
     }
 
@@ -2039,9 +2067,12 @@ class MainViewModel(
     fun loadBrowseLanding(force: Boolean = false) {
         loadBrowseMix(force)
         if (!force && browseLandingJob?.isActive == true) return
+        browseLandingJob?.cancel()
         browseLandingJob = viewModelScope.launch {
             val snapshot = _state.value
             val includeAdult = snapshot.showNsfwContent
+            fun isCurrent() = _state.value.catalogMode == snapshot.catalogMode &&
+                _state.value.showNsfwContent == includeAdult
             val trendingKey = snapshot.browseLandingCacheKey(BROWSE_TRENDING_CACHE_KEY)
             val popularKey = snapshot.browseLandingCacheKey(BROWSE_POPULAR_CACHE_KEY)
             val manhwaKey = snapshot.browseLandingCacheKey(BROWSE_MANHWA_CACHE_KEY)
@@ -2052,6 +2083,7 @@ class MainViewModel(
                 popularManhwa = browseDataSource.cachedBrowseMedia(manhwaKey).take(BROWSE_LANDING_SECTION_SIZE),
                 topManga = browseDataSource.cachedBrowseMedia(topMangaKey).take(BROWSE_LANDING_SECTION_SIZE),
             )
+            if (!isCurrent()) return@launch
             val hasCachedLanding = cachedLanding.hasContent()
             val hasVisibleLanding = BrowseLandingData(
                 trending = snapshot.browseTrending,
@@ -2078,6 +2110,7 @@ class MainViewModel(
             val popularFresh = !force && browseDataSource.browseCacheFresh(popularKey, cachePolicy.browseLandingTtlMillis)
             val manhwaFresh = !force && browseDataSource.browseCacheFresh(manhwaKey, cachePolicy.browseLandingTtlMillis)
             val topMangaFresh = !force && browseDataSource.browseCacheFresh(topMangaKey, cachePolicy.browseLandingTtlMillis)
+            if (!isCurrent()) return@launch
             if (trendingFresh && popularFresh && manhwaFresh && topMangaFresh) {
                 _state.update { it.copy(browseLandingLoaded = true, busy = false) }
                 return@launch
@@ -2088,6 +2121,7 @@ class MainViewModel(
                     perPage = BROWSE_LANDING_SECTION_SIZE,
                     accessToken = accessToken,
                     includeAdult = includeAdult,
+                    mode = snapshot.catalogMode,
                 )
                 val landing = BrowseLandingData(
                     trending = remote.trending.map { it.withTitleLanguage(snapshot.anilistTitleLanguage) },
@@ -2103,6 +2137,7 @@ class MainViewModel(
                 browseDataSource.cacheBrowseMedia(topMangaKey, landing.topManga)
                 landing
             }.onSuccess { landing ->
+                if (!isCurrent()) return@onSuccess
                 _state.update {
                     it.copy(
                         browseTrending = landing.trending,
@@ -2114,6 +2149,8 @@ class MainViewModel(
                     )
                 }
             }.onFailure { error ->
+                if (error is CancellationException) throw error
+                if (!isCurrent()) return@onFailure
                 Log.e(TAG, "AniList browse landing failed", error)
                 _state.update {
                     it.copy(
@@ -2137,6 +2174,7 @@ class MainViewModel(
         homeFeedRefreshJob = null
         homeFeedJob = viewModelScope.launch {
             val includeAdult = _state.value.showNsfwContent
+            val mode = _state.value.catalogMode
             val genres = cachedHomeGenres(includeAdult = includeAdult)
             val freshCache = if (force) {
                 null
@@ -2145,13 +2183,15 @@ class MainViewModel(
                     genres = genres,
                     includeAdult = includeAdult,
                     freshOnly = true,
+                    mode = mode,
                 )
             }
             if (freshCache != null) {
-                if (_state.value.showNsfwContent == includeAdult) {
+                if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode) {
                     applyHomeFeed(freshCache)
                 }
-                scheduleHomeFeedRefresh(includeAdult)
+                enrichHomeArtwork(freshCache, includeAdult, mode)
+                scheduleHomeFeedRefresh(includeAdult, mode)
                 refreshHomeGenresIfStale(force = false)
                 return@launch
             }
@@ -2160,8 +2200,9 @@ class MainViewModel(
                 genres = genres,
                 includeAdult = includeAdult,
                 freshOnly = false,
+                mode = mode,
             )
-            if (_state.value.showNsfwContent == includeAdult) {
+            if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode) {
                 staleCache?.let(::applyHomeFeed)
             }
             _state.update { it.withHomeFeedRefreshStarted(includeAdult, genres) }
@@ -2171,8 +2212,9 @@ class MainViewModel(
                     genres = genres,
                     accessToken = container.tokenStore.accessToken(),
                     includeAdult = includeAdult,
+                    mode = mode,
                     onTrendingLoaded = { trending ->
-                        if (_state.value.showNsfwContent == includeAdult && trending.isNotEmpty()) {
+                        if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode && trending.isNotEmpty()) {
                             val existingById = _state.value.homeTrending.associateBy(AnilistMedia::id)
                             applyHomeTrending(
                                 trending.map { media -> media.withFallbackDetails(existingById[media.id]) },
@@ -2180,7 +2222,7 @@ class MainViewModel(
                         }
                     },
                     onGenreHighlightsLoaded = { highlights ->
-                        if (_state.value.showNsfwContent == includeAdult && highlights.isNotEmpty()) {
+                        if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode && highlights.isNotEmpty()) {
                             val existingById = _state.value.homeGenreHighlights
                                 .map { it.media }
                                 .associateBy(AnilistMedia::id)
@@ -2210,25 +2252,36 @@ class MainViewModel(
                         highlight.copy(media = highlight.media.withFallbackDetails(existingMediaById[highlight.media.id]))
                     },
                 )
-                homeDataSource.saveHomeFeed(stableFeed, includeAdult = includeAdult)
-                if (_state.value.showNsfwContent == includeAdult) {
+                homeDataSource.saveHomeFeed(stableFeed, includeAdult = includeAdult, mode = mode)
+                if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode) {
                     applyHomeFeed(stableFeed)
                 }
-                scheduleHomeFeedRefresh(includeAdult)
+                enrichHomeArtwork(stableFeed, includeAdult, mode)
+                scheduleHomeFeedRefresh(includeAdult, mode)
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 Log.e(TAG, "AniList home feed failed", error)
                 _state.update { state ->
-                    if (state.showNsfwContent != includeAdult) {
+                    if (state.showNsfwContent != includeAdult || state.catalogMode != mode) {
                         state
                     } else {
                         state.copy(homeLoaded = state.homeLoaded || staleCache == null)
                             .withHomeFeedRefreshStopped(includeAdult)
                     }
                 }
-                scheduleHomeFeedRefresh(includeAdult, HOME_FEED_RETRY_DELAY_MILLIS)
+                scheduleHomeFeedRefresh(includeAdult, mode, HOME_FEED_RETRY_DELAY_MILLIS)
             }
             refreshHomeGenresIfStale(force = force)
+        }
+    }
+
+    private suspend fun enrichHomeArtwork(feed: com.tankobun.core.model.AnilistHomeFeed, includeAdult: Boolean, mode: CatalogMode) {
+        try {
+            val enriched = homeArtworkDataSource.enrich(feed, includeAdult)
+            if (_state.value.catalogMode == mode && _state.value.showNsfwContent == includeAdult) applyHomeFeed(enriched)
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            Log.w(TAG, "Home artwork enrichment failed", error)
         }
     }
 
@@ -2257,18 +2310,19 @@ class MainViewModel(
 
     private fun scheduleHomeFeedRefresh(
         includeAdult: Boolean,
+        mode: CatalogMode,
         delayMillis: Long? = null,
     ) {
         homeFeedRefreshJob?.cancel()
         val refreshDelayMillis = delayMillis ?: run {
-            val cachedAt = container.settingsStore.homeFeedCachedAtEpochMillis(includeAdult)
+            val cachedAt = container.settingsStore.homeFeedCachedAtEpochMillis(includeAdult, mode)
             (cachePolicy.homeFeedTtlMillis - (System.currentTimeMillis() - cachedAt))
                 .coerceAtLeast(1_000L)
         }
         homeFeedRefreshJob = viewModelScope.launch {
             delay(refreshDelayMillis)
             homeFeedRefreshJob = null
-            if (_state.value.showNsfwContent == includeAdult) {
+            if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode) {
                 loadHomeFeed()
             }
         }
@@ -2368,6 +2422,8 @@ class MainViewModel(
         forceRefresh: Boolean = false,
         recordHistory: Boolean = true,
     ) {
+        browseSearchJob?.cancel()
+        browseMoreJob?.cancel()
         _state.update { it.copy(browseForYouOpen = false) }
         val snapshot = _state.value
         val query = snapshot.searchQuery.trim()
@@ -2394,7 +2450,7 @@ class MainViewModel(
             recordBrowseCriteria(criteria)
         }
         val cacheKey = snapshot.browseCacheKey()
-        viewModelScope.launch {
+        browseSearchJob = viewModelScope.launch {
             _state.update {
                 it.copy(
                     busy = true,
@@ -2431,6 +2487,7 @@ class MainViewModel(
                     }
                 }
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 Log.e(TAG, "AniList search failed for $query", error)
                 if (_state.value.browseCacheKey() == cacheKey) {
                     _state.update {
@@ -2458,7 +2515,7 @@ class MainViewModel(
         }
         val cacheKey = snapshot.browseCacheKey()
         val nextPage = snapshot.browseResultsPage.coerceAtLeast(1) + 1
-        viewModelScope.launch {
+        browseMoreJob = viewModelScope.launch {
             _state.update {
                 if (
                     it.browseCacheKey() == cacheKey &&
@@ -2477,6 +2534,7 @@ class MainViewModel(
                 if (_state.value.browseCacheKey() != cacheKey) return@onSuccess
                 val merged = (_state.value.searchResults + page.media).distinctBy { it.id }
                 browseDataSource.cacheBrowseMedia(cacheKey, merged)
+                if (_state.value.browseCacheKey() != cacheKey) return@onSuccess
                 _state.update {
                     it.copy(
                         searchResults = merged,
@@ -2486,6 +2544,7 @@ class MainViewModel(
                     )
                 }
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 Log.e(TAG, "AniList browse page $nextPage failed for $cacheKey", error)
                 if (_state.value.browseCacheKey() == cacheKey) {
                     _state.update {
@@ -2607,6 +2666,8 @@ class MainViewModel(
     }
 
     fun setShowNsfwContent(enabled: Boolean) {
+        browseSearchJob?.cancel()
+        browseMoreJob?.cancel()
         browseMixJob?.cancel()
         browseLandingJob?.cancel()
         homeFeedJob?.cancel()

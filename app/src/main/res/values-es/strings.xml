@@ -100,7 +100,7 @@
     <string name="settings_library_subtitle">Elige el diseño predeterminado para tus listas de biblioteca.</string>
     <string name="settings_browse_subtitle">Elige el diseño predeterminado para buscar y descubrir manga.</string>
     <string name="settings_reader_subtitle">Ajusta paginación, desplazamiento y espaciado.</string>
-    <string name="settings_anilist_subtitle">Gestiona la sincronización y la conexión de la cuenta.</string>
+    <string name="settings_anilist_subtitle">Elige el catálogo de navegación y gestiona la sincronización de cuentas.</string>
     <string name="settings_custom_lists_subtitle">Crea, renombra y elimina listas personalizadas de manga. Los manga permanecen en sus listas normales de estado.</string>
     <string name="settings_languages_subtitle">Elige el idioma de la app y qué idiomas de fuentes debe mostrar Tankobun de forma predeterminada.</string>
     <string name="settings_backups_subtitle">Guarda y restaura tu biblioteca de manga y los ajustes de la app.</string>
@@ -1175,7 +1175,7 @@
     <string name="catalog_for_you">Para ti</string>
     <string name="about_mangabaka_website">Sitio de MangaBaka</string>
     <string name="about_catalog_credits">Créditos y licencias de los catálogos</string>
-    <string name="about_mangabaka_data">MangaBaka complementa AniList con metadatos y descubrimiento. Los datos originales de MangaBaka usan la licencia CC BY-NC-SA 4.0. Los datos e imágenes de otros proveedores conservan sus respectivos derechos y términos.</string>
+    <string name="about_mangabaka_data">MangaBaka ofrece metadatos y descubrimiento de manga. Los datos originales de MangaBaka usan la licencia CC BY-NC-SA 4.0. Los datos e imágenes de otros proveedores conservan sus respectivos derechos y términos.</string>
     <string name="about_data_adaptations">Tankobun combina y formatea metadatos para mostrarlos. Las adaptaciones de datos originales de MangaBaka conservan CC BY-NC-SA 4.0. Créditos a los proveedores de origen:</string>
     <string name="about_data_terms">Términos de los datos</string>
     <string name="about_mangabaka_terms">Términos de MangaBaka</string>
@@ -1222,4 +1222,10 @@
     <string name="filters_year_until">Hasta %1$d</string>
     <string name="filters_year_since">Desde %1$d</string>
     <string name="filters_year_unlimited">Sin límite</string>
+    <string name="catalog_navigation">Catálogo de navegación</string>
+    <string name="catalog_navigation_description">Elige cómo se ordenan los títulos en Inicio, Explorar y la búsqueda. Las fuentes de lectura y la sincronización se configuran por separado.</string>
+    <string name="catalog_combined">Combinado</string>
+    <string name="catalog_priority_anilist">Prioriza AniList, con MangaBaka como complemento y alternativa.</string>
+    <string name="catalog_priority_mangabaka">Prioriza MangaBaka, con AniList como complemento y alternativa.</string>
+    <string name="catalog_priority_combined">Alterna títulos de ambos catálogos y reúne resultados de la misma obra.</string>
 </resources>

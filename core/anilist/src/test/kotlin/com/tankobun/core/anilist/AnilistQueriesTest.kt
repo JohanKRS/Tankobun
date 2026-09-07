@@ -105,5 +105,7 @@ class AnilistQueriesTest {
 
         assertTrue(query.contains("${'$'}id0: Int!"))
         assertTrue(query.contains("media2: Media(id: ${'$'}id2, type: MANGA)"))
+        assertFalse(query.contains("characters("))
+        assertTrue(AnilistQueries.mangaByIds(5, includeCharacters = true).contains("characters(sort: [FAVOURITES_DESC], page: 1, perPage: 12)"))
     }
 }

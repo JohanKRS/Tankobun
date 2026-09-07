@@ -566,6 +566,7 @@ internal fun AniListSettingsScreen(
         subtitle = tankobunString(R.string.settings_anilist_subtitle),
         modifier = modifier,
     ) {
+        CatalogNavigationSettings(state.catalogMode, viewModel::setCatalogMode)
         if (!state.loggedIn) {
             LibraryConnectPrompt(
                 clientConfigured = state.clientConfigured,

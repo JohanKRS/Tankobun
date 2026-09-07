@@ -6,6 +6,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.tankobun.core.model.catalogNameKey
+import com.tankobun.core.model.withCoverFallback
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -61,7 +62,7 @@ internal fun AnilistMediaEntity.withFallbackDetails(fallback: AnilistMediaEntity
         titleNative = titleNative ?: fallback.titleNative,
         titleUserPreferred = titleUserPreferred.ifBlank { fallback.titleUserPreferred },
         description = description ?: fallback.description,
-        coverImage = coverImage ?: fallback.coverImage,
+        coverImage = coverImage.withCoverFallback(fallback.coverImage),
         bannerImage = bannerImage ?: fallback.bannerImage,
         mainCharacterImage = mainCharacterImage ?: fallback.mainCharacterImage,
         characterImages = characterImages.ifEmpty { fallback.characterImages },

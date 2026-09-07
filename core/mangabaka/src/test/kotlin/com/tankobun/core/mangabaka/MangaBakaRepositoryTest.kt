@@ -15,6 +15,46 @@ class MangaBakaRepositoryTest {
     private fun response(body: String) = MockResponse.Builder().code(200).body(body).build()
     private fun repository(server: MockWebServer) = MangaBakaRepository(OkHttpClient(), baseUrl = server.url("/").toString())
 
+    @Test fun homeArtworkLoadsTheLargeCoverAndBannerWithoutRepeatingTheSearch() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(response("""{"data":{"id":82,"content_rating":"safe","cover":{"x350":{"x1":"https://example.test/small.jpg","x3":"https://example.test/large.jpg"}}}}"""))
+            server.enqueue(response("""{"data":[{"type":"banner","content_rating":"safe","image":{"raw":{"width":1600,"height":700},"x350":{"x3":"https://example.test/banner.jpg"}}}]}"""))
+            val repo = repository(server)
+            val original = MangaBakaMapper.media(Json.parseToJsonElement(series(82, "null")).jsonObject)!!
+            val art = repo.artwork(original, false)!!
+            assertEquals("https://example.test/large.jpg", art.coverImage)
+            assertEquals("https://example.test/banner.jpg", art.bannerImage)
+            assertEquals(original.id, art.id)
+            assertEquals(art, repo.artwork(original, false))
+            assertEquals(2, server.requestCount)
+            assertEquals("/v1/series/82/full", server.takeRequest().target)
+            assertTrue(server.takeRequest().target.startsWith("/v1/series/82/images?"))
+        }
+    }
+
+    @Test fun homeArtworkReusesTheSourceBannerAndMainCharacters() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(response("""{"data":{"id":82,"content_rating":"safe","source":{"anilist":{"response":{"id":123,"bannerImage":"https://example.test/banner.jpg","characters":{"edges":[{"role":"MAIN","node":{"image":{"large":"https://example.test/character.jpg"}}}]}}}}}}"""))
+            val original = MangaBakaMapper.media(Json.parseToJsonElement(series(82, "123")).jsonObject)!!
+            val art = repository(server).artwork(original, false)!!
+            assertEquals("https://example.test/banner.jpg", art.bannerImage)
+            assertEquals(listOf("https://example.test/character.jpg"), art.characterImages)
+            assertEquals(1, server.requestCount)
+        }
+    }
+
+    @Test fun safeHomeArtworkRejectsAnAdultSourceRecord() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(response("""{"data":{"id":82,"content_rating":"pornographic","cover":{"raw":{"url":"https://example.test/hidden.jpg"}}}}"""))
+            val original = MangaBakaMapper.media(Json.parseToJsonElement(series(82, "null")).jsonObject)!!
+            assertNull(repository(server).artwork(original, false))
+            assertEquals(1, server.requestCount)
+        }
+    }
+
     @Test fun multipleCountriesStatusesAndYearsShareOneFilteredPage() = runTest {
         MockWebServer().use { server ->
             server.start()

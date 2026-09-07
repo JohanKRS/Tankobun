@@ -122,7 +122,7 @@ internal class BrowseDataSource(
                 includeAdult = snapshot.showNsfwContent,
             )
         } } }
-        return container.catalog.search(primary = primary, secondary = {
+        return container.catalog.search(mode = snapshot.catalogMode, primary = primary, secondary = {
             val mbTaxonomyKnown = snapshot.catalogTaxonomy.tags.any { it.mangaBakaId != null }
             if (!filters.canQueryMangaBaka && mbTaxonomyKnown) return@search AnilistMediaPage(emptyList(), page, false)
             container.mangaBakaRepository.search(query = query, page = page, limit = BROWSE_RESULTS_PAGE_SIZE,

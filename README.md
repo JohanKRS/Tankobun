@@ -38,18 +38,18 @@ Tankobun is an Android reader and tracking client built around an AniList-compat
 
 It is designed as a personal reading shelf: use a local library or sign in with AniList, browse manga metadata, open a manga entry, choose a user-installed source when available, read in paged or webtoon mode, and keep your progress organized.
 
-Local library mode does not require an account. AniList is the primary catalog; MangaBaka adds titles, metadata, recommendations, and a fallback when AniList is unavailable. Entries keep AniList-compatible statuses, scoring, notes, progress, and custom lists. Titles without an AniList match remain usable locally.
+Local library mode does not require an account. Choose AniList (the default), MangaBaka, or Combined for Home, Browse, and search. Priority modes use the other catalog for complementary search results and fallback; Combined interleaves provider rankings and merges confirmed linked works. Entries keep AniList-compatible statuses, scoring, notes, progress, and custom lists. Titles without an AniList match remain usable locally.
 
 Tankobun is not a content service, content host, extension repository, or manga source.
 
 ## What Tankobun Does
 
 - Local manga library with AniList and MangaBaka catalog entries.
-- Combined search, enriched metadata, and MangaBaka Mix discovery in the existing reading flow.
+- Choice of navigation catalog, enriched metadata, and MangaBaka Mix discovery in the existing reading flow.
 - Unified genre/tag filters, searchable tag categories, multiple formats/statuses/countries, and publication year ranges in Explore and the library.
 - Optional MangaBaka tracking through a personal access token.
 - AniList login and user-authorized library sync.
-- Adaptive Home with AniList metadata highlights, Continue Reading, and genre discovery.
+- Adaptive Home with catalog highlights, Continue Reading, and genre discovery.
 - Profile dashboard with reading activity, library statistics, genre insights, and achievements.
 - Fourteen color palettes with independent Defined or Rounded component shapes.
 - Manga list browsing, status management, scoring, custom lists, and progress updates.
@@ -140,7 +140,11 @@ as the redirect URL.
 
 ## MangaBaka
 
-[MangaBaka](https://mangabaka.org) supplements the primary AniList catalog without requiring another account. Its [API](https://mangabaka.org/data/api) provides search, metadata, similar works, and Mix suggestions. Optional tracking uses a personal token with `library.read` and `library.write`, created in [API & apps](https://mangabaka.org/my/settings/api-and-apps). Connect it in Settings → Catalogs and accounts.
+[MangaBaka](https://mangabaka.org) can be the preferred navigation catalog or complement AniList without requiring another account. Its [API](https://mangabaka.org/data/api) provides search, metadata, similar works, and Mix suggestions. Optional tracking uses a personal token with `library.read` and `library.write`, created in [API & apps](https://mangabaka.org/my/settings/api-and-apps). Connect it in Settings → Catalogs and accounts.
+
+The navigation preference is saved in settings backups and does not change tracking accounts, reading sources, downloads, or local library identity. Home and Browse caches are separated by preference; the Home carousel stays at five titles and Browse shelves at ten. Combined alternates unique works in each catalog's own ranking, preserves richer artwork on linked titles, and uses the available catalog if the other fails. It does not compare popularity scores between services. “For you” remains the existing personalized MangaBaka Mix shelf based on reading and library signals; it is independent of the Combined navigation mode.
+
+Home automatically enriches artwork for its five carousel titles, including larger MangaBaka covers and available banners or character images. AniList artwork is fetched in one batch; MangaBaka fallback uses at most two concurrent requests. Artwork checks, including titles without banners, are cached for seven days, with a 30-minute retry delay after failures. Search thumbnails cannot overwrite a cached larger variant of the same MangaBaka cover.
 
 Thanks to MangaBaka, its contributors, AniList, and the upstream metadata communities. Tankobun is independent and is not affiliated with or endorsed by these services.
 

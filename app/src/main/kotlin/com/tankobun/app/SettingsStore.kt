@@ -7,6 +7,7 @@ import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistStatItem
 import com.tankobun.core.model.AnilistTitleLanguage
+import com.tankobun.core.model.CatalogMode
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.app.state.LocalReadingActivity
 import java.util.Base64
@@ -15,6 +16,12 @@ import java.util.Locale
 class SettingsStore(context: Context) {
     private val preferences = context.getSharedPreferences("tankobun_settings", Context.MODE_PRIVATE)
     private val resources = context.resources
+
+    fun catalogMode(): CatalogMode = CatalogMode.fromStored(preferences.getString("catalog.navigation.mode", null))
+
+    fun saveCatalogMode(mode: CatalogMode) {
+        preferences.edit().putString("catalog.navigation.mode", mode.name).apply()
+    }
 
     fun cachePreferences(): CachePreferences = CachePreferences(
         readerLimitMiB = preferences.getInt("cache.reader.limit.mib", 2048),
@@ -368,16 +375,16 @@ class SettingsStore(context: Context) {
             .apply()
     }
 
-    fun homeFeedCachedAtEpochMillis(includeAdult: Boolean): Long =
+    fun homeFeedCachedAtEpochMillis(includeAdult: Boolean, mode: CatalogMode): Long =
         preferences.getLong(
-            if (includeAdult) KEY_HOME_FEED_NSFW_CACHED_AT else KEY_HOME_FEED_SAFE_CACHED_AT,
+            (if (includeAdult) KEY_HOME_FEED_NSFW_CACHED_AT else KEY_HOME_FEED_SAFE_CACHED_AT) + ".${mode.name}",
             0L,
         )
 
-    fun saveHomeFeedCachedAtEpochMillis(includeAdult: Boolean, cachedAtEpochMillis: Long) {
+    fun saveHomeFeedCachedAtEpochMillis(includeAdult: Boolean, cachedAtEpochMillis: Long, mode: CatalogMode) {
         preferences.edit()
             .putLong(
-                if (includeAdult) KEY_HOME_FEED_NSFW_CACHED_AT else KEY_HOME_FEED_SAFE_CACHED_AT,
+                (if (includeAdult) KEY_HOME_FEED_NSFW_CACHED_AT else KEY_HOME_FEED_SAFE_CACHED_AT) + ".${mode.name}",
                 cachedAtEpochMillis,
             )
             .apply()

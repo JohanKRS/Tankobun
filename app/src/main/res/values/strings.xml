@@ -101,7 +101,7 @@
     <string name="settings_library_subtitle">Pick the default layout for your swipeable library lists.</string>
     <string name="settings_browse_subtitle">Pick the default layout for manga search and discovery.</string>
     <string name="settings_reader_subtitle">Adjust paging, scrolling, and spacing.</string>
-    <string name="settings_anilist_subtitle">Manage sync and account connection.</string>
+    <string name="settings_anilist_subtitle">Choose your navigation catalog and manage account sync.</string>
     <string name="settings_custom_lists_subtitle">Create, rename, and delete manga custom lists. Manga stay in their normal status lists.</string>
     <string name="settings_languages_subtitle">Choose the app language and which source languages Tankobun should show by default.</string>
     <string name="settings_backups_subtitle">Save and restore your manga library and app settings.</string>
@@ -1174,7 +1174,7 @@
     <string name="catalog_for_you">For you</string>
     <string name="about_mangabaka_website">MangaBaka website</string>
     <string name="about_catalog_credits">Catalog credits and licenses</string>
-    <string name="about_mangabaka_data">MangaBaka complements AniList with metadata and discovery. MangaBaka-original data is licensed under CC BY-NC-SA 4.0. Data and images from other providers retain their respective rights and terms.</string>
+    <string name="about_mangabaka_data">MangaBaka provides manga metadata and discovery. MangaBaka-original data is licensed under CC BY-NC-SA 4.0. Data and images from other providers retain their respective rights and terms.</string>
     <string name="about_data_adaptations">Tankobun combines and formats metadata for display. Adaptations of MangaBaka-original data retain CC BY-NC-SA 4.0. Credits to the upstream providers:</string>
     <string name="about_data_terms">Data terms</string>
     <string name="about_mangabaka_terms">MangaBaka terms</string>
@@ -1221,4 +1221,10 @@
     <string name="filters_year_until">Through %1$d</string>
     <string name="filters_year_since">Since %1$d</string>
     <string name="filters_year_unlimited">No limit</string>
+    <string name="catalog_navigation">Navigation catalog</string>
+    <string name="catalog_navigation_description">Choose how titles are ordered in Home, Browse and search. Reading sources and account sync are configured separately.</string>
+    <string name="catalog_combined">Combined</string>
+    <string name="catalog_priority_anilist">Prioritize AniList, with MangaBaka as a complement and fallback.</string>
+    <string name="catalog_priority_mangabaka">Prioritize MangaBaka, with AniList as a complement and fallback.</string>
+    <string name="catalog_priority_combined">Alternate titles from both catalogs and combine results for the same work.</string>
 </resources>

@@ -279,7 +279,7 @@ object AnilistQueries {
         }
     """
 
-    fun mangaByIds(count: Int): String {
+    fun mangaByIds(count: Int, includeCharacters: Boolean = false): String {
         require(count > 0)
         val variables = (0 until count).joinToString(", ") { index ->
             "${'$'}id$index: Int!"
@@ -303,6 +303,7 @@ object AnilistQueries {
               description(asHtml: false)
               coverImage { extraLarge large color }
               bannerImage
+              ${if (includeCharacters) "characters(sort: [FAVOURITES_DESC], page: 1, perPage: 12) { edges { role node { image { large } } } }" else ""}
               chapters
               volumes
               format

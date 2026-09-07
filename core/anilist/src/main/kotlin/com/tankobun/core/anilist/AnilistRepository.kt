@@ -359,13 +359,13 @@ class AnilistRepository(
         return identity.resolve(AnilistJsonMapper.media(media))
     }
 
-    suspend fun mangaByIds(mediaIds: List<Int>, accessToken: String? = null): List<AnilistMedia> {
+    suspend fun mangaByIds(mediaIds: List<Int>, accessToken: String? = null, includeCharacters: Boolean = false): List<AnilistMedia> {
         val uniqueIds = mediaIds.distinct().filter { identity.anilistId(it) != null }
         if (uniqueIds.isEmpty()) return emptyList()
         val foundById = mutableMapOf<Int, AnilistMedia>()
         uniqueIds.chunked(MANGA_BY_IDS_BATCH_SIZE).forEach { chunk ->
             val data = graphQlClient.execute(
-                query = AnilistQueries.mangaByIds(chunk.size),
+                query = AnilistQueries.mangaByIds(chunk.size, includeCharacters),
                 variables = buildJsonObject {
                     chunk.forEachIndexed { index, mediaId -> put("id$index", requireNotNull(identity.anilistId(mediaId))) }
                 },
