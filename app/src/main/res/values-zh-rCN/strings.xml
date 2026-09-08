@@ -478,6 +478,13 @@
 
     <string name="source_none_selected">未选择来源。</string>
     <string name="source_install_in_settings">在“设置”中安装来源扩展。</string>
+    <string name="source_setup_title">尚未安装阅读源</string>
+    <string name="source_setup_description">添加扩展仓库以安装阅读源。</string>
+    <string name="source_setup_action">添加阅读源</string>
+    <string name="source_setup_help_title">如何添加阅读源</string>
+    <string name="source_setup_help_body">Tankobun 不提供阅读源或扩展仓库链接。你需要自行寻找兼容的扩展仓库。</string>
+    <string name="source_setup_help_steps">1. 将仓库 URL 粘贴到“%1$s”中，然后点击“%2$s”。\n\n2. 从列表中安装一个阅读源。\n\n3. 返回此漫画并选择阅读源，即可查看章节。</string>
+    <string name="source_setup_open_repository">打开扩展仓库</string>
     <string name="source_choose_to_read">选择一个来源来浏览和阅读。</string>
     <string name="source_selected_source">已选择来源</string>
     <string name="source_no_chapters_loaded">没有加载章节</string>

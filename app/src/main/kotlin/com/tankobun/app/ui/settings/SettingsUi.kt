@@ -231,7 +231,7 @@ internal fun SettingsScreen(
             ) {
                 SettingsIndexPane(
                     state = state,
-                    selectedRoute = detailRoute,
+                    selectedRoute = if (detailRoute == SettingsRoute.SOURCE_REPOSITORY) SettingsRoute.SOURCES else detailRoute,
                     onOpenRoute = onOpenRoute,
                     modifier = Modifier
                         .fillMaxHeight()
@@ -509,7 +509,9 @@ internal fun SettingsDetailContent(
             onReplayOnboarding = viewModel::startAppTour,
             modifier = modifier,
         )
-        SettingsRoute.SOURCES -> SourcesSettingsScreen(state, viewModel)
+        SettingsRoute.SOURCES, SettingsRoute.SOURCE_REPOSITORY -> key(route) {
+            SourcesSettingsScreen(state, viewModel, openRepository = route == SettingsRoute.SOURCE_REPOSITORY)
+        }
     }
 }
 

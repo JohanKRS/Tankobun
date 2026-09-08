@@ -475,6 +475,13 @@
 
     <string name="source_none_selected">No hay fuente seleccionada.</string>
     <string name="source_install_in_settings">Instala extensiones de fuentes en Ajustes.</string>
+    <string name="source_setup_title">No hay fuentes de lectura instaladas</string>
+    <string name="source_setup_description">Añade un repositorio para instalar fuentes de lectura.</string>
+    <string name="source_setup_action">Añadir fuentes</string>
+    <string name="source_setup_help_title">Cómo añadir fuentes</string>
+    <string name="source_setup_help_body">Tankobun no proporciona fuentes de lectura ni enlaces a repositorios. Debes encontrar un repositorio de extensiones compatible por tu cuenta.</string>
+    <string name="source_setup_help_steps">1. Pega la URL del repositorio en “%1$s” y toca “%2$s”.\n\n2. Instala una fuente de lectura de la lista.\n\n3. Vuelve a este manga y selecciona la fuente para ver sus capítulos.</string>
+    <string name="source_setup_open_repository">Abrir repositorio</string>
     <string name="source_choose_to_read">Elige una fuente para explorar y leer.</string>
     <string name="source_selected_source">Fuente seleccionada</string>
     <string name="source_no_chapters_loaded">No hay capítulos cargados</string>

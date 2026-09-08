@@ -241,6 +241,7 @@ internal fun MangaDetailScreen(
     onSelectMedia: (AnilistMedia) -> Unit,
     onBrowseTag: (String) -> Unit,
     onBrowseAuthor: (String) -> Unit,
+    onOpenSourceRepository: () -> Unit,
 ) {
     val backdrop = mediaDetailBackdropColor()
     val context = LocalContext.current
@@ -256,9 +257,14 @@ internal fun MangaDetailScreen(
     val trackedStatuses = remember(state.libraryItems) { state.libraryItems.trackedMediaStatuses() }
     var coverZoomOpen by remember(media.id) { mutableStateOf(false) }
     var detailShareOpen by remember(media.id) { mutableStateOf(false) }
+    var sourceSetupOpen by androidx.compose.runtime.saveable.rememberSaveable(media.id) { mutableStateOf(false) }
+    val onSetupSources = {
+        viewModel.closeSourcePicker()
+        sourceSetupOpen = true
+    }
     val detailBlur by animateDpAsState(
         targetValue = when {
-            state.sourcePickerOpen -> 8.dp
+            state.sourcePickerOpen || sourceSetupOpen -> 8.dp
             coverZoomOpen -> QuickDrawerBackdropBlurDp.dp
             else -> 0.dp
         },
@@ -352,7 +358,7 @@ internal fun MangaDetailScreen(
                 if (state.selectedSourceAwaitingTrust != null) {
                     item(key = "source-review-required") {
                         Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                            SourceSummarySection(state, viewModel)
+                            SourceSummarySection(state, viewModel, onSetupSources)
                         }
                     }
                 }
@@ -380,7 +386,7 @@ internal fun MangaDetailScreen(
 
                 item {
                     Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                        if (state.selectedSourceAwaitingTrust == null) SourceSummarySection(state, viewModel)
+                        if (state.selectedSourceAwaitingTrust == null) SourceSummarySection(state, viewModel, onSetupSources)
                     }
                 }
 
@@ -506,7 +512,17 @@ internal fun MangaDetailScreen(
         }
 
         if (state.sourcePickerOpen) {
-            SourcePickerDialog(state, viewModel, media)
+            SourcePickerDialog(state, viewModel, media, onSetupSources)
+        }
+
+        if (sourceSetupOpen) {
+            SourceRepositoryHelpDialog(
+                onDismiss = { sourceSetupOpen = false },
+                onOpenRepository = {
+                    sourceSetupOpen = false
+                    onOpenSourceRepository()
+                },
+            )
         }
 
         if (detailShareOpen) {

@@ -82,7 +82,7 @@ import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceSearchResult
 
 @Composable
-internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewModel) {
+internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewModel, onSetupSources: () -> Unit) {
     val selectedManga = state.selectedSourceManga
     val selectedSource = state.selectedSource
 
@@ -95,6 +95,8 @@ internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewMod
                 onReview = { viewModel.reviewExtension(pending) },
                 onChange = viewModel::openSourcePicker,
             )
+        } else if (state.hasNoInstalledSources) {
+            SourceSetupCard(onSetupSources)
         } else if (selectedManga == null) {
             SourceActionCard(
                 title = tankobunString(R.string.source_none_selected),
@@ -119,6 +121,72 @@ internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewMod
                 },
                 onChange = viewModel::openSourcePicker,
             )
+        }
+    }
+}
+
+private val TankobunUiState.hasNoInstalledSources: Boolean
+    get() = allInstalledSources.isEmpty() && installedSources.isEmpty() && untrustedExtensions.isEmpty()
+
+@Composable
+private fun SourceSetupCard(onSetupSources: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = LocalTankobunStyle.current.themeShapes.panel,
+        color = mediaDetailPanelColor(),
+        contentColor = mediaDetailForegroundColor(),
+    ) {
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(14.dp)) {
+            val compact = maxWidth < 430.dp
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    DetailIconBadge(icon = TankobunIcons.Extension)
+                    SourceActionText(
+                        title = tankobunString(R.string.source_setup_title),
+                        subtitle = tankobunString(R.string.source_setup_description),
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (!compact) SourceSetupButton(onSetupSources)
+                }
+                if (compact) SourceSetupButton(onSetupSources, Modifier.fillMaxWidth())
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceSetupButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedButton(onClick = onClick, modifier = modifier, shape = LocalTankobunStyle.current.themeShapes.control) {
+        Icon(TankobunIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.size(8.dp))
+        Text(tankobunString(R.string.source_setup_action))
+    }
+}
+
+@Composable
+internal fun SourceRepositoryHelpDialog(onDismiss: () -> Unit, onOpenRepository: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        TankobunDialogSurface(maxWidth = 520.dp) {
+            Text(tankobunString(R.string.source_setup_help_title), style = MaterialTheme.typography.headlineSmall)
+            Text(tankobunString(R.string.source_setup_help_body), style = MaterialTheme.typography.bodyMedium)
+            Text(
+                tankobunString(
+                    R.string.source_setup_help_steps,
+                    tankobunString(R.string.sources_repository_index_url),
+                    tankobunString(R.string.common_load),
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Button(
+                onClick = onOpenRepository,
+                modifier = Modifier.fillMaxWidth(),
+                shape = LocalTankobunStyle.current.themeShapes.control,
+            ) {
+                Text(tankobunString(R.string.source_setup_open_repository))
+            }
+            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+                Text(tankobunString(R.string.common_cancel))
+            }
         }
     }
 }
@@ -359,7 +427,7 @@ private fun Bitmap.visibleAlphaBounds(alphaThreshold: Int = 8): Rect? {
 }
 
 @Composable
-internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
+internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia, onSetupSources: () -> Unit) {
     val context = LocalContext.current
     val matches = state.sourceMatches.filter { match ->
         match.source.installed && state.untrustedExtensions.none { it.descriptor.packageName == match.source.packageName } &&
@@ -433,7 +501,9 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
 
             if (matches.isEmpty() && availableSources.isEmpty() && state.untrustedExtensions.isEmpty() && !state.sourcePickerLoading) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (state.hasNoInstalledSources) {
+                        SourceSetupCard(onSetupSources)
+                    } else Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(tankobunString(R.string.source_no_enabled), style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(8.dp))
                         Text(

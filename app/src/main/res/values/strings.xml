@@ -479,6 +479,13 @@
 
     <string name="source_none_selected">No source selected.</string>
     <string name="source_install_in_settings">Install source extensions in Settings.</string>
+    <string name="source_setup_title">No reading sources installed</string>
+    <string name="source_setup_description">Add a repository to install reading sources.</string>
+    <string name="source_setup_action">Add reading sources</string>
+    <string name="source_setup_help_title">How to add reading sources</string>
+    <string name="source_setup_help_body">Tankobun does not provide reading sources or repository links. You need to find a compatible extension repository yourself.</string>
+    <string name="source_setup_help_steps">1. Paste the repository URL into “%1$s” and tap “%2$s”.\n\n2. Install a reading source from the list.\n\n3. Return to this manga and select the source to see its chapters.</string>
+    <string name="source_setup_open_repository">Open repository</string>
     <string name="source_choose_to_read">Choose a source to browse and read.</string>
     <string name="source_selected_source">Selected source</string>
     <string name="source_no_chapters_loaded">No chapters loaded</string>
