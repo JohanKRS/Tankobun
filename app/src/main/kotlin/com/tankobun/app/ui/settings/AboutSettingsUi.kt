@@ -1,5 +1,6 @@
 package com.tankobun.app.ui.settings
 
+import com.tankobun.app.catalog.*
 import com.tankobun.app.ui.icons.TankobunIcons
 
 import android.content.Context
@@ -229,9 +230,11 @@ internal fun AboutSettingsScreen(
         AboutIdentityContent(
             onOpenGitHub = { uriHandler.openUri(TankobunGithubUrl) },
             onOpenAniList = { uriHandler.openUri(TankobunAniListUrl) },
+            onOpenMangaBaka = { uriHandler.openUri(MANGA_BAKA_URL) },
             onReplayOnboarding = onReplayOnboarding,
         )
         AboutNoticeContent()
+        AboutCatalogCredits(onOpenUrl = uriHandler::openUri)
         AppUpdatesContent(
             state = state,
             viewModel = viewModel,
@@ -246,6 +249,7 @@ internal fun AboutSettingsScreen(
 private fun AboutIdentityContent(
     onOpenGitHub: () -> Unit,
     onOpenAniList: () -> Unit,
+    onOpenMangaBaka: () -> Unit,
     onReplayOnboarding: () -> Unit,
 ) {
     TankobunPanel(
@@ -283,6 +287,13 @@ private fun AboutIdentityContent(
                     filled = false,
                 )
                 TankobunActionButton(
+                    label = tankobunString(R.string.about_mangabaka_website),
+                    icon = TankobunIcons.Link,
+                    onClick = onOpenMangaBaka,
+                    modifier = Modifier.fillMaxWidth(),
+                    filled = false,
+                )
+                TankobunActionButton(
                     label = tankobunString(R.string.about_replay_tutorial),
                     icon = TankobunIcons.Replay,
                     onClick = onReplayOnboarding,
@@ -301,6 +312,31 @@ private fun AboutNoticeContent() {
         AboutParagraph(tankobunString(R.string.about_anilist_thanks))
         AboutParagraph(tankobunString(R.string.about_anilist_data))
         AboutParagraph(tankobunString(R.string.about_sources))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AboutCatalogCredits(onOpenUrl: (String) -> Unit) {
+    AboutSection(title = tankobunString(R.string.about_catalog_credits)) {
+        AboutParagraph(tankobunString(R.string.about_mangabaka_data))
+        AboutParagraph(tankobunString(R.string.about_data_adaptations))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            upstreamCatalogCredits.forEach { credit ->
+                TextButton(onClick = { onOpenUrl(credit.url) }) { Text(credit.name) }
+            }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(onClick = { onOpenUrl(MANGA_BAKA_CC_LICENSE_URL) }) { Text("CC BY-NC-SA 4.0") }
+            TextButton(onClick = { onOpenUrl(MANGA_BAKA_DATA_LICENSE_URL) }) { Text(tankobunString(R.string.about_data_terms)) }
+            TextButton(onClick = { onOpenUrl(MANGA_BAKA_TERMS_URL) }) { Text(tankobunString(R.string.about_mangabaka_terms)) }
+            TextButton(onClick = { onOpenUrl(MANGA_BAKA_PRIVACY_URL) }) { Text(tankobunString(R.string.about_mangabaka_privacy)) }
+        }
+        AboutParagraph(tankobunString(R.string.about_code_license))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(onClick = { onOpenUrl("https://github.com/JohanKRS/Tankobun/blob/main/LICENCE.md") }) { Text("MIT") }
+            TextButton(onClick = { onOpenUrl("https://github.com/JohanKRS/Tankobun/blob/main/NOTICE.md") }) { Text(tankobunString(R.string.about_third_party_notices)) }
+        }
     }
 }
 

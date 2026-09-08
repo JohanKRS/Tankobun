@@ -38,6 +38,23 @@ data class AnilistMediaEntity(
     val isAdult: Boolean,
     val updatedAtEpochSeconds: Long?,
     val fetchedAtEpochMillis: Long,
+    val anilistId: Int? = id.takeIf { it > 0 },
+    val mangaBakaId: Int? = null,
+    @androidx.room.ColumnInfo(defaultValue = "''") val mangaBakaTagIds: List<Int> = emptyList(),
+)
+
+@Entity(tableName = "catalog_identity", indices = [Index(value = ["anilistId"], unique = true), Index(value = ["mangaBakaId"], unique = true)])
+data class CatalogIdentityEntity(
+    @PrimaryKey val localId: Int,
+    val anilistId: Int?,
+    val mangaBakaId: Int?,
+)
+
+@Entity(tableName = "catalog_pages")
+data class CatalogPageEntity(
+    @PrimaryKey val cacheKey: String,
+    val hasNextPage: Boolean,
+    val fetchedAtEpochMillis: Long,
 )
 
 @Entity(
@@ -192,4 +209,14 @@ data class SyncMutationEntity(
     val attempts: Int,
     val nextAttemptAtEpochMillis: Long,
     val createdAtEpochMillis: Long,
+)
+
+@Entity(tableName = "mangabaka_mutations", primaryKeys = ["accountKey", "mediaId"])
+data class MangaBakaMutationEntity(
+    val accountKey: String,
+    val mediaId: Int,
+    val payloadJson: String,
+    val revision: String,
+    val attempts: Int,
+    val retryAtEpochMillis: Long,
 )

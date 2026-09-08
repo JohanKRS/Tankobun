@@ -1,5 +1,6 @@
 package com.tankobun.app.backup
 
+import com.tankobun.app.catalog.withCatalogAttribution
 import com.tankobun.app.state.LibraryItem
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMedia
@@ -40,6 +41,7 @@ internal fun buildTankobunLibraryBackupJson(
     return JSONObject()
         .put("type", TANKOBUN_LIBRARY_BACKUP_TYPE)
         .put("version", TANKOBUN_LIBRARY_BACKUP_VERSION)
+        .withCatalogAttribution(items.any { it.media.mangaBakaId != null })
         .put("createdAtEpochMillis", System.currentTimeMillis())
         .put(
             "preferences",
@@ -66,6 +68,7 @@ internal fun buildTankobunLibraryBackupJson(
 internal fun parseTankobunLibraryBackupJson(text: String): TankobunLibraryBackup {
     val root = JSONObject(text)
     check(root.optString("type") == TANKOBUN_LIBRARY_BACKUP_TYPE) { "Unsupported Tankobun library backup" }
+    require(root.optInt("version", 1) in 1..TANKOBUN_LIBRARY_BACKUP_VERSION) { "Unsupported backup version" }
     val preferences = root.optJSONObject("preferences") ?: JSONObject()
     return TankobunLibraryBackup(
         scoreFormat = preferences.enumOrDefault("scoreFormat", AnilistScoreFormat.POINT_100),
@@ -79,7 +82,10 @@ internal fun parseTankobunLibraryBackupJson(text: String): TankobunLibraryBackup
                     entry = requireNotNull(item.optJSONObject("entry")) { "Missing entry" }.toEntry(),
                     sourceBinding = item.optJSONObject("sourceBinding")?.toSourceBinding(),
                     progress = item.optJSONArray("progress").objectValues().map { it.toProgress() },
-                )
+                ).also { parsed ->
+                    require(parsed.media.id != 0 && (parsed.media.anilistId?.let { it > 0 } == true || parsed.media.mangaBakaId?.let { it > 0 } == true)) { "Missing catalog identity" }
+                    require(parsed.entry.mediaId == parsed.media.id && (parsed.sourceBinding == null || parsed.sourceBinding.mediaId == parsed.media.id) && parsed.progress.all { it.mediaId == parsed.media.id }) { "Mismatched backup identity" }
+                }
             },
     )
 }
@@ -91,6 +97,9 @@ private fun AnilistMedia.toJson(): JSONObject =
     JSONObject()
         .put("id", id)
         .putNullable("idMal", idMal)
+        .putNullable("anilistId", anilistId)
+        .putNullable("mangaBakaId", mangaBakaId)
+        .put("mangaBakaTagIds", JSONArray(mangaBakaTagIds))
         .put(
             "title",
             JSONObject()
@@ -102,6 +111,8 @@ private fun AnilistMedia.toJson(): JSONObject =
         .putNullable("description", description)
         .putNullable("coverImage", coverImage)
         .putNullable("bannerImage", bannerImage)
+        .putNullable("mainCharacterImage", mainCharacterImage)
+        .put("characterImages", characterImages.toJsonArray())
         .putNullable("chapters", chapters)
         .putNullable("volumes", volumes)
         .putNullable("format", format)
@@ -124,6 +135,11 @@ private fun JSONObject.toMedia(): AnilistMedia {
     return AnilistMedia(
         id = getInt("id"),
         idMal = optIntOrNull("idMal"),
+        anilistId = if (has("anilistId")) optIntOrNull("anilistId") else getInt("id").takeIf { it > 0 },
+        mangaBakaId = optIntOrNull("mangaBakaId"),
+        mangaBakaTagIds = optJSONArray("mangaBakaTagIds").let { ids ->
+            if (ids == null) emptyList() else (0 until ids.length()).mapNotNull { ids.optInt(it).takeIf { id -> id > 0 } }.distinct()
+        },
         title = AnilistTitle(
             romaji = title.optStringOrNull("romaji"),
             english = title.optStringOrNull("english"),
@@ -133,6 +149,8 @@ private fun JSONObject.toMedia(): AnilistMedia {
         description = optStringOrNull("description"),
         coverImage = optStringOrNull("coverImage"),
         bannerImage = optStringOrNull("bannerImage"),
+        mainCharacterImage = optStringOrNull("mainCharacterImage"),
+        characterImages = optJSONArray("characterImages").stringValues(),
         chapters = optIntOrNull("chapters"),
         volumes = optIntOrNull("volumes"),
         format = optStringOrNull("format"),
@@ -260,5 +278,5 @@ private inline fun <reified T : Enum<T>> JSONObject.enumOrDefault(name: String, 
     optStringOrNull(name)?.let { value -> runCatching { enumValueOf<T>(value) }.getOrNull() } ?: default
 
 private const val TANKOBUN_LIBRARY_BACKUP_TYPE = "tankobun.library"
-private const val TANKOBUN_LIBRARY_BACKUP_VERSION = 1
+private const val TANKOBUN_LIBRARY_BACKUP_VERSION = 2
 private const val JSON_INDENT = 2

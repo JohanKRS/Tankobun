@@ -9,6 +9,7 @@ import com.tankobun.app.logic.cachedBrowsePageFromMedia
 import com.tankobun.app.logic.effectiveBrowseSort
 import com.tankobun.app.logic.hasBrowseFilters
 import com.tankobun.app.state.TankobunUiState
+import com.tankobun.core.database.CatalogPageEntity
 import com.tankobun.core.database.AnilistSearchResultEntity
 import com.tankobun.core.database.toEntity
 import com.tankobun.core.database.toModel
@@ -64,21 +65,24 @@ internal class BrowseDataSource(
     ): AnilistMediaPage {
         val now = System.currentTimeMillis()
         val cachedRows = container.database.searchResultDao().cachedSearchRows(cacheKey)
-        val cachedIsFresh = cachedRows.isNotEmpty() &&
-            cachedRows.all { now - it.fetchedAtEpochMillis <= ttlMillis }
+        val metadata = container.database.catalogDao().page(cacheKey)
+        val cachedIsFresh = metadata != null && now - metadata.fetchedAtEpochMillis <= ttlMillis &&
+            (cachedRows.isNotEmpty() || !metadata.hasNextPage)
         if (!forceRefresh && cachedIsFresh) {
-            return cachedBrowsePageFromMedia(cachedBrowseMedia(cacheKey))
+            val cached = cachedBrowseMedia(cacheKey)
+            if (cached.size == cachedRows.size) return AnilistMediaPage(cached, 1, metadata.hasNextPage)
         }
         val page = runCatching {
             fetch()
         }.getOrElse { error ->
             if (error is CancellationException) throw error
             if (cachedRows.isNotEmpty()) {
-                return cachedBrowsePageFromMedia(cachedBrowseMedia(cacheKey))
+                return AnilistMediaPage(cachedBrowseMedia(cacheKey), 1, metadata?.hasNextPage ?: false)
             }
             throw error
         }
         cacheBrowseMedia(cacheKey, page.media)
+        container.database.catalogDao().upsertPage(CatalogPageEntity(cacheKey, page.hasNextPage, now))
         return page
     }
 
@@ -86,7 +90,10 @@ internal class BrowseDataSource(
         val query = snapshot.searchQuery.trim()
         val staffName = snapshot.browseStaffName?.trim().orEmpty()
         val accessToken = container.tokenStore.accessToken()
-        return when {
+        val filters = snapshot.catalogTaxonomy.plan(snapshot.browseGenres, snapshot.browseTags)
+        val hasStaffFilters = staffName.isNotBlank() && (snapshot.browseGenres.isNotEmpty() || snapshot.browseTags.isNotEmpty() ||
+            snapshot.browseSelection.isActive)
+        val primary: (suspend () -> AnilistMediaPage)? = if (!filters.canQueryAniList || hasStaffFilters) null else { { when {
             staffName.isNotBlank() -> container.anilistRepository.staffMangaPage(
                 staffName = staffName,
                 sort = snapshot.effectiveBrowseSort(),
@@ -105,19 +112,31 @@ internal class BrowseDataSource(
             }
             else -> container.anilistRepository.browseMangaPage(
                 search = query.takeIf { it.isNotBlank() },
-                genres = snapshot.browseGenres,
-                tags = snapshot.browseTags,
-                format = snapshot.browseFormat,
-                status = snapshot.browsePublishingStatus,
-                countryOfOrigin = snapshot.browseCountryOfOrigin,
-                year = snapshot.browseYear,
+                genres = filters.anilistGenres,
+                tags = filters.anilistTags,
+                selection = snapshot.browseSelection,
                 sort = snapshot.effectiveBrowseSort(),
                 page = page,
                 perPage = BROWSE_RESULTS_PAGE_SIZE,
                 accessToken = accessToken,
                 includeAdult = snapshot.showNsfwContent,
             )
-        }.withTitleLanguage(snapshot.anilistTitleLanguage)
+        } } }
+        return container.catalog.search(mode = snapshot.catalogMode, primary = primary, secondary = {
+            val mbTaxonomyKnown = snapshot.catalogTaxonomy.tags.any { it.mangaBakaId != null }
+            if (!filters.canQueryMangaBaka && mbTaxonomyKnown) return@search AnilistMediaPage(emptyList(), page, false)
+            container.mangaBakaRepository.search(query = query, page = page, limit = BROWSE_RESULTS_PAGE_SIZE,
+                includeAdult = snapshot.showNsfwContent, staff = staffName,
+                tagIds = filters.mangaBakaTagIds, selection = snapshot.browseSelection,
+                oneShotTagId = snapshot.catalogTaxonomy.resolve("One Shot")?.mangaBakaId,
+                genres = if (mbTaxonomyKnown) emptySet() else snapshot.browseGenres.map(snapshot.catalogTaxonomy::label).toSet(),
+                tags = if (mbTaxonomyKnown) emptySet() else snapshot.browseTags.map(snapshot.catalogTaxonomy::label).toSet(),
+                sort = when (snapshot.effectiveBrowseSort()) {
+                    "POPULARITY_DESC" -> "popularity_asc"; "SCORE_DESC" -> "score_desc"; "START_DATE_DESC" -> "published_start_date_desc"
+                    "TRENDING_DESC" -> "trending_7d"; "ID_DESC" -> "latest"; else -> "relevance_desc"
+                },
+            )
+        }, page = page).withTitleLanguage(snapshot.anilistTitleLanguage)
     }
 
     suspend fun cacheBrowseMedia(cacheKey: String, media: List<AnilistMedia>) {

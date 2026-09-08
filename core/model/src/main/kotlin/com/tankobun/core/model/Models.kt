@@ -96,12 +96,18 @@ data class AnilistMedia(
     val countryOfOrigin: String? = null,
     val mainCharacterImage: String? = null,
     val characterImages: List<String> = emptyList(),
+    // id is the stable local key. External catalog IDs must never be used interchangeably.
+    val anilistId: Int? = id.takeIf { it > 0 },
+    val mangaBakaId: Int? = null,
+    val mangaBakaTagIds: List<Int> = emptyList(),
 )
 
 fun AnilistMedia.withFallbackDetails(fallback: AnilistMedia?): AnilistMedia {
     if (fallback == null || fallback.id != id) return this
     return copy(
         idMal = idMal ?: fallback.idMal,
+        anilistId = anilistId ?: fallback.anilistId,
+        mangaBakaId = mangaBakaId ?: fallback.mangaBakaId,
         title = title.copy(
             romaji = title.romaji ?: fallback.title.romaji,
             english = title.english ?: fallback.title.english,
@@ -109,7 +115,7 @@ fun AnilistMedia.withFallbackDetails(fallback: AnilistMedia?): AnilistMedia {
             userPreferred = title.userPreferred.ifBlank { fallback.title.userPreferred },
         ),
         description = description ?: fallback.description,
-        coverImage = coverImage ?: fallback.coverImage,
+        coverImage = coverImage.withCoverFallback(fallback.coverImage),
         bannerImage = bannerImage ?: fallback.bannerImage,
         chapters = chapters ?: fallback.chapters,
         volumes = volumes ?: fallback.volumes,
@@ -120,11 +126,12 @@ fun AnilistMedia.withFallbackDetails(fallback: AnilistMedia?): AnilistMedia {
         startDateYear = startDateYear ?: fallback.startDateYear,
         endDateYear = endDateYear ?: fallback.endDateYear,
         siteUrl = siteUrl ?: fallback.siteUrl,
-        genres = genres.ifEmpty { fallback.genres },
+        genres = (genres + fallback.genres).distinctBy(String::catalogNameKey),
         synonyms = synonyms.ifEmpty { fallback.synonyms },
         updatedAtEpochSeconds = updatedAtEpochSeconds ?: fallback.updatedAtEpochSeconds,
         staff = staff.ifEmpty { fallback.staff },
-        tags = tags.ifEmpty { fallback.tags },
+        tags = (tags + fallback.tags).distinctBy(String::catalogNameKey),
+        mangaBakaTagIds = (mangaBakaTagIds + fallback.mangaBakaTagIds).distinct(),
         countryOfOrigin = countryOfOrigin ?: fallback.countryOfOrigin,
         mainCharacterImage = mainCharacterImage ?: fallback.mainCharacterImage,
         characterImages = characterImages.ifEmpty { fallback.characterImages },

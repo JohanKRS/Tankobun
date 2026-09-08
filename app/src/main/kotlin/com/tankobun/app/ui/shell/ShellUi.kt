@@ -250,6 +250,7 @@ internal enum class SettingsRoute {
     BACKUPS,
     ABOUT,
     SOURCES,
+    SOURCE_REPOSITORY,
 }
 
 internal const val TankobunGithubUrl = "https://github.com/JohanKRS/Tankobun"
@@ -280,11 +281,11 @@ internal fun SettingsRoute.settingsTitle(): String =
         SettingsRoute.BROWSE -> tankobunString(R.string.common_browse)
         SettingsRoute.READER -> tankobunString(R.string.common_reader)
         SettingsRoute.DOWNLOADS -> tankobunString(R.string.common_downloads)
-        SettingsRoute.ANILIST -> "AniList"
+        SettingsRoute.ANILIST -> tankobunString(R.string.catalog_accounts)
         SettingsRoute.CUSTOM_LISTS -> tankobunString(R.string.settings_custom_lists)
         SettingsRoute.BACKUPS -> tankobunString(R.string.settings_backups)
         SettingsRoute.ABOUT -> tankobunString(R.string.common_about)
-        SettingsRoute.SOURCES -> tankobunString(R.string.settings_sources)
+        SettingsRoute.SOURCES, SettingsRoute.SOURCE_REPOSITORY -> tankobunString(R.string.settings_sources)
     }
 
 internal fun SettingsRoute.pageIcon(): ImageVector =
@@ -301,7 +302,7 @@ internal fun SettingsRoute.pageIcon(): ImageVector =
         SettingsRoute.CUSTOM_LISTS -> TankobunIcons.FormatListBulleted
         SettingsRoute.BACKUPS -> TankobunIcons.Backup
         SettingsRoute.ABOUT -> TankobunIcons.Info
-        SettingsRoute.SOURCES -> TankobunIcons.Extension
+        SettingsRoute.SOURCES, SettingsRoute.SOURCE_REPOSITORY -> TankobunIcons.Extension
     }
 
 internal enum class QuickDrawerMode {
@@ -408,7 +409,7 @@ private fun TankobunAppRootContent(
     val readerOpen = state.activeChapter != null
     val browseCanNavigateBack = selectedTab == 2 &&
         selectedMedia == null &&
-        (state.hasBrowseQueryOrFilters() || state.browseSearched)
+        (state.hasBrowseQueryOrFilters() || state.browseSearched || state.browseForYouOpen)
     val appStatusBarVisible = state.showAppStatusBar && !readerOpen
     val useDarkStatusBarIcons = !state.themePreference.isDark(isSystemInDarkTheme())
     val currentRoute = TankobunRoute(
@@ -1006,6 +1007,7 @@ internal fun TankobunScaffold(
                                     onSelectMedia = onSelectMedia,
                                     onBrowseTag = onBrowseTag,
                                     onBrowseAuthor = onBrowseAuthor,
+                                    onOpenSourceRepository = { onOpenSettingsRoute(SettingsRoute.SOURCE_REPOSITORY) },
                                 )
                             }
                         }

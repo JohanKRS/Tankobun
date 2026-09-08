@@ -25,8 +25,30 @@ object DatabaseFactory {
                 MIGRATION_10_11,
                 MIGRATION_11_12,
                 MIGRATION_12_13,
+                MIGRATION_13_14,
+                MIGRATION_14_15,
             )
             .build()
+    }
+
+    internal val MIGRATION_14_15 = object : Migration(14, 15) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE anilist_media ADD COLUMN mangaBakaTagIds TEXT NOT NULL DEFAULT ''")
+        }
+    }
+
+    internal val MIGRATION_13_14 = object : Migration(13, 14) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS mangabaka_mutations (accountKey TEXT NOT NULL, mediaId INTEGER NOT NULL, payloadJson TEXT NOT NULL, revision TEXT NOT NULL, attempts INTEGER NOT NULL, retryAtEpochMillis INTEGER NOT NULL, PRIMARY KEY(accountKey, mediaId))")
+            db.execSQL("ALTER TABLE anilist_media ADD COLUMN anilistId INTEGER")
+            db.execSQL("ALTER TABLE anilist_media ADD COLUMN mangaBakaId INTEGER")
+            db.execSQL("UPDATE anilist_media SET anilistId = id WHERE id > 0")
+            db.execSQL("CREATE TABLE IF NOT EXISTS catalog_identity (localId INTEGER NOT NULL PRIMARY KEY, anilistId INTEGER, mangaBakaId INTEGER)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_catalog_identity_anilistId ON catalog_identity(anilistId)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_catalog_identity_mangaBakaId ON catalog_identity(mangaBakaId)")
+            db.execSQL("INSERT INTO catalog_identity(localId, anilistId) SELECT id, id FROM anilist_media WHERE id > 0")
+            db.execSQL("CREATE TABLE IF NOT EXISTS catalog_pages (cacheKey TEXT NOT NULL PRIMARY KEY, hasNextPage INTEGER NOT NULL, fetchedAtEpochMillis INTEGER NOT NULL)")
+        }
     }
 
     private val MIGRATION_1_2 = object : Migration(1, 2) {

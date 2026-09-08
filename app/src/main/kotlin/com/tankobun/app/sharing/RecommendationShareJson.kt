@@ -1,5 +1,6 @@
 package com.tankobun.app.sharing
 
+import com.tankobun.app.catalog.withCatalogAttribution
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistTitle
 import org.json.JSONArray
@@ -39,6 +40,7 @@ internal fun buildRecommendationShareJson(
     JSONObject()
         .put("type", RECOMMENDATION_SHARE_TYPE)
         .put("version", RECOMMENDATION_SHARE_VERSION)
+        .withCatalogAttribution(items.any { it.media.mangaBakaId != null })
         .put("createdAtEpochMillis", createdAtEpochMillis)
         .put("suggestedListName", suggestedListName.trim().ifBlank { DEFAULT_RECOMMENDATION_LIST_NAME })
         .put(
@@ -54,7 +56,7 @@ internal fun buildRecommendationShareJson(
 internal fun parseRecommendationShareJson(text: String): RecommendationSharePayload {
     val root = JSONObject(text)
     check(root.optString("type") == RECOMMENDATION_SHARE_TYPE) { "Unsupported Tankobun recommendations file" }
-    check(root.optInt("version") == RECOMMENDATION_SHARE_VERSION) { "Unsupported Tankobun recommendations version" }
+    check(root.optInt("version") in 1..RECOMMENDATION_SHARE_VERSION) { "Unsupported Tankobun recommendations version" }
     val items = root.optJSONArray("items").objectValues().map { it.toRecommendationShareItem() }.distinctBy { it.media.id }
     check(items.isNotEmpty()) { "No recommendations found" }
     return RecommendationSharePayload(
@@ -87,6 +89,9 @@ private fun AnilistMedia.toJson(): JSONObject =
     JSONObject()
         .put("mediaId", id)
         .putNullable("idMal", idMal)
+        .putNullable("anilistId", anilistId)
+        .putNullable("mangaBakaId", mangaBakaId)
+        .put("mangaBakaTagIds", JSONArray(mangaBakaTagIds))
         .put(
             "title",
             JSONObject()
@@ -125,6 +130,11 @@ private fun JSONObject.toMedia(): AnilistMedia {
     return AnilistMedia(
         id = optInt("mediaId").takeIf { it != 0 } ?: getInt("id"),
         idMal = optIntOrNull("idMal"),
+        anilistId = if (has("anilistId")) optIntOrNull("anilistId") else (optInt("mediaId").takeIf { it != 0 } ?: optInt("id")).takeIf { it > 0 },
+        mangaBakaId = optIntOrNull("mangaBakaId"),
+        mangaBakaTagIds = optJSONArray("mangaBakaTagIds").let { ids ->
+            if (ids == null) emptyList() else (0 until ids.length()).mapNotNull { ids.optInt(it).takeIf { id -> id > 0 } }.distinct()
+        },
         title = AnilistTitle(
             romaji = title.optStringOrNull("romaji"),
             english = title.optStringOrNull("english"),
@@ -188,6 +198,6 @@ private fun String?.normalizedRecommendationMessage(): String? =
         ?.takeIf { it.isNotBlank() }
 
 private const val RECOMMENDATION_SHARE_TYPE = "tankobun.recommendations"
-private const val RECOMMENDATION_SHARE_VERSION = 1
+private const val RECOMMENDATION_SHARE_VERSION = 2
 private const val DEFAULT_RECOMMENDATION_LIST_NAME = "Tankobun recommendations"
 private const val JSON_INDENT = 2

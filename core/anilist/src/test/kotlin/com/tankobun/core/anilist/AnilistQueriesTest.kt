@@ -59,6 +59,18 @@ class AnilistQueriesTest {
     }
 
     @Test
+    fun supplementalHomeGenresUseAniListTagsAndKeepAdultFiltering() {
+        val query = AnilistQueries.homeGenreCandidates(
+            listOf("Action", "Martial Arts", "Historical", "Tragedy"), perPage = 3,
+        )
+        assertTrue(query.contains("genre: \"Action\""))
+        for (genre in listOf("Martial Arts", "Historical", "Tragedy")) {
+            assertTrue(query.contains("tag: \"$genre\", isAdult: ${'$'}isAdult, sort: TRENDING_DESC"))
+            assertFalse(query.contains("genre: \"$genre\""))
+        }
+    }
+
+    @Test
     fun homeGenreCandidatesDoesNotRepeatTrendingPayload() {
         val query = AnilistQueries.homeGenreCandidates(listOf("Fantasy"), perPage = 3)
 
@@ -93,5 +105,7 @@ class AnilistQueriesTest {
 
         assertTrue(query.contains("${'$'}id0: Int!"))
         assertTrue(query.contains("media2: Media(id: ${'$'}id2, type: MANGA)"))
+        assertFalse(query.contains("characters("))
+        assertTrue(AnilistQueries.mangaByIds(5, includeCharacters = true).contains("characters(sort: [FAVOURITES_DESC], page: 1, perPage: 12)"))
     }
 }

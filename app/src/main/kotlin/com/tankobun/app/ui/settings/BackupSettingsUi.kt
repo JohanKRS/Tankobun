@@ -211,10 +211,11 @@ internal fun BackupsSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val backupLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument(if (state.libraryMode == LibraryMode.LOCAL) "application/json" else "text/xml"),
+        ActivityResultContracts.CreateDocument("application/json"),
     ) { uri ->
         uri?.let(viewModel::saveAniListBackup)
     }
+    val xmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/xml")) { uri -> uri?.let(viewModel::exportAniListXml) }
     val appSettingsBackupLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri ->
@@ -237,8 +238,6 @@ internal fun BackupsSettingsScreen(
     }
     val context = LocalContext.current
     val totalItems = state.libraryItems.size
-    val malMatchedItems = state.libraryItems.count { it.media.idMal != null }
-    val missingMalItems = totalItems - malMatchedItems
     val backupFolderLabel = remember(context, state.backupFolderUri) {
         backupFolderDisplayLabel(context, state.backupFolderUri)
     }
@@ -249,11 +248,7 @@ internal fun BackupsSettingsScreen(
         modifier = modifier,
     ) {
         Text(
-            if (state.libraryMode == LibraryMode.LOCAL) {
-                tankobunString(R.string.backup_local_library)
-            } else {
-                tankobunString(R.string.backup_anilist_manga)
-            },
+            tankobunString(R.string.catalog_library_backup),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
         )
@@ -275,16 +270,12 @@ internal fun BackupsSettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            if (state.libraryMode == LibraryMode.LOCAL) {
-                                tankobunString(R.string.backup_tankobun_json)
-                            } else {
-                                tankobunString(R.string.backup_mal_xml)
-                            },
+                            tankobunString(R.string.backup_tankobun_json),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            backupCoverageLabel(totalItems, malMatchedItems, missingMalItems),
+                            tankobunString(R.string.catalog_backup_complete),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -298,16 +289,12 @@ internal fun BackupsSettingsScreen(
                     }
                     AssistChip(
                         onClick = {},
-                        label = { Text(tankobunString(R.string.backup_matched_count, malMatchedItems, totalItems)) },
+                        label = { Text(tankobunQuantityString(R.plurals.manga_count, totalItems, totalItems)) },
                         enabled = false,
                     )
                 }
                 Text(
-                    if (state.libraryMode == LibraryMode.LOCAL) {
-                        tankobunString(R.string.backup_local_restore_desc)
-                    } else {
-                        tankobunString(R.string.backup_restore_desc)
-                    },
+                    tankobunString(R.string.backup_local_restore_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -327,11 +314,7 @@ internal fun BackupsSettingsScreen(
                         label = tankobunString(R.string.backup_save),
                         onClick = {
                             backupLauncher.launch(
-                                if (state.libraryMode == LibraryMode.LOCAL) {
-                                    suggestedTankobunLibraryBackupFileName()
-                                } else {
-                                    suggestedAniListBackupFileName(state.viewerName)
-                                },
+                                suggestedTankobunLibraryBackupFileName(),
                             )
                         },
                         enabled = totalItems > 0,
@@ -341,12 +324,13 @@ internal fun BackupsSettingsScreen(
                         onClick = {
                             restoreLauncher.launch(arrayOf("application/json", "text/xml", "application/xml", "*/*"))
                         },
-                        enabled = state.libraryMode == LibraryMode.LOCAL || state.loggedIn,
+                        enabled = true,
                         filled = false,
                     )
                 }
             }
         }
+        TextButton(onClick = { xmlLauncher.launch(suggestedAniListBackupFileName(state.viewerName)) }, enabled = state.libraryItems.any { it.media.anilistId != null }) { Text(tankobunString(R.string.catalog_export_xml)) }
         Text(tankobunString(R.string.backup_app_settings), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         TankobunPanel(
             modifier = Modifier.fillMaxWidth(),

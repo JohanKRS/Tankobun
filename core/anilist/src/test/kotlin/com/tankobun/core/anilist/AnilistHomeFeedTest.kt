@@ -4,6 +4,8 @@ import com.tankobun.core.network.RespectfulRateLimiter
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import mockwebserver3.Dispatcher
+import mockwebserver3.RecordedRequest
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -46,12 +48,17 @@ class AnilistHomeFeedTest {
         val genres = listOf(
             "Action", "Adventure", "Comedy", "Drama", "Ecchi", "Fantasy", "Horror", "Mahou Shoujo", "Mecha",
             "Music", "Mystery", "Psychological", "Romance", "Sci-Fi", "Slice of Life", "Sports", "Supernatural", "Thriller",
+            "Hentai", "Martial Arts", "Historical", "Tragedy",
         )
 
         MockWebServer().use { server ->
             server.start()
-            server.enqueue(response(homeResponse(genres.take(9))))
-            server.enqueue(response(homeResponse(genres.drop(9))))
+            // Requests overlap, so match the response to the query, not arrival order.
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse = response(
+                    homeResponse(if (requireNotNull(request.body).utf8().contains("query HomeInitial")) genres.take(9) else genres.drop(9)),
+                )
+            }
 
             val repository = AnilistRepository(
                 AnilistGraphQlClient(
@@ -67,9 +74,31 @@ class AnilistHomeFeedTest {
                 onGenreHighlightsLoaded = { callbackSizes += it.size },
             )
 
-            assertEquals(listOf(18), callbackSizes)
+            assertEquals(listOf(9, 22), callbackSizes)
             assertEquals(genres, feed.genreHighlights.map { it.genre })
             assertEquals(2, server.requestCount)
+        }
+    }
+
+    @Test
+    fun advancesThroughCandidatesAndNeverRepeatsAnExhaustedGenre() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            val first = mediaJson(1, "Action")
+            val next = mediaJson(2, "Adventure")
+            server.enqueue(response("""{"data":{
+                "trending":{"media":[$first]},
+                "genre0Page1":{"media":[$first]},
+                "genre1Page1":{"media":[$first,$next]},
+                "genre2Page1":{"media":[$first,$next]}
+            }}"""))
+            val repository = AnilistRepository(AnilistGraphQlClient(
+                OkHttpClient(), RespectfulRateLimiter(minSpacingMillis = 0L), server.url("/graphql").toString(),
+            ))
+            val feed = repository.homeFeed(listOf("Action", "Adventure", "Comedy"))
+            assertEquals(listOf(1, 2), feed.genreHighlights.map { it.media.id })
+            assertEquals(listOf("Action", "Adventure"), feed.genreHighlights.map { it.genre })
+            assertEquals(1, server.requestCount)
         }
     }
 

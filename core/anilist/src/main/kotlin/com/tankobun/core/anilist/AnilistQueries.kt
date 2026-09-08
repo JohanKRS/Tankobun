@@ -40,10 +40,11 @@ object AnilistQueries {
     private fun homeGenrePageFields(genres: List<String>, pages: IntRange, perPage: Int): String =
         genres.flatMapIndexed { index, genre ->
             val safeGenre = genre.replace("\\", "\\\\").replace("\"", "\\\"")
+            val filter = if (genre in com.tankobun.core.model.SUPPLEMENTAL_HOME_GENRES) "tag" else "genre"
             pages.map { page ->
                 """
                   genre${index}Page$page: Page(page: $page, perPage: $perPage) {
-                    media(type: MANGA, genre: "$safeGenre", isAdult: ${'$'}isAdult, sort: TRENDING_DESC) {
+                    media(type: MANGA, $filter: "$safeGenre", isAdult: ${'$'}isAdult, sort: TRENDING_DESC) {
                       id
                       title { romaji english native userPreferred }
                       coverImage { extraLarge large color }
@@ -278,7 +279,7 @@ object AnilistQueries {
         }
     """
 
-    fun mangaByIds(count: Int): String {
+    fun mangaByIds(count: Int, includeCharacters: Boolean = false): String {
         require(count > 0)
         val variables = (0 until count).joinToString(", ") { index ->
             "${'$'}id$index: Int!"
@@ -302,6 +303,7 @@ object AnilistQueries {
               description(asHtml: false)
               coverImage { extraLarge large color }
               bannerImage
+              ${if (includeCharacters) "characters(sort: [FAVOURITES_DESC], page: 1, perPage: 12) { edges { role node { image { large } } } }" else ""}
               chapters
               volumes
               format
@@ -364,9 +366,9 @@ object AnilistQueries {
           ${'$'}search: String,
           ${'$'}genres: [String],
           ${'$'}tags: [String],
-          ${'$'}format: MediaFormat,
-          ${'$'}status: MediaStatus,
-          ${'$'}countryOfOrigin: CountryCode,
+          ${'$'}formats: [MediaFormat],
+          ${'$'}statuses: [MediaStatus],
+          ${'$'}countries: [CountryCode],
           ${'$'}startDateGreater: FuzzyDateInt,
           ${'$'}startDateLesser: FuzzyDateInt,
           ${'$'}isAdult: Boolean,
@@ -379,9 +381,9 @@ object AnilistQueries {
               search: ${'$'}search,
               genre_in: ${'$'}genres,
               tag_in: ${'$'}tags,
-              format: ${'$'}format,
-              status: ${'$'}status,
-              countryOfOrigin: ${'$'}countryOfOrigin,
+              format_in: ${'$'}formats,
+              status_in: ${'$'}statuses,
+              countryOfOrigin_in: ${'$'}countries,
               startDate_greater: ${'$'}startDateGreater,
               startDate_lesser: ${'$'}startDateLesser,
               isAdult: ${'$'}isAdult,

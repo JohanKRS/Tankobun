@@ -251,7 +251,7 @@ internal class AniListDataSource(
         val nextKnownCustomLists = (knownCustomLists + normalizedCustomLists).normalizedCustomLists()
         val existing = container.database.listEntryDao().cachedEntry(media.id)?.toModel()
         val entry = AnilistListEntry(
-            id = existing?.id ?: -media.id,
+            id = existing?.id ?: -kotlin.math.abs(media.id),
             mediaId = media.id,
             status = status,
             progress = progress ?: existing?.progress ?: 0,
@@ -268,6 +268,7 @@ internal class AniListDataSource(
         }
         container.settingsStore.saveAnilistCustomLists(nextKnownCustomLists)
         container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
+        container.mangaBakaTracking.changed(entry)
         return SavedTrackingData(
             knownCustomLists = nextKnownCustomLists,
             entry = entry,
@@ -293,7 +294,7 @@ internal class AniListDataSource(
             return null
         }
         val entry = AnilistListEntry(
-            id = existing?.id ?: -media.id,
+            id = existing?.id ?: -kotlin.math.abs(media.id),
             mediaId = media.id,
             status = nextStatus,
             progress = nextProgress,
@@ -309,6 +310,7 @@ internal class AniListDataSource(
             container.database.listEntryDao().upsertEntry(entry.toEntity(now))
         }
         container.settingsStore.saveLibrarySyncedAtEpochMillis(now)
+        container.mangaBakaTracking.changed(entry, progressOnly = true)
         return SyncedListEntryData(media = media, entry = entry)
     }
 
@@ -375,11 +377,11 @@ internal class AniListDataSource(
         val existingById = existingItems.associateBy { it.media.id }
         val now = System.currentTimeMillis()
         var queued = 0
-        val updatedItems = media.distinctBy { it.id }.map { recommendation ->
+        val updatedItems = media.map { container.catalogIdentity.resolve(it) }.distinctBy { it.id }.map { recommendation ->
             val existing = existingById[recommendation.id]
             val entry = if (existing == null) {
                 AnilistListEntry(
-                    id = -recommendation.id,
+                    id = -kotlin.math.abs(recommendation.id),
                     mediaId = recommendation.id,
                     status = MediaStatus.PLANNING,
                     progress = 0,
@@ -619,6 +621,10 @@ internal class AniListDataSource(
         scoreFormat: AnilistScoreFormat,
         hiddenFromStatusLists: Boolean? = null,
     ): SavedTrackingData {
+        if (container.catalogIdentity.anilistId(media.id) == null) return saveLocalTracking(
+            media, status ?: MediaStatus.PLANNING, progress, score, notes, private ?: false,
+            customLists, knownCustomLists, hiddenFromStatusLists,
+        )
         val normalizedCustomLists = customLists.normalizedCustomLists()
         val normalizedKnownCustomLists = knownCustomLists.normalizedCustomLists()
         val missingCustomLists = normalizedCustomLists.filterNot { selectedList ->
@@ -627,12 +633,15 @@ internal class AniListDataSource(
         val nextKnownCustomLists = if (missingCustomLists.isEmpty()) {
             normalizedKnownCustomLists
         } else {
-            updateCustomLists(
+            runCatching { updateCustomLists(
                 token = token,
                 customLists = (normalizedKnownCustomLists + missingCustomLists).normalizedCustomLists(),
-            )
+            ) }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                (normalizedKnownCustomLists + missingCustomLists).normalizedCustomLists()
+            }
         }
-        val entry = saveListEntry(
+        val entry = runCatching { saveListEntry(
             token = token,
             mediaId = media.id,
             status = status,
@@ -643,7 +652,17 @@ internal class AniListDataSource(
             customLists = normalizedCustomLists,
             hiddenFromStatusLists = hiddenFromStatusLists,
             scoreFormat = scoreFormat,
-        )
+        ) }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            val local = saveLocalTracking(media, status ?: MediaStatus.PLANNING, progress, score, notes, private ?: false,
+                normalizedCustomLists, nextKnownCustomLists, hiddenFromStatusLists).entry
+            container.database.syncMutationDao().upsertMutation(syncMutationFactory.saveMediaListEntry(
+                mediaId = media.id, status = local.status, progress = local.progress, score = local.score,
+                notes = local.notes, private = local.private, customLists = local.customLists,
+                hiddenFromStatusLists = local.hiddenFromStatusLists, nowMillis = System.currentTimeMillis(), sessionKey = syncSessionKey(token),
+            ).toEntity())
+            local
+        }
         val now = System.currentTimeMillis()
         container.database.withTransaction {
             container.database.mediaDao().upsertMedia(media.toEntity(now))
@@ -704,12 +723,14 @@ internal class AniListDataSource(
         token: String?,
         scoreFormat: AnilistScoreFormat,
     ): SyncedListEntryData? {
+        if (container.catalogIdentity.anilistId(media.id) == null) return saveLocalProgressFromChapter(media, chapterProgress, status)
         val now = System.currentTimeMillis()
         val progress = chapterProgress.takeIf { it > 0 }
         if (progress == null && status == null) return null
+        val local = saveLocalProgressFromChapter(media, chapterProgress, status)
         if (token == null) {
             queueProgressMutation(media.id, progress, status, now, token)
-            return null
+            return local
         }
 
         return runCatching {
@@ -732,7 +753,7 @@ internal class AniListDataSource(
             if (error is CancellationException) throw error
             Log.w(TAG, "AniList progress sync failed for ${media.id}", error)
             queueProgressMutation(media.id, progress, status, now, token)
-        }.getOrNull()
+        }.getOrNull() ?: local
     }
 
     suspend fun cachedLibrary(titleLanguage: AnilistTitleLanguage): CachedLibraryData {
@@ -781,6 +802,7 @@ internal class AniListDataSource(
                     // Include delayed, legacy and other-session rows: they must stay local
                     // until explicitly resolved, never be lost to an automatic refresh.
                     val pendingIds = database.syncMutationDao().pendingMutations().mapTo(hashSetOf()) { it.mediaId }
+                    current.keys.filter { container.catalogIdentity.anilistId(it) == null || current[it]?.id?.let { id -> id <= 0 } == true }.forEach { pendingIds += it }
                     val reconciled = reconcileLibrarySnapshot(
                         before = before,
                         current = current,
@@ -816,7 +838,7 @@ internal class AniListDataSource(
         if (allCustomLists != knownCustomLists.normalizedCustomLists()) {
             updateCustomLists(token = token, customLists = allCustomLists)
         }
-        localItems.forEach { item ->
+        localItems.filter { it.media.anilistId != null }.forEach { item ->
             val entry = item.entry
             saveTracking(
                 token = token,
@@ -901,6 +923,8 @@ internal class AniListDataSource(
         val cachedMedia = container.database.mediaDao().cachedMedia(mediaId)
         val cachedEntry = container.database.listEntryDao().cachedEntry(mediaId)?.toModel()
         val cachedRecommendations = cachedRecommendations(mediaId, titleLanguage)
+        val recommendationCursor = container.database.catalogDao().lastRecommendationPage(mediaId)
+        val fetchedDetails = container.database.catalogDao().page("details:$mediaId")
         val cachedMediaHasEnrichedDetails = cachedMedia?.let { it.staff.isNotEmpty() && it.tags.isNotEmpty() } ?: false
         val cachedMediaIsFresh = cachedMedia != null &&
             cachedMediaHasEnrichedDetails &&
@@ -914,9 +938,9 @@ internal class AniListDataSource(
             media = cachedMedia?.toModel(titleLanguage),
             entry = cachedEntry,
             recommendations = cachedRecommendations,
-            recommendationsPage = cachedRecommendations.recommendationPageCount(),
-            recommendationsHasMore = cachedRecommendations.size >= RECOMMENDATIONS_PAGE_SIZE,
-            isFresh = cachedMediaIsFresh && cachedRecommendationsAreFresh,
+            recommendationsPage = recommendationCursor?.cacheKey?.substringAfterLast(':')?.toIntOrNull() ?: 1,
+            recommendationsHasMore = recommendationCursor?.hasNextPage ?: false,
+            isFresh = fetchedDetails?.let { now - it.fetchedAtEpochMillis <= cachePolicy.mediaDetailsTtlMillis } ?: (cachedMediaIsFresh && cachedRecommendationsAreFresh),
         )
     }
 
@@ -927,12 +951,10 @@ internal class AniListDataSource(
         titleLanguage: AnilistTitleLanguage,
     ): MediaDetailsData {
         val now = System.currentTimeMillis()
-        val result = container.anilistRepository.mediaDetailsWithEntry(
+        val result = container.catalog.details(
             mediaId = mediaId,
             accessToken = accessToken,
             scoreFormat = scoreFormat,
-            recommendationsPage = 1,
-            recommendationsPerPage = RECOMMENDATIONS_PAGE_SIZE,
         )
         val details = result.media.withTitleLanguage(titleLanguage)
         val recommendations = result.recommendationPage.recommendations.map { recommendation ->
@@ -942,6 +964,8 @@ internal class AniListDataSource(
         container.database.withTransaction {
             container.database.mediaDao().upsertMedia(details.toEntity(now))
             container.database.mediaDao().upsertMedia(recommendations.map { it.media.toEntity(now) })
+            container.database.catalogDao().clearRecommendationPages(mediaId)
+            container.database.catalogDao().upsertPage(com.tankobun.core.database.CatalogPageEntity("recommendations:$mediaId:1", result.recommendationPage.hasNextPage, now))
             container.database.recommendationDao().deleteForMedia(mediaId)
             container.database.recommendationDao().upsertRecommendations(
                 recommendations.map { it.toEntity(mediaId, now) },
@@ -950,6 +974,7 @@ internal class AniListDataSource(
                 container.database.listEntryDao().upsertEntry(listEntry.toEntity(now))
             }
         }
+        container.database.catalogDao().upsertPage(com.tankobun.core.database.CatalogPageEntity("details:$mediaId", result.recommendationPage.hasNextPage, now))
         return MediaDetailsData(
             media = details,
             entry = listEntry,
@@ -964,6 +989,7 @@ internal class AniListDataSource(
         accessToken: String,
         scoreFormat: AnilistScoreFormat,
     ): AnilistListEntry? {
+        if (container.catalogIdentity.anilistId(mediaId) == null) return container.database.listEntryDao().cachedEntry(mediaId)?.toModel()
         val listEntry = container.anilistRepository.mediaListEntry(
             mediaId = mediaId,
             accessToken = accessToken,
@@ -1005,10 +1031,9 @@ internal class AniListDataSource(
         accessToken: String?,
         titleLanguage: AnilistTitleLanguage,
     ): RecommendationPageData {
-        val recommendationPage = container.anilistRepository.mediaRecommendations(
+        val recommendationPage = container.catalog.recommendations(
             mediaId = mediaId,
             page = page,
-            perPage = RECOMMENDATIONS_PAGE_SIZE,
             accessToken = accessToken,
         )
         val now = System.currentTimeMillis()
@@ -1021,6 +1046,7 @@ internal class AniListDataSource(
                 recommendations.map { it.toEntity(mediaId, now) },
             )
         }
+        container.database.catalogDao().upsertPage(com.tankobun.core.database.CatalogPageEntity("recommendations:$mediaId:$page", recommendationPage.hasNextPage, now))
         return RecommendationPageData(
             recommendations = recommendations,
             currentPage = recommendationPage.currentPage,
@@ -1118,6 +1144,7 @@ internal class AniListDataSource(
             scoreFormat = scoreFormat,
         )
         container.database.listEntryDao().upsertEntry(entry.toEntity(System.currentTimeMillis()))
+        container.mangaBakaTracking.changed(entry)
         return entry
     }
 
@@ -1167,7 +1194,8 @@ internal class AniListDataSource(
         fallbackEntry: AnilistListEntry,
         nowMillis: Long,
     ): SyncedOrQueuedEntry {
-        if (!syncRemote) return SyncedOrQueuedEntry(entry = fallbackEntry, queued = false)
+        container.mangaBakaTracking.changed(fallbackEntry)
+        if (!syncRemote || container.catalogIdentity.anilistId(mediaId) == null) return SyncedOrQueuedEntry(entry = fallbackEntry, queued = false)
         if (token != null) {
             runCatching {
                 saveListEntry(
@@ -1212,7 +1240,7 @@ internal class AniListDataSource(
         entry: AnilistListEntry,
         nowMillis: Long,
     ): Boolean {
-        if (!syncRemote || entry.id <= 0) return false
+        if (!syncRemote || entry.id <= 0 || container.catalogIdentity.anilistId(entry.mediaId) == null) return false
         if (token != null) {
             runCatching {
                 check(container.anilistRepository.deleteListEntry(token, entry.id)) {
@@ -1241,6 +1269,7 @@ internal class AniListDataSource(
         deleteLocalData: Boolean,
     ) {
         if (mediaIds.isEmpty()) return
+        mediaIds.forEach { container.mangaBakaTracking.deleted(it) }
         val bindings = if (deleteLocalData) {
             container.database.sourceBindingDao().cachedBindings().filter { it.mediaId in mediaIds }
         } else {

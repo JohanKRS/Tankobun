@@ -74,6 +74,34 @@ class TankobunLibraryBackupJsonTest {
         assertEquals(listOf(progress), parsed.items.single().progress)
     }
 
+    @Test fun mixedCatalogBackupPreservesExternalIdsAndArtwork() {
+        val exclusive = media().copy(id = -81, anilistId = null, mangaBakaId = 81, mangaBakaTagIds = listOf(29, 45, 515),
+            mainCharacterImage = "https://example.test/character", characterImages = listOf("https://example.test/character"))
+        val linked = media().copy(mangaBakaId = 15)
+        fun entry(id: Int) = AnilistListEntry(-kotlin.math.abs(id), id, MediaStatus.CURRENT, 12, 80.0, "note", true, listOf("Favorites"), 10)
+        val items = listOf(LibraryItem(linked, entry(linked.id)), LibraryItem(exclusive, entry(exclusive.id)))
+        val progress = ReadingProgress(-81, "/chapter", 12f, 7, 23, 18, ReaderMode.WEBTOON, false, 100L)
+        val binding = SourceBinding(-81, 2L, "pkg.source", "/series", "Fictional", null, 1L)
+        val json = buildTankobunLibraryBackupJson(items, AnilistScoreFormat.POINT_100, AnilistTitleLanguage.ENGLISH, listOf("Favorites"), listOf(binding), listOf(progress))
+        assertEquals("https://mangabaka.org/about/data-license", org.json.JSONObject(json).getJSONObject("attribution").getString("dataTerms"))
+        val parsed = parseTankobunLibraryBackupJson(json).items.associateBy { it.media.id }
+        assertEquals(exclusive, parsed[-81]?.media)
+        assertEquals(linked, parsed[42]?.media)
+        assertEquals(binding, parsed[-81]?.sourceBinding)
+        assertEquals(listOf(progress), parsed[-81]?.progress)
+    }
+
+    @Test fun legacyBackupInfersAniListIdentity() {
+        val root = org.json.JSONObject("""{"type":"tankobun.library","version":1,"items":[{"media":{"id":42,"title":{"userPreferred":"Legacy"}},"entry":{"mediaId":42}}]}""")
+        val parsed = parseTankobunLibraryBackupJson(root.toString())
+        assertEquals(42, parsed.items.single().media.anilistId)
+        assertEquals(null, parsed.items.single().media.mangaBakaId)
+    }
+
+    @Test(expected = IllegalArgumentException::class) fun futureBackupsAreRejectedBeforeRestoring() {
+        parseTankobunLibraryBackupJson("""{"type":"tankobun.library","version":999,"items":[]}""")
+    }
+
     private fun media(): AnilistMedia =
         AnilistMedia(
             id = 42,

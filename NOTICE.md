@@ -31,3 +31,33 @@ Tankobun does not bundle extension APKs, manga sources, extension repository URL
 or third-party content. User-installed extension packages may be used as runtime
 compatibility test inputs, but this project does not link to or recommend any
 extension repository.
+
+## Catalog data and images
+
+Thanks to MangaBaka, its contributors, AniList, and the upstream metadata communities.
+Tankobun uses AniList as its primary catalog and MangaBaka for complementary
+metadata, search, recommendations, Mix discovery, and optional tracking.
+
+- [MangaBaka](https://mangabaka.org) · [API and attribution](https://mangabaka.org/data/api)
+- [AniList](https://anilist.co) · [Terms](https://docs.anilist.co/guide/terms-of-use)
+- [MangaUpdates](https://www.mangaupdates.com) · [Acceptable use](https://api.mangaupdates.com/#section/Acceptable-Use-Policy)
+- [MyAnimeList](https://myanimelist.net) · [Terms](https://myanimelist.net/about/terms_of_use)
+- [Kitsu](https://kitsu.app) · [Terms](https://kitsu.app/terms)
+- [Shikimori](https://shikimori.one) · [API](https://shikimori.one/api/doc)
+- [Anime-Planet](https://www.anime-planet.com) · [Terms](https://www.anime-planet.com/about/terms)
+- [Anime News Network](https://www.animenewsnetwork.com)
+
+MangaBaka-original data is licensed under
+[Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+Tankobun combines and formats metadata for display; adaptations of MangaBaka-original
+data retain CC BY-NC-SA 4.0. Data and artwork originating from other providers retain
+their respective rights and terms. Neither this notice nor the app's MIT license
+grants additional rights to third-party data or images.
+
+See MangaBaka's [data license](https://mangabaka.org/about/data-license),
+[noncommercial terms](https://mangabaka.org/about/data-license-noncommercial),
+[service terms](https://mangabaka.org/about/terms), and
+[privacy policy](https://mangabaka.org/about/privacy).
+
+Tankobun is independent of these providers. Names, marks, data, and images belong
+to their respective owners; attribution does not imply affiliation or endorsement.

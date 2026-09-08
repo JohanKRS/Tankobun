@@ -23,6 +23,7 @@ import com.tankobun.app.state.LocalReadingActivity
 import com.tankobun.core.extensions.ExtensionIndexEntry
 import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistTitleLanguage
+import com.tankobun.core.model.CatalogMode
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.SourceDescriptor
 import kotlinx.coroutines.Dispatchers
@@ -108,6 +109,7 @@ internal class AppSettingsBackupDataSource(
             .put("showAppStatusBar", snapshot.showAppStatusBar)
             .put("dockAlignment", snapshot.dockAlignment.name)
             .put("dockIndicatorAnimation", snapshot.dockIndicatorAnimation.name)
+            .put("catalogMode", snapshot.catalogMode.name)
             .put("libraryMode", snapshot.libraryMode.name)
             .put("libraryViewMode", snapshot.libraryViewMode.name)
             .put("libraryCoverColumns", snapshot.libraryCoverColumns)
@@ -217,6 +219,7 @@ internal class AppSettingsBackupDataSource(
         settings.enumOrNull<DockAlignment>("dockAlignment")?.let(store::saveDockAlignment)
         settings.enumOrNull<DockIndicatorAnimation>("dockIndicatorAnimation")?.let(store::saveDockIndicatorAnimation)
         settings.enumOrNull<com.tankobun.app.LibraryMode>("libraryMode")?.let(store::saveLibraryMode)
+        settings.enumOrNull<CatalogMode>("catalogMode")?.let(store::saveCatalogMode)
         settings.enumOrNull<MediaViewMode>("libraryViewMode")?.let(store::saveLibraryViewMode)
         settings.optIntOrNull("libraryCoverColumns")?.let(store::saveLibraryCoverColumns)
         settings.optBooleanOrNull("libraryShowWholeCovers")?.let(store::saveLibraryShowWholeCovers)
@@ -266,6 +269,7 @@ internal class AppSettingsBackupDataSource(
         }.visibleSources()
         return TankobunUiState(
             loggedIn = container.tokenStore.accessToken() != null,
+            catalogMode = store.catalogMode(),
             libraryMode = store.libraryMode(),
             cachePreferences = store.cachePreferences(),
             themePreference = store.themePreference(),

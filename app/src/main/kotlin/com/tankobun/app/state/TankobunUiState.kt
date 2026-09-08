@@ -25,6 +25,7 @@ import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.DownloadJob
 import com.tankobun.core.model.MediaStatus
+import com.tankobun.core.model.CatalogMode
 import com.tankobun.core.model.ReaderMode
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.ReadingProgress
@@ -47,6 +48,8 @@ data class LocalReadingActivity(
 )
 
 data class TankobunUiState(
+    val mangaBakaAccountName: String? = null,
+    val mangaBakaBusy: Boolean = false,
     val loggedIn: Boolean = false,
     val clientConfigured: Boolean = false,
     val themePreference: TankobunThemePreference = TankobunThemePreference(),
@@ -55,6 +58,7 @@ data class TankobunUiState(
     val showAppStatusBar: Boolean = true,
     val dockAlignment: DockAlignment = DockAlignment.CENTER,
     val dockIndicatorAnimation: DockIndicatorAnimation = DockIndicatorAnimation.POP,
+    val catalogMode: CatalogMode = CatalogMode.ANILIST,
     val libraryMode: LibraryMode = LibraryMode.LOCAL,
     val onboardingVisible: Boolean = false,
     val appTourVisible: Boolean = false,
@@ -94,16 +98,18 @@ data class TankobunUiState(
     val browseGenres: Set<String> = emptySet(),
     val browseTags: Set<String> = emptySet(),
     val browseAvailableTags: List<AnilistMediaTag> = emptyList(),
-    val browseFormat: String? = null,
-    val browsePublishingStatus: String? = null,
-    val browseCountryOfOrigin: String? = null,
-    val browseYear: Int? = null,
+    val catalogTaxonomy: com.tankobun.core.model.CatalogTaxonomy = com.tankobun.core.model.CatalogTaxonomy.Empty,
+    val catalogTaxonomyLoading: Boolean = false,
+    val browseSelection: com.tankobun.core.model.CatalogSearchFilters = com.tankobun.core.model.CatalogSearchFilters(),
     val browseStaffName: String? = null,
     val browseSort: String = BROWSE_SORT_SEARCH_MATCH,
     val browseTrending: List<AnilistMedia> = emptyList(),
     val browsePopular: List<AnilistMedia> = emptyList(),
     val browsePopularManhwa: List<AnilistMedia> = emptyList(),
     val browseTopManga: List<AnilistMedia> = emptyList(),
+    val browseForYou: List<AnilistMedia> = emptyList(),
+    val browseForYouOpen: Boolean = false,
+    val browseForYouRefreshing: Boolean = false,
     val browseLandingLoaded: Boolean = false,
     val homeTrending: List<AnilistMedia> = emptyList(),
     val homeGenreHighlights: List<AnilistGenreHighlight> = emptyList(),
@@ -227,7 +233,7 @@ private fun AnilistMedia.toHiddenLibraryItem(): LibraryItem =
     LibraryItem(
         media = this,
         entry = AnilistListEntry(
-            id = -id,
+            id = -kotlin.math.abs(id),
             mediaId = id,
             status = MediaStatus.PLANNING,
             progress = 0,

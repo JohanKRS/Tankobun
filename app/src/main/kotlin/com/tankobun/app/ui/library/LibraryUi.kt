@@ -1,5 +1,11 @@
 package com.tankobun.app.ui.library
 
+import com.tankobun.app.ui.filters.*
+import com.tankobun.core.model.CatalogSearchFilters
+import com.tankobun.core.model.PublicationYears
+import com.tankobun.core.model.CatalogTaxonomy
+import com.tankobun.core.model.CatalogTag
+
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 
@@ -223,6 +229,15 @@ private val LibraryFilterSetSaver = listSaver<Set<String>, String>(
     restore = { it.toSet() },
 )
 
+private val LibrarySelectionSaver = listSaver<CatalogSearchFilters, String>(
+    save = { listOf(it.formats.sorted().joinToString(","), it.statuses.sorted().joinToString(","), it.countries.sorted().joinToString(","), it.years?.from?.toString().orEmpty(), it.years?.to?.toString().orEmpty()) },
+    restore = { values -> CatalogSearchFilters(
+        values[0].split(',').filter(String::isNotBlank).toSet(), values[1].split(',').filter(String::isNotBlank).toSet(),
+        values[2].split(',').filter(String::isNotBlank).toSet(),
+        if (values[3].isBlank() && values[4].isBlank()) null else PublicationYears(values[3].toIntOrNull(), values[4].toIntOrNull()),
+    ) },
+)
+
 @Composable
 internal fun LibraryScreen(
     state: TankobunUiState,
@@ -241,18 +256,20 @@ internal fun LibraryScreen(
     var tagsOpen by remember { mutableStateOf(false) }
     var genres by rememberSaveable(stateSaver = LibraryFilterSetSaver) { mutableStateOf<Set<String>>(emptySet()) }
     var tags by rememberSaveable(stateSaver = LibraryFilterSetSaver) { mutableStateOf<Set<String>>(emptySet()) }
-    var format by rememberSaveable { mutableStateOf<String?>(null) }
-    var publishingStatus by rememberSaveable { mutableStateOf<String?>(null) }
-    var countryOfOrigin by rememberSaveable { mutableStateOf<String?>(null) }
-    var year by rememberSaveable { mutableStateOf<String?>(null) }
+    var selection by rememberSaveable(stateSaver = LibrarySelectionSaver) { mutableStateOf(CatalogSearchFilters()) }
     var sort by rememberSaveable { mutableStateOf(LIBRARY_SORT_LIST_ORDER) }
     var optionsOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(state.showNsfwContent, state.catalogTaxonomy) {
+        if (!state.showNsfwContent) {
+            genres = genres.filterNot { state.catalogTaxonomy.resolve(it)?.isAdult == true }.toSet()
+            tags = tags.filterNot { state.catalogTaxonomy.resolve(it)?.isAdult == true }.toSet()
+        }
+    }
     val sections = state.librarySections
-    val tagOptions = remember(sections, state.browseAvailableTags) { libraryTagOptions(sections, state.browseAvailableTags) }
+    val tagOptions = remember(sections, state.catalogTaxonomy) { libraryTagOptions(sections, state.catalogTaxonomy) }
     val formatOptions = remember(sections) { libraryFormatOptions(sections) }
     val statusOptions = remember(sections) { libraryStatusOptions(sections) }
     val countryOptions = remember(sections) { libraryCountryOptions(sections) }
-    val yearOptions = remember(sections) { libraryYearOptions(sections) }
     val selectedLibraryItems = remember(state.libraryItems, state.selectedLibraryMediaIds, state.selectedLibraryBatchMedia) {
         state.selectedLibraryBatchItems()
     }
@@ -261,10 +278,7 @@ internal fun LibraryScreen(
         query = ""
         genres = emptySet()
         tags = emptySet()
-        format = null
-        publishingStatus = null
-        countryOfOrigin = null
-        year = null
+        selection = CatalogSearchFilters()
         sort = LIBRARY_SORT_LIST_ORDER
     }
 
@@ -279,15 +293,11 @@ internal fun LibraryScreen(
                 onQueryChange = { query = it },
                 genres = genres,
                 tags = tags,
-                format = format,
-                publishingStatus = publishingStatus,
-                countryOfOrigin = countryOfOrigin,
-                year = year,
+                selection = selection,
                 sort = sort,
                 formatOptions = formatOptions,
                 statusOptions = statusOptions,
                 countryOptions = countryOptions,
-                yearOptions = yearOptions,
                 onOpenGenres = { genresOpen = true },
                 onOpenTags = { tagsOpen = true },
                 onOpenPicker = { picker = it },
@@ -321,13 +331,11 @@ internal fun LibraryScreen(
         LibraryPager(
             onOpenBrowse = onOpenBrowse,
             sections = sections,
+            taxonomy = state.catalogTaxonomy,
             query = query,
             genres = genres,
             tags = tags,
-            format = format,
-            publishingStatus = publishingStatus,
-            countryOfOrigin = countryOfOrigin,
-            year = year,
+            selection = selection,
             sort = sort,
             viewMode = state.libraryViewMode,
             coverColumns = state.libraryCoverColumns,
@@ -364,33 +372,30 @@ internal fun LibraryScreen(
     }
 
     picker?.let { activePicker ->
-        BrowseOptionDialog(
+        if (activePicker == LibraryPicker.YEAR) {
+            FilterYearDialog(selected = selection.years, onApply = { selection = selection.copy(years = it) }, onDismiss = { picker = null })
+        } else FilterChoiceDialog(
             title = when (activePicker) {
                 LibraryPicker.FORMAT -> tankobunString(R.string.common_format)
                 LibraryPicker.STATUS -> tankobunString(R.string.browse_publishing_status)
-                LibraryPicker.COUNTRY -> tankobunString(R.string.browse_country_of_origin)
-                LibraryPicker.YEAR -> tankobunString(R.string.common_year)
+                else -> tankobunString(R.string.browse_country_of_origin)
             },
             options = when (activePicker) {
                 LibraryPicker.FORMAT -> formatOptions
                 LibraryPicker.STATUS -> statusOptions
-                LibraryPicker.COUNTRY -> countryOptions
-                LibraryPicker.YEAR -> yearOptions
+                else -> countryOptions
             },
-            selectedValue = when (activePicker) {
-                LibraryPicker.FORMAT -> format
-                LibraryPicker.STATUS -> publishingStatus
-                LibraryPicker.COUNTRY -> countryOfOrigin
-                LibraryPicker.YEAR -> year
+            selected = when (activePicker) {
+                LibraryPicker.FORMAT -> selection.formats
+                LibraryPicker.STATUS -> selection.statuses
+                else -> selection.countries
             },
-            onSelect = { value ->
-                when (activePicker) {
-                    LibraryPicker.FORMAT -> format = value
-                    LibraryPicker.STATUS -> publishingStatus = value
-                    LibraryPicker.COUNTRY -> countryOfOrigin = value
-                    LibraryPicker.YEAR -> year = value
+            onApply = { values ->
+                selection = when (activePicker) {
+                    LibraryPicker.FORMAT -> selection.copy(formats = values)
+                    LibraryPicker.STATUS -> selection.copy(statuses = values)
+                    else -> selection.copy(countries = values)
                 }
-                picker = null
             },
             onDismiss = { picker = null },
         )
@@ -398,6 +403,10 @@ internal fun LibraryScreen(
 
     if (genresOpen) {
         LibraryGenreDialog(
+            taxonomy = state.catalogTaxonomy,
+            loading = state.catalogTaxonomyLoading,
+            onRefresh = { viewModel.loadBrowseTags(force = true) },
+            includeAdult = state.showNsfwContent,
             selectedGenres = genres,
             onGenreSelected = { genre, selected ->
                 genres = if (selected) genres + genre else genres - genre
@@ -409,6 +418,9 @@ internal fun LibraryScreen(
 
     if (tagsOpen) {
         LibraryTagDialog(
+            taxonomy = state.catalogTaxonomy,
+            loading = state.catalogTaxonomyLoading,
+            onRefresh = { viewModel.loadBrowseTags(force = true) },
             availableTags = tagOptions,
             selectedTags = tags,
             includeAdultTags = state.showNsfwContent,
@@ -479,15 +491,11 @@ internal fun LibraryFilterBar(
     onQueryChange: (String) -> Unit,
     genres: Set<String>,
     tags: Set<String>,
-    format: String?,
-    publishingStatus: String?,
-    countryOfOrigin: String?,
-    year: String?,
+    selection: CatalogSearchFilters,
     sort: String,
     formatOptions: List<BrowseOption>,
     statusOptions: List<BrowseOption>,
     countryOptions: List<BrowseOption>,
-    yearOptions: List<BrowseOption>,
     onOpenGenres: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenPicker: (LibraryPicker) -> Unit,
@@ -496,10 +504,7 @@ internal fun LibraryFilterBar(
 ) {
     val filtersOrSortActive = genres.isNotEmpty() ||
         tags.isNotEmpty() ||
-        format != null ||
-        publishingStatus != null ||
-        countryOfOrigin != null ||
-        year != null ||
+        selection.isActive ||
         sort != LIBRARY_SORT_LIST_ORDER
 
     Column(
@@ -536,8 +541,8 @@ internal fun LibraryFilterBar(
             item {
                 BrowseFilterPill(
                     label = tankobunString(R.string.common_format),
-                    value = formatOptions.labelFor(format),
-                    selected = format != null,
+                    value = formatOptions.selectionLabel(selection.formats),
+                    selected = selection.formats.isNotEmpty(),
                     icon = TankobunIcons.MenuBook,
                     onClick = { onOpenPicker(LibraryPicker.FORMAT) },
                 )
@@ -545,8 +550,8 @@ internal fun LibraryFilterBar(
             item {
                 BrowseFilterPill(
                     label = tankobunString(R.string.common_status),
-                    value = statusOptions.labelFor(publishingStatus),
-                    selected = publishingStatus != null,
+                    value = statusOptions.selectionLabel(selection.statuses),
+                    selected = selection.statuses.isNotEmpty(),
                     icon = TankobunIcons.Flag,
                     onClick = { onOpenPicker(LibraryPicker.STATUS) },
                 )
@@ -554,8 +559,8 @@ internal fun LibraryFilterBar(
             item {
                 BrowseFilterPill(
                     label = tankobunString(R.string.common_country),
-                    value = countryOptions.labelFor(countryOfOrigin),
-                    selected = countryOfOrigin != null,
+                    value = countryOptions.selectionLabel(selection.countries),
+                    selected = selection.countries.isNotEmpty(),
                     icon = TankobunIcons.Public,
                     onClick = { onOpenPicker(LibraryPicker.COUNTRY) },
                 )
@@ -563,8 +568,8 @@ internal fun LibraryFilterBar(
             item {
                 BrowseFilterPill(
                     label = tankobunString(R.string.common_year),
-                    value = yearOptions.labelFor(year),
-                    selected = year != null,
+                    value = selection.years.filterLabel(),
+                    selected = selection.years != null,
                     icon = TankobunIcons.CalendarMonth,
                     onClick = { onOpenPicker(LibraryPicker.YEAR) },
                 )
@@ -631,14 +636,12 @@ internal fun LibraryConnectPrompt(
 @Composable
 internal fun LibraryPager(
     onOpenBrowse: () -> Unit,
+    taxonomy: CatalogTaxonomy,
     sections: List<LibrarySection>,
     query: String,
     genres: Set<String>,
     tags: Set<String>,
-    format: String?,
-    publishingStatus: String?,
-    countryOfOrigin: String?,
-    year: String?,
+    selection: CatalogSearchFilters,
     sort: String,
     viewMode: MediaViewMode,
     coverColumns: Int,
@@ -704,18 +707,16 @@ internal fun LibraryPager(
     val sectionKeys = remember(sections) { sections.map { it.key } }
     val pageListStates = remember(sectionKeys) { List(sections.size) { LazyListState() } }
     val pageGridStates = remember(sectionKeys) { List(sections.size) { LazyGridState() } }
-    val visibleSections = remember(sections, query, genres, tags, format, publishingStatus, countryOfOrigin, year, sort) {
+    val visibleSections = remember(sections, taxonomy, query, genres, tags, selection, sort) {
         sections.map { section ->
             section.copy(
                 items = section.items
                     .filterLibraryItems(
+                        taxonomy = taxonomy,
                         query = query,
                         genres = genres,
                         tags = tags,
-                        format = format,
-                        publishingStatus = publishingStatus,
-                        countryOfOrigin = countryOfOrigin,
-                        year = year,
+                        selection = selection,
                     )
                     .sortLibraryItems(sort),
             )
@@ -724,10 +725,7 @@ internal fun LibraryPager(
     val filtersActive = query.isNotBlank() ||
         genres.isNotEmpty() ||
         tags.isNotEmpty() ||
-        format != null ||
-        publishingStatus != null ||
-        countryOfOrigin != null ||
-        year != null
+        selection.isActive
     val searchHeaderCollapsePx = headerCollapsePx.coerceIn(0f, searchHeaderHeightPx.toFloat())
     val headerTranslationY = -searchHeaderCollapsePx
     val visibleHeaderHeight = with(density) {
@@ -1565,127 +1563,31 @@ private val LibraryContentPadding = 18.dp
 
 @Composable
 internal fun LibraryGenreDialog(
-    selectedGenres: Set<String>,
-    onGenreSelected: (String, Boolean) -> Unit,
-    onClear: () -> Unit,
-    onDismiss: () -> Unit,
+    taxonomy: CatalogTaxonomy, loading: Boolean, onRefresh: () -> Unit, includeAdult: Boolean, selectedGenres: Set<String>,
+    onGenreSelected: (String, Boolean) -> Unit, onClear: () -> Unit, onDismiss: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        TankobunDialogSurface(fillMaxHeightFraction = 0.78f, scrollable = false) {
-            TankobunDialogHeader(title = tankobunString(R.string.common_genres), onDismiss = onDismiss)
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                FlowRowCompat {
-                    BrowseGenres.forEach { genre ->
-                        TankobunChip(
-                            selected = genre in selectedGenres,
-                            onClick = { onGenreSelected(genre, genre !in selectedGenres) },
-                            leadingIcon = { TankobunChipIcon(genreIcon(genre)) },
-                            label = {
-                                Text(browseGenreLabel(genre), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            },
-                        )
-                    }
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onClear) {
-                    Text(tankobunString(R.string.common_clear))
-                }
-                Spacer(Modifier.weight(1f))
-                TankobunActionButton(label = tankobunString(R.string.common_apply), onClick = onDismiss)
-            }
-        }
-    }
+    CatalogFilterDialog(
+        title = tankobunString(R.string.common_genres), taxonomy = taxonomy, options = taxonomy.tags,
+        selected = selectedGenres, includeAdult = includeAdult, genresOnly = true, loading = loading, onRefresh = onRefresh,
+        onApply = { selection -> onClear(); selection.forEach { onGenreSelected(it, true) } }, onDismiss = onDismiss,
+    )
 }
 
 @Composable
 internal fun LibraryTagDialog(
-    availableTags: List<AnilistMediaTag>,
-    selectedTags: Set<String>,
-    includeAdultTags: Boolean,
-    onTagSelected: (String, Boolean) -> Unit,
-    onClear: () -> Unit,
-    onDismiss: () -> Unit,
+    taxonomy: CatalogTaxonomy, loading: Boolean, onRefresh: () -> Unit, availableTags: List<CatalogTag>, selectedTags: Set<String>, includeAdultTags: Boolean,
+    onTagSelected: (String, Boolean) -> Unit, onClear: () -> Unit, onDismiss: () -> Unit,
 ) {
-    var query by remember { mutableStateOf("") }
-    val visibleTags = availableTags.visibleTags(query, includeAdult = includeAdultTags)
-
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        TankobunDialogSurface(fillMaxHeightFraction = 0.82f, scrollable = false) {
-            TankobunDialogHeader(title = tankobunString(R.string.common_tags), onDismiss = onDismiss)
-            TankobunSearchField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = tankobunString(R.string.browse_find_tag),
-                showSearchAction = false,
-            )
-            if (availableTags.isEmpty()) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Text(
-                        tankobunString(R.string.library_tags_after_sync),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    FlowRowCompat {
-                        visibleTags.forEach { tag ->
-                            TankobunChip(
-                                selected = tag.name in selectedTags,
-                                onClick = { onTagSelected(tag.name, tag.name !in selectedTags) },
-                                leadingIcon = { TankobunChipIcon(TankobunIcons.LocalOffer) },
-                                label = {
-                                    Text(
-                                        tag.name,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onClear) {
-                    Text(tankobunString(R.string.common_clear))
-                }
-                Spacer(Modifier.weight(1f))
-                TankobunActionButton(label = tankobunString(R.string.common_apply), onClick = onDismiss)
-            }
-        }
-    }
+    CatalogFilterDialog(
+        title = tankobunString(R.string.common_tags), taxonomy = taxonomy, options = availableTags,
+        selected = selectedTags, includeAdult = includeAdultTags, loading = loading, onRefresh = onRefresh,
+        onApply = { selection -> onClear(); selection.forEach { onTagSelected(it, true) } }, onDismiss = onDismiss,
+    )
 }
 
-internal fun libraryTagOptions(
-    sections: List<LibrarySection>,
-    anilistTags: List<AnilistMediaTag>,
-): List<AnilistMediaTag> {
-    val tagsInLibrary = sections
-        .flatMap { section -> section.items }
-        .flatMap { item -> item.media.tags }
-        .distinctBy { it.lowercase(Locale.ROOT) }
-        .sortedWith(String.CASE_INSENSITIVE_ORDER)
-    val knownTagsByName = anilistTags.associateBy { it.name.lowercase(Locale.ROOT) }
-    return tagsInLibrary.map { tagName ->
-        knownTagsByName[tagName.lowercase(Locale.ROOT)] ?: AnilistMediaTag(
-            name = tagName,
-            category = null,
-            isAdult = false,
-        )
-    }
-}
+internal fun libraryTagOptions(sections: List<LibrarySection>, taxonomy: CatalogTaxonomy): List<CatalogTag> =
+    taxonomy.tags + sections.flatMap { it.items }.flatMap { it.media.tags }.distinct()
+        .filter { taxonomy.resolve(it) == null }.map { CatalogTag(it, it) }
 
 internal fun libraryFormatOptions(sections: List<LibrarySection>): List<BrowseOption> =
     listOf(BrowseOption(R.string.common_any, null)) +
@@ -1714,38 +1616,21 @@ internal fun libraryCountryOptions(sections: List<LibrarySection>): List<BrowseO
     return if (countryOptions.size > 1) countryOptions else BrowseCountryOptions
 }
 
-internal fun libraryYearOptions(sections: List<LibrarySection>): List<BrowseOption> =
-    listOf(BrowseOption(R.string.common_any, null)) +
-        sections.flatMap { section -> section.items }
-            .mapNotNull { it.media.startDateYear }
-            .distinct()
-            .sortedDescending()
-            .map { BrowseOption(it.toString(), it.toString()) }
-
 internal fun List<LibraryItem>.filterLibraryItems(
     query: String,
     genres: Set<String>,
     tags: Set<String>,
-    format: String?,
-    publishingStatus: String?,
-    countryOfOrigin: String?,
-    year: String?,
+    selection: CatalogSearchFilters,
+    taxonomy: CatalogTaxonomy = CatalogTaxonomy.Empty,
 ): List<LibraryItem> {
     val normalizedQuery = query.trim().lowercase()
     return filter { item ->
         val media = item.media
         val queryMatches = normalizedQuery.isBlank() || media.librarySearchText().contains(normalizedQuery)
-        val genreMatches = genres.isEmpty() || genres.any { genre ->
-            media.genres.any { it.equals(genre, ignoreCase = true) }
-        }
-        val tagMatches = tags.isEmpty() || tags.any { tag ->
-            media.tags.any { it.equals(tag, ignoreCase = true) }
-        }
-        val formatMatches = format == null || media.format == format
-        val statusMatches = publishingStatus == null || media.status == publishingStatus
-        val countryMatches = countryOfOrigin == null || media.countryOfOrigin == countryOfOrigin
-        val yearMatches = year == null || media.startDateYear?.toString() == year
-        queryMatches && genreMatches && tagMatches && formatMatches && statusMatches && countryMatches && yearMatches
+        val keys = taxonomy.mediaFilterKeys(media)
+        val genreMatches = taxonomy.matchesAny(keys, genres)
+        val tagMatches = taxonomy.matchesAny(keys, tags)
+        queryMatches && genreMatches && tagMatches && selection.matches(media)
     }
 }
 

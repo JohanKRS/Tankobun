@@ -40,12 +40,12 @@ internal class CacheStorageDataSource(
             }
 
             CacheClearTarget.SOURCE_NETWORK -> NetworkHelper.clearCache()
-            CacheClearTarget.NAVIGATION_DATA -> container.database.navigationCacheDao().prune(Long.MAX_VALUE)
+            CacheClearTarget.NAVIGATION_DATA -> clearNavigationData()
             CacheClearTarget.READER_PAGES -> ReaderPageCache.clear(container.application)
             CacheClearTarget.TEMPORARY_FILES -> temporaryCacheDir(container.application.cacheDir).recreate()
             CacheClearTarget.ALL -> {
                 clearAnilistAndImages()
-                container.database.navigationCacheDao().prune(Long.MAX_VALUE)
+                clearNavigationData()
                 NetworkHelper.clearCache()
                 temporaryCacheDir(container.application.cacheDir).recreate()
                 ReaderPageCache.clear(container.application)
@@ -53,7 +53,14 @@ internal class CacheStorageDataSource(
         }
     }
 
-    private fun clearAnilistAndImages() {
+    private suspend fun clearNavigationData() {
+        container.mangaBakaRepository.clearCache()
+        container.settingsStore.clearCatalogTaxonomyCache()
+        container.database.navigationCacheDao().prune(Long.MAX_VALUE)
+    }
+
+    private suspend fun clearAnilistAndImages() {
+        container.mangaBakaRepository.clearCache()
         container.okHttpClient.cache?.evictAll()
         val images = SingletonImageLoader.get(container.application)
         images.diskCache?.clear()

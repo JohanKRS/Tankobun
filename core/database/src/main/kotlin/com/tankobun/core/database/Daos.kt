@@ -5,6 +5,8 @@ import androidx.room.Delete
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
+import com.tankobun.core.model.catalogNameKey
+import com.tankobun.core.model.withCoverFallback
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -49,16 +51,18 @@ interface MediaDao {
     }
 }
 
-private fun AnilistMediaEntity.withFallbackDetails(fallback: AnilistMediaEntity?): AnilistMediaEntity {
+internal fun AnilistMediaEntity.withFallbackDetails(fallback: AnilistMediaEntity?): AnilistMediaEntity {
     if (fallback == null) return this
     return copy(
         idMal = idMal ?: fallback.idMal,
+        anilistId = anilistId ?: fallback.anilistId,
+        mangaBakaId = mangaBakaId ?: fallback.mangaBakaId,
         titleRomaji = titleRomaji ?: fallback.titleRomaji,
         titleEnglish = titleEnglish ?: fallback.titleEnglish,
         titleNative = titleNative ?: fallback.titleNative,
         titleUserPreferred = titleUserPreferred.ifBlank { fallback.titleUserPreferred },
         description = description ?: fallback.description,
-        coverImage = coverImage ?: fallback.coverImage,
+        coverImage = coverImage.withCoverFallback(fallback.coverImage),
         bannerImage = bannerImage ?: fallback.bannerImage,
         mainCharacterImage = mainCharacterImage ?: fallback.mainCharacterImage,
         characterImages = characterImages.ifEmpty { fallback.characterImages },
@@ -72,10 +76,11 @@ private fun AnilistMediaEntity.withFallbackDetails(fallback: AnilistMediaEntity?
         startDateYear = startDateYear ?: fallback.startDateYear,
         endDateYear = endDateYear ?: fallback.endDateYear,
         siteUrl = siteUrl ?: fallback.siteUrl,
-        genres = genres.ifEmpty { fallback.genres },
+        genres = (genres + fallback.genres).distinctBy(String::catalogNameKey),
         synonyms = synonyms.ifEmpty { fallback.synonyms },
         staff = staff.ifEmpty { fallback.staff },
-        tags = tags.ifEmpty { fallback.tags },
+        tags = (tags + fallback.tags).distinctBy(String::catalogNameKey),
+        mangaBakaTagIds = (mangaBakaTagIds + fallback.mangaBakaTagIds).distinct(),
         updatedAtEpochSeconds = updatedAtEpochSeconds ?: fallback.updatedAtEpochSeconds,
     )
 }
@@ -120,12 +125,12 @@ interface RecommendationDao {
         SELECT media.* FROM anilist_recommendations AS rec
         INNER JOIN anilist_media AS media ON media.id = rec.recommendationMediaId
         WHERE rec.mediaId = :mediaId
-        ORDER BY COALESCE(rec.rating, 0) DESC
+        ORDER BY rec.rowid ASC
         """,
     )
     suspend fun cachedRecommendationMedia(mediaId: Int): List<AnilistMediaEntity>
 
-    @Query("SELECT * FROM anilist_recommendations WHERE mediaId = :mediaId ORDER BY COALESCE(rating, 0) DESC")
+    @Query("SELECT * FROM anilist_recommendations WHERE mediaId = :mediaId ORDER BY rowid ASC")
     suspend fun cachedRecommendations(mediaId: Int): List<AnilistRecommendationEntity>
 
     @Query("DELETE FROM anilist_recommendations WHERE mediaId = :mediaId")

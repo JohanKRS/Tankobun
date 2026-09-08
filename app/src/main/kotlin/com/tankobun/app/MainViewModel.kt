@@ -132,11 +132,15 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tankobun.core.anilist.AnilistOAuth
 import com.tankobun.core.extensions.ExtensionIndexEntry
+import com.tankobun.core.model.CatalogSearchFilters
+import com.tankobun.core.model.PublicationYears
 import com.tankobun.core.model.AnilistListEntry
 import com.tankobun.core.model.AnilistMediaTag
 import com.tankobun.core.model.AnilistScoreFormat
 import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.AnilistMedia
+import com.tankobun.core.model.CatalogMode
+import com.tankobun.app.catalog.withCatalogMode
 import com.tankobun.core.model.CachePolicy
 import com.tankobun.core.model.DownloadState
 import com.tankobun.core.model.MediaStatus
@@ -183,10 +187,7 @@ private data class BrowseCriteria(
     val searchQuery: String = "",
     val genres: Set<String> = emptySet(),
     val tags: Set<String> = emptySet(),
-    val format: String? = null,
-    val publishingStatus: String? = null,
-    val countryOfOrigin: String? = null,
-    val year: Int? = null,
+    val selection: CatalogSearchFilters = CatalogSearchFilters(),
     val staffName: String? = null,
     val sort: String = BROWSE_SORT_SEARCH_MATCH,
 ) {
@@ -194,10 +195,7 @@ private data class BrowseCriteria(
         get() = searchQuery.trim().isNotBlank() ||
             genres.isNotEmpty() ||
             tags.isNotEmpty() ||
-            format != null ||
-            publishingStatus != null ||
-            countryOfOrigin != null ||
-            year != null ||
+            selection.isActive ||
             staffName != null ||
             sort != BROWSE_SORT_SEARCH_MATCH
 }
@@ -250,6 +248,8 @@ class MainViewModel(
     private val libraryRefreshGate = com.tankobun.app.logic.LibraryRefreshGate()
     private var automaticLibraryRefresh = false
     private var scheduledBackupJob: Job? = null
+    private var browseSearchJob: Job? = null
+    private var browseMoreJob: Job? = null
     private var browseLandingJob: Job? = null
     private var homeFeedJob: Job? = null
     private var homeFeedRefreshJob: Job? = null
@@ -282,6 +282,7 @@ class MainViewModel(
         TankobunUiState(
             loggedIn = initialAccessToken != null,
             clientConfigured = BuildConfig.ANILIST_CLIENT_ID.isNotBlank(),
+            catalogMode = container.settingsStore.catalogMode(),
             libraryMode = initialLibraryMode,
             viewerName = container.settingsStore.viewerName(),
             anilistScoreFormat = container.settingsStore.anilistScoreFormat(),
@@ -300,6 +301,9 @@ class MainViewModel(
             browseCoverColumns = container.settingsStore.browseCoverColumns(),
             browseShowWholeCovers = container.settingsStore.browseShowWholeCovers(),
             browseAvailableTags = container.settingsStore.anilistTags(),
+            catalogTaxonomy = com.tankobun.core.model.CatalogTaxonomy.merge(
+                container.settingsStore.anilistTags(), container.settingsStore.anilistGenres().ifEmpty { FALLBACK_HOME_GENRES }, emptyList(),
+            ),
             sourceLanguages = container.settingsStore.sourceLanguages(),
             disabledSourceKeys = container.settingsStore.disabledSourceKeys(),
             extensionRepositoryUrl = container.settingsStore.extensionRepositoryUrl(),
@@ -345,6 +349,7 @@ class MainViewModel(
         localizedContext().resources.getQuantityString(id, quantity, *args)
 
     private val browseDataSource = BrowseDataSource(container, cachePolicy) { _state.value.anilistTitleLanguage }
+    private val homeArtworkDataSource = com.tankobun.app.home.HomeArtworkDataSource(container, cachePolicy)
     private val homeDataSource = HomeDataSource(container, cachePolicy) { _state.value.anilistTitleLanguage }
     private val sourceDataSource = SourceDataSource(container, cachePolicy)
     val state: StateFlow<TankobunUiState> = _state
@@ -494,6 +499,26 @@ class MainViewModel(
             container.settingsStore.saveLocalReadingActivity(activity)
             _state.update { it.copy(localReadingActivity = activity) }
         }
+    }
+
+    fun setCatalogMode(mode: CatalogMode) {
+        if (_state.value.catalogMode == mode) return
+        container.settingsStore.saveCatalogMode(mode)
+        reloadCatalogNavigation(mode)
+    }
+
+    private fun reloadCatalogNavigation(mode: CatalogMode) {
+        browseSearchJob?.cancel()
+        browseMoreJob?.cancel()
+        browseLandingJob?.cancel()
+        browseLandingJob = null
+        homeFeedJob?.cancel()
+        homeFeedJob = null
+        homeFeedRefreshJob?.cancel()
+        homeFeedRefreshJob = null
+        _state.update { it.withCatalogMode(mode) }
+        loadHomeFeed()
+        if (_state.value.hasBrowseQueryOrFilters()) searchAniList(recordHistory = false) else loadBrowseLanding()
     }
 
     fun setLibraryMode(mode: LibraryMode) {
@@ -1190,11 +1215,44 @@ class MainViewModel(
         }
     }
 
+    fun connectMangaBaka(token: String) {
+        if (_state.value.mangaBakaBusy || token.isBlank()) return
+        viewModelScope.launch {
+            _state.update { it.copy(mangaBakaBusy = true) }
+            runCatching { container.mangaBakaRepository.profile(token.trim()) }
+                .onSuccess { profile ->
+                    container.tokenStore.saveMangaBaka(token.trim(), profile.id, profile.name)
+                    _state.update { it.copy(mangaBakaAccountName = profile.name) }
+                }
+                .onFailure { error -> if (error is CancellationException) throw error; _state.update { it.copy(message = string(R.string.catalog_connect_failed)) } }
+            _state.update { it.copy(mangaBakaBusy = false) }
+        }
+    }
+
+    fun disconnectMangaBaka() {
+        container.tokenStore.clearMangaBaka()
+        _state.update { it.copy(mangaBakaAccountName = null) }
+    }
+
+    fun syncMangaBaka() {
+        if (_state.value.mangaBakaBusy) return
+        viewModelScope.launch {
+            _state.update { it.copy(mangaBakaBusy = true) }
+            runCatching { container.mangaBakaTracking.sync() }
+                .onSuccess { loadCachedLibrary(); _state.update { it.copy(message = string(R.string.catalog_sync_done)) } }
+                .onFailure { error -> if (error is CancellationException) throw error; _state.update { it.copy(message = string(R.string.catalog_sync_failed)) } }
+            _state.update { it.copy(mangaBakaBusy = false) }
+        }
+    }
+
     fun refreshLibrary() {
+        container.mangaBakaTracking.schedule()
         requestLibraryRefresh(automatic = false)
     }
 
     fun onAppForegrounded() {
+        _state.update { it.copy(mangaBakaAccountName = container.tokenStore.mangaBakaName()) }
+        container.mangaBakaTracking.schedule()
         val due = libraryRefreshGate.onForeground(android.os.SystemClock.elapsedRealtime())
         if (due && _state.value.anilistRefreshLibraryOnOpen) requestLibraryRefresh(automatic = true)
     }
@@ -1291,16 +1349,7 @@ class MainViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                if (snapshot.libraryMode == LibraryMode.LOCAL) {
-                    backupDataSource.saveLocalLibraryBackup(uri = uri, snapshot = snapshot)
-                } else {
-                    backupDataSource.saveBackup(
-                        uri = uri,
-                        items = items,
-                        viewerName = snapshot.viewerName,
-                        scoreFormat = snapshot.anilistScoreFormat,
-                    )
-                }
+                backupDataSource.saveLocalLibraryBackup(uri = uri, snapshot = snapshot)
             }.onSuccess {
                 _state.update {
                     it.copy(
@@ -1322,31 +1371,23 @@ class MainViewModel(
         }
     }
 
+    fun exportAniListXml(uri: Uri) {
+        val snapshot = _state.value
+        viewModelScope.launch {
+            runCatching { backupDataSource.saveBackup(uri, snapshot.libraryItems.filter { it.media.anilistId != null }, snapshot.viewerName, snapshot.anilistScoreFormat) }
+                .onSuccess { _state.update { it.copy(message = string(R.string.msg_backup_saved, quantityString(R.plurals.manga_count, it.libraryItems.size, it.libraryItems.size))) } }
+                .onFailure { error -> _state.update { it.copy(message = error.userMessage(localizedContext(), string(R.string.msg_backup_failed))) } }
+        }
+    }
+
     fun restoreAniListBackup(uri: Uri) {
         val snapshot = _state.value
         val token = container.tokenStore.accessToken()
-        if (snapshot.libraryMode == LibraryMode.ANILIST && token == null) {
-            _state.update { it.copy(message = string(R.string.msg_connect_before_restore)) }
-            return
-        }
 
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
-                if (snapshot.libraryMode == LibraryMode.LOCAL) {
-                    backupDataSource.restoreLocalLibraryBackup(
-                        uri = uri,
-                        scoreFormat = snapshot.anilistScoreFormat,
-                        knownCustomLists = snapshot.anilistCustomLists,
-                    )
-                } else {
-                    backupDataSource.restoreBackup(
-                        uri = uri,
-                        accessToken = requireNotNull(token),
-                        scoreFormat = snapshot.anilistScoreFormat,
-                        knownCustomLists = snapshot.anilistCustomLists,
-                    )
-                }
+                backupDataSource.restoreLocalLibraryBackup(uri, snapshot.anilistScoreFormat, snapshot.anilistCustomLists)
             }.onSuccess { result ->
                 container.settingsStore.saveAnilistCustomLists(result.customLists)
                 loadCachedLibrary()
@@ -1497,6 +1538,8 @@ class MainViewModel(
                 message = message,
             )
         }
+        reloadCatalogNavigation(store.catalogMode())
+        _state.update { it.copy(message = message) }
         NewChapterCheckWork.update(container.application, store.newChapterChecksEnabled())
     }
 
@@ -1613,11 +1656,7 @@ class MainViewModel(
                         snapshot.libraryItems
                             .takeIf { it.isNotEmpty() }
                             ?.let {
-                                if (snapshot.libraryMode == LibraryMode.LOCAL) {
-                                    backupDataSource.writeScheduledLocalLibraryBackup(folderUri = folderUri, snapshot = snapshot)
-                                } else {
-                                    backupDataSource.writeScheduledBackup(folderUri = folderUri, snapshot = snapshot)
-                                }
+                                backupDataSource.writeScheduledLocalLibraryBackup(folderUri = folderUri, snapshot = snapshot)
                             }
                     } else {
                         null
@@ -1799,24 +1838,34 @@ class MainViewModel(
         }
     }
 
-    fun setBrowseFormat(format: String?) {
-        _state.update { it.copy(browseFormat = format, browseStaffName = null) }
+    fun setBrowseFormats(formats: Set<String>) {
+        _state.update { it.copy(browseSelection = it.browseSelection.copy(formats = formats), browseStaffName = null) }
     }
 
-    fun setBrowsePublishingStatus(status: String?) {
-        _state.update { it.copy(browsePublishingStatus = status, browseStaffName = null) }
+    fun setBrowseStatuses(statuses: Set<String>) {
+        _state.update { it.copy(browseSelection = it.browseSelection.copy(statuses = statuses), browseStaffName = null) }
     }
 
-    fun setBrowseCountryOfOrigin(country: String?) {
-        _state.update { it.copy(browseCountryOfOrigin = country, browseStaffName = null) }
+    fun setBrowseCountries(countries: Set<String>) {
+        _state.update { it.copy(browseSelection = it.browseSelection.copy(countries = countries), browseStaffName = null) }
     }
 
-    fun setBrowseYear(year: Int?) {
-        _state.update { it.copy(browseYear = year, browseStaffName = null) }
+    fun setBrowseYears(years: PublicationYears?) {
+        _state.update { it.copy(browseSelection = it.browseSelection.copy(years = years), browseStaffName = null) }
     }
 
     fun setBrowseSort(sort: String) {
         _state.update { it.copy(browseSort = sort) }
+    }
+
+    fun applyBrowseGenres(selection: Set<String>) {
+        _state.update { it.copy(browseGenres = selection) }
+        searchAniList()
+    }
+
+    fun applyBrowseTags(selection: Set<String>) {
+        _state.update { it.copy(browseTags = selection) }
+        searchAniList()
     }
 
     fun resetBrowseFilters() {
@@ -1832,10 +1881,7 @@ class MainViewModel(
                 browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = emptySet(),
-                browseFormat = null,
-                browsePublishingStatus = null,
-                browseCountryOfOrigin = null,
-                browseYear = null,
+                browseSelection = CatalogSearchFilters(),
                 browseStaffName = null,
                 browseSort = BROWSE_SORT_SEARCH_MATCH,
                 message = null,
@@ -1845,6 +1891,10 @@ class MainViewModel(
     }
 
     fun navigateBrowseBack(): Boolean {
+        if (_state.value.browseForYouOpen) {
+            closeBrowseForYou()
+            return true
+        }
         val currentCriteria = _state.value.toBrowseCriteria()
         if (currentCriteria != committedBrowseCriteria) {
             restoreBrowseCriteria(committedBrowseCriteria)
@@ -1895,10 +1945,7 @@ class MainViewModel(
                 browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = emptySet(),
-                browseFormat = null,
-                browsePublishingStatus = null,
-                browseCountryOfOrigin = null,
-                browseYear = null,
+                browseSelection = CatalogSearchFilters(),
                 browseStaffName = null,
                 browseSort = sort,
                 message = null,
@@ -1918,10 +1965,7 @@ class MainViewModel(
                 browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = emptySet(),
-                browseFormat = null,
-                browsePublishingStatus = null,
-                browseCountryOfOrigin = "KR",
-                browseYear = null,
+                browseSelection = CatalogSearchFilters(countries = setOf("KR")),
                 browseStaffName = null,
                 browseSort = "POPULARITY_DESC",
                 message = null,
@@ -1941,10 +1985,7 @@ class MainViewModel(
                 browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = setOf(tag),
-                browseFormat = null,
-                browsePublishingStatus = null,
-                browseCountryOfOrigin = null,
-                browseYear = null,
+                browseSelection = CatalogSearchFilters(),
                 browseStaffName = null,
                 browseSort = BROWSE_SORT_SEARCH_MATCH,
                 message = null,
@@ -1964,10 +2005,7 @@ class MainViewModel(
                 browseResultsLoadingMore = false,
                 browseGenres = emptySet(),
                 browseTags = emptySet(),
-                browseFormat = null,
-                browsePublishingStatus = null,
-                browseCountryOfOrigin = null,
-                browseYear = null,
+                browseSelection = CatalogSearchFilters(),
                 browseStaffName = author,
                 browseSort = "POPULARITY_DESC",
                 message = null,
@@ -1976,21 +2014,76 @@ class MainViewModel(
         searchAniList()
     }
 
+    private var browseMixJob: Job? = null
+
+    fun viewAllBrowseForYou() {
+        _state.update { it.copy(browseForYouOpen = true) }
+    }
+
+    fun closeBrowseForYou() {
+        _state.update { it.copy(browseForYouOpen = false) }
+    }
+
+    fun refreshBrowseForYou() {
+        if (browseMixJob?.isActive != true) loadBrowseMix(force = true)
+    }
+
+    private fun loadBrowseMix(force: Boolean) {
+        if (browseMixJob?.isActive == true && !force) return
+        browseMixJob?.cancel()
+        browseMixJob = viewModelScope.launch {
+            val adult = _state.value.showNsfwContent
+            _state.update { it.copy(browseForYouRefreshing = true) }
+            try {
+                runCatching {
+                    val seeds = container.catalog.mixSeeds()
+                    if (seeds.isEmpty()) return@runCatching emptyList<AnilistMedia>()
+                    val key = "mangabaka:mix:${seeds.joinToString(",")}:$adult"
+                    browseDataSource.cachedAnilistBrowseMediaPage(key, forceRefresh = force) {
+                        com.tankobun.core.model.AnilistMediaPage(
+                            container.mangaBakaRepository.mix(seeds, adult, forceRefresh = force), 1, false,
+                        )
+                    }.media
+                }.onSuccess { media ->
+                    _state.update { current ->
+                        if (current.showNsfwContent != adult) current else {
+                            val owned = current.libraryItems.mapTo(hashSetOf()) { it.media.id }
+                            current.copy(browseForYou = media.filter { it.id !in owned && (adult || !it.isAdult) }
+                                .map { it.withTitleLanguage(current.anilistTitleLanguage) })
+                        }
+                    }
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                    Log.w(TAG, "MangaBaka Mix unavailable; keeping current shelves", error)
+                }
+            } finally {
+                if (_state.value.showNsfwContent == adult) {
+                    _state.update { it.copy(browseForYouRefreshing = false) }
+                }
+            }
+        }
+    }
+
     fun loadBrowseLanding(force: Boolean = false) {
+        loadBrowseMix(force)
         if (!force && browseLandingJob?.isActive == true) return
+        browseLandingJob?.cancel()
         browseLandingJob = viewModelScope.launch {
             val snapshot = _state.value
             val includeAdult = snapshot.showNsfwContent
+            fun isCurrent() = _state.value.catalogMode == snapshot.catalogMode &&
+                _state.value.showNsfwContent == includeAdult
             val trendingKey = snapshot.browseLandingCacheKey(BROWSE_TRENDING_CACHE_KEY)
             val popularKey = snapshot.browseLandingCacheKey(BROWSE_POPULAR_CACHE_KEY)
             val manhwaKey = snapshot.browseLandingCacheKey(BROWSE_MANHWA_CACHE_KEY)
             val topMangaKey = snapshot.browseLandingCacheKey(BROWSE_TOP_MANGA_CACHE_KEY)
             val cachedLanding = BrowseLandingData(
-                trending = browseDataSource.cachedBrowseMedia(trendingKey),
-                popular = browseDataSource.cachedBrowseMedia(popularKey),
-                popularManhwa = browseDataSource.cachedBrowseMedia(manhwaKey),
+                trending = browseDataSource.cachedBrowseMedia(trendingKey).take(BROWSE_LANDING_SECTION_SIZE),
+                popular = browseDataSource.cachedBrowseMedia(popularKey).take(BROWSE_LANDING_SECTION_SIZE),
+                popularManhwa = browseDataSource.cachedBrowseMedia(manhwaKey).take(BROWSE_LANDING_SECTION_SIZE),
                 topManga = browseDataSource.cachedBrowseMedia(topMangaKey).take(BROWSE_LANDING_SECTION_SIZE),
             )
+            if (!isCurrent()) return@launch
             val hasCachedLanding = cachedLanding.hasContent()
             val hasVisibleLanding = BrowseLandingData(
                 trending = snapshot.browseTrending,
@@ -2017,16 +2110,18 @@ class MainViewModel(
             val popularFresh = !force && browseDataSource.browseCacheFresh(popularKey, cachePolicy.browseLandingTtlMillis)
             val manhwaFresh = !force && browseDataSource.browseCacheFresh(manhwaKey, cachePolicy.browseLandingTtlMillis)
             val topMangaFresh = !force && browseDataSource.browseCacheFresh(topMangaKey, cachePolicy.browseLandingTtlMillis)
+            if (!isCurrent()) return@launch
             if (trendingFresh && popularFresh && manhwaFresh && topMangaFresh) {
                 _state.update { it.copy(browseLandingLoaded = true, busy = false) }
                 return@launch
             }
             runCatching {
                 val accessToken = container.tokenStore.accessToken()
-                val remote = container.anilistRepository.browseLanding(
+                val remote = container.catalog.browseLanding(
                     perPage = BROWSE_LANDING_SECTION_SIZE,
                     accessToken = accessToken,
                     includeAdult = includeAdult,
+                    mode = snapshot.catalogMode,
                 )
                 val landing = BrowseLandingData(
                     trending = remote.trending.map { it.withTitleLanguage(snapshot.anilistTitleLanguage) },
@@ -2042,6 +2137,7 @@ class MainViewModel(
                 browseDataSource.cacheBrowseMedia(topMangaKey, landing.topManga)
                 landing
             }.onSuccess { landing ->
+                if (!isCurrent()) return@onSuccess
                 _state.update {
                     it.copy(
                         browseTrending = landing.trending,
@@ -2053,6 +2149,8 @@ class MainViewModel(
                     )
                 }
             }.onFailure { error ->
+                if (error is CancellationException) throw error
+                if (!isCurrent()) return@onFailure
                 Log.e(TAG, "AniList browse landing failed", error)
                 _state.update {
                     it.copy(
@@ -2076,6 +2174,7 @@ class MainViewModel(
         homeFeedRefreshJob = null
         homeFeedJob = viewModelScope.launch {
             val includeAdult = _state.value.showNsfwContent
+            val mode = _state.value.catalogMode
             val genres = cachedHomeGenres(includeAdult = includeAdult)
             val freshCache = if (force) {
                 null
@@ -2084,13 +2183,15 @@ class MainViewModel(
                     genres = genres,
                     includeAdult = includeAdult,
                     freshOnly = true,
+                    mode = mode,
                 )
             }
             if (freshCache != null) {
-                if (_state.value.showNsfwContent == includeAdult) {
+                if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode) {
                     applyHomeFeed(freshCache)
                 }
-                scheduleHomeFeedRefresh(includeAdult)
+                enrichHomeArtwork(freshCache, includeAdult, mode)
+                scheduleHomeFeedRefresh(includeAdult, mode)
                 refreshHomeGenresIfStale(force = false)
                 return@launch
             }
@@ -2099,19 +2200,21 @@ class MainViewModel(
                 genres = genres,
                 includeAdult = includeAdult,
                 freshOnly = false,
+                mode = mode,
             )
-            if (_state.value.showNsfwContent == includeAdult) {
+            if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode) {
                 staleCache?.let(::applyHomeFeed)
             }
             _state.update { it.withHomeFeedRefreshStarted(includeAdult, genres) }
 
             try {
-                val feed = container.anilistRepository.homeFeed(
+                val feed = container.catalog.homeFeed(
                     genres = genres,
                     accessToken = container.tokenStore.accessToken(),
                     includeAdult = includeAdult,
+                    mode = mode,
                     onTrendingLoaded = { trending ->
-                        if (_state.value.showNsfwContent == includeAdult && trending.isNotEmpty()) {
+                        if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode && trending.isNotEmpty()) {
                             val existingById = _state.value.homeTrending.associateBy(AnilistMedia::id)
                             applyHomeTrending(
                                 trending.map { media -> media.withFallbackDetails(existingById[media.id]) },
@@ -2119,7 +2222,7 @@ class MainViewModel(
                         }
                     },
                     onGenreHighlightsLoaded = { highlights ->
-                        if (_state.value.showNsfwContent == includeAdult && highlights.isNotEmpty()) {
+                        if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode && highlights.isNotEmpty()) {
                             val existingById = _state.value.homeGenreHighlights
                                 .map { it.media }
                                 .associateBy(AnilistMedia::id)
@@ -2149,31 +2252,43 @@ class MainViewModel(
                         highlight.copy(media = highlight.media.withFallbackDetails(existingMediaById[highlight.media.id]))
                     },
                 )
-                homeDataSource.saveHomeFeed(stableFeed, includeAdult = includeAdult)
-                if (_state.value.showNsfwContent == includeAdult) {
+                homeDataSource.saveHomeFeed(stableFeed, genres = genres, includeAdult = includeAdult, mode = mode)
+                if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode) {
                     applyHomeFeed(stableFeed)
                 }
-                scheduleHomeFeedRefresh(includeAdult)
+                enrichHomeArtwork(stableFeed, includeAdult, mode)
+                scheduleHomeFeedRefresh(includeAdult, mode)
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 Log.e(TAG, "AniList home feed failed", error)
                 _state.update { state ->
-                    if (state.showNsfwContent != includeAdult) {
+                    if (state.showNsfwContent != includeAdult || state.catalogMode != mode) {
                         state
                     } else {
                         state.copy(homeLoaded = state.homeLoaded || staleCache == null)
                             .withHomeFeedRefreshStopped(includeAdult)
                     }
                 }
-                scheduleHomeFeedRefresh(includeAdult, HOME_FEED_RETRY_DELAY_MILLIS)
+                scheduleHomeFeedRefresh(includeAdult, mode, HOME_FEED_RETRY_DELAY_MILLIS)
             }
             refreshHomeGenresIfStale(force = force)
         }
     }
 
+    private suspend fun enrichHomeArtwork(feed: com.tankobun.core.model.AnilistHomeFeed, includeAdult: Boolean, mode: CatalogMode) {
+        try {
+            val enriched = homeArtworkDataSource.enrich(feed, includeAdult)
+            if (_state.value.catalogMode == mode && _state.value.showNsfwContent == includeAdult) applyHomeFeed(enriched)
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            Log.w(TAG, "Home artwork enrichment failed", error)
+        }
+    }
+
     private fun cachedHomeGenres(includeAdult: Boolean): List<String> =
-        container.settingsStore.anilistGenres()
-            .ifEmpty { FALLBACK_HOME_GENRES }
+        (container.settingsStore.anilistGenres().ifEmpty { FALLBACK_HOME_GENRES } +
+            com.tankobun.core.model.SUPPLEMENTAL_HOME_GENRES)
+            .distinct()
             .filter { genre -> includeAdult || !genre.equals("Hentai", ignoreCase = true) }
 
     private suspend fun refreshHomeGenresIfStale(force: Boolean) {
@@ -2195,18 +2310,19 @@ class MainViewModel(
 
     private fun scheduleHomeFeedRefresh(
         includeAdult: Boolean,
+        mode: CatalogMode,
         delayMillis: Long? = null,
     ) {
         homeFeedRefreshJob?.cancel()
         val refreshDelayMillis = delayMillis ?: run {
-            val cachedAt = container.settingsStore.homeFeedCachedAtEpochMillis(includeAdult)
+            val cachedAt = container.settingsStore.homeFeedCachedAtEpochMillis(includeAdult, mode)
             (cachePolicy.homeFeedTtlMillis - (System.currentTimeMillis() - cachedAt))
                 .coerceAtLeast(1_000L)
         }
         homeFeedRefreshJob = viewModelScope.launch {
             delay(refreshDelayMillis)
             homeFeedRefreshJob = null
-            if (_state.value.showNsfwContent == includeAdult) {
+            if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode) {
                 loadHomeFeed()
             }
         }
@@ -2215,7 +2331,7 @@ class MainViewModel(
     private fun applyHomeFeed(feed: com.tankobun.core.model.AnilistHomeFeed) {
         _state.update {
             it.copy(
-                homeTrending = feed.trending.map { media -> media.withTitleLanguage(it.anilistTitleLanguage) },
+                homeTrending = feed.trending.take(com.tankobun.app.home.HOME_TRENDING_LIMIT).map { media -> media.withTitleLanguage(it.anilistTitleLanguage) },
                 homeGenreHighlights = feed.genreHighlights.map { highlight ->
                     highlight.copy(media = highlight.media.withTitleLanguage(it.anilistTitleLanguage))
                 },
@@ -2230,7 +2346,7 @@ class MainViewModel(
     private fun applyHomeTrending(trending: List<AnilistMedia>) {
         _state.update { state ->
             state.copy(
-                homeTrending = trending.map { media -> media.withTitleLanguage(state.anilistTitleLanguage) },
+                homeTrending = trending.take(com.tankobun.app.home.HOME_TRENDING_LIMIT).map { media -> media.withTitleLanguage(state.anilistTitleLanguage) },
                 homeTrendingRefreshing = false,
             )
         }
@@ -2241,34 +2357,62 @@ class MainViewModel(
         highlights: List<com.tankobun.core.model.AnilistGenreHighlight>,
     ) {
         _state.update { state ->
-            val existingByGenre = state.homeGenreHighlights.associateBy { it.genre }
             val incomingByGenre = highlights.associateBy { it.genre }
             state.copy(
                 homeGenreHighlights = genres.mapNotNull { genre ->
-                    (incomingByGenre[genre] ?: existingByGenre[genre])?.let { highlight ->
+                    incomingByGenre[genre]?.let { highlight ->
                         highlight.copy(media = highlight.media.withTitleLanguage(state.anilistTitleLanguage))
                     }
-                },
+                }.distinctBy { it.media.id },
             ).withHomeGenresRefreshProgress(highlights.mapTo(mutableSetOf()) { it.genre })
         }
     }
 
+    private var catalogTaxonomyJob: Job? = null
+
     fun loadBrowseTags(force: Boolean = false) {
-        val now = System.currentTimeMillis()
-        val cachedTags = container.settingsStore.anilistTags()
-        val cachedAt = container.settingsStore.anilistTagsCachedAtEpochMillis()
-        if (!force && cachedTags.isNotEmpty() && now - cachedAt <= cachePolicy.anilistTagsTtlMillis) {
-            _state.update { it.copy(browseAvailableTags = cachedTags) }
-            return
-        }
-        viewModelScope.launch {
-            runCatching {
-                container.anilistRepository.mediaTags()
-            }.onSuccess { tags ->
-                container.settingsStore.saveAnilistTags(tags, System.currentTimeMillis())
-                _state.update { it.copy(browseAvailableTags = tags) }
-            }.onFailure { error ->
-                Log.w(TAG, "AniList tag collection failed", error)
+        if (catalogTaxonomyJob?.isActive == true) return
+        catalogTaxonomyJob = viewModelScope.launch {
+            _state.update { it.copy(catalogTaxonomyLoading = true) }
+            try {
+                val settings = container.settingsStore
+                var alTags = settings.anilistTags()
+                var mbTags = withContext(Dispatchers.IO) { settings.mangaBakaTags() }
+                var publication = 0
+                suspend fun publish() {
+                    val revision = ++publication
+                    val alSnapshot = alTags
+                    val mbSnapshot = mbTags
+                    val taxonomy = withContext(Dispatchers.Default) {
+                        com.tankobun.core.model.CatalogTaxonomy.merge(alSnapshot, settings.anilistGenres().ifEmpty { FALLBACK_HOME_GENRES }, mbSnapshot)
+                    }
+                    if (publication == revision) _state.update { it.copy(browseAvailableTags = alSnapshot, catalogTaxonomy = taxonomy) }
+                }
+                publish()
+                kotlinx.coroutines.coroutineScope {
+                    launch {
+                        if (!force && alTags.isNotEmpty() && System.currentTimeMillis() - settings.anilistTagsCachedAtEpochMillis() <= cachePolicy.anilistTagsTtlMillis) return@launch
+                        runCatching { container.anilistRepository.mediaTags() }.onSuccess { tags ->
+                            if (tags.isNotEmpty()) {
+                                alTags = tags
+                                settings.saveAnilistTags(tags, System.currentTimeMillis())
+                                publish()
+                            }
+                        }.onFailure { if (it is CancellationException) throw it else Log.w(TAG, "AniList taxonomy unavailable", it) }
+                    }
+                    launch {
+                        if (!force && mbTags.isNotEmpty() && System.currentTimeMillis() - settings.mangaBakaTagsCachedAtEpochMillis() <= cachePolicy.anilistTaxonomyTtlMillis) return@launch
+                        runCatching { container.mangaBakaRepository.tags(forceRefresh = force) }.onSuccess { tags ->
+                            if (tags.isNotEmpty()) {
+                                mbTags = tags
+                                withContext(Dispatchers.IO) { settings.saveMangaBakaTags(tags, System.currentTimeMillis()) }
+                                publish()
+                            }
+                        }.onFailure { if (it is CancellationException) throw it else Log.w(TAG, "MangaBaka taxonomy unavailable", it) }
+                    }
+                }
+            } finally {
+                _state.update { it.copy(catalogTaxonomyLoading = false) }
             }
         }
     }
@@ -2277,6 +2421,9 @@ class MainViewModel(
         forceRefresh: Boolean = false,
         recordHistory: Boolean = true,
     ) {
+        browseSearchJob?.cancel()
+        browseMoreJob?.cancel()
+        _state.update { it.copy(browseForYouOpen = false) }
         val snapshot = _state.value
         val query = snapshot.searchQuery.trim()
         val criteria = snapshot.toBrowseCriteria()
@@ -2302,7 +2449,7 @@ class MainViewModel(
             recordBrowseCriteria(criteria)
         }
         val cacheKey = snapshot.browseCacheKey()
-        viewModelScope.launch {
+        browseSearchJob = viewModelScope.launch {
             _state.update {
                 it.copy(
                     busy = true,
@@ -2339,6 +2486,7 @@ class MainViewModel(
                     }
                 }
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 Log.e(TAG, "AniList search failed for $query", error)
                 if (_state.value.browseCacheKey() == cacheKey) {
                     _state.update {
@@ -2366,7 +2514,7 @@ class MainViewModel(
         }
         val cacheKey = snapshot.browseCacheKey()
         val nextPage = snapshot.browseResultsPage.coerceAtLeast(1) + 1
-        viewModelScope.launch {
+        browseMoreJob = viewModelScope.launch {
             _state.update {
                 if (
                     it.browseCacheKey() == cacheKey &&
@@ -2385,6 +2533,7 @@ class MainViewModel(
                 if (_state.value.browseCacheKey() != cacheKey) return@onSuccess
                 val merged = (_state.value.searchResults + page.media).distinctBy { it.id }
                 browseDataSource.cacheBrowseMedia(cacheKey, merged)
+                if (_state.value.browseCacheKey() != cacheKey) return@onSuccess
                 _state.update {
                     it.copy(
                         searchResults = merged,
@@ -2394,6 +2543,7 @@ class MainViewModel(
                     )
                 }
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 Log.e(TAG, "AniList browse page $nextPage failed for $cacheKey", error)
                 if (_state.value.browseCacheKey() == cacheKey) {
                     _state.update {
@@ -2515,6 +2665,10 @@ class MainViewModel(
     }
 
     fun setShowNsfwContent(enabled: Boolean) {
+        browseSearchJob?.cancel()
+        browseMoreJob?.cancel()
+        browseMixJob?.cancel()
+        browseLandingJob?.cancel()
         homeFeedJob?.cancel()
         homeFeedJob = null
         homeFeedRefreshJob?.cancel()
@@ -2523,6 +2677,13 @@ class MainViewModel(
         _state.update {
             it.copy(
                 showNsfwContent = enabled,
+                browseForYou = emptyList(),
+                browseForYouOpen = false,
+                browseForYouRefreshing = false,
+                browseTrending = emptyList(),
+                browsePopular = emptyList(),
+                browsePopularManhwa = emptyList(),
+                browseTopManga = emptyList(),
                 homeTrending = emptyList(),
                 homeGenreHighlights = emptyList(),
                 homeLoaded = false,
@@ -2538,12 +2699,9 @@ class MainViewModel(
                 browseTags = if (enabled) {
                     it.browseTags
                 } else {
-                    val adultTagNames = it.browseAvailableTags
-                        .filter { tag -> tag.isAdult }
-                        .map { tag -> tag.name }
-                        .toSet()
-                    it.browseTags - adultTagNames
+                    it.browseTags.filterNot { key -> it.catalogTaxonomy.resolve(key)?.isAdult == true }.toSet()
                 },
+                browseGenres = if (enabled) it.browseGenres else it.browseGenres.filterNot { key -> it.catalogTaxonomy.resolve(key)?.isAdult == true }.toSet(),
             )
         }
         loadHomeFeed()
@@ -3022,7 +3180,7 @@ class MainViewModel(
         val entry = snapshot.selectedListEntry
             ?.takeIf { it.mediaId == media.id }
             ?: AnilistListEntry(
-                id = -media.id,
+                id = -kotlin.math.abs(media.id),
                 mediaId = media.id,
                 status = snapshot.trackingStatus,
                 progress = snapshot.trackingProgress.toIntOrNull()?.coerceAtLeast(0) ?: 0,
@@ -3487,7 +3645,7 @@ class MainViewModel(
         val media = _state.value.selectedMedia ?: return
         val snapshot = _state.value
         val token = container.tokenStore.accessToken()
-        if (snapshot.libraryMode == LibraryMode.ANILIST && token == null) {
+        if (snapshot.libraryMode == LibraryMode.ANILIST && token == null && media.anilistId != null) {
             if (!autoSave) {
                 _state.update { it.copy(message = string(R.string.msg_connect_anilist_track_manga)) }
             }
@@ -3510,7 +3668,7 @@ class MainViewModel(
         }
         val optimisticKnownCustomLists = (knownCustomLists + missingCustomLists).normalizedCustomLists()
         val optimisticEntry = AnilistListEntry(
-            id = snapshot.selectedListEntry?.id ?: -media.id,
+            id = snapshot.selectedListEntry?.id ?: -kotlin.math.abs(media.id),
             mediaId = media.id,
             status = snapshot.trackingStatus,
             progress = progress ?: 0,
@@ -3532,7 +3690,7 @@ class MainViewModel(
                 )
             }
             runCatching {
-                if (snapshot.libraryMode == LibraryMode.LOCAL) {
+                if ((snapshot.libraryMode == LibraryMode.LOCAL || media.anilistId == null)) {
                     aniListDataSource.saveLocalTracking(
                         media = media,
                         status = snapshot.trackingStatus,
@@ -3566,7 +3724,7 @@ class MainViewModel(
                         entry = result.entry,
                         knownCustomLists = result.knownCustomLists,
                         autoSave = autoSave,
-                        successMessage = if (snapshot.libraryMode == LibraryMode.LOCAL) {
+                        successMessage = if ((snapshot.libraryMode == LibraryMode.LOCAL || media.anilistId == null)) {
                             string(R.string.msg_tracking_saved_local)
                         } else {
                             string(R.string.msg_tracking_saved)
@@ -4240,11 +4398,7 @@ class MainViewModel(
             loadAnilistDetails(resolvedItem.media.id)
             loadCachedSourceState(resolvedItem.media.id)
             val chapter = resolvedItem.chapter
-            if (chapter == null) {
-                _state.update {
-                    it.copy(message = string(R.string.msg_chapter_cache_missing, resolvedItem.media.title.userPreferred))
-                }
-            } else {
+            if (chapter != null) {
                 openChapter(chapter)
             }
         }
@@ -4856,6 +5010,10 @@ class MainViewModel(
 
     private fun clearCacheStorage(target: CacheClearTarget) {
         viewModelScope.launch {
+            if (target == CacheClearTarget.NAVIGATION_DATA || target == CacheClearTarget.ALL) {
+                catalogTaxonomyJob?.cancel()
+                catalogTaxonomyJob?.join()
+            }
             _state.update { it.copy(busy = true, message = null) }
             runCatching {
                 cacheStorageDataSource.clear(target)
@@ -5143,10 +5301,7 @@ private fun TankobunUiState.toBrowseCriteria(): BrowseCriteria =
         searchQuery = searchQuery,
         genres = browseGenres,
         tags = browseTags,
-        format = browseFormat,
-        publishingStatus = browsePublishingStatus,
-        countryOfOrigin = browseCountryOfOrigin,
-        year = browseYear,
+        selection = browseSelection,
         staffName = browseStaffName,
         sort = browseSort,
     )
@@ -5161,10 +5316,7 @@ private fun TankobunUiState.withBrowseCriteria(criteria: BrowseCriteria): Tankob
         browseResultsLoadingMore = false,
         browseGenres = criteria.genres,
         browseTags = criteria.tags,
-        browseFormat = criteria.format,
-        browsePublishingStatus = criteria.publishingStatus,
-        browseCountryOfOrigin = criteria.countryOfOrigin,
-        browseYear = criteria.year,
+        browseSelection = criteria.selection,
         browseStaffName = criteria.staffName,
         browseSort = criteria.sort,
         message = null,

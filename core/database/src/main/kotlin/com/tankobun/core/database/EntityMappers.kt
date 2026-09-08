@@ -18,6 +18,9 @@ fun AnilistMedia.toEntity(fetchedAtEpochMillis: Long): AnilistMediaEntity =
     AnilistMediaEntity(
         id = id,
         idMal = idMal,
+        anilistId = anilistId,
+        mangaBakaId = mangaBakaId,
+        mangaBakaTagIds = mangaBakaTagIds,
         titleRomaji = title.romaji,
         titleEnglish = title.english,
         titleNative = title.native,
@@ -50,6 +53,9 @@ fun AnilistMediaEntity.toModel(): AnilistMedia =
     AnilistMedia(
         id = id,
         idMal = idMal,
+        anilistId = anilistId,
+        mangaBakaId = mangaBakaId,
+        mangaBakaTagIds = mangaBakaTagIds,
         title = AnilistTitle(titleRomaji, titleEnglish, titleNative, titleUserPreferred),
         description = description,
         coverImage = coverImage,

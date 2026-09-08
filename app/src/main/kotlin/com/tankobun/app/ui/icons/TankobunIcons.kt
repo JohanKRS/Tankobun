@@ -63,6 +63,7 @@ internal object TankobunIcons {
     val PlayArrow: ImageVector = TablerIcons.PlayerPlay
     val PlaylistRemove: ImageVector = TablerIcons.List
     val Photo: ImageVector = TablerIcons.Photo
+    val OneShot: ImageVector = TablerIcons.FileText
     val Public: ImageVector = TablerIcons.World
     val Refresh: ImageVector = TablerIcons.Refresh
     val Replay: ImageVector = TablerIcons.RotateClockwise
@@ -96,9 +97,9 @@ internal object TankobunIcons {
     val GenreAdventure: ImageVector = TablerIcons.Compass
     val GenreComedy: ImageVector = TablerIcons.MoodHappy
     val GenreDrama: ImageVector = TablerIcons.HeartBroken
-    val GenreEcchi: ImageVector = TablerIcons.Heart
+    val GenreEcchi: ImageVector = TablerIcons.MoodTongue
     val GenreFantasy: ImageVector = TablerIcons.Wand
-    val GenreHentai: ImageVector = TablerIcons.Venus
+    val GenreHentai: ImageVector = TablerIcons.Lock
     val GenreHorror: ImageVector = TablerIcons.Ghost
     val GenreMahouShoujo: ImageVector = TablerIcons.Stars
     val GenreMecha: ImageVector = TablerIcons.SettingsAutomation
@@ -109,6 +110,12 @@ internal object TankobunIcons {
     val GenreSciFi: ImageVector = TablerIcons.Atom
     val GenreSliceOfLife: ImageVector = TablerIcons.Sun
     val GenreSports: ImageVector = TablerIcons.BallFootball
-    val GenreSupernatural: ImageVector = TablerIcons.Ghost
+    val GenreSupernatural: ImageVector = TablerIcons.YinYang
     val GenreThriller: ImageVector = TablerIcons.AlertTriangle
+    val GenreMartialArts: ImageVector = TablerIcons.Karate
+    val GenreBoysLove: ImageVector = TablerIcons.Mars
+    val GenreGirlsLove: ImageVector = TablerIcons.Venus
+    val GenreAdult: ImageVector = TablerIcons.UserExclamation
+    val GenreSmut: ImageVector = TablerIcons.Flame
+    val GenreTragedy: ImageVector = TablerIcons.MoodCry
 }

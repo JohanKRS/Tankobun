@@ -213,7 +213,7 @@ import com.tankobun.app.ui.settings.*
 import com.tankobun.app.ui.shell.*
 
 @Composable
-internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewModel) {
+internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewModel, openRepository: Boolean = false) {
     val context = LocalContext.current
     val chromeInsets = LocalTankobunChromeInsets.current
     var sourceSettingsQuery by remember { mutableStateOf("") }
@@ -306,7 +306,10 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
         requestExtensionUninstall(context, packageName)
     }
 
-    val pagerState = rememberPagerState(pageCount = { 2 })
+    val pagerState = rememberPagerState(initialPage = if (openRepository) 1 else 0, pageCount = { 2 })
+    LaunchedEffect(openRepository) {
+        if (openRepository) pagerState.scrollToPage(1)
+    }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     var sourceHeaderHeightPx by remember { mutableIntStateOf(0) }
@@ -406,6 +409,9 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
             modifier = Modifier.fillMaxSize(),
         ) { page ->
             val listState = rememberLazyListState()
+            LaunchedEffect(openRepository, page) {
+                if (openRepository && page == 1) listState.scrollToItem(0)
+            }
             val pageBottomPadding = if (page == 0) installedBottomPadding else SourceSettingsContentPadding
             val pageContentPadding = PaddingValues(
                 start = SourceSettingsContentPadding,

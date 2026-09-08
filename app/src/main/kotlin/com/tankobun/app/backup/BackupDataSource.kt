@@ -57,9 +57,13 @@ internal class BackupDataSource(
     }
 
     suspend fun saveLocalLibraryBackup(uri: Uri, snapshot: TankobunUiState): Int = withContext(Dispatchers.IO) {
-        val mediaIds = snapshot.libraryItems.map { it.media.id }.toSet()
+        val items = container.database.withTransaction {
+            val media = container.database.mediaDao().libraryMedia().associateBy { it.id }
+            container.database.listEntryDao().cachedEntries().mapNotNull { entry -> media[entry.mediaId]?.let { LibraryItem(it.toModel(), entry.toModel()) } }
+        }
+        val mediaIds = items.map { it.media.id }.toSet()
         val payload = buildTankobunLibraryBackupJson(
-            items = snapshot.libraryItems,
+            items = items,
             scoreFormat = snapshot.anilistScoreFormat,
             titleLanguage = snapshot.anilistTitleLanguage,
             customLists = snapshot.anilistCustomLists,
@@ -76,7 +80,7 @@ internal class BackupDataSource(
             checkNotNull(output) { "Could not open backup destination" }
             output.write(payload.toByteArray(Charsets.UTF_8))
         }
-        snapshot.libraryItems.size
+        items.size
     }
 
     suspend fun restoreLocalLibraryBackup(
@@ -98,19 +102,30 @@ internal class BackupDataSource(
 
     private suspend fun restoreTankobunLibraryBackup(backup: TankobunLibraryBackup): BackupRestoreResult {
         val now = System.currentTimeMillis()
-        val media = backup.items.map { it.media.toEntity(now) }
-        val entries = backup.items.map { item ->
-            item.entry.copy(id = item.entry.id.takeIf { it != 0 } ?: -item.media.id).toEntity(now)
-        }
         container.database.withTransaction {
-            container.database.mediaDao().upsertMedia(media)
-            container.database.listEntryDao().upsertEntries(entries)
-        }
-        backup.items.mapNotNull { it.sourceBinding?.toEntity() }.forEach { binding ->
-            container.database.sourceBindingDao().upsertBinding(binding)
-        }
-        backup.items.flatMap { item -> item.progress.map { it.toEntity() } }.forEach { progress ->
-            container.database.progressDao().upsertProgress(progress)
+            backup.items.forEach { item ->
+                val media = container.catalogIdentity.resolve(item.media)
+                val existing = container.database.listEntryDao().cachedEntry(media.id)
+                // List-entry IDs belong to an account, and cannot safely travel in a backup.
+                val entry = item.entry.copy(mediaId = media.id, id = existing?.id ?: -kotlin.math.abs(media.id))
+                container.database.mediaDao().upsertMedia(media.toEntity(now))
+                container.database.listEntryDao().upsertEntry(entry.toEntity(now))
+                item.sourceBinding?.copy(mediaId = media.id)?.toEntity()?.let { container.database.sourceBindingDao().upsertBinding(it) }
+                item.progress.forEach { progress -> container.database.progressDao().upsertProgress(progress.copy(mediaId = media.id).toEntity()) }
+                // Restored progress must remain pending locally until the connected tracker
+                // accepts it; an older remote snapshot must not undo the restore.
+                container.mangaBakaTracking.changed(entry, scoreFormat = backup.scoreFormat)
+                if (media.anilistId != null) {
+                    val token = container.tokenStore.accessToken()
+                    val mutation = com.tankobun.core.sync.SyncMutationFactory().saveMediaListEntry(
+                        mediaId = media.id, status = entry.status, progress = entry.progress, score = entry.score,
+                        notes = entry.notes, private = entry.private, customLists = entry.customLists,
+                        hiddenFromStatusLists = entry.hiddenFromStatusLists, nowMillis = now,
+                        sessionKey = com.tankobun.core.sync.syncSessionKey(token),
+                    )
+                    container.database.syncMutationDao().upsertMutation(mutation.toEntity())
+                }
+            }
         }
         container.settingsStore.saveAnilistScoreFormat(backup.scoreFormat)
         container.settingsStore.saveAnilistTitleLanguage(backup.titleLanguage)
@@ -148,7 +163,7 @@ internal class BackupDataSource(
                 skipped += 1
             } else {
                 val localEntry = com.tankobun.core.model.AnilistListEntry(
-                    id = -media.id,
+                    id = -kotlin.math.abs(media.id),
                     mediaId = media.id,
                     status = entry.status,
                     progress = entry.progress ?: 0,

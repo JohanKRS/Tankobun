@@ -45,7 +45,17 @@ class RecommendationShareJsonTest {
     @Test
     fun parserRejectsUnsupportedTypeAndVersion() {
         assertInvalid("""{"type":"other","version":1,"items":[{"mediaId":1,"title":{"userPreferred":"A"}}]}""")
-        assertInvalid("""{"type":"tankobun.recommendations","version":2,"items":[{"mediaId":1,"title":{"userPreferred":"A"}}]}""")
+        assertInvalid("""{"type":"tankobun.recommendations","version":999,"items":[{"mediaId":1,"title":{"userPreferred":"A"}}]}""")
+    }
+
+    @Test
+    fun mangaBakaExportCarriesAttributionAndStillRestoresItsIdentity() {
+        val manga = media(-82, "Independent title").copy(anilistId = null, mangaBakaId = 82, mangaBakaTagIds = listOf(29, 45, 515))
+        val text = buildRecommendationShareJson("Picks", listOf(RecommendationShareItem(manga)))
+        val attribution = org.json.JSONObject(text).getJSONObject("attribution")
+        assertEquals("https://creativecommons.org/licenses/by-nc-sa/4.0/", attribution.getString("mangaBakaOriginalDataLicense"))
+        assertEquals("MangaBaka", attribution.getJSONArray("catalogs").getJSONObject(0).getString("name"))
+        assertEquals(manga, parseRecommendationShareJson(text).items.single().media)
     }
 
     @Test
