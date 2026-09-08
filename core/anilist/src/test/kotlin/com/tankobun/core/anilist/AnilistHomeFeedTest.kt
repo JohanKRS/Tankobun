@@ -74,9 +74,31 @@ class AnilistHomeFeedTest {
                 onGenreHighlightsLoaded = { callbackSizes += it.size },
             )
 
-            assertEquals(listOf(22), callbackSizes)
+            assertEquals(listOf(9, 22), callbackSizes)
             assertEquals(genres, feed.genreHighlights.map { it.genre })
             assertEquals(2, server.requestCount)
+        }
+    }
+
+    @Test
+    fun advancesThroughCandidatesAndNeverRepeatsAnExhaustedGenre() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            val first = mediaJson(1, "Action")
+            val next = mediaJson(2, "Adventure")
+            server.enqueue(response("""{"data":{
+                "trending":{"media":[$first]},
+                "genre0Page1":{"media":[$first]},
+                "genre1Page1":{"media":[$first,$next]},
+                "genre2Page1":{"media":[$first,$next]}
+            }}"""))
+            val repository = AnilistRepository(AnilistGraphQlClient(
+                OkHttpClient(), RespectfulRateLimiter(minSpacingMillis = 0L), server.url("/graphql").toString(),
+            ))
+            val feed = repository.homeFeed(listOf("Action", "Adventure", "Comedy"))
+            assertEquals(listOf(1, 2), feed.genreHighlights.map { it.media.id })
+            assertEquals(listOf("Action", "Adventure"), feed.genreHighlights.map { it.genre })
+            assertEquals(1, server.requestCount)
         }
     }
 

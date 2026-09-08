@@ -6,6 +6,8 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.MediaStatus
 import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.SourceChapter
+import com.tankobun.core.model.SourceDescriptor
+import com.tankobun.core.model.SourceManga
 
 internal const val CONTINUE_READING_LIMIT = 10
 
@@ -17,7 +19,7 @@ internal data class RecentReadingMetrics(
 )
 
 internal fun RecentReadingProgress.withCurrentSourceChapters(
-    sourcePackageName: String,
+    sourcePackageName: String?,
     chapters: List<SourceChapter>,
 ): RecentReadingProgress {
     val previousChapter = chapter
@@ -39,6 +41,21 @@ internal fun RecentReadingProgress.withCurrentSourceChapters(
         chapter = currentChapter,
         sourcePackageName = sourcePackageName,
     )
+}
+
+/** History is a resume hint, never a substitute for the current source binding. */
+internal suspend fun RecentReadingProgress.resolveCurrentSource(
+    source: SourceDescriptor?,
+    manga: SourceManga?,
+    boundPackageName: String?,
+    loadChapters: suspend () -> List<SourceChapter>,
+): RecentReadingProgress {
+    if (source?.installed != true || manga == null || manga.url.isBlank() ||
+        source.packageName.isBlank() || source.packageName != boundPackageName || source.id != manga.sourceId
+    ) return withCurrentSourceChapters(boundPackageName, emptyList())
+    return withCurrentSourceChapters(source.packageName, loadChapters().filter {
+        it.sourceId == source.id && it.mangaUrl == manga.url
+    })
 }
 
 internal fun recentReadingMetrics(

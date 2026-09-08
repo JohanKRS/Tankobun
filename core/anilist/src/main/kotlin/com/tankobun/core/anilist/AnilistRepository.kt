@@ -58,7 +58,17 @@ class AnilistRepository(
         includeAdult: Boolean = false,
         onTrendingLoaded: (List<AnilistMedia>) -> Unit = {},
         onGenreHighlightsLoaded: (List<AnilistGenreHighlight>) -> Unit = {},
-    ): AnilistHomeFeed = withContext(Dispatchers.Default) {
+    ): AnilistHomeFeed = homeCandidates(genres, accessToken, includeAdult) { candidates ->
+        onTrendingLoaded(candidates.trending)
+        onGenreHighlightsLoaded(candidates.feed(genres).genreHighlights)
+    }.feed(genres)
+
+    suspend fun homeCandidates(
+        genres: List<String>,
+        accessToken: String? = null,
+        includeAdult: Boolean = false,
+        onLoaded: (com.tankobun.core.model.HomeGenreCandidates) -> Unit = {},
+    ): com.tankobun.core.model.HomeGenreCandidates = withContext(Dispatchers.Default) {
         val variables = buildJsonObject {
             if (!includeAdult) put("isAdult", false)
         }
@@ -69,7 +79,7 @@ class AnilistRepository(
                 graphQlClient.execute(
                     query = AnilistQueries.homeInitial(
                         genres = firstGenreChunk,
-                        perPage = HOME_GENRE_CANDIDATES_PER_PAGE,
+                        perPage = genres.size.coerceIn(3, 50),
                     ),
                     variables = variables,
                     accessToken = accessToken,
@@ -80,41 +90,31 @@ class AnilistRepository(
                     graphQlClient.execute(
                         query = AnilistQueries.homeGenreCandidates(
                             genres = chunk,
-                            perPage = HOME_GENRE_CANDIDATES_PER_PAGE,
+                            perPage = genres.size.coerceIn(3, 50),
                         ),
                         variables = variables,
                         accessToken = accessToken,
                     )
                 }
             }
-            val usedMediaIds = mutableSetOf<Int>()
-            val genreHighlights = mutableListOf<AnilistGenreHighlight>()
+            val candidatesByGenre = linkedMapOf<String, List<AnilistMedia>>()
 
             suspend fun appendHighlights(chunk: List<String>, data: JsonObject) {
                 chunk.forEachIndexed { index, genre ->
-                    val candidates = data.localMediaFromPage("genre${index}Page1")
-                    val selected = candidates.firstOrNull { it.id !in usedMediaIds }
-                        ?: candidates.firstOrNull()
-                        ?: return@forEachIndexed
-                    usedMediaIds += selected.id
-                    genreHighlights += AnilistGenreHighlight(genre = genre, media = selected)
+                    candidatesByGenre[genre] = data.localMediaFromPage("genre${index}Page1")
                 }
             }
 
             val initialData = initialRequest.await()
-            val trending = initialData.localMediaFromPage("trending").also(onTrendingLoaded)
+            val trending = initialData.localMediaFromPage("trending")
             appendHighlights(firstGenreChunk, initialData)
-            if (remainingRequest == null && genreHighlights.isNotEmpty()) {
-                onGenreHighlightsLoaded(genreHighlights.toList())
-            }
+            onLoaded(com.tankobun.core.model.HomeGenreCandidates(trending, candidatesByGenre.toMap()))
 
             remainingRequest?.await()?.let { remainingData ->
                 appendHighlights(remainingGenres, remainingData)
-                if (genreHighlights.isNotEmpty()) {
-                    onGenreHighlightsLoaded(genreHighlights.toList())
-                }
+                onLoaded(com.tankobun.core.model.HomeGenreCandidates(trending, candidatesByGenre.toMap()))
             }
-            AnilistHomeFeed(trending = trending, genreHighlights = genreHighlights)
+            com.tankobun.core.model.HomeGenreCandidates(trending, candidatesByGenre.toMap())
         }
     }
 
@@ -620,7 +620,6 @@ class AnilistRepository(
 
 private const val MANGA_BY_IDS_BATCH_SIZE = 25
 private const val HOME_GENRE_BATCH_SIZE = 9
-private const val HOME_GENRE_CANDIDATES_PER_PAGE = 3
 private const val DEFAULT_RECOMMENDATIONS_PER_PAGE = 18
 
 private fun JsonObject.mediaFromPage(name: String): List<AnilistMedia> =

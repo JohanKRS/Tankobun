@@ -2252,7 +2252,7 @@ class MainViewModel(
                         highlight.copy(media = highlight.media.withFallbackDetails(existingMediaById[highlight.media.id]))
                     },
                 )
-                homeDataSource.saveHomeFeed(stableFeed, includeAdult = includeAdult, mode = mode)
+                homeDataSource.saveHomeFeed(stableFeed, genres = genres, includeAdult = includeAdult, mode = mode)
                 if (_state.value.showNsfwContent == includeAdult && _state.value.catalogMode == mode) {
                     applyHomeFeed(stableFeed)
                 }
@@ -2357,14 +2357,13 @@ class MainViewModel(
         highlights: List<com.tankobun.core.model.AnilistGenreHighlight>,
     ) {
         _state.update { state ->
-            val existingByGenre = state.homeGenreHighlights.associateBy { it.genre }
             val incomingByGenre = highlights.associateBy { it.genre }
             state.copy(
                 homeGenreHighlights = genres.mapNotNull { genre ->
-                    (incomingByGenre[genre] ?: existingByGenre[genre])?.let { highlight ->
+                    incomingByGenre[genre]?.let { highlight ->
                         highlight.copy(media = highlight.media.withTitleLanguage(state.anilistTitleLanguage))
                     }
-                },
+                }.distinctBy { it.media.id },
             ).withHomeGenresRefreshProgress(highlights.mapTo(mutableSetOf()) { it.genre })
         }
     }
@@ -4399,11 +4398,7 @@ class MainViewModel(
             loadAnilistDetails(resolvedItem.media.id)
             loadCachedSourceState(resolvedItem.media.id)
             val chapter = resolvedItem.chapter
-            if (chapter == null) {
-                _state.update {
-                    it.copy(message = string(R.string.msg_chapter_cache_missing, resolvedItem.media.title.userPreferred))
-                }
-            } else {
+            if (chapter != null) {
                 openChapter(chapter)
             }
         }

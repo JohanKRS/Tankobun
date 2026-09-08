@@ -15,7 +15,10 @@ import com.tankobun.core.model.CachePolicy
 internal const val HOME_TRENDING_LIMIT = 5
 
 internal fun AnilistHomeFeed.withHomeTrendingLimit(): AnilistHomeFeed =
-    copy(trending = trending.distinctBy(AnilistMedia::id).take(HOME_TRENDING_LIMIT))
+    copy(
+        trending = trending.distinctBy(AnilistMedia::id).take(HOME_TRENDING_LIMIT),
+        genreHighlights = genreHighlights.distinctBy { it.media.id },
+    )
 
 internal class HomeDataSource(
     private val container: AppContainer,
@@ -55,10 +58,10 @@ internal class HomeDataSource(
         }
         // The fallback can cover only some genres. Its fresh cache is still usable;
         // missing categories must not trigger the same request on every visit.
-        return AnilistHomeFeed(trending = trending, genreHighlights = highlights)
+        return AnilistHomeFeed(trending = trending, genreHighlights = highlights).withHomeTrendingLimit()
     }
 
-    suspend fun saveHomeFeed(feed: AnilistHomeFeed, includeAdult: Boolean, mode: CatalogMode) {
+    suspend fun saveHomeFeed(feed: AnilistHomeFeed, genres: List<String>, includeAdult: Boolean, mode: CatalogMode) {
         val now = System.currentTimeMillis()
         val boundedFeed = feed.withHomeTrendingLimit()
         val media = (boundedFeed.trending + boundedFeed.genreHighlights.map { it.media }).distinctBy(AnilistMedia::id)
@@ -66,6 +69,7 @@ internal class HomeDataSource(
             container.database.mediaDao().upsertMedia(media.map { item -> item.toEntity(now) })
             val resultsByKey = buildMap {
                 put(trendingKey(includeAdult, mode), boundedFeed.trending)
+                genres.forEach { put(genreKey(it, includeAdult, mode), emptyList()) }
                 boundedFeed.genreHighlights.forEach { highlight ->
                     put(genreKey(highlight.genre, includeAdult, mode), listOf(highlight.media))
                 }
@@ -88,10 +92,10 @@ internal class HomeDataSource(
     }
 
     private fun trendingKey(includeAdult: Boolean, mode: CatalogMode): String =
-        "home:v6:${mode.name}:${adultCacheSegment(includeAdult)}:trending"
+        "home:v7:${mode.name}:${adultCacheSegment(includeAdult)}:trending"
 
     private fun genreKey(genre: String, includeAdult: Boolean, mode: CatalogMode): String =
-        "home:v6:${mode.name}:${adultCacheSegment(includeAdult)}:genre:$genre"
+        "home:v7:${mode.name}:${adultCacheSegment(includeAdult)}:genre:$genre"
 
     private fun adultCacheSegment(includeAdult: Boolean): String = if (includeAdult) "nsfw" else "safe"
 }

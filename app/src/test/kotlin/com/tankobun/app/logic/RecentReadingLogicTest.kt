@@ -15,6 +15,49 @@ import org.junit.Test
 
 class RecentReadingLogicTest {
     @Test
+    fun absentOrUnavailableBindingOpensDetailsWithoutConsultingOldSource() = kotlinx.coroutines.runBlocking {
+        val item = com.tankobun.app.state.RecentReadingProgress(
+            media = media("RELEASING"), progress = progress(12f), chapter = chapter(12f), sourcePackageName = "old.package",
+        )
+        val source = com.tankobun.core.model.SourceDescriptor(1L, "Source", "en", "current.package", null, null, false, true)
+        val manga = com.tankobun.core.model.SourceManga(1L, "manga", "Story", null, null, null, null, null)
+        val bindings = listOf(
+            Triple(null, null, null), // Explicitly unlinked, even though history still has a chapter.
+            Triple(null, manga, "current.package"), // Removed or awaiting trust.
+            Triple(source.copy(installed = false), manga, "current.package"),
+            Triple(source, null, "current.package"),
+            Triple(source, manga, "wrong.package"),
+            Triple(source, manga.copy(sourceId = 2L), "current.package"),
+        )
+        for ((currentSource, currentManga, pkg) in bindings) {
+            val resolved = item.resolveCurrentSource(currentSource, currentManga, pkg) { error("Must not load an unavailable source") }
+            assertNull(resolved.chapter)
+            assertEquals(item.progress, resolved.progress)
+            val state = com.tankobun.app.state.TankobunUiState(selectedSourceId = 99L).withRecentProgressOpened(resolved, null)
+            assertEquals(item.media, state.selectedMedia)
+            assertNull(state.selectedSourceId)
+            assertNull(state.activeChapter)
+            assertNull(state.readerError)
+        }
+    }
+
+    @Test
+    fun validBindingResumesCurrentChapterAndRejectsStaleChaptersFromAnotherBinding() = kotlinx.coroutines.runBlocking {
+        val item = com.tankobun.app.state.RecentReadingProgress(
+            media = media("RELEASING"), progress = progress(12f), chapter = chapter(12f), sourcePackageName = "old.package",
+        )
+        val source = com.tankobun.core.model.SourceDescriptor(2L, "Source", "en", "current.package", null, null, false, true)
+        val manga = com.tankobun.core.model.SourceManga(2L, "new-manga", "Story", null, null, null, null, null)
+        val expected = chapter(12f, sourceId = 2L, mangaUrl = "new-manga")
+        val resolved = item.resolveCurrentSource(source, manga, source.packageName) {
+            listOf(chapter(12f), expected, chapter(12f, sourceId = 2L, mangaUrl = "wrong-manga"))
+        }
+        assertEquals(expected, resolved.chapter)
+        assertEquals(source.packageName, resolved.sourcePackageName)
+        assertEquals(item.progress, resolved.progress)
+    }
+
+    @Test
     fun currentSourceReplacesChapterFromOldSourceByChapterNumber() {
         val oldProgress = progress(chapterNumber = 12f)
         val item = com.tankobun.app.state.RecentReadingProgress(

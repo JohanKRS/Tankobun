@@ -13,7 +13,7 @@ import com.tankobun.app.logic.sourceMatchKey
 import com.tankobun.app.logic.sourcePickerDiagnosticDetail
 import com.tankobun.app.logic.sourceSearchQueries
 import com.tankobun.app.logic.sourceSearchRankTitleVariants
-import com.tankobun.app.logic.withCurrentSourceChapters
+import com.tankobun.app.logic.resolveCurrentSource
 import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.core.database.SourceSearchResultEntity
 import com.tankobun.core.database.toEntity
@@ -271,25 +271,23 @@ internal class SourceDataSource(
     ): RecentReadingProgress {
         val cached = cachedSourceState(item.media.id, sources)
         val boundPackageName = cached.boundSource?.packageName ?: cached.boundSourcePackageName
-            ?: return item
         val source = cached.boundSource
         val manga = cached.boundManga
-        if (source == null || manga == null) {
-            return item.withCurrentSourceChapters(boundPackageName, emptyList())
+        return item.resolveCurrentSource(source, manga, boundPackageName) {
+            cached.sourceChapters.ifEmpty {
+                runCatching {
+                    loadChapters(
+                        source = requireNotNull(source),
+                        manga = requireNotNull(manga),
+                        mediaId = item.media.id,
+                        now = now,
+                    ).chapters
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                    Log.w(TAG, "Current source chapter load failed for ${item.media.id}/${source?.name}", error)
+                }.getOrDefault(emptyList())
+            }
         }
-        val chapters = cached.sourceChapters.ifEmpty {
-            runCatching {
-                loadChapters(
-                    source = source,
-                    manga = manga,
-                    mediaId = item.media.id,
-                    now = now,
-                ).chapters
-            }.onFailure { error ->
-                Log.w(TAG, "Current source chapter load failed for ${item.media.id}/${source.name}", error)
-            }.getOrDefault(emptyList())
-        }
-        return item.withCurrentSourceChapters(source.packageName, chapters)
     }
 
     suspend fun searchSourceMatches(
