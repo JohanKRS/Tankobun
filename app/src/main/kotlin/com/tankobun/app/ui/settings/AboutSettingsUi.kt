@@ -1,5 +1,8 @@
 package com.tankobun.app.ui.settings
 
+import androidx.compose.runtime.produceState
+import androidx.compose.material3.AlertDialog
+
 import com.tankobun.app.catalog.*
 import com.tankobun.app.ui.icons.TankobunIcons
 
@@ -233,8 +236,6 @@ internal fun AboutSettingsScreen(
             onOpenMangaBaka = { uriHandler.openUri(MANGA_BAKA_URL) },
             onReplayOnboarding = onReplayOnboarding,
         )
-        AboutNoticeContent()
-        AboutCatalogCredits(onOpenUrl = uriHandler::openUri)
         AppUpdatesContent(
             state = state,
             viewModel = viewModel,
@@ -242,6 +243,8 @@ internal fun AboutSettingsScreen(
             onOpenRelease = { url -> uriHandler.openUri(url) },
         )
         AboutChangelogContent(state = state)
+        AboutNoticeContent()
+        AboutCatalogCredits(onOpenUrl = uriHandler::openUri)
     }
 }
 
@@ -332,6 +335,8 @@ private fun AboutCatalogCredits(onOpenUrl: (String) -> Unit) {
             TextButton(onClick = { onOpenUrl(MANGA_BAKA_TERMS_URL) }) { Text(tankobunString(R.string.about_mangabaka_terms)) }
             TextButton(onClick = { onOpenUrl(MANGA_BAKA_PRIVACY_URL) }) { Text(tankobunString(R.string.about_mangabaka_privacy)) }
         }
+        AboutParagraph(tankobunString(R.string.about_novel_compatibility))
+        NovelRuntimeLicenseButton()
         AboutParagraph(tankobunString(R.string.about_code_license))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             TextButton(onClick = { onOpenUrl("https://github.com/JohanKRS/Tankobun/blob/main/LICENCE.md") }) { Text("MIT") }
@@ -550,3 +555,18 @@ internal fun downloadedAppUpdateInstallIntent(installRequest: AppUpdateInstallRe
     Intent(Intent.ACTION_VIEW)
         .setDataAndType(Uri.parse(installRequest.apkUri), "application/vnd.android.package-archive")
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+@Composable
+private fun NovelRuntimeLicenseButton() {
+    var open by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    TextButton(onClick = { open = true }) { Text(tankobunString(R.string.about_novel_licenses)) }
+    if (open) {
+        val notices by produceState(initialValue = "", context) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { context.assets.open("novel/LICENSES.txt").bufferedReader().use { it.readText() } }
+        }
+        AlertDialog(onDismissRequest = { open = false }, title = { Text(tankobunString(R.string.about_novel_licenses)) },
+            text = { androidx.compose.foundation.text.selection.SelectionContainer { Text(notices, Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), style = MaterialTheme.typography.bodySmall) } },
+            confirmButton = { TextButton(onClick = { open = false }) { Text(tankobunString(R.string.common_close)) } })
+    }
+}

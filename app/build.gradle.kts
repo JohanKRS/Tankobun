@@ -50,6 +50,7 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 49
         versionName = "4.2.1"
+        testInstrumentationRunner = "com.tankobun.app.NovelCompatibilityInstrumentation"
 
         val clientId = configValue("anilistClientId", "ANILIST_CLIENT_ID")
         buildConfigField("String", "ANILIST_CLIENT_ID", "\"$clientId\"")
@@ -80,6 +81,7 @@ android {
     }
 
     buildTypes {
+        debug { applicationIdSuffix = providers.gradleProperty("qaApplicationIdSuffix").orNull }
         release {
             signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
@@ -94,6 +96,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.kotlinx.serialization.json)
     implementation(project(":core:model"))
     implementation(project(":core:network"))
     implementation(project(":core:anilist"))
@@ -107,6 +110,7 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.preference)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)

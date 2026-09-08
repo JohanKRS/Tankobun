@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.media
 
+import com.tankobun.core.model.supports
+
 import com.tankobun.app.ui.icons.TankobunIcons
 
 import android.graphics.Bitmap
@@ -126,7 +128,7 @@ internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewMod
 }
 
 private val TankobunUiState.hasNoInstalledSources: Boolean
-    get() = allInstalledSources.isEmpty() && installedSources.isEmpty() && untrustedExtensions.isEmpty()
+    get() = (allInstalledSources + installedSources).none { selectedMedia?.let(it::supports) != false } && untrustedExtensions.none { selectedMedia?.let(it.descriptor::supports) != false }
 
 @Composable
 private fun SourceSetupCard(onSetupSources: () -> Unit) {
@@ -345,7 +347,7 @@ internal fun PlainSourceIcon(
     val sourceIcon = remember(source?.packageName) {
         source?.packageName?.let { packageName ->
             runCatching {
-                context.packageManager.getApplicationIcon(packageName).toSourceImageBitmap()
+                com.tankobun.core.extensions.ExtensionPackageStore(context).icon(packageName)?.toSourceImageBitmap()
             }.getOrNull()
         }
     }

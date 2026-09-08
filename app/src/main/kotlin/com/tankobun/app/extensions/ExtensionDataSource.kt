@@ -1,5 +1,6 @@
 package com.tankobun.app.extensions
 
+import com.tankobun.core.extensions.readingContentKind
 import android.net.Uri
 import androidx.core.content.FileProvider
 import com.tankobun.app.AppContainer
@@ -27,7 +28,33 @@ internal data class InstalledSourceState(
 internal class ExtensionDataSource(
     private val container: AppContainer,
 ) {
-    private val extensionApkValidator = ExtensionApkValidator(container.application.packageManager)
+    private val extensionApkValidator = ExtensionApkValidator(container.application)
+    private val packages = com.tankobun.core.extensions.ExtensionPackageStore(container.application)
+
+    fun usesAndroidInstaller(packageName: String): Boolean =
+        !packageName.startsWith(com.tankobun.core.extensions.novel.LNREADER_PACKAGE_PREFIX) &&
+            !packages.isPrivate(packageName) && packages.systemPackage(packageName) != null
+
+    suspend fun installPrivateExtension(apkUri: Uri, entry: ExtensionIndexEntry) = withContext(Dispatchers.IO) {
+        // Downloaded APKs already passed repository/package/version/signature checks.
+        val file = File(container.application.cacheDir, "extension_apks/${entry.packageName}-${entry.versionCode}.apk")
+        check(FileProvider.getUriForFile(container.application, "${container.application.packageName}.fileprovider", file) == apkUri)
+        extensionApkValidator.validate(file, entry)
+        packages.installPrivate(file, entry.packageName, entry.versionCode)
+    }
+
+    suspend fun migrateExtension(packageName: String) = withContext(Dispatchers.IO) {
+        val installed = packages.systemPackage(packageName) ?: error("Extension is not installed in Android")
+        val archive = File(requireNotNull(installed.applicationInfo).sourceDir)
+        val expected = ExtensionIndexEntry(packageName, packageName, "", "", installed.longVersionCode.toInt(), installed.versionName.orEmpty())
+        extensionApkValidator.validate(archive, expected)
+        packages.installPrivate(archive, packageName, expected.versionCode)
+        check(packages.isPrivate(packageName)) { "Private extension could not be activated" }
+    }
+
+    suspend fun removePrivateExtension(packageName: String) = withContext(Dispatchers.IO) {
+        check(packages.uninstallPrivate(packageName)) { "Extension could not be removed" }
+    }
 
     suspend fun installedSourceState(
         preferredLanguages: Set<String>,
@@ -44,6 +71,7 @@ internal class ExtensionDataSource(
                         id = source.id,
                         name = source.name,
                         lang = source.lang,
+                        contentKind = source.readingContentKind(),
                     )
                 }
             }.getOrDefault(emptyList()).ifEmpty { listOf(descriptor) }
@@ -70,7 +98,11 @@ internal class ExtensionDataSource(
 
     fun installedExtensionVersion(packageName: String): InstalledExtensionVersion? =
         runCatching {
-            val packageInfo = container.application.packageManager.getPackageInfo(packageName, 0)
+            if (packageName.startsWith(com.tankobun.core.extensions.novel.LNREADER_PACKAGE_PREFIX)) {
+                return@runCatching com.tankobun.core.extensions.novel.LnReaderPluginStore(container.application).record(packageName)?.first
+                    ?.let { InstalledExtensionVersion(it.versionCode, it.version) }
+            }
+            val packageInfo = packages.packageInfo(packageName) ?: return@runCatching null
             InstalledExtensionVersion(
                 versionCode = if (android.os.Build.VERSION.SDK_INT >= 28) {
                     packageInfo.longVersionCode.toInt()

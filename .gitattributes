@@ -1,0 +1,3 @@
+# Generated dependency bundle and upstream notices: preserve literal whitespace.
+core/extensions/src/main/assets/novel/runtime.js linguist-generated=true -whitespace
+core/extensions/src/main/assets/novel/LICENSES.txt linguist-generated=true -whitespace

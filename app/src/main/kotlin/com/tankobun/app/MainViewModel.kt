@@ -1,5 +1,7 @@
 package com.tankobun.app
 
+import com.tankobun.core.model.supports
+
 import com.tankobun.app.backup.BackupDataSource
 import com.tankobun.app.backup.AppSettingsBackupDataSource
 import com.tankobun.app.backup.isDue
@@ -16,6 +18,9 @@ import com.tankobun.app.extensions.ExtensionDataSource
 import com.tankobun.app.extensions.ExtensionApkValidationException
 import com.tankobun.app.extensions.InstalledExtensionVersion
 import com.tankobun.app.logic.CONTINUE_READING_LIMIT
+import com.tankobun.app.logic.ExtensionUpdateResult
+import com.tankobun.app.logic.pendingExtensionUpdates
+import com.tankobun.app.logic.runExtensionUpdates
 import com.tankobun.app.logic.BROWSE_LANDING_SECTION_SIZE
 import com.tankobun.app.logic.BROWSE_MANHWA_CACHE_KEY
 import com.tankobun.app.logic.BROWSE_POPULAR_CACHE_KEY
@@ -239,6 +244,14 @@ class MainViewModel(
     private val cacheStorageDataSource = CacheStorageDataSource(container)
     private val downloadDataSource = DownloadDataSource(container)
     private val extensionDataSource = ExtensionDataSource(container)
+    private var extensionInstallJob: Job? = null
+    private var stopExtensionUpdates = false
+    private data class PendingExtensionInstaller(
+        val request: ExtensionInstallRequest,
+        val result: kotlinx.coroutines.CompletableDeferred<ExtensionUpdateResult>,
+        var reconciling: Boolean = false,
+    )
+    private var pendingExtensionInstaller: PendingExtensionInstaller? = null
     private val appUpdateDataSource = AppUpdateDataSource(container)
     private val readerDataSource = ReaderDataSource(container)
     private var trackingAutoSaveJob: Job? = null
@@ -317,6 +330,8 @@ class MainViewModel(
             onboardingVisible = shouldShowOnboarding(initialOnboardingVersion),
             readerTutorialVisible = !container.settingsStore.readerTutorialCompleted(),
             readerMode = container.settingsStore.readerMode(),
+            novelReaderPreferences = container.settingsStore.novelReaderPreferences(),
+            extensionRepositories = container.settingsStore.extensionRepositories(),
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
             showWebtoonChapterDividers = container.settingsStore.showWebtoonChapterDividers(),
             readerScreenOrientation = container.settingsStore.readerScreenOrientation(),
@@ -905,41 +920,100 @@ class MainViewModel(
         }
     }
 
+    fun removeExtensionRepository(url: String) {
+        val next = container.settingsStore.extensionRepositories() - url
+        container.settingsStore.saveExtensionRepositories(next)
+        if (container.settingsStore.extensionRepositoryUrl() == url) container.settingsStore.saveExtensionRepositoryUrl("")
+        _state.update { it.copy(extensionRepositories = next, availableExtensions = it.availableExtensions.filterNot { entry -> entry.repositoryUrl == url }, extensionRepositoryUrl = it.extensionRepositoryUrl.takeUnless { draft -> draft == url }.orEmpty()) }
+    }
+
     fun refreshExtensionIndex(silent: Boolean = false) {
-        val repositoryUrl = _state.value.extensionRepositoryUrl.trim()
-        if (repositoryUrl.isBlank()) {
-            if (!silent) {
-                _state.update { it.copy(message = string(R.string.msg_paste_repository_first)) }
-            }
+        val draft = _state.value.extensionRepositoryUrl.trim()
+        val repositories = (container.settingsStore.extensionRepositories() + listOfNotNull(draft.takeIf { it.isNotBlank() })).distinct()
+        if (repositories.isEmpty()) {
+            if (!silent) _state.update { it.copy(message = string(R.string.msg_paste_repository_first)) }
             return
         }
         viewModelScope.launch {
-            if (!silent) {
-                _state.update { it.copy(busy = true, message = null) }
+            if (!silent) _state.update { it.copy(busy = true, message = null) }
+            val entries = _state.value.availableExtensions.toMutableList()
+            val saved = container.settingsStore.extensionRepositories().toMutableList()
+            val errors = mutableListOf<String>()
+            var resolvedDraft = draft
+            for (url in repositories) {
+                try {
+                    val result = extensionDataSource.fetchExtensionIndex(url)
+                    if (url == draft) resolvedDraft = result.resolvedIndexUrl
+                    entries.removeAll { it.repositoryUrl == url || it.repositoryUrl == result.resolvedIndexUrl }
+                    entries.addAll(result.entries)
+                    saved.remove(url)
+                    saved.add(result.resolvedIndexUrl)
+                } catch (error: kotlinx.coroutines.CancellationException) { throw error }
+                catch (error: Exception) { errors.add(error.message ?: string(R.string.msg_extension_index_failed)) }
             }
-            runCatching {
-                extensionDataSource.fetchExtensionIndex(repositoryUrl)
-            }.onSuccess { result ->
-                if (result.resolvedIndexUrl != repositoryUrl) {
-                    container.settingsStore.saveExtensionRepositoryUrl(result.resolvedIndexUrl)
+            container.settingsStore.saveExtensionRepositories(saved.distinct())
+            if (_state.value.extensionRepositoryUrl.trim() == draft) container.settingsStore.saveExtensionRepositoryUrl(resolvedDraft)
+            _state.update { it.copy(extensionRepositories = saved.distinct(),
+                extensionRepositoryUrl = if (it.extensionRepositoryUrl.trim() == draft) resolvedDraft else it.extensionRepositoryUrl,
+                availableExtensions = entries.distinctBy { entry -> entry.packageName }, busy = if (silent) it.busy else false,
+                message = if (silent) it.message else errors.firstOrNull() ?: string(R.string.msg_loaded_extensions, entries.size)) }
+        }
+    }
+
+    fun uninstallNovelPlugin(packageName: String) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            com.tankobun.core.extensions.novel.LnReaderPluginStore(container.application).uninstall(packageName)
+            withContext(kotlinx.coroutines.Dispatchers.Main) { refreshInstalledSources() }
+        }
+    }
+
+    fun removePrivateExtension(packageName: String) {
+        if (extensionInstallJob?.isActive == true) return
+        viewModelScope.launch {
+            try {
+                val hasSystemCopy = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    com.tankobun.core.extensions.ExtensionPackageStore(container.application).systemPackage(packageName) != null
                 }
-                _state.update {
-                    it.copy(
-                        extensionRepositoryUrl = result.resolvedIndexUrl,
-                        availableExtensions = result.entries,
-                        busy = if (silent) it.busy else false,
-                        message = if (silent) it.message else string(R.string.msg_loaded_extensions, result.entries.size),
-                    )
+                if (hasSystemCopy) {
+                    _state.update { it.copy(message = string(R.string.sources_remove_android_first)) }
+                    return@launch
                 }
-            }.onFailure { error ->
-                _state.update {
-                    it.copy(
-                        busy = if (silent) it.busy else false,
-                        message = if (silent) it.message else error.message ?: string(R.string.msg_extension_index_failed),
-                    )
-                }
+                extensionDataSource.removePrivateExtension(packageName)
+                container.sourceHost.clearCache(packageName)
+                _state.update { it.copy(message = string(R.string.sources_private_removed)) }
+            } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+            catch (error: Exception) {
+                _state.update { it.copy(message = string(R.string.sources_private_remove_failed)) }
+            } finally { refreshInstalledSources() }
+        }
+    }
+
+    fun migrateExtension(packageName: String) {
+        if (extensionInstallJob?.isActive == true) return
+        extensionInstallJob = viewModelScope.launch {
+            _state.update { it.copy(installingExtensionPackageName = packageName, message = string(R.string.sources_migrating)) }
+            try {
+                extensionDataSource.migrateExtension(packageName)
+                container.sourceHost.clearCache(packageName)
+                _state.update { it.copy(message = string(R.string.sources_migrated)) }
+            } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+            catch (error: Exception) {
+                Log.w(TAG, "Extension migration failed", error)
+                _state.update { it.copy(message = string(R.string.sources_private_failed)) }
+            } finally {
+                _state.update { it.copy(installingExtensionPackageName = null) }
+                refreshInstalledSources()
             }
         }
+    }
+
+    fun requiresAndroidInstaller(packageName: String): Boolean =
+        (_state.value.allInstalledSources + _state.value.untrustedExtensions.map { it.descriptor })
+            .any { it.packageName == packageName && it.hasSystemCopy && !it.isPrivateExtension }
+
+    fun setNovelReaderPreferences(value: com.tankobun.core.model.NovelReaderPreferences) {
+        container.settingsStore.saveNovelReaderPreferences(value)
+        _state.update { it.copy(novelReaderPreferences = value.normalized()) }
     }
 
     fun extensionApkUrl(entry: ExtensionIndexEntry): String =
@@ -950,46 +1024,88 @@ class MainViewModel(
             .takeIf { it.isNotBlank() }
             ?.let { extensionDataSource.extensionIconUrl(it, entry) }
 
-    fun installExtension(entry: ExtensionIndexEntry) {
-        val apkUrl = extensionApkUrl(entry)
-        viewModelScope.launch {
-            _state.update {
-                it.copy(
-                    installingExtensionPackageName = entry.packageName,
-                    extensionInstallRequest = null,
-                    message = string(R.string.msg_downloading_extension, entry.name),
-                )
-            }
-            runCatching {
-                extensionDataSource.downloadExtensionApk(apkUrl, entry)
-            }.onSuccess { apkUri ->
-                _state.update {
-                    it.copy(
-                        installingExtensionPackageName = null,
-                        extensionInstallRequest = ExtensionInstallRequest(
-                            packageName = entry.packageName,
-                            name = entry.name,
-                            apkUri = apkUri.toString(),
-                            expectedVersionCode = entry.versionCode,
-                            expectedVersionName = entry.versionName,
-                        ),
-                        message = string(R.string.msg_ready_to_install_extension, entry.name),
-                    )
+    fun installExtension(entry: ExtensionIndexEntry) = startExtensionInstalls(listOf(entry), batch = false)
+
+    fun updateAllExtensions() {
+        val current = _state.value
+        val updates = pendingExtensionUpdates(current.allInstalledSources + current.untrustedExtensions.map { it.descriptor }, current.availableExtensions)
+        if (updates.isNotEmpty()) startExtensionInstalls(updates, batch = true)
+    }
+
+    fun stopUpdatingExtensions() {
+        stopExtensionUpdates = true
+        _state.update { it.copy(extensionUpdateProgress = it.extensionUpdateProgress?.copy(stopping = true)) }
+    }
+
+    private fun startExtensionInstalls(entries: List<ExtensionIndexEntry>, batch: Boolean) {
+        if (extensionInstallJob?.isActive == true) return
+        stopExtensionUpdates = false
+        extensionInstallJob = viewModelScope.launch {
+            try {
+                val summary = runExtensionUpdates(entries,
+                    shouldStop = { stopExtensionUpdates },
+                    onProgress = { progress ->
+                        if (batch) _state.update { it.copy(extensionUpdateProgress = progress.copy(stopping = stopExtensionUpdates)) }
+                    },
+                    install = { entry -> installOneExtension(entry, onlyUpdate = batch) })
+                if (batch) _state.update {
+                    it.copy(message = string(if (summary.stopped) R.string.extensions_updates_stopped else R.string.extensions_updates_finished,
+                        summary.updated, summary.failed))
                 }
-            }.onFailure { error ->
-                Log.w(TAG, "Extension APK download failed for ${entry.packageName}", error)
-                _state.update {
-                    it.copy(
-                        installingExtensionPackageName = null,
-                        message = if (error is ExtensionApkValidationException) {
-                            string(R.string.msg_extension_package_rejected)
-                        } else {
-                            error.message ?: string(R.string.msg_extension_download_failed)
-                        },
-                    )
-                }
+            } finally {
+                pendingExtensionInstaller = null
+                _state.update { it.copy(installingExtensionPackageName = null, extensionInstallRequest = null, extensionUpdateProgress = null) }
+                refreshInstalledSources()
             }
         }
+    }
+
+    private suspend fun installOneExtension(entry: ExtensionIndexEntry, onlyUpdate: Boolean): ExtensionUpdateResult {
+        // A package may have been updated or removed while an earlier installer was open.
+        if (onlyUpdate) {
+            val installed = withContext(kotlinx.coroutines.Dispatchers.IO) { extensionDataSource.installedExtensionVersion(entry.packageName) }
+            if (installed == null || installed.versionCode >= entry.versionCode) return ExtensionUpdateResult.SKIPPED
+        }
+        _state.update { it.copy(installingExtensionPackageName = entry.packageName, message = string(R.string.msg_downloading_extension, entry.name)) }
+        try {
+            val plugin = entry.lnReaderPlugin
+            if (plugin != null) {
+                com.tankobun.core.extensions.novel.LnReaderPluginStore(container.application).install(plugin, container.okHttpClient, container.application)
+                container.sourceHost.clearCache(entry.packageName)
+                _state.update { it.copy(message = string(R.string.msg_updated_extension, entry.name, plugin.version),
+                    backupMissingSources = it.backupMissingSources.filterNot { missing -> missing.packageName == entry.packageName }) }
+                refreshInstalledSources()
+                return ExtensionUpdateResult.UPDATED
+            }
+            val apkUri = extensionDataSource.downloadExtensionApk(extensionApkUrl(entry), entry)
+            if (!withContext(kotlinx.coroutines.Dispatchers.IO) { extensionDataSource.usesAndroidInstaller(entry.packageName) }) {
+                extensionDataSource.installPrivateExtension(apkUri, entry)
+                container.sourceHost.clearCache(entry.packageName)
+                _state.update { it.copy(message = string(R.string.msg_updated_extension, entry.name, entry.versionName),
+                    backupMissingSources = it.backupMissingSources.filterNot { missing -> missing.packageName == entry.packageName }) }
+                refreshInstalledSources()
+                return ExtensionUpdateResult.UPDATED
+            }
+            val request = ExtensionInstallRequest(entry.packageName, entry.name, apkUri.toString(), entry.versionCode, entry.versionName)
+            val pending = PendingExtensionInstaller(request, kotlinx.coroutines.CompletableDeferred())
+            pendingExtensionInstaller = pending
+            _state.update { it.copy(extensionInstallRequest = request, message = string(R.string.msg_ready_to_install_extension, entry.name)) }
+            return pending.result.await()
+        } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+        catch (error: Exception) {
+            Log.w(TAG, "Extension update failed for ${entry.packageName}", error)
+            _state.update { it.copy(message = if (error is ExtensionApkValidationException) string(R.string.msg_extension_package_rejected)
+                else error.message ?: string(R.string.msg_extension_download_failed)) }
+            return ExtensionUpdateResult.FAILED
+        } finally {
+            pendingExtensionInstaller = null
+            _state.update { it.copy(installingExtensionPackageName = null) }
+        }
+    }
+
+    fun extensionInstallerLaunchFailed() {
+        pendingExtensionInstaller?.result?.complete(ExtensionUpdateResult.FAILED)
+        _state.update { it.copy(extensionInstallRequest = null, message = string(R.string.msg_extension_download_failed)) }
     }
 
     fun requireExtensionInstallPermission() {
@@ -1137,40 +1253,36 @@ class MainViewModel(
         }
     }
 
-    fun refreshInstalledSourcesAfterExtensionInstall(request: ExtensionInstallRequest) {
+    fun onExtensionInstallerResult(resultCode: Int) {
+        // Kept in the ViewModel so rotating the screen cannot lose the in-flight request.
+        val pending = pendingExtensionInstaller ?: return
+        if (pending.reconciling || pending.result.isCompleted) return
+        pending.reconciling = true
         viewModelScope.launch {
-            var installedVersion: InstalledExtensionVersion? = null
-            for (attempt in 0 until 5) {
-                refreshInstalledSources()
-                installedVersion = extensionDataSource.installedExtensionVersion(request.packageName)
-                if ((installedVersion?.versionCode ?: -1) >= request.expectedVersionCode) {
-                    break
+            val request = pending.request
+            var installed: InstalledExtensionVersion? = null
+            repeat(if (resultCode == android.app.Activity.RESULT_CANCELED) 1 else 5) { attempt ->
+                if ((installed?.versionCode ?: -1) < request.expectedVersionCode) {
+                    if (attempt > 0) delay(250L * attempt)
+                    installed = withContext(kotlinx.coroutines.Dispatchers.IO) { extensionDataSource.installedExtensionVersion(request.packageName) }
                 }
-                delay(1_000L * (attempt + 1))
             }
+            val version = installed
+            val updated = (version?.versionCode ?: -1) >= request.expectedVersionCode
+            if (updated) container.sourceHost.clearCache(request.packageName)
+            _state.update { it.copy(
+                backupMissingSources = if (updated) it.backupMissingSources.filterNot { missing -> missing.packageName == request.packageName } else it.backupMissingSources,
+                message = when {
+                    updated -> string(R.string.msg_updated_extension, request.name, version!!.versionName)
+                    version == null -> string(R.string.msg_installer_returned_before_install, request.name)
+                    else -> string(R.string.msg_extension_still_old, request.name, version.versionName)
+                }) }
             refreshInstalledSources()
-            val version = installedVersion
-            val message = when {
-                version == null -> string(R.string.msg_installer_returned_before_install, request.name)
-                version.versionCode >= request.expectedVersionCode -> string(R.string.msg_updated_extension, request.name, version.versionName)
-                else -> string(R.string.msg_extension_still_old, request.name, version.versionName)
-            }
-            _state.update {
-                it.copy(
-                    backupMissingSources = if ((version?.versionCode ?: -1) >= request.expectedVersionCode) {
-                        it.backupMissingSources.filterNot { missing -> missing.packageName == request.packageName }
-                    } else {
-                        it.backupMissingSources
-                    },
-                    message = message,
-                )
-            }
-            if (BuildConfig.DEBUG) {
-                Log.i(
-                    TAG,
-                    "Installer returned for ${request.packageName}; installed=${version?.versionCode}, expected=${request.expectedVersionCode}",
-                )
-            }
+            pending.result.complete(when {
+                updated -> ExtensionUpdateResult.UPDATED
+                resultCode == android.app.Activity.RESULT_CANCELED -> ExtensionUpdateResult.CANCELLED
+                else -> ExtensionUpdateResult.FAILED
+            })
         }
     }
 
@@ -1504,6 +1616,8 @@ class MainViewModel(
                 browseCoverColumns = store.browseCoverColumns(),
                 browseShowWholeCovers = store.browseShowWholeCovers(),
                 readerMode = store.readerMode(),
+                novelReaderPreferences = store.novelReaderPreferences(),
+                extensionRepositories = store.extensionRepositories(),
                 readerPageGapLevel = store.readerPageGapLevel(),
                 showWebtoonChapterDividers = store.showWebtoonChapterDividers(),
                 readerScreenOrientation = store.readerScreenOrientation(),
@@ -3849,7 +3963,7 @@ class MainViewModel(
     private fun loadCachedSourceState(mediaId: Int) {
         viewModelScope.launch {
             val sources = _state.value.allInstalledSources.ifEmpty { _state.value.installedSources }
-            val cached = sourceDataSource.cachedSourceState(mediaId, sources)
+            val cached = sourceDataSource.cachedSourceState(mediaId, sources, _state.value.selectedMedia?.takeIf { it.id == mediaId })
             _state.update {
                 if (it.selectedMedia?.id != mediaId) {
                     it
@@ -3937,6 +4051,7 @@ class MainViewModel(
 
     fun bindSource(source: SourceDescriptor) {
         val media = _state.value.selectedMedia ?: return
+        if (!source.supports(media)) return
         val requestId = beginSourcePickerJob()
         sourcePickerJob = viewModelScope.launch {
             _state.update { it.withSourcePickerSourceSearchStarted(localizedContext(), source) }
@@ -4052,6 +4167,7 @@ class MainViewModel(
 
     fun bindSourceMatch(match: SourceSearchResult) {
         val media = _state.value.selectedMedia ?: return
+        if (!match.source.supports(media)) return
         val requestId = beginSourcePickerJob()
         sourcePickerJob = viewModelScope.launch {
             _state.update { it.withSourcePickerMatchOpening(localizedContext(), match) }

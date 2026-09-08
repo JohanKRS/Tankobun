@@ -46,7 +46,23 @@ class SettingsStore(context: Context) {
         preferences.getString(KEY_EXTENSION_REPOSITORY_URL, "").orEmpty()
 
     fun saveExtensionRepositoryUrl(url: String) {
+        if (!preferences.contains("extension.repositories")) saveExtensionRepositories(listOfNotNull(extensionRepositoryUrl().takeIf { it.isNotBlank() }))
         preferences.edit().putString(KEY_EXTENSION_REPOSITORY_URL, url).apply()
+    }
+
+    fun extensionRepositories(): List<String> {
+        val saved = preferences.getString("extension.repositories", null)
+        return if (saved == null) listOfNotNull(extensionRepositoryUrl().takeIf { it.isNotBlank() })
+        else runCatching { org.json.JSONArray(saved).let { a -> (0 until a.length()).map { a.getString(it) } } }.getOrDefault(emptyList())
+    }
+    fun saveExtensionRepositories(urls: List<String>) {
+        preferences.edit().putString("extension.repositories", org.json.JSONArray(urls.map { it.trim() }.filter { it.isNotBlank() }.distinct()).toString()).apply()
+    }
+    fun novelReaderPreferences(): com.tankobun.core.model.NovelReaderPreferences = runCatching {
+        kotlinx.serialization.json.Json.decodeFromString<com.tankobun.core.model.NovelReaderPreferences>(preferences.getString("reader.novel", "{}").orEmpty()).normalized()
+    }.getOrDefault(com.tankobun.core.model.NovelReaderPreferences())
+    fun saveNovelReaderPreferences(value: com.tankobun.core.model.NovelReaderPreferences) {
+        preferences.edit().putString("reader.novel", kotlinx.serialization.json.Json.encodeToString(com.tankobun.core.model.NovelReaderPreferences.serializer(), value.normalized())).apply()
     }
 
     fun themePreference(): TankobunThemePreference {

@@ -27,6 +27,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.protobuf)
 
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20240303")
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockwebserver)
 }

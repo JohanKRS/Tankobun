@@ -229,6 +229,10 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         )
         return
     }
+    if (state.readerPages.any { it.novelBlock != null }) {
+        NovelReader(state, viewModel)
+        return
+    }
     var controlsVisible by remember { mutableStateOf(false) }
     val transformKey = if (state.readerMode == ReaderMode.WEBTOON) {
         "${state.selectedMedia?.id}:${state.selectedSourceId}:webtoon"

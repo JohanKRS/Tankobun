@@ -61,7 +61,7 @@ class ExtensionIndexRepository(
         if (entry.apkName.startsWith("https://") || entry.apkName.startsWith("http://")) {
             return entry.apkName
         }
-        val uri = URI(indexUrl)
+        val uri = URI(entry.repositoryUrl.ifBlank { indexUrl })
         val indexPath = uri.path.substringBeforeLast('/', "")
         val apkPath = "$indexPath/apk/${entry.apkName}".replace("//", "/")
         return URI(uri.scheme, uri.authority, apkPath, null, null).toString()
@@ -69,7 +69,7 @@ class ExtensionIndexRepository(
 
     fun iconUrl(indexUrl: String, entry: ExtensionIndexEntry): String {
         entry.iconUrl?.takeIf { it.isRemoteUrl() }?.let { return it }
-        val uri = URI(indexUrl)
+        val uri = URI(entry.repositoryUrl.ifBlank { indexUrl })
         val indexPath = uri.path.substringBeforeLast('/', "")
         val iconPath = "$indexPath/icon/${entry.packageName}.png".replace("//", "/")
         return URI(uri.scheme, uri.authority, iconPath, null, null).toString()
@@ -86,8 +86,9 @@ class ExtensionIndexRepository(
 
         return when (payload.firstMeaningfulByte()) {
             JSON_ARRAY_START -> ExtensionIndexResult(
-                entries = json.decodeFromString<List<ExtensionIndexEntry>>(payload.decodeToString()).map { entry ->
-                    entry.copy(repositorySigningKey = repositorySigningKey?.takeIf { it.isNotBlank() })
+                entries = (com.tankobun.core.extensions.novel.parseLnReaderIndex(payload.decodeToString(), indexUrl)
+                    ?: json.decodeFromString<List<ExtensionIndexEntry>>(payload.decodeToString())).map { entry ->
+                    entry.copy(repositorySigningKey = repositorySigningKey?.takeIf { it.isNotBlank() }, repositoryUrl = indexUrl)
                 },
                 resolvedIndexUrl = indexUrl,
             )
@@ -113,7 +114,7 @@ class ExtensionIndexRepository(
             ?.let { listUrl -> decodeV2ExtensionList(resolveUrl(indexUrl, listUrl)) }
             ?: error("Extension repository does not contain an extension list")
         return ExtensionIndexResult(
-            entries = extensionList.toIndexEntries(store.signingKey),
+            entries = extensionList.toIndexEntries(store.signingKey).map { it.copy(repositoryUrl = indexUrl) },
             resolvedIndexUrl = indexUrl,
         )
     }

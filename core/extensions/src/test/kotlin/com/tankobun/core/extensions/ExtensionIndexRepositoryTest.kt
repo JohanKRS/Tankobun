@@ -16,6 +16,24 @@ import java.io.ByteArrayOutputStream
 import java.util.zip.GZIPOutputStream
 
 class ExtensionIndexRepositoryTest {
+    @Test fun lnReaderManifestUsesItsOwnRepositoryForStablePluginIdentity() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(jsonResponse("""[{"id":"fiction","name":"Paper Observatory","site":"https://example.invalid","lang":"English","version":"1.2.3","url":"scripts/fiction.js"}]"""))
+            val url = server.url("/plugins.json").toString()
+            val result = repository().fetchIndex(url)
+            val entry = result.entries.single()
+            assertEquals(url, entry.repositoryUrl)
+            assertEquals("en", entry.lang)
+            assertEquals(server.url("/scripts/fiction.js").toString(), entry.apkName)
+            assertEquals(entry.packageName, entry.lnReaderPlugin!!.packageName)
+        }
+    }
+    @Test fun relativeApkUsesEntryOriginAfterAnotherRepositoryIsAdded() {
+        val entry = ExtensionIndexEntry("Paper", "pkg.paper", "paper.apk", "en", 1, "1", repositoryUrl = "https://one.invalid/index.json")
+        assertEquals("https://one.invalid/apk/paper.apk", repository().apkUrl("https://two.invalid/index.json", entry))
+    }
+
     @Test
     fun legacyUrlMigratesThroughRepositoryMetadataToV2Index() = runTest {
         MockWebServer().use { server ->

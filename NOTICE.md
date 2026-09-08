@@ -3,6 +3,11 @@
 Tankobun includes extension compatibility behavior adapted from, or modeled after,
 the Mihon/Tachiyomi-compatible Android extension host and network layer.
 
+Private APK extension storage and migration follow the community architecture
+documented in Mihon's ExtensionLoader and ExtensionInstaller. Tankobun retains
+original APK identities and uses its own atomic storage and validation integration.
+Reference: https://github.com/mihonapp/mihon/blob/aebf11a74954fd82f81b8bce9f8ac4fc89fa6127/app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionLoader.kt
+
 Upstream projects:
 
 - Mihon: https://github.com/mihonapp/mihon
@@ -61,3 +66,18 @@ See MangaBaka's [data license](https://mangabaka.org/about/data-license),
 
 Tankobun is independent of these providers. Names, marks, data, and images belong
 to their respective owners; attribution does not imply affiliation or endorsement.
+
+## Novel reader compatibility
+
+The independently implemented novel adapter follows LNReader's CommonJS plugin
+contract and the NovelSource text-source API used by community readers. Thanks to
+the LNReader and Tsundoku contributors for documenting these interfaces. No source
+plugin code or source/repository index is bundled with Tankobun.
+
+The JavaScript runtime bundles Cheerio, htmlparser2, dayjs, urlencode,
+@noble/ciphers, protobufjs and their runtime dependencies. Their complete MIT,
+ISC and BSD license notices are included in
+`core/extensions/src/main/assets/novel/LICENSES.txt`, generated from the pinned
+project-local dependency lockfile. The Apache-2.0 notice above also applies to the
+Tachiyomi/NovelSource interface compatibility layer. Build tooling and test-only
+fictional content do not supply reading sources.

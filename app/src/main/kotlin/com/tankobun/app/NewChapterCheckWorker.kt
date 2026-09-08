@@ -1,5 +1,6 @@
 package com.tankobun.app
 
+import com.tankobun.core.extensions.readingContentKind
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -223,6 +224,7 @@ internal class NewChapterChecker(
                 id = source.id,
                 name = source.name,
                 lang = source.lang,
+                contentKind = source.readingContentKind(),
             )
         }
         return null

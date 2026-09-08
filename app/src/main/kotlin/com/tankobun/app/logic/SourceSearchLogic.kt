@@ -1,5 +1,6 @@
 package com.tankobun.app.logic
 
+import com.tankobun.core.model.supports
 import android.content.Context
 import com.tankobun.app.R
 import com.tankobun.app.state.TankobunUiState
@@ -74,6 +75,7 @@ internal fun sourcePickerDefaultSearchTitle(media: AnilistMedia): String =
 
 internal fun TankobunUiState.sourcePickerSources(): List<SourceDescriptor> =
     installedSources
+        .filter { source -> selectedMedia?.let(source::supports) != false }
         .distinctBy { "${it.packageName}:${it.id}" }
         .sortedWith(
             compareBy<SourceDescriptor> {

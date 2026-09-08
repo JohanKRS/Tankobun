@@ -52,6 +52,14 @@ class TachiyomiSourceHost(
 
     private fun loadSourcesLocked(packageName: String): List<Source> {
         ensureHttpAgent()
+        if (packageName.startsWith(com.tankobun.core.extensions.novel.LNREADER_PACKAGE_PREFIX)) {
+            val (plugin, code) = com.tankobun.core.extensions.novel.LnReaderPluginStore(appContext).record(packageName) ?: return emptyList()
+            val key = "LNReader:${plugin.version}:${com.tankobun.core.extensions.novel.digest(code.toByteArray())}"
+            synchronized(sourceCache) {
+                sourceCache[packageName]?.takeIf { it.cacheKey == key }?.let { return it.sources }
+                return listOf(com.tankobun.core.extensions.novel.LnReaderSource(appContext, plugin)).also { sourceCache[packageName] = CachedSources(key, it) }
+            }
+        }
         val packageInfo = packageInfo(packageName) ?: return emptyList()
         // Gate every entrypoint, including background work and cached source instances.
         if (!trustStore.isTrusted(packageInfo)) return emptyList()
@@ -138,6 +146,16 @@ class TachiyomiSourceHost(
         runSourceAction(source, sourceInstance, "pages") {
             val sourceChapter = chapter.toSChapter()
             val pages = sourceInstance.getPageList(sourceChapter)
+            if (source.contentKind == com.tankobun.core.model.ReadingContentKind.NOVEL) {
+                check(sourceInstance.readingContentKind() == com.tankobun.core.model.ReadingContentKind.NOVEL)
+                val html = pages.joinToStringText { page ->
+                    if (sourceInstance is eu.kanade.tachiyomi.source.NovelSource) sourceInstance.fetchPageText(page)
+                    else sourceInstance.fetchPageText(page)
+                }
+                val textHeaders = (sourceInstance as? HttpSource)?.headers?.toMap().orEmpty()
+                val base = (sourceInstance as? HttpSource)?.getChapterUrl(sourceChapter) ?: chapter.url
+                return@runSourceAction com.tankobun.core.extensions.novel.NovelDocument.parse(html, base, textHeaders)
+            }
             val headers = (sourceInstance as? HttpSource)?.headers?.let { values ->
                 values.names().associateWith { values[it].orEmpty() }
             }.orEmpty()
@@ -153,6 +171,7 @@ class TachiyomiSourceHost(
         maxAttempts: Int = SOURCE_IMAGE_RETRY_ATTEMPTS,
     ): ByteArray = withContext(Dispatchers.IO) {
         val sourceInstance = findSource(source) ?: error("Source is not installed")
+        if (sourceInstance is com.tankobun.core.extensions.novel.LnReaderSource) sourceInstance.ensureImageHeaders()
         page.sourcePageUri?.takeIf { it.isLocalPageUri() }?.let { uri ->
             return@withContext runInterruptible {
                 appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() }
@@ -263,7 +282,8 @@ class TachiyomiSourceHost(
         val classLoader = PathClassLoader(appInfo.sourceDir, appContext.classLoader)
         val metadata = appInfo.metaData
 
-        val declared = metadata?.getString("tachiyomi.extension.class")
+        val declared = (metadata?.getString("tachiyomi.extension.class")
+            ?: metadata?.getString("tachiyomi.novelextension.class"))
             ?.split(';', ',')
             ?.map { it.trim() }
             ?.filter { it.isNotBlank() }
@@ -287,7 +307,7 @@ class TachiyomiSourceHost(
     private fun packageInfo(packageName: String): PackageInfo? =
         runCatching {
             @Suppress("DEPRECATION")
-            appContext.packageManager.getPackageInfo(packageName, EXTENSION_PACKAGE_FLAGS)
+            ExtensionPackageStore(appContext).packageInfo(packageName)
         }.onFailure { error ->
             logSourceFailure(
                 action = "packageInfo",
@@ -439,3 +459,7 @@ internal fun String.toFullyQualifiedSourceClassName(packageName: String): String
         '.' in this -> this
         else -> "$packageName.$this"
     }
+
+private suspend fun List<Page>.joinToStringText(fetch: suspend (Page) -> String): String = buildString {
+    for (page in this@joinToStringText) { append(fetch(page)); append("<hr>") }
+}

@@ -15,6 +15,8 @@ import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.reader.ReaderProgressCalculator
 import com.tankobun.core.reader.ReaderSession
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -38,16 +40,47 @@ internal class ReaderDataSource(
         mediaId: Int,
         chapter: SourceChapter,
         source: SourceDescriptor?,
-    ): List<ReaderPage> {
+    ): List<ReaderPage> = withContext(Dispatchers.IO) {
         val cachedPages = cachedDownloadedPages(mediaId, chapter)
-        if (cachedPages.isNotEmpty()) return cachedPages
-        if (source == null) return emptyList()
-        return ReaderPageCache.withCachedPaths(
+        if (cachedPages.isNotEmpty()) return@withContext cachedPages
+        if (source == null) return@withContext emptyList()
+        ReaderPageCache.withCachedPaths(
             context = container.application,
             mediaId = mediaId,
             chapter = chapter,
-            pages = container.sourceHost.pages(source, chapter),
+            pages = pagesForSource(mediaId, chapter, source),
         )
+    }
+
+    suspend fun pagesForSource(mediaId: Int, chapter: SourceChapter, source: SourceDescriptor): List<ReaderPage> = withContext(Dispatchers.IO) {
+        if (source.contentKind != com.tankobun.core.model.ReadingContentKind.NOVEL) return@withContext container.sourceHost.pages(source, chapter)
+        val pluginSettings = if (source.packageName.startsWith(com.tankobun.core.extensions.novel.LNREADER_PACKAGE_PREFIX)) {
+            com.tankobun.core.extensions.novel.LnReaderSettingsStore(container.application, source.packageName)
+        } else null
+        var installedVersion: String? = null
+        val contentVersions = container.application.getSharedPreferences("novel_content_versions", 0)
+        val pluginVersion = if (pluginSettings != null) {
+            val store = com.tankobun.core.extensions.novel.LnReaderPluginStore(container.application)
+            // Keep cache-only access possible after an extension is removed.
+            installedVersion = store.record(source.packageName)?.let { store.contentVersion(source.packageName) }
+            ":${installedVersion ?: contentVersions.getString(source.packageName, "legacy")}"
+        } else ""
+        fun cacheKey(revision: Long): ReaderPage {
+            val key = "novel-document:v2$pluginVersion:$revision"
+            return ReaderPage(-1, key, null, sourcePageUrl = key)
+        }
+        val revision = pluginSettings?.revision() ?: 0L
+        val bytes = ReaderPageCache.cachedOrFetch(container.application, mediaId, chapter, cacheKey(revision)) {
+            com.tankobun.core.extensions.novel.NovelDocument.encodePages(container.sourceHost.pages(source, chapter))
+        }.bytes
+        val preparedRevision = pluginSettings?.revision() ?: 0L
+        if (preparedRevision != revision) {
+            // A chapter script may update its own browser storage while preparing this document.
+            ReaderPageCache.cachedOrFetch(container.application, mediaId, chapter, cacheKey(preparedRevision)) { bytes }
+        }
+        val pages = com.tankobun.core.extensions.novel.NovelDocument.decodePages(bytes)
+        installedVersion?.let { contentVersions.edit().putString(source.packageName, it).apply() }
+        pages
     }
 
     private fun prefetchAllowed(): Boolean {
@@ -89,7 +122,7 @@ internal class ReaderDataSource(
         initialDelayMillis: Long,
     ) {
         if (!prefetchAllowed()) return
-        val pagesToCache = pages.filter { it.cachedFilePath == null }
+        val pagesToCache = pages.filter { it.cachedFilePath == null && it.novelBlock == null }
         if (pagesToCache.isEmpty()) return
         if (initialDelayMillis > 0L) {
             delay(initialDelayMillis)
@@ -193,11 +226,15 @@ internal class ReaderDataSource(
             .associateBy { it.chapterUrl }
 
     private suspend fun cachedDownloadedPages(mediaId: Int, chapter: SourceChapter): List<ReaderPage> {
-        container.database.downloadDao().completedForChapter(mediaId, chapter.url) ?: return emptyList()
-        return container.database.downloadPageDao()
-            .pagesForChapter(mediaId, chapter.url)
-            .filter { File(it.filePath).isFile }
-            .map { it.toReaderPage() }
+        val job = container.database.downloadDao().completedForChapter(mediaId, chapter.url) ?: return emptyList()
+        val stored = container.database.downloadPageDao().pagesForChapter(mediaId, chapter.url)
+        if (stored.size != job.pageCount || stored.any { !File(it.filePath).isFile }) return emptyList()
+        return stored.map { entity ->
+                val page = entity.toReaderPage()
+                if (com.tankobun.core.extensions.novel.NovelDocument.isText(page)) {
+                    page.copy(novelBlock = com.tankobun.core.extensions.novel.NovelDocument.decodeBlock(File(entity.filePath).readBytes()))
+                } else page
+            }
     }
 
     private fun orderedCacheWindow(

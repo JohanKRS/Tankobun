@@ -53,7 +53,10 @@ Tankobun is not a content service, content host, extension repository, or manga 
 - Profile dashboard with reading activity, library statistics, genre insights, and achievements.
 - Fourteen color palettes with independent Defined or Rounded component shapes.
 - Manga list browsing, status management, scoring, custom lists, and progress updates.
-- Reader interface with paged and webtoon modes.
+- Reader interface with paged and webtoon modes for manga, and adjustable typography and themes for novels.
+- A shared library, catalog search, and details page for manga and novels. Source matching follows the work’s format.
+- Multiple user-managed extension repositories, including compatible manga/NovelSource APKs and LNReader JavaScript plugins.
+- Update all pending extension updates from the source manager, with sequential installation, progress and a stop control. Updates to APKs still installed in Android use its installer confirmation.
 - Local reading state, caching, and optional offline storage for user-selected sources where permitted by the source and applicable law.
 - Source selection through extensions installed by the user.
 - Complete native Tankobun JSON backups for local and synced libraries, including both catalog identities.
@@ -70,9 +73,24 @@ Tankobun does not include a default extension repository. It does not recommend 
 
 Any source extension used with Tankobun must be added and installed by the user. The user is solely responsible for choosing which extensions, repositories, websites, or services they use, and for making sure their use complies with applicable laws, site terms, publisher rights, and creator rights.
 
-Before loading an installed extension, Tankobun asks the user to trust its package and current signing identity. Existing extensions also need this initial approval; updates signed by the same identity retain it. A changed signer requires a new review. Extensions execute inside Tankobun's process: this approval is not a sandbox or a guarantee that an extension is safe.
+Before loading an installed APK extension, Tankobun asks the user to trust its package and current signing identity. Existing extensions also need this initial approval; updates signed by the same identity retain it. A changed signer requires a new review. Extensions execute inside Tankobun's process: this approval is not a sandbox or a guarantee that an extension is safe.
+
+New extension APKs are stored privately in Tankobun, following the community private-extension approach also used by Mihon. They keep their original package and source IDs but do not become separate Android applications. Installation checks the archive identity, version and signer; updates are committed atomically using immutable, read-only APK paths. Private extensions can be removed inside the reader without `REQUEST_DELETE_PACKAGES`. This reduces the permissions needed; it does not guarantee any particular Google Play Protect classification.
+
+Existing Android-installed extensions remain supported. In **Installed**, the migration action copies an extension into Tankobun without changing library links, reading progress or per-source settings. Once copied, the phone button opens Android app information so the user can uninstall the old Android copy. Other readers may depend on that shared copy. Tankobun does not uninstall Android applications itself. Private APK files are excluded from library/settings backups, which retain source identities and settings for reinstalling later; uninstalling Tankobun or clearing its data also removes its private extensions.
 
 Extensions awaiting approval stay visible in the extension manager. A manga with a saved source shows a review action while keeping its source selection and cached chapter list; approving the extension restores the existing connection.
+
+
+Novel support uses the community LNReader plugin contract and the NovelSource text API. There is no Tankobun-specific source repository format. The same source manager accepts user-entered repository indexes; installing an LNReader plugin stores that selected plugin privately in the app. Installing a plugin authorizes its code to run. Updates keep its source identity; removing a repository does not delete reading progress or installed sources. JavaScript plugins are not automatically installed by restoring a backup.
+
+The novel reader offers serif, sans-serif and monospace fonts, text size, line/paragraph spacing, margins, alignment, five color modes, text selection, text search, chapter selection and precise resume after reflow. Text and illustrations share the reader cache quota and download manager. Library backups retain catalog format, source identity, chapter and text position; settings backups retain typography and repository addresses. Downloaded reading content and plugin executables are not embedded in library/settings backups.
+
+Each installed LNReader plugin has a settings button for its text, switch, select and checkbox options. Its website can be opened inside Tankobun for sign-in; cookies stay in Android's website store, while local/session storage snapshots are scoped to that plugin and the source's origin. Reader requests use the resulting session. Settings backups preserve switches and selection preferences; free-text fields and browser sessions stay on the device because they can contain credentials.
+
+Compatible manga and NovelSource APKs also show a settings button when they implement `ConfigurableSource`. Tankobun hosts their native Android preference screen, retaining switches, lists, multiple selections, text/password fields, sliders, nested screens and extension-defined actions and validation. Changes are saved automatically in the community-standard per-source storage and refresh the loaded source instance. Settings backups include recognized switches, selections and sliders; text fields, credentials and arbitrary plugin storage remain on the device. Only installed, trusted APKs can open these settings.
+
+Custom chapter JavaScript and CSS are downloaded with the selected plugin and stored atomically with integrity hashes. Scripts run against an isolated chapter DOM before native text rendering, caching and downloading; a failing or unfinished script produces an error instead of silently saving incomplete text. Source settings, session changes and plugin updates invalidate the prepared chapter cache. A listed plugin is not a guarantee that its website is reachable or that every authentication flow works. Runtime dependency licenses are bundled in `core/extensions/src/main/assets/novel/LICENSES.txt`. Rebuild the software-only JavaScript runtime with `npm ci && npm test && npm run build` from `tools/novel-runtime`.
 
 Tankobun is only a reader/tracking client. It does not grant permission to access, copy, download, or redistribute any third-party content.
 

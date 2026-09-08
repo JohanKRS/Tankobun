@@ -1235,4 +1235,53 @@
     <string name="catalog_priority_anilist">Prioriza o AniList, com MangaBaka como complemento e alternativa.</string>
     <string name="catalog_priority_mangabaka">Prioriza o MangaBaka, com AniList como complemento e alternativa.</string>
     <string name="catalog_priority_combined">Alterna títulos dos dois catálogos e reúne resultados da mesma obra.</string>
+    <string name="novel_remove_repository" formatted="false">Remover</string>
+    <string name="novel_chapters" formatted="false">Capítulos</string>
+    <string name="novel_chapter_end" formatted="false">Fim do capítulo</string>
+    <string name="novel_appearance" formatted="false">Aparência da leitura</string>
+    <string name="novel_serif" formatted="false">Com serifa</string>
+    <string name="novel_sans" formatted="false">Sem serifa</string>
+    <string name="novel_mono" formatted="false">Monoespaçada</string>
+    <string name="novel_system" formatted="false">Sistema</string>
+    <string name="novel_light" formatted="false">Claro</string>
+    <string name="novel_sepia" formatted="false">Sépia</string>
+    <string name="novel_dark" formatted="false">Escuro</string>
+    <string name="novel_black" formatted="false">Preto</string>
+    <string name="novel_font_size" formatted="false">Tamanho do texto</string>
+    <string name="novel_line_spacing" formatted="false">Entrelinhas (%)</string>
+    <string name="novel_paragraph_spacing" formatted="false">Espaço entre parágrafos</string>
+    <string name="novel_margins" formatted="false">Margens laterais</string>
+    <string name="novel_justify" formatted="false">Justificar texto</string>
+    <string name="novel_keep_awake" formatted="false">Manter tela ligada</string>
+    <string name="about_novel_licenses">Licenças do leitor de novels</string>
+    <string name="about_novel_compatibility">A compatibilidade com fontes de novels segue as APIs da comunidade LNReader e NovelSource. O Tankobun não inclui fontes, conteúdo de leitura ou endereços de repositórios.</string>
+    <string name="novel_read_progress">%1$d%% do capítulo</string>
+    <string name="novel_source_settings">Configurações de %1$s</string>
+    <string name="novel_source_no_settings">Esta extensão não oferece configurações adicionais.</string>
+    <string name="novel_source_website">Abrir site da fonte</string>
+    <string name="novel_source_website_hint">Entre na sua conta no site da fonte, se necessário, e toque em Concluir para voltar ao Tankobun.</string>
+    <string name="novel_source_save">Salvar</string>
+    <string name="novel_source_reload">Recarregar</string>
+    <string name="novel_source_done">Concluir</string>
+    <string name="source_preferences_autosave">As alterações são salvas automaticamente</string>
+    <string name="source_preferences_unavailable">As configurações desta fonte estão indisponíveis. Verifique se a extensão está instalada e autorizada.</string>
+    <string name="extensions_update_all">Atualizar todas (%1$d)</string>
+    <string name="extensions_updates_progress">Atualizando %1$d de %2$d · %3$s</string>
+    <string name="extensions_updates_stop">Parar após esta</string>
+    <string name="extensions_updates_finishing_current">Finalizando a atualização atual…</string>
+    <string name="extensions_updates_finished">Atualizações concluídas: %1$d atualizadas, %2$d falharam.</string>
+    <string name="extensions_updates_stopped">Atualizações interrompidas: %1$d atualizadas, %2$d falharam.</string>
+    <string name="sources_private_location">No Tankobun</string>
+    <string name="sources_remove_private_cd">Remover %1$s do Tankobun</string>
+    <string name="sources_remove_android_copy">Gerenciar cópia Android de %1$s</string>
+    <string name="sources_migrate_cd">Migrar %1$s para o Tankobun</string>
+    <string name="sources_migrate_title">Copiar para o Tankobun</string>
+    <string name="sources_migrate_action">Copiar</string>
+    <string name="sources_migrate_description">Sua biblioteca, progresso e configurações serão mantidos.\n\nApós copiar %1$s, use o ícone de celular para remover o APK do Android. Outros leitores podem precisar dele.</string>
+    <string name="sources_migrating">Copiando extensão para o Tankobun…</string>
+    <string name="sources_migrated">Cópia pronta. Use o ícone de celular para remover o APK do Android.</string>
+    <string name="sources_private_failed">Não foi possível copiar. A extensão atual foi mantida.</string>
+    <string name="sources_private_removed">Extensão removida. Biblioteca, progresso e configurações mantidos.</string>
+    <string name="sources_remove_android_first">Remova primeiro a cópia do Android pelo ícone de celular em Instaladas.</string>
+    <string name="sources_private_remove_failed">Não foi possível remover a extensão.</string>
 </resources>

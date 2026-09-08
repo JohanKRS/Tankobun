@@ -11,9 +11,9 @@ class InstalledExtensionScanner(
 ) {
     fun installedExtensions(): List<SourceDescriptor> {
         val packageManager = context.packageManager
+        val packages = ExtensionPackageStore(context)
         @Suppress("DEPRECATION")
-        return packageManager.getInstalledPackages(EXTENSION_PACKAGE_FLAGS)
-            .filter { it.isExtensionPackage() }
+        return packages.installedPackages()
             .map { pkg ->
                 val appInfo = pkg.applicationInfo
                 val label = appInfo?.loadLabel(packageManager)?.toString()
@@ -31,10 +31,17 @@ class InstalledExtensionScanner(
                         @Suppress("DEPRECATION")
                         pkg.versionCode
                     },
-                    isNsfw = appInfo?.metaData?.extensionBoolean("tachiyomi.extension.nsfw") ?: false,
+                    isNsfw = appInfo?.metaData?.extensionBoolean("tachiyomi.extension.nsfw")
+                        ?: appInfo?.metaData?.extensionBoolean("tachiyomi.novelextension.nsfw") ?: false,
                     installed = true,
+                    contentKind = if (pkg.packageName.startsWith("$NOVEL_EXTENSION_PREFIX.")) {
+                        com.tankobun.core.model.ReadingContentKind.NOVEL
+                    } else com.tankobun.core.model.ReadingContentKind.MANGA,
+                    isPrivateExtension = packages.isPrivate(pkg.packageName),
+                    hasSystemCopy = packages.systemPackage(pkg.packageName) != null,
                 )
             }
+            .plus(com.tankobun.core.extensions.novel.LnReaderPluginStore(context).installed().map { it.descriptor() })
             .sortedWith(compareBy<SourceDescriptor> { it.lang }.thenBy { it.name })
     }
 
@@ -56,7 +63,9 @@ private fun Bundle.extensionBoolean(key: String): Boolean? =
     }
 
 internal fun extensionLanguageFromPackage(packageName: String): String {
-    val extensionPrefix = "${InstalledExtensionScanner.TACHIYOMI_EXTENSION_PREFIX}."
+    val extensionPrefix = if (packageName.startsWith("$NOVEL_EXTENSION_PREFIX.")) {
+        "$NOVEL_EXTENSION_PREFIX."
+    } else "${InstalledExtensionScanner.TACHIYOMI_EXTENSION_PREFIX}."
     return packageName
         .takeIf { it.startsWith(extensionPrefix) }
         ?.removePrefix(extensionPrefix)

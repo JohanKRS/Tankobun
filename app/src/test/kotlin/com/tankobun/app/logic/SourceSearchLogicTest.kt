@@ -14,6 +14,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SourceSearchLogicTest {
+    @Test fun novelAndMangaSourceSearchesStaySeparateEvenWithIdenticalNames() {
+        val manga = source(id = 1, name = "Same site")
+        val novel = source(id = 2, name = "Same site").copy(contentKind = com.tankobun.core.model.ReadingContentKind.NOVEL)
+        val mixed = TankobunUiState(installedSources = listOf(manga, novel), selectedMedia = media(userPreferred = "A story").copy(format = "NOVEL"))
+        assertEquals(listOf(novel), mixed.sourcePickerSources())
+        assertEquals(listOf(manga), mixed.copy(selectedMedia = mixed.selectedMedia!!.copy(format = "MANGA")).sourcePickerSources())
+    }
+
     @Test
     fun buildsSearchQueriesFromTitleVariants() {
         val media = media(

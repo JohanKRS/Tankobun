@@ -1,5 +1,7 @@
 package com.tankobun.app.logic
 
+import com.tankobun.core.model.supports
+
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.app.state.LibraryItem
 import com.tankobun.core.model.AnilistListEntry
@@ -14,13 +16,13 @@ import com.tankobun.core.model.withFallbackDetails
 import java.util.Locale
 
 internal fun TankobunUiState.readerSourceForChapter(chapter: SourceChapter): SourceDescriptor? =
-    installedSources.firstOrNull {
+    (installedSources.firstOrNull {
         it.id == chapter.sourceId && it.packageName == selectedSourcePackageName
     } ?: allInstalledSources.firstOrNull {
         it.id == chapter.sourceId && it.packageName == selectedSourcePackageName
     } ?: installedSources.firstOrNull { it.id == chapter.sourceId }
         ?: allInstalledSources.firstOrNull { it.id == chapter.sourceId }
-        ?: selectedSource?.takeIf { it.id == chapter.sourceId }
+        ?: selectedSource?.takeIf { it.id == chapter.sourceId })?.takeIf { source -> selectedMedia?.let(source::supports) != false }
 
 internal fun TankobunUiState.withAniListTitleLanguage(language: AnilistTitleLanguage): TankobunUiState =
     copy(

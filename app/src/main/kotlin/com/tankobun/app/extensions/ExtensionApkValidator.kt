@@ -31,8 +31,10 @@ internal data class ExtensionApkIdentity(
 )
 
 internal class ExtensionApkValidator(
-    private val packageManager: PackageManager,
+    context: android.content.Context,
 ) {
+    private val packageManager = context.packageManager
+    private val packages = com.tankobun.core.extensions.ExtensionPackageStore(context)
     fun validateIndexEntry(expected: ExtensionIndexEntry) {
         extensionIndexEntryValidationFailure(expected)?.let { failure ->
             throw ExtensionApkValidationException(failure)
@@ -44,7 +46,7 @@ internal class ExtensionApkValidator(
         val downloadedPackage = packageManager.getPackageArchiveInfoCompat(apkFile)
             ?: throw ExtensionApkValidationException(ExtensionApkValidationFailure.INVALID_ARCHIVE)
         val downloadedIdentity = downloadedPackage.toExtensionApkIdentity()
-        val installedSigners = packageManager.installedSignerFingerprints(expected.packageName)
+        val installedSigners = packages.packageInfo(expected.packageName)?.signerFingerprints()
         extensionApkValidationFailure(
             expected = expected,
             downloaded = downloadedIdentity,
@@ -56,7 +58,7 @@ internal class ExtensionApkValidator(
 internal fun extensionIndexEntryValidationFailure(
     expected: ExtensionIndexEntry,
 ): ExtensionApkValidationFailure? =
-    if (!expected.packageName.startsWith("$EXTENSION_PACKAGE_PREFIX.") || expected.versionCode <= 0) {
+    if (!com.tankobun.core.extensions.isSupportedExtensionPackageName(expected.packageName) || expected.versionCode <= 0) {
         ExtensionApkValidationFailure.INVALID_INDEX_ENTRY
     } else {
         null
@@ -115,19 +117,13 @@ private fun PackageManager.getPackageArchiveInfoCompat(apkFile: File): PackageIn
     return getPackageArchiveInfo(apkFile.absolutePath, PACKAGE_INFO_FLAGS)
 }
 
-private fun PackageManager.installedSignerFingerprints(packageName: String): Set<String>? =
-    try {
-        @Suppress("DEPRECATION")
-        getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES).signerFingerprints()
-    } catch (_: PackageManager.NameNotFoundException) {
-        null
-    }
-
 private fun PackageInfo.toExtensionApkIdentity(): ExtensionApkIdentity =
     ExtensionApkIdentity(
         packageName = packageName,
         versionCode = longVersionCode,
-        hasExtensionFeature = reqFeatures.orEmpty().any { feature -> feature.name == EXTENSION_FEATURE },
+        hasExtensionFeature = reqFeatures.orEmpty().any { feature ->
+            feature.name == EXTENSION_FEATURE || feature.name == com.tankobun.core.extensions.NOVEL_EXTENSION_FEATURE
+        },
         signerFingerprints = signerFingerprints(),
     )
 
@@ -152,7 +148,6 @@ private fun Char.isHexDigit(): Boolean =
     this in '0'..'9' || this in 'a'..'f'
 
 private const val EXTENSION_FEATURE = "tachiyomi.extension"
-private const val EXTENSION_PACKAGE_PREFIX = "eu.kanade.tachiyomi.extension"
 private const val SHA_256_HEX_LENGTH = 64
 
 @Suppress("DEPRECATION")
