@@ -19,6 +19,12 @@ class NovelCompatibilityInstrumentation : Instrumentation() {
         val report = Bundle()
         try {
             check(targetContext.packageName.endsWith(".novelqa")) { "Use -PqaApplicationIdSuffix=.novelqa" }
+            if (options.getString("catalogStartup") == "true") {
+                runBlocking { checkCatalogStartup() }
+                report.putString("stream", "PASS: catalog startup priority, fallback and saved preferences\n")
+                finish(-1, report)
+                return
+            }
             if (options.getString("repositories") == "true") {
                 runBlocking { checkRepositoryManagement() }
                 report.putString("stream", "PASS: repository management contract\n")

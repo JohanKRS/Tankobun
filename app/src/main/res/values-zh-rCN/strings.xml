@@ -736,9 +736,9 @@
     <string name="about_sources">来源和扩展均为第三方。Tankobun 只与兼容的扩展格式和用户本地配置配合使用。</string>
 
     <string name="sources_empty_installed">未找到已安装的 Tachiyomi 兼容来源扩展。</string>
-    <string name="sources_empty_installed_filter">没有已安装来源符合此搜索和语言筛选。</string>
+    <string name="sources_empty_installed_filter">没有已安装来源符合当前筛选条件。</string>
     <string name="sources_empty_repository">加载仓库索引以浏览可安装扩展。</string>
-    <string name="sources_empty_repository_filter">没有仓库扩展符合此搜索和语言筛选。</string>
+    <string name="sources_empty_repository_filter">没有扩展符合当前筛选条件。</string>
     <string name="sources_header">来源扩展</string>
     <string name="sources_active_installed_count">%1$d 个启用 / %2$d 个已安装</string>
     <string name="sources_search_installed">搜索已安装来源</string>
@@ -1289,4 +1289,9 @@
     <string name="sources_remove_repository">移除仓库 %1$d</string>
     <string name="sources_repository_added">已添加仓库。</string>
     <string name="sources_no_repository_extensions">已添加的仓库中没有可用扩展。</string>
+    <string name="sources_rename_repository">重命名仓库</string>
+    <string name="sources_repository_name">名称</string>
+    <string name="sources_repository_name_automatic">留空则使用自动名称。</string>
+    <string name="sources_hide_repository">隐藏 %1$s 中的扩展</string>
+    <string name="sources_show_repository">显示 %1$s 中的扩展</string>
 </resources>

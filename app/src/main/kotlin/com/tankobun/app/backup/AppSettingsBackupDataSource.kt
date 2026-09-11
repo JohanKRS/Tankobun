@@ -146,6 +146,8 @@ internal class AppSettingsBackupDataSource(
         JSONObject()
             .put("extensionRepositoryUrl", snapshot.extensionRepositoryUrl)
             .put("extensionRepositories", org.json.JSONArray(snapshot.extensionRepositories))
+            .put("extensionRepositoryNames", JSONObject(snapshot.extensionRepositoryNames))
+            .put("hiddenExtensionRepositories", snapshot.hiddenExtensionRepositories.sorted().toJsonArray())
             .put("novelPluginPreferences", novelPluginPreferences(snapshot))
             .put("apkSourcePreferences", com.tankobun.core.extensions.SourcePreferenceStore(container.application).backup())
             .put("sourceLanguages", snapshot.sourceLanguages.sorted().toJsonArray())
@@ -302,6 +304,8 @@ internal class AppSettingsBackupDataSource(
             readerMode = store.readerMode(),
             novelReaderPreferences = store.novelReaderPreferences(),
             extensionRepositories = store.extensionRepositories(),
+            extensionRepositoryNames = store.extensionRepositoryNames(),
+            hiddenExtensionRepositories = store.hiddenExtensionRepositories(),
             readerPageGapLevel = store.readerPageGapLevel(),
             showWebtoonChapterDividers = store.showWebtoonChapterDividers(),
             readerScreenOrientation = store.readerScreenOrientation(),
@@ -350,6 +354,13 @@ internal class AppSettingsBackupDataSource(
         val repositories = sources.optJSONArray("extensionRepositories")
         if (repositories != null) store.saveExtensionRepositories((0 until repositories.length()).map { repositories.getString(it) })
         else if (sources.has("extensionRepositoryUrl")) store.saveExtensionRepositories(listOfNotNull(sources.optStringOrNull("extensionRepositoryUrl")?.takeIf { it.isNotBlank() }))
+        sources.optJSONObject("extensionRepositoryNames")?.let { names ->
+            store.saveExtensionRepositoryNames(names.keys().asSequence()
+                .mapNotNull { url -> (names.opt(url) as? String)?.let { url to it } }.toMap())
+        }
+        sources.optJSONArray("hiddenExtensionRepositories")?.let { hidden ->
+            store.saveHiddenExtensionRepositories(hidden.stringValues().toSet())
+        }
         val languages = sources.optJSONArray("sourceLanguages")
             ?.stringValues()
             ?.map { it.trim().lowercase().replace('_', '-') }

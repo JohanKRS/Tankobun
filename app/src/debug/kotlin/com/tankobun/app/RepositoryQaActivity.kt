@@ -32,6 +32,9 @@ class RepositoryQaActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         check(packageName.endsWith(".novelqa"))
         val container = (application as TankobunApplication).container
+        if (intent.getBooleanExtra("filterFixture", false)) {
+            container.settingsStore.saveExtensionRepositories(repositoryFilterQaUrls())
+        }
         val client = OkHttpClient.Builder().addInterceptor { chain ->
             val path = chain.request().url.encodedPath
             if (path.endsWith(".json")) requests.add(path)
@@ -39,6 +42,7 @@ class RepositoryQaActivity : ComponentActivity() {
             val body = when (path) {
                 "/alias.json" -> """{"index_v2":"/panels/index.json"}"""
                 "/panels/index.json", "/slow/index.json" -> """[{"name":"Paper Panels","pkg":"eu.kanade.tachiyomi.extension.en.repositoryqa","apk":"paper.apk","lang":"en","code":1,"version":"1.0"}]"""
+                "/mirror/index.json" -> """[{"name":"Paper Panels","pkg":"eu.kanade.tachiyomi.extension.en.repositoryqa","apk":"mirror.apk","lang":"en","code":2,"version":"2.0"}]"""
                 "/novels/index.json" -> """[{"id":"repositoryqa","name":"Paper Words","site":"https://example.invalid","lang":"English","version":"1.0.0","url":"scripts/paper.js"}]"""
                 else -> null
             }
@@ -62,7 +66,10 @@ class RepositoryQaActivity : ComponentActivity() {
         setContent {
             val state by model.state.collectAsStateWithLifecycle()
             TankobunTheme(SettingsStore(this).themePreference()) {
-                Surface(Modifier.fillMaxSize().safeDrawingPadding()) { SourcesSettingsScreen(state, model, openRepository = true) }
+                Surface(Modifier.fillMaxSize().safeDrawingPadding()) {
+                    SourcesSettingsScreen(if (intent.getBooleanExtra("filterFixture", false)) repositoryFilterQaState(state) else state,
+                        model, openRepository = true)
+                }
             }
         }
     }

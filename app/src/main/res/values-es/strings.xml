@@ -729,9 +729,9 @@
     <string name="about_sources">Las fuentes y extensiones son de terceros. Tankobun solo funciona con formatos de extensión compatibles y configuración local del usuario.</string>
 
     <string name="sources_empty_installed">No se encontraron extensiones de fuentes compatibles con Tachiyomi instaladas.</string>
-    <string name="sources_empty_installed_filter">Ninguna fuente instalada coincide con esta búsqueda y filtro de idioma.</string>
+    <string name="sources_empty_installed_filter">Ninguna fuente instalada coincide con los filtros actuales.</string>
     <string name="sources_empty_repository">Carga un índice de repositorio para explorar extensiones instalables.</string>
-    <string name="sources_empty_repository_filter">Ninguna extensión del repositorio coincide con esta búsqueda y filtro de idioma.</string>
+    <string name="sources_empty_repository_filter">Ninguna extensión coincide con los filtros actuales.</string>
     <string name="sources_header">Extensiones de fuentes</string>
     <string name="sources_active_installed_count">%1$d activas / %2$d instaladas</string>
     <string name="sources_search_installed">Buscar fuentes instaladas</string>
@@ -1291,4 +1291,9 @@
     <string name="sources_remove_repository">Quitar repositorio %1$d</string>
     <string name="sources_repository_added">Repositorio agregado.</string>
     <string name="sources_no_repository_extensions">No hay extensiones disponibles en los repositorios agregados.</string>
+    <string name="sources_rename_repository">Renombrar repositorio</string>
+    <string name="sources_repository_name">Nombre</string>
+    <string name="sources_repository_name_automatic">Déjalo vacío para usar el nombre automático.</string>
+    <string name="sources_hide_repository">Ocultar extensiones de %1$s</string>
+    <string name="sources_show_repository">Mostrar extensiones de %1$s</string>
 </resources>

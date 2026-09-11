@@ -20,6 +20,7 @@ import com.tankobun.app.extensions.InstalledExtensionVersion
 import com.tankobun.app.logic.CONTINUE_READING_LIMIT
 import com.tankobun.app.logic.ExtensionUpdateResult
 import com.tankobun.app.logic.pendingExtensionUpdates
+import com.tankobun.app.logic.latestExtensionsPerRepository
 import com.tankobun.app.logic.runExtensionUpdates
 import com.tankobun.app.logic.BROWSE_LANDING_SECTION_SIZE
 import com.tankobun.app.logic.BROWSE_MANHWA_CACHE_KEY
@@ -333,6 +334,8 @@ class MainViewModel(
             readerMode = container.settingsStore.readerMode(),
             novelReaderPreferences = container.settingsStore.novelReaderPreferences(),
             extensionRepositories = container.settingsStore.extensionRepositories(),
+            extensionRepositoryNames = container.settingsStore.extensionRepositoryNames(),
+            hiddenExtensionRepositories = container.settingsStore.hiddenExtensionRepositories(),
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
             showWebtoonChapterDividers = container.settingsStore.showWebtoonChapterDividers(),
             readerScreenOrientation = container.settingsStore.readerScreenOrientation(),
@@ -927,7 +930,25 @@ class MainViewModel(
         val draft = _state.value.extensionRepositoryUrl.takeUnless { it.trim() == url }.orEmpty()
         container.settingsStore.saveExtensionRepositories(next)
         container.settingsStore.saveExtensionRepositoryUrl(draft)
-        _state.update { it.copy(extensionRepositories = next, availableExtensions = it.availableExtensions.filterNot { entry -> entry.repositoryUrl == url }, extensionRepositoryUrl = draft) }
+        _state.update { it.copy(extensionRepositories = next, extensionRepositoryNames = container.settingsStore.extensionRepositoryNames(),
+            hiddenExtensionRepositories = container.settingsStore.hiddenExtensionRepositories(),
+            availableExtensions = it.availableExtensions.filterNot { entry -> entry.repositoryUrl == url }, extensionRepositoryUrl = draft) }
+    }
+
+    fun renameExtensionRepository(url: String, name: String) {
+        if (extensionRepositoryJob?.isActive == true || url !in _state.value.extensionRepositories) return
+        val store = container.settingsStore
+        store.saveExtensionRepositoryNames(store.extensionRepositoryNames() + (url to name))
+        _state.update { it.copy(extensionRepositoryNames = store.extensionRepositoryNames()) }
+    }
+
+    fun setExtensionRepositoryVisible(url: String, visible: Boolean) {
+        if (extensionRepositoryJob?.isActive == true || url !in _state.value.extensionRepositories) return
+        val store = container.settingsStore
+        val hidden = store.hiddenExtensionRepositories()
+        store.saveHiddenExtensionRepositories(if (visible) hidden - url else hidden + url)
+        // List visibility is independent from enabled sources, reading bindings and update checks.
+        _state.update { it.copy(hiddenExtensionRepositories = store.hiddenExtensionRepositories()) }
     }
 
     fun addExtensionRepository() {
@@ -947,6 +968,8 @@ class MainViewModel(
             try {
                 val entries = _state.value.availableExtensions.toMutableList()
                 val saved = container.settingsStore.extensionRepositories().toMutableList()
+                val names = container.settingsStore.extensionRepositoryNames().toMutableMap()
+                val hidden = container.settingsStore.hiddenExtensionRepositories().toMutableSet()
                 val errors = mutableListOf<String>()
                 var added = false
                 for (url in repositories) {
@@ -957,15 +980,21 @@ class MainViewModel(
                         entries.addAll(result.entries)
                         saved.remove(url)
                         saved.add(result.resolvedIndexUrl)
+                        if (url != result.resolvedIndexUrl) names.remove(url)?.let { names.putIfAbsent(result.resolvedIndexUrl, it) }
+                        if (url != result.resolvedIndexUrl && hidden.remove(url)) hidden.add(result.resolvedIndexUrl)
                     } catch (error: kotlinx.coroutines.CancellationException) { throw error }
                     catch (error: Exception) { errors.add(error.message ?: string(R.string.msg_extension_index_failed)) }
                 }
                 container.settingsStore.saveExtensionRepositories(saved.distinct())
+                container.settingsStore.saveExtensionRepositoryNames(names)
+                container.settingsStore.saveHiddenExtensionRepositories(hidden)
                 val clearDraft = added && _state.value.extensionRepositoryUrl.trim() == submittedDraft
                 if (clearDraft) container.settingsStore.saveExtensionRepositoryUrl("")
                 _state.update { it.copy(extensionRepositories = saved.distinct(),
+                    extensionRepositoryNames = container.settingsStore.extensionRepositoryNames(),
+                    hiddenExtensionRepositories = container.settingsStore.hiddenExtensionRepositories(),
                     extensionRepositoryUrl = if (clearDraft) "" else it.extensionRepositoryUrl,
-                    availableExtensions = entries.distinctBy { entry -> entry.packageName },
+                    availableExtensions = latestExtensionsPerRepository(entries),
                     message = if (silent) it.message else errors.firstOrNull() ?: if (added) string(R.string.sources_repository_added) else string(R.string.msg_loaded_extensions, entries.size)) }
             } finally {
                 _state.update { it.copy(extensionRepositoryLoading = false) }
@@ -1629,6 +1658,8 @@ class MainViewModel(
                 readerMode = store.readerMode(),
                 novelReaderPreferences = store.novelReaderPreferences(),
                 extensionRepositories = store.extensionRepositories(),
+                extensionRepositoryNames = store.extensionRepositoryNames(),
+                hiddenExtensionRepositories = store.hiddenExtensionRepositories(),
                 readerPageGapLevel = store.readerPageGapLevel(),
                 showWebtoonChapterDividers = store.showWebtoonChapterDividers(),
                 readerScreenOrientation = store.readerScreenOrientation(),

@@ -123,6 +123,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
@@ -216,7 +217,23 @@ import com.tankobun.app.ui.shell.*
 internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewModel, openRepository: Boolean = false) {
     val context = LocalContext.current
     val chromeInsets = LocalTankobunChromeInsets.current
-    var sourceSettingsQuery by remember { mutableStateOf("") }
+    var sourceSettingsQuery by rememberSaveable { mutableStateOf("") }
+    var editingRepository by rememberSaveable { mutableStateOf<String?>(null) }
+    val repositories = remember(state.extensionRepositories, state.availableExtensions, state.extensionRepositoryNames) {
+        sourceRepositoryOptions(state.extensionRepositories + state.availableExtensions.map { it.repositoryUrl }, state.extensionRepositoryNames)
+    }
+    val repositoriesByPackage = remember(state.availableExtensions) {
+        sourceRepositoriesByPackage(state.availableExtensions)
+    }
+    val repositoryNames = remember(repositories) { repositories.associate { it.url to it.name } }
+    editingRepository?.takeIf { it in state.extensionRepositories }?.let { url ->
+        SourceRepositoryNameDialog(
+            currentName = state.extensionRepositoryNames[url].orEmpty(),
+            automaticName = sourceRepositoryOptions(listOf(url)).single().name,
+            onDismiss = { editingRepository = null },
+            onSave = { name -> viewModel.renameExtensionRepository(url, name); editingRepository = null },
+        )
+    }
     val installLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         viewModel.onExtensionInstallerResult(result.resultCode)
     }
@@ -245,10 +262,13 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
     val normalizedSourceSettingsQuery = remember(sourceSettingsQuery) {
         sourceSettingsQuery.trim().lowercase(Locale.ROOT)
     }
-    val pendingReviews = remember(state.untrustedExtensions, repositoryByPackage, normalizedSourceSettingsQuery) {
+    val searchablePendingReviews = remember(state.untrustedExtensions, repositoryByPackage, normalizedSourceSettingsQuery) {
         state.untrustedExtensions.filter { candidate ->
             candidate.descriptor.matchesSourceSettingsQuery(normalizedSourceSettingsQuery, repositoryByPackage[candidate.descriptor.packageName])
         }.sortedBy { it.descriptor.name.extensionDisplayName().lowercase(Locale.ROOT) }
+    }
+    val pendingReviews = remember(searchablePendingReviews, state.hiddenExtensionRepositories, repositoriesByPackage) {
+        searchablePendingReviews.filter { sourceRepositoryVisible(repositoriesByPackage[it.descriptor.packageName].orEmpty(), state.hiddenExtensionRepositories) }
     }
     val installedSourceSearchIndex = remember(
         state.allInstalledSources,
@@ -263,7 +283,7 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
             .filter { (_, searchText) -> searchText.contains(normalizedSourceSettingsQuery) }
             .map { (source, _) -> source }
     }
-    val visibleInstalledSourceList = remember(
+    val languageFilteredInstalledSources = remember(
         searchableInstalledSources,
         state.sourceLanguages,
     ) {
@@ -271,6 +291,9 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
             val language = source.lang.normalizedSourceLanguage()
             language in state.sourceLanguages || language == UNIVERSAL_SOURCE_LANGUAGE
         }
+    }
+    val visibleInstalledSourceList = remember(languageFilteredInstalledSources, state.hiddenExtensionRepositories, repositoriesByPackage) {
+        languageFilteredInstalledSources.filter { sourceRepositoryVisible(repositoriesByPackage[it.packageName].orEmpty(), state.hiddenExtensionRepositories) }
     }
     val sourceGroups = remember(visibleInstalledSourceList) {
         visibleInstalledSourceList
@@ -307,7 +330,9 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
             language in state.sourceLanguages || language == UNIVERSAL_SOURCE_LANGUAGE
         }
     }
-    val visibleRepositoryEntries = activeRepositoryEntries
+    val visibleRepositoryEntries = remember(activeRepositoryEntries, state.hiddenExtensionRepositories) {
+        visibleRepositoryExtensions(activeRepositoryEntries, state.hiddenExtensionRepositories)
+    }
     val launchUninstall: (String) -> Unit = { packageName ->
         if (packageName.startsWith(com.tankobun.core.extensions.novel.LNREADER_PACKAGE_PREFIX)) viewModel.uninstallNovelPlugin(packageName)
         else if (installedByPackage[packageName]?.any { it.isPrivateExtension } == true) viewModel.removePrivateExtension(packageName)
@@ -532,6 +557,10 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                         }
                         itemsIndexed(state.extensionRepositories, key = { _, url -> "repo:$url" }) { index, url ->
                             SourceRepositoryRow(index + 1, url, enabled = !state.extensionRepositoryLoading,
+                                visible = url !in state.hiddenExtensionRepositories,
+                                name = repositoryNames[url],
+                                onVisibilityChange = { viewModel.setExtensionRepositoryVisible(url, it) },
+                                onRename = { editingRepository = url },
                                 onRemove = { viewModel.removeExtensionRepository(url) })
                         }
                     }
@@ -551,7 +580,7 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                                 TankobunEmptyState(title = tankobunString(R.string.sources_empty_repository_filter))
                             }
                         }
-                        items(visibleRepositoryEntries, key = { "${it.packageName}:${it.versionCode}" }) { extension ->
+                        items(visibleRepositoryEntries, key = { "${it.repositoryUrl}:${it.packageName}:${it.versionCode}" }) { extension ->
                             ExtensionRepositoryRow(
                                 extension = extension,
                                 installedSources = installedByPackage[extension.packageName].orEmpty(),
@@ -579,7 +608,7 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
             ) {
                 Spacer(Modifier.height(SourceSettingsContentPadding))
                 SourceSettingsHeader(
-                    activeInstalledCount = state.installedSources.size,
+                    activeInstalledCount = visibleInstalledSourceList.count { state.sourceActive(it) },
                     visibleInstalledCount = visibleInstalledSourceList.size + pendingReviews.size,
                     query = sourceSettingsQuery,
                     selectedTab = currentPage,
@@ -902,7 +931,7 @@ internal fun ExtensionRepositoryRow(
     ) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val compact = maxWidth < 520.dp
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 ExtensionRowIdentity(
                     packageName = installedSources.firstOrNull()?.packageName,

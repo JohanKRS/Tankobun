@@ -92,6 +92,8 @@ internal object TankobunIcons {
     val ViewStream: ImageVector = TablerIcons.LayoutList
     val Whatshot: ImageVector = TablerIcons.Flame
     val Menu: ImageVector = TablerIcons.Menu2
+    val Visibility: ImageVector = TablerIcons.Eye
+    val VisibilityOff: ImageVector = TablerIcons.EyeOff
 
     val GenreAction: ImageVector = TablerIcons.Bolt
     val GenreAdventure: ImageVector = TablerIcons.Compass

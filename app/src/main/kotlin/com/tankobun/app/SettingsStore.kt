@@ -59,7 +59,26 @@ class SettingsStore(context: Context) {
         else runCatching { org.json.JSONArray(saved).let { a -> (0 until a.length()).map { a.getString(it) } } }.getOrDefault(emptyList())
     }
     fun saveExtensionRepositories(urls: List<String>) {
-        preferences.edit().putString("extension.repositories", org.json.JSONArray(urls.map { it.trim() }.filter { it.isNotBlank() }.distinct()).toString()).apply()
+        val normalized = urls.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+        val names = extensionRepositoryNames().filterKeys { it in normalized }
+        preferences.edit().putString("extension.repositories", org.json.JSONArray(normalized).toString())
+            .putStringSet("extension.repositories.hidden", hiddenExtensionRepositories().intersect(normalized.toSet()))
+            .putString("extension.repository.names", org.json.JSONObject(names).toString()).apply()
+    }
+    fun extensionRepositoryNames(): Map<String, String> = runCatching {
+        val json = org.json.JSONObject(preferences.getString("extension.repository.names", "{}").orEmpty())
+        json.keys().asSequence().mapNotNull { url -> (json.opt(url) as? String)?.let { url to it } }.toMap()
+    }.getOrDefault(emptyMap())
+
+    fun saveExtensionRepositoryNames(names: Map<String, String>) {
+        val saved = com.tankobun.app.logic.normalizedRepositoryNames(names, extensionRepositories())
+        preferences.edit().putString("extension.repository.names", org.json.JSONObject(saved).toString()).apply()
+    }
+    fun hiddenExtensionRepositories(): Set<String> =
+        preferences.getStringSet("extension.repositories.hidden", emptySet()).orEmpty().toSet()
+
+    fun saveHiddenExtensionRepositories(urls: Set<String>) {
+        preferences.edit().putStringSet("extension.repositories.hidden", urls.intersect(extensionRepositories().toSet())).apply()
     }
     fun novelReaderPreferences(): com.tankobun.core.model.NovelReaderPreferences = runCatching {
         kotlinx.serialization.json.Json.decodeFromString<com.tankobun.core.model.NovelReaderPreferences>(preferences.getString("reader.novel", "{}").orEmpty()).normalized()

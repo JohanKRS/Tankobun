@@ -83,3 +83,28 @@ legacy settings, restart, repository removal and actual settings backup/restore.
 Adding a second index must not request the first again. The test leaves two
 fictional repositories in `RepositoryQaActivity` for phone/tablet visual checks.
 The activity and fixture responses are debug-only and never enter the release.
+
+The repository contract also verifies that the same APK offered by two indexes
+keeps both download URLs and survives removal of either index. For filter UI QA,
+launch `RepositoryQaActivity` with `--ez filterFixture true`: its display-only
+fixtures include 12 fictional repositories, a shared package, a language excluded
+by the English preference and an installed source with no matching repository.
+Check the per-repository eye buttons with multiple visible repositories, all
+hidden, search, and tab switching at phone/tablet widths. Unidentified installed
+sources stay visible, and shared packages appear if any matching repository is
+visible. No separate repository selector or labels appear on extension rows.
+The add action sits inside the URL field. Verify its disabled/loading states,
+submit with the plus button and the keyboard Done action, and confirm the field
+clears only after success. Compare the right edges of search/URL fields and
+refresh/delete/install actions at phone and tablet widths.
+The contract covers custom names and visibility, no refetch or source disabling,
+URL resolution, restart, removal, settings backup/restore and older backups.
+
+## Initial catalog priority
+
+Run the isolated QA instrumentation with `-e catalogStartup true`. Original
+in-memory API responses exercise the real Home/Browse catalog loading with no
+saved catalog preference and no account. A healthy AniList must supply both
+screens without requesting MangaBaka; a failed AniList must be attempted before
+the MangaBaka fallback. Saved MangaBaka and Combined choices must remain effective.
+The contract restores the previous preference and catalog clients afterward.
