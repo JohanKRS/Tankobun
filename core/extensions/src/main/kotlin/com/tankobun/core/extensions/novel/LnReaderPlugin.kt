@@ -11,11 +11,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.net.URI
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 
@@ -96,7 +96,7 @@ class LnReaderPluginStore(context: Context) {
         check(metadata.optString("id") == plugin.id && metadata.optString("version") == plugin.version) { "Plugin does not match repository metadata" }
         fun downloadAsset(url: String?): String {
             if (url.isNullOrBlank()) return ""
-            val assetRequest = Request.Builder().url(URI(plugin.repositoryUrl).resolve(url).toString()).build()
+            val assetRequest = Request.Builder().url(resolveLnReaderUrl(plugin.repositoryUrl, url)).build()
             require(assetRequest.url.isHttps) { "Plugin assets must use HTTPS" }
             return client.newCall(assetRequest).execute().use { response ->
                 check(response.isSuccessful && response.request.url.isHttps) { "Plugin asset download failed: HTTP ${response.code}" }
@@ -130,10 +130,14 @@ internal fun parseLnReaderIndex(payload: String, repositoryUrl: String): List<Ex
     return (0 until array.length()).map { index ->
         val plugin = json.decodeFromString<LnReaderPlugin>(array.getJSONObject(index).toString())
         plugin.copy(repositoryUrl = repositoryUrl,
-            url = URI(repositoryUrl).resolve(plugin.url).toString(),
-            iconUrl = plugin.iconUrl?.let { URI(repositoryUrl).resolve(it).toString() }).indexEntry()
+            url = resolveLnReaderUrl(repositoryUrl, plugin.url),
+            iconUrl = plugin.iconUrl?.let { resolveLnReaderUrl(repositoryUrl, it) }).indexEntry()
     }
 }
+
+/** Community filenames can contain literal brackets/spaces; preserve existing escapes and URL structure. */
+internal fun resolveLnReaderUrl(repositoryUrl: String, url: String): String =
+    requireNotNull(repositoryUrl.toHttpUrl().resolve(url)) { "Invalid novel plugin URL" }.toUri().toASCIIString()
 
 internal fun digest(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 internal fun languageCode(value: String): String = when (value.replace(Regex("[\\p{Cf}]"), "").trim().lowercase()) {

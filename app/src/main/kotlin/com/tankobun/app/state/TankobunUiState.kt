@@ -140,6 +140,7 @@ data class TankobunUiState(
     val disabledSourceKeys: Set<String> = emptySet(),
     val extensionRepositoryUrl: String = "",
     val extensionRepositories: List<String> = emptyList(),
+    val extensionRepositoryLoading: Boolean = false,
     val novelReaderPreferences: com.tankobun.core.model.NovelReaderPreferences = com.tankobun.core.model.NovelReaderPreferences(),
     val availableExtensions: List<ExtensionIndexEntry> = emptyList(),
     val installingExtensionPackageName: String? = null,

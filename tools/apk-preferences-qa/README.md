@@ -72,3 +72,14 @@ Android app info, uninstall the Android copy and return. Confirm the source stil
 works, then update all. Install and remove the second fixture from Repository;
 private APK operations must not launch the Android package installer/uninstaller.
 Use original fixtures only; none are distributed with Tankobun.
+
+## Multiple repository management
+
+Run the separate QA instrumentation with `-e repositories true`. Its in-memory
+fixtures exercise adding indexes, clearing only a successful submitted URL,
+retaining failed or newly edited drafts, canonical URL deduplication, icons and
+APK URLs with an empty input, and refreshing only saved indexes. It also checks
+legacy settings, restart, repository removal and actual settings backup/restore.
+Adding a second index must not request the first again. The test leaves two
+fictional repositories in `RepositoryQaActivity` for phone/tablet visual checks.
+The activity and fixture responses are debug-only and never enter the release.

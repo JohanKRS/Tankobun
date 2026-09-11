@@ -42,17 +42,20 @@ class SettingsStore(context: Context) {
             .apply()
     }
 
-    fun extensionRepositoryUrl(): String =
+    private fun storedExtensionRepositoryUrl(): String =
         preferences.getString(KEY_EXTENSION_REPOSITORY_URL, "").orEmpty()
 
+    fun extensionRepositoryUrl(): String = storedExtensionRepositoryUrl()
+        .takeUnless { it.trim() in extensionRepositories() }.orEmpty()
+
     fun saveExtensionRepositoryUrl(url: String) {
-        if (!preferences.contains("extension.repositories")) saveExtensionRepositories(listOfNotNull(extensionRepositoryUrl().takeIf { it.isNotBlank() }))
+        if (!preferences.contains("extension.repositories")) saveExtensionRepositories(extensionRepositories())
         preferences.edit().putString(KEY_EXTENSION_REPOSITORY_URL, url).apply()
     }
 
     fun extensionRepositories(): List<String> {
         val saved = preferences.getString("extension.repositories", null)
-        return if (saved == null) listOfNotNull(extensionRepositoryUrl().takeIf { it.isNotBlank() })
+        return if (saved == null) listOfNotNull(storedExtensionRepositoryUrl().trim().takeIf { it.isNotBlank() })
         else runCatching { org.json.JSONArray(saved).let { a -> (0 until a.length()).map { a.getString(it) } } }.getOrDefault(emptyList())
     }
     fun saveExtensionRepositories(urls: List<String>) {

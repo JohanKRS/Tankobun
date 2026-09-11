@@ -19,6 +19,12 @@ class NovelCompatibilityInstrumentation : Instrumentation() {
         val report = Bundle()
         try {
             check(targetContext.packageName.endsWith(".novelqa")) { "Use -PqaApplicationIdSuffix=.novelqa" }
+            if (options.getString("repositories") == "true") {
+                runBlocking { checkRepositoryManagement() }
+                report.putString("stream", "PASS: repository management contract\n")
+                finish(-1, report)
+                return
+            }
             runBlocking {
                 options.getString("privateExtensions")?.let { checkPrivateExtensions(afterSystemRemoval = it == "after-removal") }
                 options.getString("apkPreferences")?.let { checkApkSourcePreferences(it) }

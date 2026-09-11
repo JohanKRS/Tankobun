@@ -738,8 +738,8 @@
     <string name="sources_search_extensions">Buscar extensiones</string>
     <string name="sources_tab_installed">Instaladas</string>
     <string name="sources_tab_repository">Repositorio</string>
-    <string name="sources_repository">Repositorio de extensiones</string>
-    <string name="sources_repository_index_url">URL del índice del repositorio</string>
+    <string name="sources_repository">Repositorios de extensiones</string>
+    <string name="sources_repository_index_url">URL del repositorio</string>
     <string name="sources_extensions_shown">%1$d extensiones mostradas</string>
     <string name="sources_active_of_count">%1$d de %2$d activas</string>
     <string name="sources_all_on">Todas activadas</string>
@@ -1284,4 +1284,11 @@
     <string name="sources_private_removed">Extensión quitada. Biblioteca, progreso y ajustes conservados.</string>
     <string name="sources_remove_android_first">Primero quita la copia de Android con el botón del teléfono en Instaladas.</string>
     <string name="sources_private_remove_failed">No se pudo quitar la extensión.</string>
+    <string name="sources_add_another_repository">Agregar otro</string>
+    <string name="sources_added_repositories">Repositorios agregados (%1$d)</string>
+    <string name="sources_refresh_repositories">Actualizar repositorios</string>
+    <string name="sources_repository_number">Repositorio %1$d</string>
+    <string name="sources_remove_repository">Quitar repositorio %1$d</string>
+    <string name="sources_repository_added">Repositorio agregado.</string>
+    <string name="sources_no_repository_extensions">No hay extensiones disponibles en los repositorios agregados.</string>
 </resources>

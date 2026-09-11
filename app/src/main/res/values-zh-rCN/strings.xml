@@ -746,7 +746,7 @@
     <string name="sources_tab_installed">已安装</string>
     <string name="sources_tab_repository">仓库</string>
     <string name="sources_repository">扩展仓库</string>
-    <string name="sources_repository_index_url">仓库索引 URL</string>
+    <string name="sources_repository_index_url">仓库 URL</string>
     <string name="sources_extensions_shown">显示 %1$d 个扩展</string>
     <string name="sources_active_of_count">%1$d / %2$d 个启用</string>
     <string name="sources_all_on">全部开启</string>
@@ -1282,4 +1282,11 @@
     <string name="sources_private_removed">扩展已移除。书库、进度和设置已保留。</string>
     <string name="sources_remove_android_first">请先在已安装页面使用手机按钮移除 Android 副本。</string>
     <string name="sources_private_remove_failed">无法移除扩展。</string>
+    <string name="sources_add_another_repository">添加另一个</string>
+    <string name="sources_added_repositories">已添加的仓库（%1$d）</string>
+    <string name="sources_refresh_repositories">刷新仓库</string>
+    <string name="sources_repository_number">仓库 %1$d</string>
+    <string name="sources_remove_repository">移除仓库 %1$d</string>
+    <string name="sources_repository_added">已添加仓库。</string>
+    <string name="sources_no_repository_extensions">已添加的仓库中没有可用扩展。</string>
 </resources>

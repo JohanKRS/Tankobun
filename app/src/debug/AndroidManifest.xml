@@ -4,5 +4,6 @@
         <activity android:name=".NovelPluginQaActivity" android:exported="true" />
         <activity android:name=".ApkPreferencesQaActivity" android:exported="true" />
         <activity android:name=".ExtensionUpdatesQaActivity" android:exported="true" />
+        <activity android:name=".RepositoryQaActivity" android:exported="true" />
     </application>
 </manifest>

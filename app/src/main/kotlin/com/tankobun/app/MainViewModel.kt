@@ -245,6 +245,7 @@ class MainViewModel(
     private val downloadDataSource = DownloadDataSource(container)
     private val extensionDataSource = ExtensionDataSource(container)
     private var extensionInstallJob: Job? = null
+    private var extensionRepositoryJob: Job? = null
     private var stopExtensionUpdates = false
     private data class PendingExtensionInstaller(
         val request: ExtensionInstallRequest,
@@ -385,7 +386,7 @@ class MainViewModel(
             container.downloadCoordinator.schedulePending()
         }
         refreshInstalledSources()
-        if (_state.value.extensionRepositoryUrl.isNotBlank()) {
+        if (_state.value.extensionRepositories.isNotEmpty()) {
             refreshExtensionIndex(silent = true)
         }
         refreshCacheStorageSummary()
@@ -921,42 +922,54 @@ class MainViewModel(
     }
 
     fun removeExtensionRepository(url: String) {
+        if (extensionRepositoryJob?.isActive == true) return
         val next = container.settingsStore.extensionRepositories() - url
+        val draft = _state.value.extensionRepositoryUrl.takeUnless { it.trim() == url }.orEmpty()
         container.settingsStore.saveExtensionRepositories(next)
-        if (container.settingsStore.extensionRepositoryUrl() == url) container.settingsStore.saveExtensionRepositoryUrl("")
-        _state.update { it.copy(extensionRepositories = next, availableExtensions = it.availableExtensions.filterNot { entry -> entry.repositoryUrl == url }, extensionRepositoryUrl = it.extensionRepositoryUrl.takeUnless { draft -> draft == url }.orEmpty()) }
+        container.settingsStore.saveExtensionRepositoryUrl(draft)
+        _state.update { it.copy(extensionRepositories = next, availableExtensions = it.availableExtensions.filterNot { entry -> entry.repositoryUrl == url }, extensionRepositoryUrl = draft) }
+    }
+
+    fun addExtensionRepository() {
+        val draft = _state.value.extensionRepositoryUrl.trim()
+        if (draft.isBlank()) return
+        loadExtensionRepositories(listOf(draft), submittedDraft = draft)
     }
 
     fun refreshExtensionIndex(silent: Boolean = false) {
-        val draft = _state.value.extensionRepositoryUrl.trim()
-        val repositories = (container.settingsStore.extensionRepositories() + listOfNotNull(draft.takeIf { it.isNotBlank() })).distinct()
-        if (repositories.isEmpty()) {
-            if (!silent) _state.update { it.copy(message = string(R.string.msg_paste_repository_first)) }
-            return
-        }
-        viewModelScope.launch {
-            if (!silent) _state.update { it.copy(busy = true, message = null) }
-            val entries = _state.value.availableExtensions.toMutableList()
-            val saved = container.settingsStore.extensionRepositories().toMutableList()
-            val errors = mutableListOf<String>()
-            var resolvedDraft = draft
-            for (url in repositories) {
-                try {
-                    val result = extensionDataSource.fetchExtensionIndex(url)
-                    if (url == draft) resolvedDraft = result.resolvedIndexUrl
-                    entries.removeAll { it.repositoryUrl == url || it.repositoryUrl == result.resolvedIndexUrl }
-                    entries.addAll(result.entries)
-                    saved.remove(url)
-                    saved.add(result.resolvedIndexUrl)
-                } catch (error: kotlinx.coroutines.CancellationException) { throw error }
-                catch (error: Exception) { errors.add(error.message ?: string(R.string.msg_extension_index_failed)) }
+        loadExtensionRepositories(container.settingsStore.extensionRepositories(), silent = silent)
+    }
+
+    private fun loadExtensionRepositories(repositories: List<String>, submittedDraft: String? = null, silent: Boolean = false) {
+        if (repositories.isEmpty() || extensionRepositoryJob?.isActive == true) return
+        extensionRepositoryJob = viewModelScope.launch {
+            _state.update { it.copy(extensionRepositoryLoading = true, message = if (silent) it.message else null) }
+            try {
+                val entries = _state.value.availableExtensions.toMutableList()
+                val saved = container.settingsStore.extensionRepositories().toMutableList()
+                val errors = mutableListOf<String>()
+                var added = false
+                for (url in repositories) {
+                    try {
+                        val result = extensionDataSource.fetchExtensionIndex(url)
+                        if (url == submittedDraft) added = true
+                        entries.removeAll { it.repositoryUrl == url || it.repositoryUrl == result.resolvedIndexUrl }
+                        entries.addAll(result.entries)
+                        saved.remove(url)
+                        saved.add(result.resolvedIndexUrl)
+                    } catch (error: kotlinx.coroutines.CancellationException) { throw error }
+                    catch (error: Exception) { errors.add(error.message ?: string(R.string.msg_extension_index_failed)) }
+                }
+                container.settingsStore.saveExtensionRepositories(saved.distinct())
+                val clearDraft = added && _state.value.extensionRepositoryUrl.trim() == submittedDraft
+                if (clearDraft) container.settingsStore.saveExtensionRepositoryUrl("")
+                _state.update { it.copy(extensionRepositories = saved.distinct(),
+                    extensionRepositoryUrl = if (clearDraft) "" else it.extensionRepositoryUrl,
+                    availableExtensions = entries.distinctBy { entry -> entry.packageName },
+                    message = if (silent) it.message else errors.firstOrNull() ?: if (added) string(R.string.sources_repository_added) else string(R.string.msg_loaded_extensions, entries.size)) }
+            } finally {
+                _state.update { it.copy(extensionRepositoryLoading = false) }
             }
-            container.settingsStore.saveExtensionRepositories(saved.distinct())
-            if (_state.value.extensionRepositoryUrl.trim() == draft) container.settingsStore.saveExtensionRepositoryUrl(resolvedDraft)
-            _state.update { it.copy(extensionRepositories = saved.distinct(),
-                extensionRepositoryUrl = if (it.extensionRepositoryUrl.trim() == draft) resolvedDraft else it.extensionRepositoryUrl,
-                availableExtensions = entries.distinctBy { entry -> entry.packageName }, busy = if (silent) it.busy else false,
-                message = if (silent) it.message else errors.firstOrNull() ?: string(R.string.msg_loaded_extensions, entries.size)) }
         }
     }
 
@@ -1020,9 +1033,7 @@ class MainViewModel(
         extensionDataSource.extensionApkUrl(_state.value.extensionRepositoryUrl.trim(), entry)
 
     fun extensionIconUrl(entry: ExtensionIndexEntry): String? =
-        _state.value.extensionRepositoryUrl.trim()
-            .takeIf { it.isNotBlank() }
-            ?.let { extensionDataSource.extensionIconUrl(it, entry) }
+        runCatching { extensionDataSource.extensionIconUrl(_state.value.extensionRepositoryUrl.trim(), entry) }.getOrNull()
 
     fun installExtension(entry: ExtensionIndexEntry) = startExtensionInstalls(listOf(entry), batch = false)
 
@@ -1567,7 +1578,7 @@ class MainViewModel(
                 )
                 refreshInstalledSources()
                 updateCachePreferences(container.settingsStore.cachePreferences())
-                if (_state.value.extensionRepositoryUrl.isNotBlank()) {
+                if (_state.value.extensionRepositories.isNotEmpty()) {
                     refreshExtensionIndex(silent = true)
                 }
                 ScheduledBackupWork.update(container.application, container.settingsStore.backupSchedule())

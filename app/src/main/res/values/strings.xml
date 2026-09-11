@@ -746,8 +746,8 @@
     <string name="sources_search_extensions">Search extensions</string>
     <string name="sources_tab_installed">Installed</string>
     <string name="sources_tab_repository">Repository</string>
-    <string name="sources_repository">Extension repository</string>
-    <string name="sources_repository_index_url">Repository index URL</string>
+    <string name="sources_repository">Extension repositories</string>
+    <string name="sources_repository_index_url">Repository URL</string>
     <string name="sources_extensions_shown">%1$d extensions shown</string>
     <string name="sources_active_of_count">%1$d of %2$d active</string>
     <string name="sources_all_on">All on</string>
@@ -1283,4 +1283,11 @@
     <string name="sources_private_removed">Extension removed. Library, progress and settings kept.</string>
     <string name="sources_remove_android_first">First remove the Android copy using the phone button in Installed.</string>
     <string name="sources_private_remove_failed">Could not remove the extension.</string>
+    <string name="sources_add_another_repository">Add another</string>
+    <string name="sources_added_repositories">Added repositories (%1$d)</string>
+    <string name="sources_refresh_repositories">Refresh repositories</string>
+    <string name="sources_repository_number">Repository %1$d</string>
+    <string name="sources_remove_repository">Remove repository %1$d</string>
+    <string name="sources_repository_added">Repository added.</string>
+    <string name="sources_no_repository_extensions">No extensions are available in the added repositories.</string>
 </resources>

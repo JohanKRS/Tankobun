@@ -516,20 +516,34 @@ internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewMo
                     item(key = "repository-controls") {
                         SourceRepositoryControls(
                             repositoryUrl = state.extensionRepositoryUrl,
-                            repositoryCount = visibleRepositoryEntries.size,
+                            hasRepositories = state.extensionRepositories.isNotEmpty(),
+                            loading = state.extensionRepositoryLoading,
                             onRepositoryUrlChange = viewModel::setExtensionRepositoryUrl,
-                            onRefreshRepository = viewModel::refreshExtensionIndex,
+                            onAddRepository = viewModel::addExtensionRepository,
                         )
                     }
-                    items(state.extensionRepositories, key = { "repo:$it" }) { url ->
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(url, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, maxLines = 2)
-                            TextButton(onClick = { viewModel.removeExtensionRepository(url) }) { Text(tankobunString(R.string.novel_remove_repository)) }
+                    if (state.extensionRepositories.isNotEmpty()) {
+                        item(key = "repository-list-heading") {
+                            SourceRepositoryListHeading(
+                                count = state.extensionRepositories.size,
+                                loading = state.extensionRepositoryLoading,
+                                onRefresh = viewModel::refreshExtensionIndex,
+                            )
+                        }
+                        itemsIndexed(state.extensionRepositories, key = { _, url -> "repo:$url" }) { index, url ->
+                            SourceRepositoryRow(index + 1, url, enabled = !state.extensionRepositoryLoading,
+                                onRemove = { viewModel.removeExtensionRepository(url) })
+                        }
+                    }
+                    if (visibleRepositoryEntries.isNotEmpty()) {
+                        item(key = "repository-extension-count") {
+                            Text(tankobunString(R.string.sources_extensions_shown, visibleRepositoryEntries.size),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     if (repositoryEntries.isEmpty()) {
                         item(key = "repository-empty") {
-                            TankobunEmptyState(title = tankobunString(R.string.sources_empty_repository))
+                            TankobunEmptyState(title = tankobunString(if (state.extensionRepositories.isEmpty()) R.string.sources_empty_repository else R.string.sources_no_repository_extensions))
                         }
                     } else {
                         if (visibleRepositoryEntries.isEmpty()) {
@@ -702,51 +716,6 @@ internal fun SourceSettingsTabRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
-            )
-        }
-    }
-}
-
-@Composable
-internal fun SourceRepositoryControls(
-    repositoryUrl: String,
-    repositoryCount: Int,
-    onRepositoryUrlChange: (String) -> Unit,
-    onRefreshRepository: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            tankobunString(R.string.sources_repository),
-            style = LocalTankobunStyle.current.typography.sectionLabel,
-            color = LocalTankobunStyle.current.colors.accent,
-        )
-        OutlinedTextField(
-            value = repositoryUrl,
-            onValueChange = onRepositoryUrlChange,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(tankobunString(R.string.sources_repository_index_url)) },
-            shape = LocalTankobunStyle.current.themeShapes.control,
-            trailingIcon = {
-                Button(
-                    onClick = onRefreshRepository,
-                    shape = LocalTankobunStyle.current.themeShapes.control,
-                    contentPadding = PaddingValues(horizontal = 10.dp),
-                    modifier = Modifier
-                        .padding(end = 6.dp)
-                        .height(40.dp),
-                ) {
-                    Icon(TankobunIcons.Refresh, contentDescription = null, modifier = Modifier.size(17.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(tankobunString(R.string.common_load), maxLines = 1)
-                }
-            },
-        )
-        if (repositoryCount > 0) {
-            Text(
-                tankobunString(R.string.sources_extensions_shown, repositoryCount),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

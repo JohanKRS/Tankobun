@@ -738,8 +738,8 @@
     <string name="sources_search_extensions">Buscar extensões</string>
     <string name="sources_tab_installed">Instaladas</string>
     <string name="sources_tab_repository">Repositório</string>
-    <string name="sources_repository">Repositório de extensões</string>
-    <string name="sources_repository_index_url">URL do índice do repositório</string>
+    <string name="sources_repository">Repositórios de extensões</string>
+    <string name="sources_repository_index_url">URL do repositório</string>
     <string name="sources_extensions_shown">%1$d extensões exibidas</string>
     <string name="sources_active_of_count">%1$d de %2$d ativas</string>
     <string name="sources_all_on">Ativar todas</string>
@@ -1284,4 +1284,11 @@
     <string name="sources_private_removed">Extensão removida. Biblioteca, progresso e configurações mantidos.</string>
     <string name="sources_remove_android_first">Remova primeiro a cópia do Android pelo ícone de celular em Instaladas.</string>
     <string name="sources_private_remove_failed">Não foi possível remover a extensão.</string>
+    <string name="sources_add_another_repository">Adicionar outro</string>
+    <string name="sources_added_repositories">Repositórios adicionados (%1$d)</string>
+    <string name="sources_refresh_repositories">Atualizar repositórios</string>
+    <string name="sources_repository_number">Repositório %1$d</string>
+    <string name="sources_remove_repository">Remover repositório %1$d</string>
+    <string name="sources_repository_added">Repositório adicionado.</string>
+    <string name="sources_no_repository_extensions">Nenhuma extensão disponível nos repositórios adicionados.</string>
 </resources>
