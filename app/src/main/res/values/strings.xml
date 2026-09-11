@@ -1307,4 +1307,9 @@
     <string name="novel_previous_page">Previous page</string>
     <string name="novel_next_page">Next page</string>
     <string name="novel_two_pages">Two pages in landscape</string>
+    <string name="msg_secure_token_unavailable">Secure credential storage is unavailable. Your local library is still available. Try connecting again later.</string>
+    <string name="sources_repository_identity_changed">Repository signing identity changed</string>
+    <string name="sources_repository_identity_none">No signing identity provided</string>
+    <string name="sources_repository_identity_review">%1$s\n\nPrevious: %2$s\nNew: %3$s\n\nDownloads from this repository are paused. Approve only if you have verified this change with the repository publisher.</string>
+    <string name="sources_repository_identity_approve">Approve new identity</string>
 </resources>

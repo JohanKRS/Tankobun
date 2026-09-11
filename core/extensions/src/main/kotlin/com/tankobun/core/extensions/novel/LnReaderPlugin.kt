@@ -1,5 +1,8 @@
 package com.tankobun.core.extensions.novel
 
+import com.tankobun.core.network.*
+import java.util.concurrent.TimeUnit
+
 import android.content.Context
 import android.util.AtomicFile
 import com.tankobun.core.extensions.ExtensionIndexEntry
@@ -84,23 +87,26 @@ class LnReaderPluginStore(context: Context) {
     }
     suspend fun install(plugin: LnReaderPlugin, client: OkHttpClient, context: Context) = withContext(Dispatchers.IO) {
         require(plugin.repositoryUrl.isNotBlank() && plugin.id.isNotBlank())
-        val request = Request.Builder().url(plugin.url).build()
-        require(request.url.isHttps) { "Novel plugins must be downloaded over HTTPS" }
-        val code = client.newCall(request).execute().use { response ->
+        val distributionClient = client.codeDistributionClient()
+        val request = Request.Builder().url(requireDistributionUrl(plugin.url))
+            .tag(ResponseByteLimit::class.java, ResponseByteLimit(4L * 1024 * 1024)).build()
+        val call = distributionClient.newCall(request).also { it.timeout().timeout(TransferLimits.METADATA_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS) }
+        val code = call.consumeCancellable { response, checkActive ->
             check(response.isSuccessful && response.request.url.isHttps) { "Plugin download failed: HTTP ${response.code}" }
-            val bytes = response.body.byteStream().use { readBounded(it, 4 * 1024 * 1024) }
+            val bytes = response.body.readBytesLimited(4 * 1024 * 1024, checkActive)
             check(bytes.isNotEmpty() && bytes.size <= 4 * 1024 * 1024) { "Invalid plugin size" }
             bytes.decodeToString()
         }
         val metadata = LnReaderRuntime(context).call(plugin, code, "metadata", JSONArray(), persistStorage = false) as JSONObject
         check(metadata.optString("id") == plugin.id && metadata.optString("version") == plugin.version) { "Plugin does not match repository metadata" }
-        fun downloadAsset(url: String?): String {
+        suspend fun downloadAsset(url: String?): String {
             if (url.isNullOrBlank()) return ""
-            val assetRequest = Request.Builder().url(resolveLnReaderUrl(plugin.repositoryUrl, url)).build()
-            require(assetRequest.url.isHttps) { "Plugin assets must use HTTPS" }
-            return client.newCall(assetRequest).execute().use { response ->
+            val assetRequest = Request.Builder().url(requireDistributionUrl(resolveLnReaderUrl(plugin.repositoryUrl, url)))
+                .tag(ResponseByteLimit::class.java, ResponseByteLimit(1024L * 1024)).build()
+            val assetCall = distributionClient.newCall(assetRequest).also { it.timeout().timeout(TransferLimits.METADATA_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS) }
+            return assetCall.consumeCancellable { response, checkActive ->
                 check(response.isSuccessful && response.request.url.isHttps) { "Plugin asset download failed: HTTP ${response.code}" }
-                response.body.byteStream().use { readBounded(it, 1024 * 1024) }.decodeToString()
+                response.body.readBytesLimited(1024 * 1024, checkActive).decodeToString()
             }
         }
         val javascript = downloadAsset(plugin.customJS)

@@ -3,13 +3,14 @@ package com.tankobun.app.updates
 import android.net.Uri
 import androidx.core.content.FileProvider
 import com.tankobun.app.AppContainer
+import com.tankobun.core.network.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 import java.util.Locale
 
 internal const val TANKOBUN_UPDATE_MANIFEST_TYPE = "tankobun.update-manifest"
@@ -29,17 +30,21 @@ data class AppUpdateInfo(
 internal class AppUpdateDataSource(
     private val container: AppContainer,
 ) {
+    private val distributionClient = container.okHttpClient.codeDistributionClient()
+    private val apkValidator = AppUpdateApkValidator(container.application)
     suspend fun fetchUpdateInfo(manifestUrl: String): AppUpdateInfo =
         withContext(Dispatchers.IO) {
             val request = Request.Builder()
-                .url(manifestUrl)
+                .url(requireDistributionUrl(manifestUrl))
                 .header("Accept", "application/json")
+                .tag(ResponseByteLimit::class.java, ResponseByteLimit(1024L * 1024))
                 .build()
-            container.okHttpClient.newCall(request).execute().use { response ->
+            val call = distributionClient.newCall(request).also { it.timeout().timeout(TransferLimits.METADATA_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS) }
+            call.consumeCancellable { response, checkActive ->
                 if (!response.isSuccessful) {
                     error("Update check failed: HTTP ${response.code}")
                 }
-                parseTankobunUpdateManifestJson(response.body.string())
+                parseTankobunUpdateManifestJson(response.body.readBytesLimited(1024 * 1024, checkActive).decodeToString())
             }
         }
 
@@ -49,38 +54,14 @@ internal class AppUpdateDataSource(
             val safeName = "tankobun-${update.versionCode}-${update.versionName}.apk"
                 .replace(Regex("[^A-Za-z0-9._-]"), "_")
             val apkFile = File(cacheDir, safeName)
-            val partialFile = File(cacheDir, "$safeName.part")
 
             cacheDir.listFiles()
                 ?.filter { it.name != apkFile.name }
                 ?.forEach { it.delete() }
 
-            val request = Request.Builder()
-                .url(update.apkUrl)
-                .header("Accept", "application/vnd.android.package-archive")
-                .build()
-            container.okHttpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    error("APK download failed: HTTP ${response.code}")
-                }
-                partialFile.outputStream().use { output ->
-                    response.body.byteStream().use { input -> input.copyTo(output) }
-                }
-            }
-
-            if (partialFile.length() <= 0L) {
-                partialFile.delete()
-                error("APK download failed: empty file")
-            }
-            update.apkSha256?.takeIf { it.isNotBlank() }?.let { expected ->
-                val actual = partialFile.sha256()
-                if (!actual.equals(expected.removePrefix("sha256:").trim(), ignoreCase = true)) {
-                    partialFile.delete()
-                    error("APK download failed: SHA-256 mismatch")
-                }
-            }
-            if (apkFile.exists()) apkFile.delete()
-            check(partialFile.renameTo(apkFile)) { "APK download failed: could not finalize file" }
+            val hash = normalizedSha256(update.apkSha256) ?: error("Update SHA-256 is required")
+            downloadCodeFile(container.okHttpClient, update.apkUrl, apkFile, TransferLimits.APP_APK_BYTES,
+                expectedSize = update.sizeBytes, expectedSha256 = hash) { apkValidator.validate(it, update) }
 
             FileProvider.getUriForFile(
                 container.application,
@@ -102,16 +83,19 @@ internal fun parseTankobunUpdateManifestJson(text: String): AppUpdateInfo {
     val versionName = release.optString("versionName").trim()
     require(versionName.isNotBlank()) { "Update manifest release has no versionName" }
     val apkUrl = release.optString("apkUrl").trim()
-    require(apkUrl.startsWith("https://")) { "Update manifest APK URL must use HTTPS" }
+    requireDistributionUrl(apkUrl)
+    val apkSha256 = normalizedSha256(release.optStringOrNull("apkSha256")) ?: error("Update manifest requires a valid SHA-256")
+    val sizeBytes = release.optLongOrNull("sizeBytes")
+    require(sizeBytes == null || sizeBytes in 1..TransferLimits.APP_APK_BYTES) { "Update manifest has an invalid APK size" }
 
     return AppUpdateInfo(
         versionCode = versionCode,
         versionName = versionName,
         apkUrl = apkUrl,
-        apkSha256 = release.optStringOrNull("apkSha256"),
+        apkSha256 = apkSha256,
         releaseUrl = release.optStringOrNull("releaseUrl"),
         publishedAt = release.optStringOrNull("publishedAt"),
-        sizeBytes = release.optLongOrNull("sizeBytes"),
+        sizeBytes = sizeBytes,
         mandatory = release.optBoolean("mandatory", false),
         changelog = release.optJSONObject("changelog").toChangelogMap(),
     )
@@ -138,16 +122,3 @@ private fun JSONObject.optStringOrNull(name: String): String? =
 
 private fun JSONObject.optLongOrNull(name: String): Long? =
     if (has(name) && !isNull(name)) optLong(name) else null
-
-private fun File.sha256(): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-    inputStream().use { input ->
-        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-        while (true) {
-            val read = input.read(buffer)
-            if (read < 0) break
-            if (read > 0) digest.update(buffer, 0, read)
-        }
-    }
-    return digest.digest().joinToString("") { byte -> "%02x".format(byte) }
-}

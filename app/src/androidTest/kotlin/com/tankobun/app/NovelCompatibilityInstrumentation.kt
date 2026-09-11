@@ -19,6 +19,11 @@ class NovelCompatibilityInstrumentation : Instrumentation() {
         val report = Bundle()
         try {
             check(targetContext.packageName.endsWith(".novelqa")) { "Use -PqaApplicationIdSuffix=.novelqa" }
+            if (options.getString("security") == "true") {
+                report.putString("stream", checkSecurityRegressions(targetContext) + "\n")
+                finish(-1, report)
+                return
+            }
             if (options.getString("novelReader") == "true") {
                 runBlocking { checkNovelReader() }
                 report.putString("stream", "PASS: novel reader adjacent chapters, offline loading, character anchors and preference backup/restore\n")

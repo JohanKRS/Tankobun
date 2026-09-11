@@ -32,6 +32,12 @@ class RepositoryQaActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         check(packageName.endsWith(".novelqa"))
         val container = (application as TankobunApplication).container
+        if (intent.getBooleanExtra("identityChangeFixture", false)) {
+            val url = "https://repositories.example.invalid/panels/index.json"
+            container.settingsStore.saveExtensionRepositories(listOf(url))
+            com.tankobun.core.extensions.RepositoryTrustStore(this).checkAndRemember(url,
+                com.tankobun.core.extensions.ExtensionIndexResult(emptyList(), url, "a".repeat(64)))
+        }
         if (intent.getBooleanExtra("filterFixture", false)) {
             container.settingsStore.saveExtensionRepositories(repositoryFilterQaUrls())
         }

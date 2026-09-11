@@ -1306,4 +1306,9 @@
     <string name="novel_previous_page">上一页</string>
     <string name="novel_next_page">下一页</string>
     <string name="novel_two_pages">横屏显示双页</string>
+    <string name="msg_secure_token_unavailable">安全凭据存储不可用。本地书库仍可使用。请稍后重新连接。</string>
+    <string name="sources_repository_identity_changed">仓库签名身份已更改</string>
+    <string name="sources_repository_identity_none">未提供签名身份</string>
+    <string name="sources_repository_identity_review">%1$s\n\n原身份：%2$s\n新身份：%3$s\n\n此仓库的下载已暂停。请先向仓库发布者确认此更改，再批准。</string>
+    <string name="sources_repository_identity_approve">批准新身份</string>
 </resources>

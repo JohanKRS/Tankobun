@@ -30,4 +30,5 @@ dependencies {
     testImplementation("org.json:json:20240303")
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockwebserver)
+    testImplementation(libs.okhttp.tls)
 }

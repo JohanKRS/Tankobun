@@ -25,6 +25,7 @@ data class ExtensionIndexEntry(
 data class ExtensionIndexResult(
     val entries: List<ExtensionIndexEntry>,
     val resolvedIndexUrl: String,
+    val repositorySigningKey: String? = null,
 )
 
 @Serializable

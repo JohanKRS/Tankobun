@@ -94,7 +94,8 @@ internal suspend fun Instrumentation.checkRepositoryManagement() {
     RepositoryQaActivity.requests.clear()
     runOnMainSync { vm.refreshExtensionIndex() }
     waitLoaded()
-    check(RepositoryQaActivity.requests.toSet() == setOf("/panels/index.json", "/novels/index.json"))
+    // The descriptor remains part of refreshes so its signing identity cannot be lost.
+    check(RepositoryQaActivity.requests.toSet() == setOf("/alias.json", "/panels/index.json", "/novels/index.json"))
     check(vm.state.value.extensionRepositoryUrl.endsWith("draft/index.json"))
     runOnMainSync { vm.setExtensionRepositoryUrl("") }
     check(vm.state.value.extensionRepositoryNames == expectedNames)

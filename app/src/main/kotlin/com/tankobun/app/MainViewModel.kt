@@ -427,7 +427,10 @@ class MainViewModel(
         container.settingsStore.savePendingAnilistOAuthState(null)
         libraryRefreshJob?.cancel()
         pendingAniListSyncJob?.cancel()
-        container.tokenStore.saveAccessToken(token.accessToken)
+        if (!container.tokenStore.saveAccessToken(token.accessToken)) {
+            _state.update { it.copy(message = string(R.string.msg_secure_token_unavailable)) }
+            return
+        }
         val shouldGuideMerge = _state.value.libraryMode == LibraryMode.LOCAL && _state.value.libraryItems.isNotEmpty()
         _state.update {
             it.copy(
@@ -961,6 +964,19 @@ class MainViewModel(
         loadExtensionRepositories(container.settingsStore.extensionRepositories(), silent = silent)
     }
 
+    fun dismissRepositoryIdentityReview() {
+        _state.update { it.copy(repositoryIdentityReview = null) }
+    }
+
+    fun approveRepositoryIdentity(change: com.tankobun.core.extensions.RepositoryIdentityChange) {
+        if (_state.value.repositoryIdentityReview != change || extensionRepositoryJob?.isActive == true) return
+        viewModelScope.launch {
+            val approved = withContext(Dispatchers.IO) { extensionDataSource.repositoryTrust.approve(change) }
+            _state.update { it.copy(repositoryIdentityReview = null) }
+            if (approved) loadExtensionRepositories(listOf(change.repositoryUrl), submittedDraft = change.repositoryUrl)
+        }
+    }
+
     private fun loadExtensionRepositories(repositories: List<String>, submittedDraft: String? = null, silent: Boolean = false) {
         if (repositories.isEmpty() || extensionRepositoryJob?.isActive == true) return
         extensionRepositoryJob = viewModelScope.launch {
@@ -983,7 +999,18 @@ class MainViewModel(
                         if (url != result.resolvedIndexUrl) names.remove(url)?.let { names.putIfAbsent(result.resolvedIndexUrl, it) }
                         if (url != result.resolvedIndexUrl && hidden.remove(url)) hidden.add(result.resolvedIndexUrl)
                     } catch (error: kotlinx.coroutines.CancellationException) { throw error }
-                    catch (error: Exception) { errors.add(error.message ?: string(R.string.msg_extension_index_failed)) }
+                    catch (error: com.tankobun.core.extensions.RepositoryIdentityChangedException) {
+                        entries.removeAll { it.repositoryUrl == url || it.repositoryUrl == error.change.resolvedUrl }
+                        _state.update { it.copy(repositoryIdentityReview = it.repositoryIdentityReview ?: error.change) }
+                        errors.add(string(R.string.sources_repository_identity_changed))
+                    }
+                    catch (error: Exception) {
+                        if (error is com.tankobun.core.network.UnsafeDistributionException ||
+                            error is com.tankobun.core.network.InputLimitExceededException || error is com.tankobun.core.network.TransferLimitException) {
+                            entries.removeAll { it.repositoryUrl == url }
+                        }
+                        errors.add(error.message ?: string(R.string.msg_extension_index_failed))
+                    }
                 }
                 container.settingsStore.saveExtensionRepositories(saved.distinct())
                 container.settingsStore.saveExtensionRepositoryNames(names)
@@ -1111,6 +1138,7 @@ class MainViewModel(
         _state.update { it.copy(installingExtensionPackageName = entry.packageName, message = string(R.string.msg_downloading_extension, entry.name)) }
         try {
             val plugin = entry.lnReaderPlugin
+            withContext(Dispatchers.IO) { extensionDataSource.repositoryTrust.verifyEntry(entry) }
             if (plugin != null) {
                 com.tankobun.core.extensions.novel.LnReaderPluginStore(container.application).install(plugin, container.okHttpClient, container.application)
                 container.sourceHost.clearCache(entry.packageName)
@@ -1375,8 +1403,11 @@ class MainViewModel(
             _state.update { it.copy(mangaBakaBusy = true) }
             runCatching { container.mangaBakaRepository.profile(token.trim()) }
                 .onSuccess { profile ->
-                    container.tokenStore.saveMangaBaka(token.trim(), profile.id, profile.name)
-                    _state.update { it.copy(mangaBakaAccountName = profile.name) }
+                    if (container.tokenStore.saveMangaBaka(token.trim(), profile.id, profile.name)) {
+                        _state.update { it.copy(mangaBakaAccountName = profile.name) }
+                    } else {
+                        _state.update { it.copy(message = string(R.string.msg_secure_token_unavailable)) }
+                    }
                 }
                 .onFailure { error -> if (error is CancellationException) throw error; _state.update { it.copy(message = string(R.string.catalog_connect_failed)) } }
             _state.update { it.copy(mangaBakaBusy = false) }

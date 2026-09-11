@@ -216,6 +216,19 @@ import com.tankobun.app.ui.shell.*
 @Composable
 internal fun SourcesSettingsScreen(state: TankobunUiState, viewModel: MainViewModel, openRepository: Boolean = false) {
     val context = LocalContext.current
+    state.repositoryIdentityReview?.let { change ->
+        val unsignedIdentity = tankobunString(R.string.sources_repository_identity_none)
+        fun identity(value: String) = if (value == "unsigned") unsignedIdentity else value
+        AlertDialog(
+            onDismissRequest = viewModel::dismissRepositoryIdentityReview,
+            title = { Text(tankobunString(R.string.sources_repository_identity_changed)) },
+            text = { Text(tankobunString(R.string.sources_repository_identity_review, change.repositoryUrl, identity(change.previousIdentity), identity(change.newIdentity))) },
+            confirmButton = { TextButton(enabled = !state.extensionRepositoryLoading, onClick = { viewModel.approveRepositoryIdentity(change) }) {
+                Text(tankobunString(R.string.sources_repository_identity_approve))
+            } },
+            dismissButton = { TextButton(onClick = viewModel::dismissRepositoryIdentityReview) { Text(tankobunString(R.string.common_cancel)) } },
+        )
+    }
     val chromeInsets = LocalTankobunChromeInsets.current
     var sourceSettingsQuery by rememberSaveable { mutableStateOf("") }
     var editingRepository by rememberSaveable { mutableStateOf<String?>(null) }

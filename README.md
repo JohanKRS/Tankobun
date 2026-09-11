@@ -75,6 +75,10 @@ Any source extension used with Tankobun must be added and installed by the user.
 
 Before loading an installed APK extension, Tankobun asks the user to trust its package and current signing identity. Existing extensions also need this initial approval; updates signed by the same identity retain it. A changed signer requires a new review. Extensions execute inside Tankobun's process: this approval is not a sandbox or a guarantee that an extension is safe.
 
+Extension indexes, descriptors, secondary lists, APKs and novel plugin assets must use HTTPS throughout the redirect chain. The app remembers the repository signing identity on its first successful fetch, including migrated index URLs; replacement or removal of that identity pauses installation until reviewed. This first-use record does not authenticate an unknown publisher. Existing package/signer approval remains required. These transport rules apply to code distribution independently of the reading websites used by extensions.
+
+Downloads enforce actual byte limits: 8 MiB for repository responses, 32 MiB after expanding a gzip index, 32 MiB for shared source responses (before and after HTTP decompression) and encoded reader images, 64 MiB per extension APK and 128 MiB per app APK. Novel plugin code and chapter assets retain their 4 MiB and 1 MiB limits. Code and image transfers have total deadlines, remain cancellable while reading the body, and remove partial APKs on failure. Oversized inputs produce an error instead of a truncated file.
+
 New extension APKs are stored privately in Tankobun, following the community private-extension approach also used by Mihon. They keep their original package and source IDs but do not become separate Android applications. Installation checks the archive identity, version and signer; updates are committed atomically using immutable, read-only APK paths. Private extensions can be removed inside the reader without `REQUEST_DELETE_PACKAGES`. This reduces the permissions needed; it does not guarantee any particular Google Play Protect classification.
 
 Existing Android-installed extensions remain supported. In **Installed**, the migration action copies an extension into Tankobun without changing library links, reading progress or per-source settings. Once copied, the phone button opens Android app information so the user can uninstall the old Android copy. Other readers may depend on that shared copy. Tankobun does not uninstall Android applications itself. Private APK files are excluded from library/settings backups, which retain source identities and settings for reinstalling later; uninstalling Tankobun or clearing its data also removes its private extensions.
@@ -117,6 +121,8 @@ Tankobun can check for app updates from a static `updates.json` manifest hosted 
 The update manifest is only for official Tankobun app APK builds. It must not include manga content, source extensions, extension repository URLs, source recommendations, content feeds, or bypass/access guidance.
 
 Release APK updates must keep the same application id and signing lineage as the installed build, and each new release must use a higher `versionCode`.
+
+Before offering an APK to Android's installer, Tankobun requires a valid SHA-256, checks any declared byte size, and verifies the archive's package, version code/name and signing continuity against the installed app. Forward signing-key rotation must be verified by Android. Manifest and APK requests require HTTPS on every redirect.
 
 For release builds, set `tankobunUpdateManifestUrl` in `local.properties` or `TANKOBUN_UPDATE_MANIFEST_URL` in the environment. The default points to:
 
@@ -198,6 +204,8 @@ Depending on how you use it, the app may store local app data such as reading pr
 Tankobun does not operate a server controlled by this project for manga hosting, content indexing, analytics, tracking, advertising, or user profiling.
 
 Public catalog searches and the title IDs used for Mix are sent to MangaBaka without requiring a MangaBaka account. If connected, subsequent tracking edits are sent using the personal token, which is stored securely on the device and excluded from backups. See the [MangaBaka privacy policy](https://mangabaka.org/about/privacy) and [terms](https://mangabaka.org/about/terms). Third-party services, image hosts, and user-installed extensions also have their own privacy policies and terms.
+
+AniList and MangaBaka credentials are persisted only in encrypted storage. If Android's secure storage cannot be opened or recovered, account connection is unavailable and the local library remains usable. Legacy plaintext tokens are discarded. Disconnecting one provider clears only that provider's credentials, with a deferred revocation if the encrypted store is temporarily unavailable.
 
 ## Disclaimer
 

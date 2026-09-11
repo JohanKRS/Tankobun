@@ -6,6 +6,11 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.util.Log
 import com.tankobun.core.network.RespectfulRateLimiter
+import com.tankobun.core.network.InputLimitExceededException
+import com.tankobun.core.network.TransferLimitException
+import com.tankobun.core.network.TransferLimits
+import com.tankobun.core.network.readBytesLimited
+import com.tankobun.core.network.readBytesCancellable
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.SourceChapter
@@ -173,9 +178,10 @@ class TachiyomiSourceHost(
         val sourceInstance = findSource(source) ?: error("Source is not installed")
         if (sourceInstance is com.tankobun.core.extensions.novel.LnReaderSource) sourceInstance.ensureImageHeaders()
         page.sourcePageUri?.takeIf { it.isLocalPageUri() }?.let { uri ->
-            return@withContext runInterruptible {
-                appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() }
+            return@withContext kotlinx.coroutines.withTimeout(SOURCE_IMAGE_TIMEOUT_MILLIS) {
+                val input = runInterruptible { appContext.contentResolver.openInputStream(Uri.parse(uri)) }
                     ?: throw java.io.FileNotFoundException(uri)
+                input.readBytesCancellable(TransferLimits.IMAGE_BYTES, SOURCE_IMAGE_TIMEOUT_MILLIS)
             }
         }
         if (sourceInstance !is HttpSource) {
@@ -252,13 +258,13 @@ class TachiyomiSourceHost(
             rateLimiter.recordResponse(it.headers, it.code)
             if (!it.isSuccessful) throw SourceImageHttpException(page.index, it.code)
             val contentType = it.body.contentType()?.toString().orEmpty()
-            it.body.bytes().also { bytes ->
+            it.body.readBytesLimited(TransferLimits.IMAGE_BYTES).also { bytes ->
                 check(bytes.looksLikeImage() || contentType.startsWith("image/", ignoreCase = true)) {
                     "Page ${page.index + 1} did not return an image"
                 }
             }
         }
-    }.awaitSourceValue()
+    }.withImageDeadline().awaitSourceValue()
 
     private fun SourceDescriptor.imageFetchKey(): String = "$packageName:$id"
 
@@ -327,6 +333,12 @@ class TachiyomiSourceHost(
     }
 }
 
+private const val SOURCE_IMAGE_TIMEOUT_MILLIS = 120_000L
+
+/** Timeout includes response headers and body; unsubscription cancels the source call. */
+internal fun rx.Observable<ByteArray>.withImageDeadline(timeoutMillis: Long = SOURCE_IMAGE_TIMEOUT_MILLIS): rx.Observable<ByteArray> =
+    timeout(timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+
 private data class CachedSources(
     val cacheKey: String,
     val sources: List<Source>,
@@ -345,6 +357,7 @@ private class SourceImageHttpException(
 internal fun Throwable.isTransientSourceImageFailure(): Boolean =
     causeChain().firstNotNullOfOrNull { error ->
         when (error) {
+            is InputLimitExceededException, is TransferLimitException -> false
             is SourceImageHttpException -> error.statusCode in TRANSIENT_SOURCE_IMAGE_STATUS_CODES
             is eu.kanade.tachiyomi.network.HttpException -> error.code in TRANSIENT_SOURCE_IMAGE_STATUS_CODES
             is IOException -> true

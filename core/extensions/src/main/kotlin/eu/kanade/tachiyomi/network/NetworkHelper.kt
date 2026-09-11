@@ -60,6 +60,8 @@ class NetworkHelper {
 
         private fun baseBuilder(): OkHttpClient.Builder =
             OkHttpClient.Builder()
+                .addInterceptor(com.tankobun.core.network.ResponseSizeLimitInterceptor(com.tankobun.core.network.TransferLimits.IMAGE_BYTES.toLong()))
+                .addNetworkInterceptor(com.tankobun.core.network.ResponseSizeLimitInterceptor(com.tankobun.core.network.TransferLimits.IMAGE_BYTES.toLong()))
                 .cache(sourceCache())
                 .cookieJar(AndroidCookieJar)
                 // Connect/read timeouts bound network stalls; quota waits remain cancellable.

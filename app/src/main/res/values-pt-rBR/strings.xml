@@ -1308,4 +1308,9 @@
     <string name="novel_previous_page">Página anterior</string>
     <string name="novel_next_page">Próxima página</string>
     <string name="novel_two_pages">Duas páginas em paisagem</string>
+    <string name="msg_secure_token_unavailable">O armazenamento seguro de credenciais está indisponível. Sua biblioteca local continua disponível. Tente conectar novamente mais tarde.</string>
+    <string name="sources_repository_identity_changed">A identidade de assinatura do repositório mudou</string>
+    <string name="sources_repository_identity_none">Sem identidade de assinatura informada</string>
+    <string name="sources_repository_identity_review">%1$s\n\nAnterior: %2$s\nNova: %3$s\n\nOs downloads deste repositório estão pausados. Aprove apenas se você confirmou a mudança com o responsável pelo repositório.</string>
+    <string name="sources_repository_identity_approve">Aprovar nova identidade</string>
 </resources>
