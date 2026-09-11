@@ -729,17 +729,17 @@
     <string name="about_sources">Las fuentes y extensiones son de terceros. Tankobun solo funciona con formatos de extensión compatibles y configuración local del usuario.</string>
 
     <string name="sources_empty_installed">No se encontraron extensiones de fuentes compatibles con Tachiyomi instaladas.</string>
-    <string name="sources_empty_installed_filter">Ninguna fuente instalada coincide con esta búsqueda y filtro de idioma.</string>
+    <string name="sources_empty_installed_filter">Ninguna fuente instalada coincide con los filtros actuales.</string>
     <string name="sources_empty_repository">Carga un índice de repositorio para explorar extensiones instalables.</string>
-    <string name="sources_empty_repository_filter">Ninguna extensión del repositorio coincide con esta búsqueda y filtro de idioma.</string>
+    <string name="sources_empty_repository_filter">Ninguna extensión coincide con los filtros actuales.</string>
     <string name="sources_header">Extensiones de fuentes</string>
     <string name="sources_active_installed_count">%1$d activas / %2$d instaladas</string>
     <string name="sources_search_installed">Buscar fuentes instaladas</string>
     <string name="sources_search_extensions">Buscar extensiones</string>
     <string name="sources_tab_installed">Instaladas</string>
     <string name="sources_tab_repository">Repositorio</string>
-    <string name="sources_repository">Repositorio de extensiones</string>
-    <string name="sources_repository_index_url">URL del índice del repositorio</string>
+    <string name="sources_repository">Repositorios de extensiones</string>
+    <string name="sources_repository_index_url">URL del repositorio</string>
     <string name="sources_extensions_shown">%1$d extensiones mostradas</string>
     <string name="sources_active_of_count">%1$d de %2$d activas</string>
     <string name="sources_all_on">Todas activadas</string>
@@ -1235,4 +1235,82 @@
     <string name="catalog_priority_anilist">Prioriza AniList, con MangaBaka como complemento y alternativa.</string>
     <string name="catalog_priority_mangabaka">Prioriza MangaBaka, con AniList como complemento y alternativa.</string>
     <string name="catalog_priority_combined">Alterna títulos de ambos catálogos y reúne resultados de la misma obra.</string>
+    <string name="novel_remove_repository" formatted="false">Quitar</string>
+    <string name="novel_chapters" formatted="false">Capítulos</string>
+    <string name="novel_chapter_end" formatted="false">Fin del capítulo</string>
+    <string name="novel_appearance" formatted="false">Apariencia de lectura</string>
+    <string name="novel_serif" formatted="false">Con serifa</string>
+    <string name="novel_sans" formatted="false">Sin serifa</string>
+    <string name="novel_mono" formatted="false">Monoespaciada</string>
+    <string name="novel_system" formatted="false">Sistema</string>
+    <string name="novel_light" formatted="false">Claro</string>
+    <string name="novel_sepia" formatted="false">Sepia</string>
+    <string name="novel_dark" formatted="false">Oscuro</string>
+    <string name="novel_black" formatted="false">Negro</string>
+    <string name="novel_font_size" formatted="false">Tamaño del texto</string>
+    <string name="novel_line_spacing" formatted="false">Interlineado (%)</string>
+    <string name="novel_paragraph_spacing" formatted="false">Espacio entre párrafos</string>
+    <string name="novel_margins" formatted="false">Márgenes laterales</string>
+    <string name="novel_justify" formatted="false">Justificar texto</string>
+    <string name="novel_keep_awake" formatted="false">Mantener pantalla encendida</string>
+    <string name="about_novel_licenses">Licencias del lector de novelas</string>
+    <string name="about_novel_compatibility">La compatibilidad con fuentes de novelas sigue las API de LNReader y NovelSource. Tankobun no incluye fuentes, contenido de lectura ni direcciones de repositorios.</string>
+    <string name="novel_read_progress">%1$d%% del capítulo</string>
+    <string name="novel_source_settings">Ajustes de %1$s</string>
+    <string name="novel_source_no_settings">Esta extensión no ofrece ajustes adicionales.</string>
+    <string name="novel_source_website">Abrir sitio de la fuente</string>
+    <string name="novel_source_website_hint">Inicia sesión en el sitio de la fuente si es necesario y toca Listo para volver a Tankobun.</string>
+    <string name="novel_source_save">Guardar</string>
+    <string name="novel_source_reload">Recargar</string>
+    <string name="novel_source_done">Listo</string>
+    <string name="source_preferences_autosave">Los cambios se guardan automáticamente</string>
+    <string name="source_preferences_unavailable">La configuración de esta fuente no está disponible. Comprueba que la extensión esté instalada y autorizada.</string>
+    <string name="extensions_update_all">Actualizar todas (%1$d)</string>
+    <string name="extensions_updates_progress">Actualizando %1$d de %2$d · %3$s</string>
+    <string name="extensions_updates_stop">Parar después de esta</string>
+    <string name="extensions_updates_finishing_current">Finalizando la actualización actual…</string>
+    <string name="extensions_updates_finished">Actualizaciones completadas: %1$d actualizadas, %2$d fallidas.</string>
+    <string name="extensions_updates_stopped">Actualizaciones detenidas: %1$d actualizadas, %2$d fallidas.</string>
+    <string name="sources_private_location">En Tankobun</string>
+    <string name="sources_remove_private_cd">Quitar %1$s de Tankobun</string>
+    <string name="sources_remove_android_copy">Gestionar copia Android de %1$s</string>
+    <string name="sources_migrate_cd">Migrar %1$s a Tankobun</string>
+    <string name="sources_migrate_title">Copiar a Tankobun</string>
+    <string name="sources_migrate_action">Copiar</string>
+    <string name="sources_migrate_description">Se conservarán tu biblioteca, progreso y ajustes.\n\nTras copiar %1$s, usa el botón del teléfono para quitar su APK de Android. Otros lectores pueden necesitarlo.</string>
+    <string name="sources_migrating">Copiando extensión a Tankobun…</string>
+    <string name="sources_migrated">Copia lista. Usa el botón del teléfono para quitar el APK de Android.</string>
+    <string name="sources_private_failed">No se pudo copiar. Se conservó la extensión actual.</string>
+    <string name="sources_private_removed">Extensión quitada. Biblioteca, progreso y ajustes conservados.</string>
+    <string name="sources_remove_android_first">Primero quita la copia de Android con el botón del teléfono en Instaladas.</string>
+    <string name="sources_private_remove_failed">No se pudo quitar la extensión.</string>
+    <string name="sources_add_another_repository">Agregar otro</string>
+    <string name="sources_added_repositories">Repositorios agregados (%1$d)</string>
+    <string name="sources_refresh_repositories">Actualizar repositorios</string>
+    <string name="sources_repository_number">Repositorio %1$d</string>
+    <string name="sources_remove_repository">Quitar repositorio %1$d</string>
+    <string name="sources_repository_added">Repositorio agregado.</string>
+    <string name="sources_no_repository_extensions">No hay extensiones disponibles en los repositorios agregados.</string>
+    <string name="sources_rename_repository">Renombrar repositorio</string>
+    <string name="sources_repository_name">Nombre</string>
+    <string name="sources_repository_name_automatic">Déjalo vacío para usar el nombre automático.</string>
+    <string name="sources_hide_repository">Ocultar extensiones de %1$s</string>
+    <string name="sources_show_repository">Mostrar extensiones de %1$s</string>
+    <string name="reader_show_controls">Mostrar controles</string>
+    <string name="reader_hide_controls">Ocultar controles</string>
+    <string name="novel_reading_mode">Modo de lectura</string>
+    <string name="novel_scroll">Desplazamiento vertical</string>
+    <string name="novel_continuous">Lectura continua</string>
+    <string name="novel_continuous_hint">Carga capítulos cercanos para seguir leyendo en ambas direcciones.</string>
+    <string name="novel_text_width">Ancho máximo del texto</string>
+    <string name="novel_controls_hint">Toca el centro para mostrar u ocultar los controles</string>
+    <string name="novel_illustration">Ilustración del capítulo</string>
+    <string name="novel_previous_page">Página anterior</string>
+    <string name="novel_next_page">Página siguiente</string>
+    <string name="novel_two_pages">Dos páginas en horizontal</string>
+    <string name="msg_secure_token_unavailable">El almacenamiento seguro de credenciales no está disponible. Tu biblioteca local sigue disponible. Intenta conectarte más tarde.</string>
+    <string name="sources_repository_identity_changed">La identidad de firma del repositorio cambió</string>
+    <string name="sources_repository_identity_none">Sin identidad de firma indicada</string>
+    <string name="sources_repository_identity_review">%1$s\n\nAnterior: %2$s\nNueva: %3$s\n\nLas descargas de este repositorio están pausadas. Aprueba solo si verificaste el cambio con el responsable del repositorio.</string>
+    <string name="sources_repository_identity_approve">Aprobar nueva identidad</string>
 </resources>

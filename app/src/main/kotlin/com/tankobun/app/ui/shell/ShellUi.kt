@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.shell
 
+import com.tankobun.core.model.readingContentKind
+
 import androidx.compose.material3.AlertDialog
 
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -2004,7 +2006,8 @@ internal fun RecentReadingAction(item: RecentReadingProgress, onClick: () -> Uni
                     item.chapter?.name
                         ?: item.progress.chapterNumber.takeIf { it > 0 }?.let { tankobunString(R.string.reader_chapter_number, it.toString()) }
                         ?: tankobunString(R.string.reader_saved_chapter),
-                    tankobunString(R.string.reader_page_fraction, item.progress.pageIndex + 1, item.progress.totalPages),
+                    if (item.media.readingContentKind == com.tankobun.core.model.ReadingContentKind.NOVEL) tankobunString(R.string.novel_read_progress, (item.progress.pageIndex * 100 / (item.progress.totalPages - 1).coerceAtLeast(1)).coerceIn(0, 100))
+                    else tankobunString(R.string.reader_page_fraction, item.progress.pageIndex + 1, item.progress.totalPages),
                 ).joinToString(" / "),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

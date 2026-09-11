@@ -1,0 +1,22 @@
+{
+  "name": "tankobun-novel-runtime",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test runtime.test.mjs"
+  },
+  "dependencies": {
+    "@noble/ciphers": "2.4.0",
+    "buffer": "6.0.3",
+    "cheerio": "1.0.0-rc.12",
+    "dayjs": "1.11.21",
+    "htmlparser2": "12.0.0",
+    "protobufjs": "8.7.1",
+    "string_decoder": "1.3.0",
+    "urlencode": "2.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

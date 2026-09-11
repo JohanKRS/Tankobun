@@ -219,6 +219,9 @@ data class SourceDescriptor(
     val versionCode: Int?,
     val isNsfw: Boolean,
     val installed: Boolean,
+    val contentKind: ReadingContentKind = ReadingContentKind.MANGA,
+    val isPrivateExtension: Boolean = false,
+    val hasSystemCopy: Boolean = false,
 )
 
 data class SourceManga(
@@ -249,6 +252,7 @@ data class SourceChapter(
     val memoJson: String? = null,
 )
 
+@kotlinx.serialization.Serializable
 data class ReaderPage(
     val index: Int,
     val imageUrl: String,
@@ -260,6 +264,7 @@ data class ReaderPage(
     val imageHeight: Int? = null,
     val sourcePageIndex: Int? = null,
     val sourcePageUri: String? = null,
+    val novelBlock: NovelBlock? = null,
 )
 
 data class SourceBinding(

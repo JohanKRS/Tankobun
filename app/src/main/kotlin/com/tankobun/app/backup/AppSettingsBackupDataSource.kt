@@ -1,5 +1,6 @@
 package com.tankobun.app.backup
 
+import com.tankobun.core.extensions.readingContentKind
 import android.net.Uri
 import com.tankobun.app.AppContainer
 import com.tankobun.app.AppLanguage
@@ -118,6 +119,7 @@ internal class AppSettingsBackupDataSource(
             .put("browseCoverColumns", snapshot.browseCoverColumns)
             .put("browseShowWholeCovers", snapshot.browseShowWholeCovers)
             .put("readerMode", snapshot.readerMode.name)
+            .put("novelReaderPreferences", kotlinx.serialization.json.Json.encodeToString(com.tankobun.core.model.NovelReaderPreferences.serializer(), snapshot.novelReaderPreferences))
             .put("readerPageGapLevel", snapshot.readerPageGapLevel)
             .put("showWebtoonChapterDividers", snapshot.showWebtoonChapterDividers)
             .put("readerScreenOrientation", snapshot.readerScreenOrientation.name)
@@ -143,9 +145,20 @@ internal class AppSettingsBackupDataSource(
     private fun sourcesJson(snapshot: TankobunUiState): JSONObject =
         JSONObject()
             .put("extensionRepositoryUrl", snapshot.extensionRepositoryUrl)
+            .put("extensionRepositories", org.json.JSONArray(snapshot.extensionRepositories))
+            .put("extensionRepositoryNames", JSONObject(snapshot.extensionRepositoryNames))
+            .put("hiddenExtensionRepositories", snapshot.hiddenExtensionRepositories.sorted().toJsonArray())
+            .put("novelPluginPreferences", novelPluginPreferences(snapshot))
+            .put("apkSourcePreferences", com.tankobun.core.extensions.SourcePreferenceStore(container.application).backup())
             .put("sourceLanguages", snapshot.sourceLanguages.sorted().toJsonArray())
             .put("disabledSourceKeys", snapshot.disabledSourceKeys.sorted().toJsonArray())
             .put("installedExtensions", installedExtensionsJson(snapshot))
+
+    private fun novelPluginPreferences(snapshot: TankobunUiState): JSONObject = JSONObject().apply {
+        snapshot.allInstalledSources.map { it.packageName }.distinct()
+            .filter { it.startsWith(com.tankobun.core.extensions.novel.LNREADER_PACKAGE_PREFIX) }
+            .forEach { packageName -> put(packageName, com.tankobun.core.extensions.novel.LnReaderSettingsStore(container.application, packageName).backupValues()) }
+    }
 
     private fun installedExtensionsJson(snapshot: TankobunUiState): JSONArray {
         val repositoryByPackage = snapshot.availableExtensions.associateBy { it.packageName }
@@ -227,6 +240,9 @@ internal class AppSettingsBackupDataSource(
         settings.optIntOrNull("browseCoverColumns")?.let(store::saveBrowseCoverColumns)
         settings.optBooleanOrNull("browseShowWholeCovers")?.let(store::saveBrowseShowWholeCovers)
         settings.enumOrNull<ReaderMode>("readerMode")?.let(store::saveReaderMode)
+        settings.optStringOrNull("novelReaderPreferences")?.let { value ->
+            runCatching { kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString<com.tankobun.core.model.NovelReaderPreferences>(value) }.getOrNull()?.let(store::saveNovelReaderPreferences)
+        }
         settings.optIntOrNull("readerPageGapLevel")?.let(store::saveReaderPageGapLevel)
         settings.optBooleanOrNull("showWebtoonChapterDividers")?.let(store::saveShowWebtoonChapterDividers)
         settings.enumOrNull<ReaderScreenOrientation>("readerScreenOrientation")?.let(store::saveReaderScreenOrientation)
@@ -263,6 +279,7 @@ internal class AppSettingsBackupDataSource(
                         id = source.id,
                         name = source.name,
                         lang = source.lang,
+                        contentKind = source.readingContentKind(),
                     )
                 }
             }.getOrDefault(emptyList()).ifEmpty { listOf(descriptor) }
@@ -285,6 +302,10 @@ internal class AppSettingsBackupDataSource(
             browseCoverColumns = store.browseCoverColumns(),
             browseShowWholeCovers = store.browseShowWholeCovers(),
             readerMode = store.readerMode(),
+            novelReaderPreferences = store.novelReaderPreferences(),
+            extensionRepositories = store.extensionRepositories(),
+            extensionRepositoryNames = store.extensionRepositoryNames(),
+            hiddenExtensionRepositories = store.hiddenExtensionRepositories(),
             readerPageGapLevel = store.readerPageGapLevel(),
             showWebtoonChapterDividers = store.showWebtoonChapterDividers(),
             readerScreenOrientation = store.readerScreenOrientation(),
@@ -318,7 +339,28 @@ internal class AppSettingsBackupDataSource(
 
     private fun restoreSourcePreferences(sources: JSONObject) {
         val store = container.settingsStore
+        sources.optJSONObject("apkSourcePreferences")?.let { values ->
+            com.tankobun.core.extensions.SourcePreferenceStore(container.application).restore(values)
+                .forEach { container.sourceHost.clearCache(it) }
+        }
+        sources.optJSONObject("novelPluginPreferences")?.let { plugins ->
+            plugins.keys().forEach { packageName ->
+                if (packageName.matches(Regex("com\\.tankobun\\.lnreader\\.[a-f0-9]{32}"))) {
+                    plugins.optJSONObject(packageName)?.let { values -> com.tankobun.core.extensions.novel.LnReaderSettingsStore(container.application, packageName).restoreValues(values) }
+                }
+            }
+        }
         sources.optStringOrNull("extensionRepositoryUrl")?.let(store::saveExtensionRepositoryUrl)
+        val repositories = sources.optJSONArray("extensionRepositories")
+        if (repositories != null) store.saveExtensionRepositories((0 until repositories.length()).map { repositories.getString(it) })
+        else if (sources.has("extensionRepositoryUrl")) store.saveExtensionRepositories(listOfNotNull(sources.optStringOrNull("extensionRepositoryUrl")?.takeIf { it.isNotBlank() }))
+        sources.optJSONObject("extensionRepositoryNames")?.let { names ->
+            store.saveExtensionRepositoryNames(names.keys().asSequence()
+                .mapNotNull { url -> (names.opt(url) as? String)?.let { url to it } }.toMap())
+        }
+        sources.optJSONArray("hiddenExtensionRepositories")?.let { hidden ->
+            store.saveHiddenExtensionRepositories(hidden.stringValues().toSet())
+        }
         val languages = sources.optJSONArray("sourceLanguages")
             ?.stringValues()
             ?.map { it.trim().lowercase().replace('_', '-') }

@@ -16,6 +16,11 @@ interface Source {
     val supportsLatest: Boolean
         get() = false
 
+    val isNovelSource: Boolean get() = this is NovelSource
+
+    suspend fun fetchPageText(page: Page): String =
+        throw UnsupportedOperationException("Text chapters are not supported by $name")
+
     fun getFilterList(): FilterList = FilterList()
 
     suspend fun getPopularManga(page: Int): MangasPage =

@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity android:name=".NovelReaderQaActivity" android:exported="true" />
+        <activity android:name=".NovelPluginQaActivity" android:exported="true" />
+        <activity android:name=".ApkPreferencesQaActivity" android:exported="true" />
+        <activity android:name=".ExtensionUpdatesQaActivity" android:exported="true" />
+        <activity android:name=".RepositoryQaActivity" android:exported="true" />
+    </application>
+</manifest>

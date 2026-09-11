@@ -3,6 +3,7 @@
 package com.tankobun.core.extensions
 
 import com.tankobun.core.network.RespectfulRateLimiter
+import com.tankobun.core.network.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
@@ -14,35 +15,40 @@ import okhttp3.Request
 import java.io.ByteArrayInputStream
 import java.net.URI
 import java.util.zip.GZIPInputStream
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 class ExtensionIndexRepository(
     private val okHttpClient: OkHttpClient,
     private val rateLimiter: RespectfulRateLimiter,
 ) {
+    private val distributionClient = okHttpClient.codeDistributionClient()
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
     }
 
     suspend fun fetchIndex(indexUrl: String): ExtensionIndexResult {
-        val requestedUrl = indexUrl.trim()
-        require(requestedUrl.isNotEmpty()) { "Extension index URL must not be blank" }
+        val requestedUrl = requireDistributionUrl(indexUrl.trim()).toString()
 
         legacyRepositoryMetadataUrl(requestedUrl)?.let { metadataUrl ->
             val descriptor = try {
                 decodeRepositoryDescriptor(fetchBytes(metadataUrl))
             } catch (error: CancellationException) {
                 throw error
-            } catch (_: Throwable) {
+            } catch (error: Exception) {
+                error.rethrowDistributionFailure()
                 null
             }
             if (descriptor != null) {
                 descriptor.indexV2?.takeIf { it.isNotBlank() }?.let { v2Url ->
                     try {
-                        return decodeIndex(resolveUrl(metadataUrl, v2Url), linkedSetOf())
+                        return decodeIndex(resolveUrl(metadataUrl, v2Url), linkedSetOf(), descriptor.meta?.signingKeyFingerprint)
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Throwable) {
+                    } catch (error: Exception) {
+                        error.rethrowDistributionFailure()
                         // Keep legacy repositories usable while a v2 endpoint is unavailable.
                     }
                 }
@@ -58,18 +64,18 @@ class ExtensionIndexRepository(
     }
 
     fun apkUrl(indexUrl: String, entry: ExtensionIndexEntry): String {
-        if (entry.apkName.startsWith("https://") || entry.apkName.startsWith("http://")) {
-            return entry.apkName
+        if (entry.apkName.startsWith("https://", ignoreCase = true) || entry.apkName.startsWith("http://", ignoreCase = true)) {
+            return requireDistributionUrl(entry.apkName).toString()
         }
-        val uri = URI(indexUrl)
+        val uri = URI(entry.repositoryUrl.ifBlank { indexUrl })
         val indexPath = uri.path.substringBeforeLast('/', "")
         val apkPath = "$indexPath/apk/${entry.apkName}".replace("//", "/")
-        return URI(uri.scheme, uri.authority, apkPath, null, null).toString()
+        return requireDistributionUrl(URI(uri.scheme, uri.authority, apkPath, null, null).toString()).toString()
     }
 
     fun iconUrl(indexUrl: String, entry: ExtensionIndexEntry): String {
         entry.iconUrl?.takeIf { it.isRemoteUrl() }?.let { return it }
-        val uri = URI(indexUrl)
+        val uri = URI(entry.repositoryUrl.ifBlank { indexUrl })
         val indexPath = uri.path.substringBeforeLast('/', "")
         val iconPath = "$indexPath/icon/${entry.packageName}.png".replace("//", "/")
         return URI(uri.scheme, uri.authority, iconPath, null, null).toString()
@@ -82,44 +88,51 @@ class ExtensionIndexRepository(
     ): ExtensionIndexResult {
         check(visitedUrls.add(indexUrl)) { "Extension repository redirect loop" }
         check(visitedUrls.size <= MAX_REDIRECT_DEPTH) { "Too many extension repository redirects" }
-        val payload = fetchBytes(indexUrl).decompressIfGzipped()
+        val context = currentCoroutineContext()
+        val payload = fetchBytes(indexUrl).decompressIfGzipped { context.ensureActive() }
 
         return when (payload.firstMeaningfulByte()) {
             JSON_ARRAY_START -> ExtensionIndexResult(
-                entries = json.decodeFromString<List<ExtensionIndexEntry>>(payload.decodeToString()).map { entry ->
-                    entry.copy(repositorySigningKey = repositorySigningKey?.takeIf { it.isNotBlank() })
+                entries = (com.tankobun.core.extensions.novel.parseLnReaderIndex(payload.decodeToString(), indexUrl)
+                    ?: json.decodeFromString<List<ExtensionIndexEntry>>(payload.decodeToString())).map { entry ->
+                    entry.copy(repositorySigningKey = repositorySigningKey?.takeIf { it.isNotBlank() }, repositoryUrl = indexUrl)
                 },
                 resolvedIndexUrl = indexUrl,
+                repositorySigningKey = repositorySigningKey,
             )
             JSON_OBJECT_START -> {
                 val descriptor = decodeRepositoryDescriptor(payload)
                 val v2Url = descriptor.indexV2?.takeIf { it.isNotBlank() }
                 if (v2Url != null) {
-                    decodeIndex(resolveUrl(indexUrl, v2Url), visitedUrls)
+                    decodeIndex(resolveUrl(indexUrl, v2Url), visitedUrls, mergeSigningKeys(repositorySigningKey, descriptor.meta?.signingKeyFingerprint))
                 } else {
-                    decodeV2Store(indexUrl, json.decodeFromString<ExtensionStoreV2>(payload.decodeToString()))
+                    decodeV2Store(indexUrl, json.decodeFromString<ExtensionStoreV2>(payload.decodeToString()), repositorySigningKey)
                 }
             }
-            else -> decodeV2Store(indexUrl, ProtoBuf.decodeFromByteArray<ExtensionStoreV2>(payload))
+            else -> decodeV2Store(indexUrl, ProtoBuf.decodeFromByteArray<ExtensionStoreV2>(payload), repositorySigningKey)
         }
     }
 
     private suspend fun decodeV2Store(
         indexUrl: String,
         store: ExtensionStoreV2,
+        inheritedSigningKey: String? = null,
     ): ExtensionIndexResult {
         val extensionList = store.extensionList ?: store.extensionListUrl
             ?.takeIf { it.isNotBlank() }
             ?.let { listUrl -> decodeV2ExtensionList(resolveUrl(indexUrl, listUrl)) }
             ?: error("Extension repository does not contain an extension list")
+        val signingKey = mergeSigningKeys(inheritedSigningKey, store.signingKey)
         return ExtensionIndexResult(
-            entries = extensionList.toIndexEntries(store.signingKey),
+            entries = extensionList.toIndexEntries(signingKey).map { it.copy(repositoryUrl = indexUrl) },
             resolvedIndexUrl = indexUrl,
+            repositorySigningKey = signingKey,
         )
     }
 
     private suspend fun decodeV2ExtensionList(listUrl: String): ExtensionStoreV2.ExtensionList {
-        val payload = fetchBytes(listUrl).decompressIfGzipped()
+        val context = currentCoroutineContext()
+        val payload = fetchBytes(listUrl).decompressIfGzipped { context.ensureActive() }
         return if (payload.firstMeaningfulByte() == JSON_OBJECT_START) {
             json.decodeFromString(payload.decodeToString())
         } else {
@@ -129,13 +142,15 @@ class ExtensionIndexRepository(
 
     private suspend fun fetchBytes(url: String): ByteArray = rateLimiter.run {
         withContext(Dispatchers.IO) {
-            val request = Request.Builder().url(url).build()
-            okHttpClient.newCall(request).execute().use { response ->
+            val request = Request.Builder().url(requireDistributionUrl(url))
+                .tag(ResponseByteLimit::class.java, ResponseByteLimit(TransferLimits.INDEX_BYTES.toLong())).build()
+            val call = distributionClient.newCall(request).also { it.timeout().timeout(TransferLimits.METADATA_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS) }
+            call.consumeCancellable { response, checkActive ->
                 rateLimiter.recordResponse(response.headers, response.code)
                 if (!response.isSuccessful) {
                     error("Failed to fetch extension index: HTTP ${response.code}")
                 }
-                response.body.bytes()
+                response.body.readBytesLimited(TransferLimits.INDEX_BYTES, checkActive)
             }
         }
     }
@@ -151,17 +166,17 @@ class ExtensionIndexRepository(
     }
 
     private fun resolveUrl(baseUrl: String, candidate: String): String =
-        URI(baseUrl).resolve(candidate).toString()
+        requireDistributionUrl(requireDistributionUrl(baseUrl).resolve(candidate)?.toString().orEmpty()).toString()
 
     private fun ByteArray.firstMeaningfulByte(): Byte? =
         firstOrNull { byte -> !byte.toInt().toChar().isWhitespace() }
 
-    private fun ByteArray.decompressIfGzipped(): ByteArray {
+    private fun ByteArray.decompressIfGzipped(checkActive: () -> Unit): ByteArray {
         val isGzip = size >= 2 &&
             (this[0].toInt() and 0xFF) == GZIP_MAGIC_BYTE_1 &&
             (this[1].toInt() and 0xFF) == GZIP_MAGIC_BYTE_2
         if (!isGzip) return this
-        return GZIPInputStream(ByteArrayInputStream(this)).use { input -> input.readBytes() }
+        return GZIPInputStream(ByteArrayInputStream(this)).use { input -> input.readBytesLimited(TransferLimits.EXPANDED_INDEX_BYTES, checkActive) }
     }
 
     private fun String.isRemoteUrl(): Boolean =
@@ -176,4 +191,15 @@ class ExtensionIndexRepository(
         const val GZIP_MAGIC_BYTE_1 = 0x1F
         const val GZIP_MAGIC_BYTE_2 = 0x8B
     }
+}
+
+private fun Exception.rethrowDistributionFailure() {
+    if (this is UnsafeDistributionException || this is TransferLimitException || this is InputLimitExceededException) throw this
+}
+
+private fun mergeSigningKeys(first: String?, second: String?): String? {
+    val a = first?.takeIf { it.isNotBlank() }?.let(::repositoryIdentity)
+    val b = second?.takeIf { it.isNotBlank() }?.let(::repositoryIdentity)
+    if (a != null && b != null && a != b) throw UnsafeDistributionException("Conflicting repository signing identities")
+    return b ?: a
 }

@@ -42,11 +42,49 @@ class SettingsStore(context: Context) {
             .apply()
     }
 
-    fun extensionRepositoryUrl(): String =
+    private fun storedExtensionRepositoryUrl(): String =
         preferences.getString(KEY_EXTENSION_REPOSITORY_URL, "").orEmpty()
 
+    fun extensionRepositoryUrl(): String = storedExtensionRepositoryUrl()
+        .takeUnless { it.trim() in extensionRepositories() }.orEmpty()
+
     fun saveExtensionRepositoryUrl(url: String) {
+        if (!preferences.contains("extension.repositories")) saveExtensionRepositories(extensionRepositories())
         preferences.edit().putString(KEY_EXTENSION_REPOSITORY_URL, url).apply()
+    }
+
+    fun extensionRepositories(): List<String> {
+        val saved = preferences.getString("extension.repositories", null)
+        return if (saved == null) listOfNotNull(storedExtensionRepositoryUrl().trim().takeIf { it.isNotBlank() })
+        else runCatching { org.json.JSONArray(saved).let { a -> (0 until a.length()).map { a.getString(it) } } }.getOrDefault(emptyList())
+    }
+    fun saveExtensionRepositories(urls: List<String>) {
+        val normalized = urls.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+        val names = extensionRepositoryNames().filterKeys { it in normalized }
+        preferences.edit().putString("extension.repositories", org.json.JSONArray(normalized).toString())
+            .putStringSet("extension.repositories.hidden", hiddenExtensionRepositories().intersect(normalized.toSet()))
+            .putString("extension.repository.names", org.json.JSONObject(names).toString()).apply()
+    }
+    fun extensionRepositoryNames(): Map<String, String> = runCatching {
+        val json = org.json.JSONObject(preferences.getString("extension.repository.names", "{}").orEmpty())
+        json.keys().asSequence().mapNotNull { url -> (json.opt(url) as? String)?.let { url to it } }.toMap()
+    }.getOrDefault(emptyMap())
+
+    fun saveExtensionRepositoryNames(names: Map<String, String>) {
+        val saved = com.tankobun.app.logic.normalizedRepositoryNames(names, extensionRepositories())
+        preferences.edit().putString("extension.repository.names", org.json.JSONObject(saved).toString()).apply()
+    }
+    fun hiddenExtensionRepositories(): Set<String> =
+        preferences.getStringSet("extension.repositories.hidden", emptySet()).orEmpty().toSet()
+
+    fun saveHiddenExtensionRepositories(urls: Set<String>) {
+        preferences.edit().putStringSet("extension.repositories.hidden", urls.intersect(extensionRepositories().toSet())).apply()
+    }
+    fun novelReaderPreferences(): com.tankobun.core.model.NovelReaderPreferences = runCatching {
+        kotlinx.serialization.json.Json.decodeFromString<com.tankobun.core.model.NovelReaderPreferences>(preferences.getString("reader.novel", "{}").orEmpty()).normalized()
+    }.getOrDefault(com.tankobun.core.model.NovelReaderPreferences())
+    fun saveNovelReaderPreferences(value: com.tankobun.core.model.NovelReaderPreferences) {
+        preferences.edit().putString("reader.novel", kotlinx.serialization.json.Json.encodeToString(com.tankobun.core.model.NovelReaderPreferences.serializer(), value.normalized())).apply()
     }
 
     fun themePreference(): TankobunThemePreference {

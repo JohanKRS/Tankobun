@@ -1,5 +1,6 @@
 package com.tankobun.app
 
+import com.tankobun.core.extensions.readingContentKind
 import android.app.Application
 import android.net.Uri
 import androidx.annotation.PluralsRes
@@ -205,7 +206,7 @@ class AppContainer(application: Application) {
     ): DownloadPageFetcher =
         object : DownloadPageFetcher {
             override suspend fun pages(job: DownloadJob): List<ReaderPage> =
-                sourceHost.pages(source, chapter)
+                com.tankobun.app.reader.ReaderDataSource(this@AppContainer).pagesForSource(downloadJob.mediaId, chapter, source)
 
             override suspend fun bytes(page: ReaderPage): ByteArray =
                 downloadPageBytes(source, downloadJob, chapter, page)
@@ -246,7 +247,8 @@ class AppContainer(application: Application) {
             ) {
                 // DownloadTaskRunner owns retry/backoff here. Avoid multiplying its
                 // attempts by the reader-oriented retries inside the source host.
-                sourceHost.imageBytes(source, page, maxAttempts = 1)
+                page.novelBlock?.let(com.tankobun.core.extensions.novel.NovelDocument::encodeBlock)
+                    ?: sourceHost.imageBytes(source, page, maxAttempts = 1)
             }.bytes
         }
 
@@ -330,6 +332,7 @@ class AppContainer(application: Application) {
                 id = source.id,
                 name = source.name,
                 lang = source.lang,
+                contentKind = source.readingContentKind(),
             )
         }
         return null
@@ -341,6 +344,7 @@ class AppContainer(application: Application) {
     }
 
     private fun pageFileExtension(url: String): String {
+        if (url.startsWith("novel-text:")) return "tknovel"
         val extension = Uri.parse(url).lastPathSegment
             ?.substringAfterLast('.', missingDelimiterValue = "")
             ?.lowercase(Locale.ROOT)

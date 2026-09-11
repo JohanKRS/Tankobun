@@ -15,6 +15,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TankobunLibraryBackupJsonTest {
+    @Test fun mixedMangaNovelBackupKeepsFormatSourceIdentityAndTextAnchor() {
+        val novel = media().copy(id = -100, anilistId = null, mangaBakaId = 900, format = "NOVEL")
+        val items = listOf(media(), novel).map { m -> LibraryItem(m, AnilistListEntry(-1, m.id, MediaStatus.CURRENT, 1, 0.0, null, false, emptyList(), 1)) }
+        val position = ReadingProgress(novel.id, "fiction/one", 1f, 23, 107, 70, ReaderMode.PAGED, false, 100)
+        val binding = SourceBinding(novel.id, 99L, "com.tankobun.lnreader.fixture", "fiction", "A fictional work", null, 10)
+        val restored = parseTankobunLibraryBackupJson(buildTankobunLibraryBackupJson(items, AnilistScoreFormat.POINT_100, AnilistTitleLanguage.ENGLISH, emptyList(), listOf(binding), listOf(position)))
+        val restoredNovel = restored.items.single { it.media.id == novel.id }
+        assertEquals("NOVEL", restoredNovel.media.format)
+        assertEquals(900, restoredNovel.media.mangaBakaId)
+        assertEquals(binding, restoredNovel.sourceBinding)
+        assertEquals(position, restoredNovel.progress.single())
+        assertEquals("MANGA", restored.items.single { it.media.id == 42 }.media.format)
+    }
+
     @Test
     fun tankobunLibraryBackupRoundTripsLocalLibraryData() {
         val item = LibraryItem(

@@ -1,8 +1,10 @@
 package com.tankobun.app.logic
 
 import com.tankobun.app.state.TankobunUiState
+import com.tankobun.core.extensions.UntrustedExtension
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistTitle
+import com.tankobun.core.model.ReadingContentKind
 import com.tankobun.core.model.SourceChapter
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.SourceManga
@@ -14,6 +16,64 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SourceSearchLogicTest {
+    @Test fun novelAndMangaSourceSearchesStaySeparateEvenWithIdenticalNames() {
+        val manga = source(id = 1, name = "Same site")
+        val novel = source(id = 2, name = "Same site").copy(contentKind = ReadingContentKind.NOVEL)
+        val mixed = TankobunUiState(installedSources = listOf(manga, novel), selectedMedia = media(userPreferred = "A story").copy(format = "NOVEL"))
+        assertEquals(listOf(novel), mixed.sourcePickerSources())
+        assertEquals(listOf(manga), mixed.copy(selectedMedia = mixed.selectedMedia!!.copy(format = "MANGA")).sourcePickerSources())
+    }
+
+    @Test fun pickerExcludesCachedMatchesOfTheOtherTypeEvenWhenSelected() {
+        val manga = match(source = source(id = 1, name = "Same site"))
+        val novel = match(source = source(id = 2, name = "Same site").copy(contentKind = ReadingContentKind.NOVEL))
+        val mixed = TankobunUiState(
+            selectedMedia = media(userPreferred = "A story").copy(format = "NOVEL"),
+            sourceMatches = listOf(manga, novel),
+            sourceMatchChapterCounts = mapOf(manga.sourceMatchKey() to 8, novel.sourceMatchKey() to 10),
+            selectedSourceId = manga.source.id,
+            selectedSourcePackageName = manga.source.packageName,
+            selectedSourceManga = manga.manga,
+        )
+        assertEquals(listOf(novel), mixed.sourcePickerMatches())
+        assertEquals(listOf(manga), mixed.copy(selectedMedia = mixed.selectedMedia!!.copy(format = "MANGA")).sourcePickerMatches())
+        val completed = mixed.withSourcePickerSearchCompleted(VerifiedSourceMatches(listOf(novel), emptyMap()), null)
+        assertEquals(listOf(novel), completed.sourceMatches)
+        assertEquals("Found 1 readable sources", completed.sourcePickerMessage)
+    }
+
+    @Test fun compatibleMatchesStillRequireInstallationTrustAndVerifiedChapters() {
+        val good = match(source = source(id = 1))
+        val missing = match(source = source(id = 2).copy(installed = false))
+        val untrusted = match(source = source(id = 3))
+        val unverified = match(source = source(id = 4))
+        val state = TankobunUiState(
+            selectedMedia = media(userPreferred = "A story").copy(format = "MANGA"),
+            sourceMatches = listOf(good, missing, untrusted, unverified),
+            sourceMatchChapterCounts = listOf(good, missing, untrusted).associate { it.sourceMatchKey() to 8 },
+            untrustedExtensions = listOf(UntrustedExtension(untrusted.source, setOf("fixture"))),
+        )
+        assertEquals(listOf(good), state.sourcePickerMatches())
+    }
+
+    @Test fun incompatiblePendingExtensionsDoNotHideTheNoSourcesState() {
+        val manga = UntrustedExtension(source(id = 1), setOf("fixture"))
+        val novel = UntrustedExtension(source(id = 2).copy(contentKind = ReadingContentKind.NOVEL), setOf("fixture"))
+        val state = TankobunUiState(
+            selectedMedia = media(userPreferred = "A story").copy(format = "NOVEL"),
+            sourcePickerOpen = true,
+            installedSources = listOf(manga.descriptor),
+            untrustedExtensions = listOf(manga),
+        )
+        assertTrue(state.sourcePickerSources().isEmpty())
+        assertTrue(state.sourcePickerUntrustedExtensions().isEmpty())
+        assertEquals("Enable or install a source extension first", state.withSourcePickerNoSources().sourcePickerMessage)
+        val withNovels = state.copy(untrustedExtensions = listOf(manga, novel))
+        assertEquals(listOf(novel), withNovels.sourcePickerUntrustedExtensions())
+        assertNull(withNovels.withSourcePickerNoSources().sourcePickerMessage)
+        assertEquals(listOf(manga), withNovels.copy(selectedMedia = state.selectedMedia!!.copy(format = "MANGA")).sourcePickerUntrustedExtensions())
+    }
+
     @Test
     fun buildsSearchQueriesFromTitleVariants() {
         val media = media(

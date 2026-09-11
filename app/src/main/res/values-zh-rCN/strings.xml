@@ -736,9 +736,9 @@
     <string name="about_sources">来源和扩展均为第三方。Tankobun 只与兼容的扩展格式和用户本地配置配合使用。</string>
 
     <string name="sources_empty_installed">未找到已安装的 Tachiyomi 兼容来源扩展。</string>
-    <string name="sources_empty_installed_filter">没有已安装来源符合此搜索和语言筛选。</string>
+    <string name="sources_empty_installed_filter">没有已安装来源符合当前筛选条件。</string>
     <string name="sources_empty_repository">加载仓库索引以浏览可安装扩展。</string>
-    <string name="sources_empty_repository_filter">没有仓库扩展符合此搜索和语言筛选。</string>
+    <string name="sources_empty_repository_filter">没有扩展符合当前筛选条件。</string>
     <string name="sources_header">来源扩展</string>
     <string name="sources_active_installed_count">%1$d 个启用 / %2$d 个已安装</string>
     <string name="sources_search_installed">搜索已安装来源</string>
@@ -746,7 +746,7 @@
     <string name="sources_tab_installed">已安装</string>
     <string name="sources_tab_repository">仓库</string>
     <string name="sources_repository">扩展仓库</string>
-    <string name="sources_repository_index_url">仓库索引 URL</string>
+    <string name="sources_repository_index_url">仓库 URL</string>
     <string name="sources_extensions_shown">显示 %1$d 个扩展</string>
     <string name="sources_active_of_count">%1$d / %2$d 个启用</string>
     <string name="sources_all_on">全部开启</string>
@@ -1233,4 +1233,82 @@
     <string name="catalog_priority_anilist">优先使用 AniList，MangaBaka 提供补充和备用内容。</string>
     <string name="catalog_priority_mangabaka">优先使用 MangaBaka，AniList 提供补充和备用内容。</string>
     <string name="catalog_priority_combined">交替显示两个目录的作品，合并同一作品的结果。</string>
+    <string name="novel_remove_repository" formatted="false">移除</string>
+    <string name="novel_chapters" formatted="false">章节</string>
+    <string name="novel_chapter_end" formatted="false">本章结束</string>
+    <string name="novel_appearance" formatted="false">阅读外观</string>
+    <string name="novel_serif" formatted="false">衬线</string>
+    <string name="novel_sans" formatted="false">无衬线</string>
+    <string name="novel_mono" formatted="false">等宽</string>
+    <string name="novel_system" formatted="false">跟随系统</string>
+    <string name="novel_light" formatted="false">浅色</string>
+    <string name="novel_sepia" formatted="false">护眼</string>
+    <string name="novel_dark" formatted="false">深色</string>
+    <string name="novel_black" formatted="false">纯黑</string>
+    <string name="novel_font_size" formatted="false">文字大小</string>
+    <string name="novel_line_spacing" formatted="false">行距（%）</string>
+    <string name="novel_paragraph_spacing" formatted="false">段间距</string>
+    <string name="novel_margins" formatted="false">左右边距</string>
+    <string name="novel_justify" formatted="false">两端对齐</string>
+    <string name="novel_keep_awake" formatted="false">保持屏幕常亮</string>
+    <string name="about_novel_licenses">小说阅读器许可证</string>
+    <string name="about_novel_compatibility">小说来源兼容遵循 LNReader 和 NovelSource 社区 API。Tankobun 不包含来源、阅读内容或仓库地址。</string>
+    <string name="novel_read_progress">本章 %1$d%%</string>
+    <string name="novel_source_settings">%1$s 设置</string>
+    <string name="novel_source_no_settings">此扩展没有其他设置。</string>
+    <string name="novel_source_website">打开来源网站</string>
+    <string name="novel_source_website_hint">如有需要，请登录来源网站，然后点击完成返回 Tankobun。</string>
+    <string name="novel_source_save">保存</string>
+    <string name="novel_source_reload">重新加载</string>
+    <string name="novel_source_done">完成</string>
+    <string name="source_preferences_autosave">更改会自动保存</string>
+    <string name="source_preferences_unavailable">此来源的设置不可用。请检查扩展是否已安装并受信任。</string>
+    <string name="extensions_update_all">全部更新（%1$d）</string>
+    <string name="extensions_updates_progress">正在更新 %1$d/%2$d · %3$s</string>
+    <string name="extensions_updates_stop">完成此项后停止</string>
+    <string name="extensions_updates_finishing_current">正在完成当前更新…</string>
+    <string name="extensions_updates_finished">更新完成：成功 %1$d，失败 %2$d。</string>
+    <string name="extensions_updates_stopped">更新已停止：成功 %1$d，失败 %2$d。</string>
+    <string name="sources_private_location">在 Tankobun 内</string>
+    <string name="sources_remove_private_cd">从 Tankobun 移除 %1$s</string>
+    <string name="sources_remove_android_copy">管理 %1$s 的 Android 副本</string>
+    <string name="sources_migrate_cd">将 %1$s 迁移到 Tankobun</string>
+    <string name="sources_migrate_title">复制到 Tankobun</string>
+    <string name="sources_migrate_action">复制</string>
+    <string name="sources_migrate_description">书库、进度和设置将保留。\n\n复制 %1$s 后，使用手机按钮移除 Android 中的 APK。其他阅读器可能仍需要它。</string>
+    <string name="sources_migrating">正在将扩展复制到 Tankobun…</string>
+    <string name="sources_migrated">复制完成。使用手机按钮移除 Android 中的 APK。</string>
+    <string name="sources_private_failed">复制失败。已保留现有扩展。</string>
+    <string name="sources_private_removed">扩展已移除。书库、进度和设置已保留。</string>
+    <string name="sources_remove_android_first">请先在已安装页面使用手机按钮移除 Android 副本。</string>
+    <string name="sources_private_remove_failed">无法移除扩展。</string>
+    <string name="sources_add_another_repository">添加另一个</string>
+    <string name="sources_added_repositories">已添加的仓库（%1$d）</string>
+    <string name="sources_refresh_repositories">刷新仓库</string>
+    <string name="sources_repository_number">仓库 %1$d</string>
+    <string name="sources_remove_repository">移除仓库 %1$d</string>
+    <string name="sources_repository_added">已添加仓库。</string>
+    <string name="sources_no_repository_extensions">已添加的仓库中没有可用扩展。</string>
+    <string name="sources_rename_repository">重命名仓库</string>
+    <string name="sources_repository_name">名称</string>
+    <string name="sources_repository_name_automatic">留空则使用自动名称。</string>
+    <string name="sources_hide_repository">隐藏 %1$s 中的扩展</string>
+    <string name="sources_show_repository">显示 %1$s 中的扩展</string>
+    <string name="reader_show_controls">显示控制栏</string>
+    <string name="reader_hide_controls">隐藏控制栏</string>
+    <string name="novel_reading_mode">阅读模式</string>
+    <string name="novel_scroll">纵向滚动</string>
+    <string name="novel_continuous">连续阅读</string>
+    <string name="novel_continuous_hint">加载相邻章节，向前或向后连续阅读。</string>
+    <string name="novel_text_width">最大文本宽度</string>
+    <string name="novel_controls_hint">轻触屏幕中央以显示或隐藏控制栏</string>
+    <string name="novel_illustration">章节插图</string>
+    <string name="novel_previous_page">上一页</string>
+    <string name="novel_next_page">下一页</string>
+    <string name="novel_two_pages">横屏显示双页</string>
+    <string name="msg_secure_token_unavailable">安全凭据存储不可用。本地书库仍可使用。请稍后重新连接。</string>
+    <string name="sources_repository_identity_changed">仓库签名身份已更改</string>
+    <string name="sources_repository_identity_none">未提供签名身份</string>
+    <string name="sources_repository_identity_review">%1$s\n\n原身份：%2$s\n新身份：%3$s\n\n此仓库的下载已暂停。请先向仓库发布者确认此更改，再批准。</string>
+    <string name="sources_repository_identity_approve">批准新身份</string>
 </resources>

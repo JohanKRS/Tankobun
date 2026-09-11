@@ -1,8 +1,11 @@
 package com.tankobun.app.extensions
 
+import com.tankobun.core.extensions.readingContentKind
 import android.net.Uri
 import androidx.core.content.FileProvider
 import com.tankobun.app.AppContainer
+import com.tankobun.core.network.TransferLimits
+import com.tankobun.core.network.downloadCodeFile
 import com.tankobun.app.logic.preferredVisibleSources
 import com.tankobun.app.logic.visibleSources
 import com.tankobun.core.extensions.ExtensionIndexEntry
@@ -10,7 +13,6 @@ import com.tankobun.core.extensions.ExtensionIndexResult
 import com.tankobun.core.model.SourceDescriptor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.Request
 import java.io.File
 
 internal data class InstalledExtensionVersion(
@@ -27,7 +29,35 @@ internal data class InstalledSourceState(
 internal class ExtensionDataSource(
     private val container: AppContainer,
 ) {
-    private val extensionApkValidator = ExtensionApkValidator(container.application.packageManager)
+    val repositoryTrust = com.tankobun.core.extensions.RepositoryTrustStore(container.application)
+    private val extensionApkValidator = ExtensionApkValidator(container.application)
+    private val packages = com.tankobun.core.extensions.ExtensionPackageStore(container.application)
+
+    fun usesAndroidInstaller(packageName: String): Boolean =
+        !packageName.startsWith(com.tankobun.core.extensions.novel.LNREADER_PACKAGE_PREFIX) &&
+            !packages.isPrivate(packageName) && packages.systemPackage(packageName) != null
+
+    suspend fun installPrivateExtension(apkUri: Uri, entry: ExtensionIndexEntry) = withContext(Dispatchers.IO) {
+        repositoryTrust.verifyEntry(entry)
+        // Downloaded APKs already passed repository/package/version/signature checks.
+        val file = File(container.application.cacheDir, "extension_apks/${entry.packageName}-${entry.versionCode}.apk")
+        check(FileProvider.getUriForFile(container.application, "${container.application.packageName}.fileprovider", file) == apkUri)
+        extensionApkValidator.validate(file, entry)
+        packages.installPrivate(file, entry.packageName, entry.versionCode)
+    }
+
+    suspend fun migrateExtension(packageName: String) = withContext(Dispatchers.IO) {
+        val installed = packages.systemPackage(packageName) ?: error("Extension is not installed in Android")
+        val archive = File(requireNotNull(installed.applicationInfo).sourceDir)
+        val expected = ExtensionIndexEntry(packageName, packageName, "", "", installed.longVersionCode.toInt(), installed.versionName.orEmpty())
+        extensionApkValidator.validate(archive, expected)
+        packages.installPrivate(archive, packageName, expected.versionCode)
+        check(packages.isPrivate(packageName)) { "Private extension could not be activated" }
+    }
+
+    suspend fun removePrivateExtension(packageName: String) = withContext(Dispatchers.IO) {
+        check(packages.uninstallPrivate(packageName)) { "Extension could not be removed" }
+    }
 
     suspend fun installedSourceState(
         preferredLanguages: Set<String>,
@@ -44,6 +74,7 @@ internal class ExtensionDataSource(
                         id = source.id,
                         name = source.name,
                         lang = source.lang,
+                        contentKind = source.readingContentKind(),
                     )
                 }
             }.getOrDefault(emptyList()).ifEmpty { listOf(descriptor) }
@@ -59,8 +90,12 @@ internal class ExtensionDataSource(
         )
     }
 
-    suspend fun fetchExtensionIndex(repositoryUrl: String): ExtensionIndexResult =
-        container.extensionRepository.fetchIndex(repositoryUrl)
+    suspend fun fetchExtensionIndex(repositoryUrl: String): ExtensionIndexResult {
+        val fetchUrl = repositoryTrust.fetchUrl(repositoryUrl)
+        return container.extensionRepository.fetchIndex(fetchUrl).also { result ->
+            withContext(Dispatchers.IO) { repositoryTrust.checkAndRemember(fetchUrl, result) }
+        }
+    }
 
     fun extensionApkUrl(repositoryUrl: String, entry: ExtensionIndexEntry): String =
         container.extensionRepository.apkUrl(repositoryUrl, entry)
@@ -70,7 +105,11 @@ internal class ExtensionDataSource(
 
     fun installedExtensionVersion(packageName: String): InstalledExtensionVersion? =
         runCatching {
-            val packageInfo = container.application.packageManager.getPackageInfo(packageName, 0)
+            if (packageName.startsWith(com.tankobun.core.extensions.novel.LNREADER_PACKAGE_PREFIX)) {
+                return@runCatching com.tankobun.core.extensions.novel.LnReaderPluginStore(container.application).record(packageName)?.first
+                    ?.let { InstalledExtensionVersion(it.versionCode, it.version) }
+            }
+            val packageInfo = packages.packageInfo(packageName) ?: return@runCatching null
             InstalledExtensionVersion(
                 versionCode = if (android.os.Build.VERSION.SDK_INT >= 28) {
                     packageInfo.longVersionCode.toInt()
@@ -84,36 +123,21 @@ internal class ExtensionDataSource(
 
     suspend fun downloadExtensionApk(apkUrl: String, entry: ExtensionIndexEntry): Uri =
         withContext(Dispatchers.IO) {
+            repositoryTrust.verifyEntry(entry)
             extensionApkValidator.validateIndexEntry(entry)
             val cacheDir = File(container.application.cacheDir, "extension_apks").also { it.mkdirs() }
             val safeName = "${entry.packageName}-${entry.versionCode}.apk"
                 .replace(Regex("[^A-Za-z0-9._-]"), "_")
             val apkFile = File(cacheDir, safeName)
-            val partialFile = File(cacheDir, "$safeName.part")
 
             cacheDir.listFiles()
                 ?.filter { it.name.startsWith(entry.packageName) && it.name != apkFile.name }
                 ?.forEach { it.delete() }
 
             try {
-                val request = Request.Builder().url(apkUrl).build()
-                container.okHttpClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        error("APK download failed: HTTP ${response.code}")
-                    }
-                    val body = response.body
-                    partialFile.outputStream().use { output ->
-                        body.byteStream().use { input -> input.copyTo(output) }
-                    }
+                downloadCodeFile(container.okHttpClient, apkUrl, apkFile, TransferLimits.EXTENSION_APK_BYTES) {
+                    extensionApkValidator.validate(it, entry)
                 }
-
-                if (partialFile.length() <= 0L) {
-                    error("APK download failed: empty file")
-                }
-                if (apkFile.exists()) apkFile.delete()
-                check(partialFile.renameTo(apkFile)) { "APK download failed: could not finalize file" }
-
-                extensionApkValidator.validate(apkFile, entry)
 
                 FileProvider.getUriForFile(
                     container.application,
@@ -121,7 +145,6 @@ internal class ExtensionDataSource(
                     apkFile,
                 )
             } catch (error: Throwable) {
-                partialFile.delete()
                 apkFile.delete()
                 throw error
             }

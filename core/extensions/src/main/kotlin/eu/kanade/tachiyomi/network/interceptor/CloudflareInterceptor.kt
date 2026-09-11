@@ -46,16 +46,22 @@ internal object CloudflareInterceptor : Interceptor {
         return chain.proceed(request)
     }
 
-    private fun Response.isCloudflareChallenge(): Boolean {
+    internal fun Response.isCloudflareChallenge(): Boolean {
         if (code !in ERROR_CODES) return false
         if (!header("Server").orEmpty().contains("cloudflare", ignoreCase = true)) return false
         if (header("Cf-Mitigated").orEmpty().equals("challenge", ignoreCase = true)) return true
 
-        return runCatching {
-            val document = Jsoup.parse(peekBody(Long.MAX_VALUE).string(), request.url.toString())
+        return try {
+            val document = Jsoup.parse(peekBody(64L * 1024).string(), request.url.toString())
             document.getElementById("challenge-error-title") != null ||
                 document.getElementById("challenge-error-text") != null
-        }.getOrDefault(false)
+        } catch (error: Exception) {
+            if (error is com.tankobun.core.network.TransferLimitException || error is com.tankobun.core.network.InputLimitExceededException) {
+                close()
+                throw error
+            }
+            false
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")

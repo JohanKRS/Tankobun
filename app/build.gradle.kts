@@ -1,4 +1,7 @@
 import java.util.Properties
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.FileSystemOperations
 
 plugins {
     alias(libs.plugins.android.application)
@@ -40,6 +43,38 @@ val hasReleaseSigning = listOf(
     releaseKeyPassword,
 ).all { !it.isNullOrBlank() }
 
+abstract class BundleLicenseAssets : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val licenseFiles: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @get:javax.inject.Inject
+    abstract val fileSystemOperations: FileSystemOperations
+
+    @TaskAction
+    fun bundle() {
+        fileSystemOperations.sync {
+            from(licenseFiles)
+            into(outputDirectory.dir("licenses"))
+        }
+    }
+}
+
+val bundleLicenseAssets = tasks.register<BundleLicenseAssets>("bundleLicenseAssets") {
+    outputDirectory.set(layout.buildDirectory.dir("generated/licenseAssets"))
+    licenseFiles.from(
+        rootProject.file("LICENCE.md"),
+        rootProject.file("NOTICE.md"),
+        rootProject.file("docs/licenses/APACHE-2.0.txt"),
+        rootProject.file("docs/licenses/OFL-1.1.txt"),
+        rootProject.file("docs/licenses/TABLER-ICONS-MIT.txt"),
+        rootProject.file("docs/licenses/COMPOSE-ICONS-MIT.txt"),
+    )
+}
+
 android {
     namespace = "com.tankobun.app"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -50,6 +85,7 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 49
         versionName = "4.2.1"
+        testInstrumentationRunner = "com.tankobun.app.NovelCompatibilityInstrumentation"
 
         val clientId = configValue("anilistClientId", "ANILIST_CLIENT_ID")
         buildConfigField("String", "ANILIST_CLIENT_ID", "\"$clientId\"")
@@ -80,6 +116,7 @@ android {
     }
 
     buildTypes {
+        debug { applicationIdSuffix = providers.gradleProperty("qaApplicationIdSuffix").orNull }
         release {
             signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
@@ -93,7 +130,12 @@ android {
     }
 }
 
+androidComponents.onVariants { variant ->
+    variant.sources.assets?.addGeneratedSourceDirectory(bundleLicenseAssets, BundleLicenseAssets::outputDirectory)
+}
+
 dependencies {
+    implementation(libs.kotlinx.serialization.json)
     implementation(project(":core:model"))
     implementation(project(":core:network"))
     implementation(project(":core:anilist"))
@@ -107,6 +149,7 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.preference)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)

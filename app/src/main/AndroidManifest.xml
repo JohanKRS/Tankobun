@@ -28,6 +28,11 @@
         </provider>
 
         <activity
+            android:name=".SourcePreferencesActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Tankobun.SourcePreferences" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <property

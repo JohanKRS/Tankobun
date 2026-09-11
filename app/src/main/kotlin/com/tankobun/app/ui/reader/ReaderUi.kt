@@ -208,8 +208,8 @@ import com.tankobun.app.ui.shell.*
 private const val ReaderSideTapZoneWeight = 1f
 private const val ReaderCenterTapZoneWeight = 1.15f
 private const val ReaderTapZoneTotalWeight = ReaderSideTapZoneWeight + ReaderCenterTapZoneWeight + ReaderSideTapZoneWeight
-private const val ReaderPreviousTapZoneEndFraction = ReaderSideTapZoneWeight / ReaderTapZoneTotalWeight
-private const val ReaderNextTapZoneStartFraction =
+internal const val ReaderPreviousTapZoneEndFraction = ReaderSideTapZoneWeight / ReaderTapZoneTotalWeight
+internal const val ReaderNextTapZoneStartFraction =
     (ReaderSideTapZoneWeight + ReaderCenterTapZoneWeight) / ReaderTapZoneTotalWeight
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -227,6 +227,10 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
             onClose = viewModel::closeReader,
             ignoreDisplayCutout = ignoreDisplayCutout,
         )
+        return
+    }
+    if (state.readerPages.any { it.novelBlock != null }) {
+        NovelReader(state, viewModel)
         return
     }
     var controlsVisible by remember { mutableStateOf(false) }

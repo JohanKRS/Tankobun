@@ -1,5 +1,6 @@
 package com.tankobun.app.source
 
+import com.tankobun.core.model.supports
 import android.util.Log
 import com.tankobun.app.AppContainer
 import com.tankobun.app.BuildConfig
@@ -64,7 +65,7 @@ internal class SourceDataSource(
     private val container: AppContainer,
     private val cachePolicy: CachePolicy,
 ) {
-    suspend fun cachedSourceState(mediaId: Int, sources: List<SourceDescriptor>): CachedSourceState {
+    suspend fun cachedSourceState(mediaId: Int, sources: List<SourceDescriptor>, media: AnilistMedia? = null): CachedSourceState {
         val binding = container.database.sourceBindingDao().bindingForMedia(mediaId)
         val cachedResults = container.database.sourceSearchDao().cachedSearchResults(mediaId)
         val cachedMatches = cachedResults.map { result ->
@@ -83,9 +84,10 @@ internal class SourceDataSource(
                     versionCode = null,
                     isNsfw = false,
                     installed = false,
+                    contentKind = if (result.sourcePackageName.startsWith(com.tankobun.core.extensions.novel.LNREADER_PACKAGE_PREFIX) || result.sourcePackageName.startsWith(com.tankobun.core.extensions.NOVEL_EXTENSION_PREFIX)) com.tankobun.core.model.ReadingContentKind.NOVEL else com.tankobun.core.model.ReadingContentKind.MANGA,
                 )
             result.toSearchResult(source)
-        }.distinctBy { "${it.source.packageName}:${it.source.id}:${it.manga.url}:${it.manga.title}" }
+        }.filter { media == null || it.source.supports(media) }.distinctBy { "${it.source.packageName}:${it.source.id}:${it.manga.url}:${it.manga.title}" }
 
         val chapterCounts = mutableMapOf<String, Int>()
         val matches = buildList {
@@ -110,7 +112,7 @@ internal class SourceDataSource(
                 packageName = cached.sourcePackageName,
                 sourceName = boundSourceHint?.sourceName,
                 sourceLang = boundSourceHint?.sourceLang,
-            )
+            )?.takeIf { media == null || it.supports(media) }
         }
         val effectiveBinding = if (binding != null && boundSource != null && (
                 binding.sourceId != boundSource.id || binding.sourcePackageName != boundSource.packageName
@@ -199,7 +201,7 @@ internal class SourceDataSource(
         onUpdate: suspend (SourcePickerSearchUpdate) -> Unit = {},
     ): VerifiedSourceMatches = supervisorScope {
         val semaphore = Semaphore(SOURCE_SEARCH_CONCURRENCY)
-        val verified = sources
+        val verified = sources.filter { it.supports(media) }
             .map { source ->
                 async {
                     semaphore.withPermit {
@@ -269,7 +271,7 @@ internal class SourceDataSource(
         sources: List<SourceDescriptor>,
         now: Long,
     ): RecentReadingProgress {
-        val cached = cachedSourceState(item.media.id, sources)
+        val cached = cachedSourceState(item.media.id, sources, item.media)
         val boundPackageName = cached.boundSource?.packageName ?: cached.boundSourcePackageName
         val source = cached.boundSource
         val manga = cached.boundManga
@@ -296,6 +298,7 @@ internal class SourceDataSource(
         now: Long,
         titleOverride: String? = null,
     ): List<SourceSearchResult> {
+        if (!source.supports(media)) return emptyList()
         val queries = sourceSearchQueries(media, titleOverride)
         val titleOverrides = titleOverride?.let(::sourceSearchRankTitleVariants).orEmpty()
         val candidates = mutableListOf<SourceManga>()

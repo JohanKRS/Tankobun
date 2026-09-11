@@ -16,6 +16,8 @@ data class ExtensionIndexEntry(
     val sources: List<ExtensionIndexSource> = emptyList(),
     val iconUrl: String? = null,
     @Transient val repositorySigningKey: String? = null,
+    val repositoryUrl: String = "",
+    val lnReaderPlugin: com.tankobun.core.extensions.novel.LnReaderPlugin? = null,
 ) {
     val isNsfw: Boolean get() = nsfwFlag == 1
 }
@@ -23,6 +25,7 @@ data class ExtensionIndexEntry(
 data class ExtensionIndexResult(
     val entries: List<ExtensionIndexEntry>,
     val resolvedIndexUrl: String,
+    val repositorySigningKey: String? = null,
 )
 
 @Serializable

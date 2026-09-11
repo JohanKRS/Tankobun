@@ -6,6 +6,11 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.util.Log
 import com.tankobun.core.network.RespectfulRateLimiter
+import com.tankobun.core.network.InputLimitExceededException
+import com.tankobun.core.network.TransferLimitException
+import com.tankobun.core.network.TransferLimits
+import com.tankobun.core.network.readBytesLimited
+import com.tankobun.core.network.readBytesCancellable
 import com.tankobun.core.model.SourceDescriptor
 import com.tankobun.core.model.ReaderPage
 import com.tankobun.core.model.SourceChapter
@@ -52,6 +57,14 @@ class TachiyomiSourceHost(
 
     private fun loadSourcesLocked(packageName: String): List<Source> {
         ensureHttpAgent()
+        if (packageName.startsWith(com.tankobun.core.extensions.novel.LNREADER_PACKAGE_PREFIX)) {
+            val (plugin, code) = com.tankobun.core.extensions.novel.LnReaderPluginStore(appContext).record(packageName) ?: return emptyList()
+            val key = "LNReader:${plugin.version}:${com.tankobun.core.extensions.novel.digest(code.toByteArray())}"
+            synchronized(sourceCache) {
+                sourceCache[packageName]?.takeIf { it.cacheKey == key }?.let { return it.sources }
+                return listOf(com.tankobun.core.extensions.novel.LnReaderSource(appContext, plugin)).also { sourceCache[packageName] = CachedSources(key, it) }
+            }
+        }
         val packageInfo = packageInfo(packageName) ?: return emptyList()
         // Gate every entrypoint, including background work and cached source instances.
         if (!trustStore.isTrusted(packageInfo)) return emptyList()
@@ -138,6 +151,16 @@ class TachiyomiSourceHost(
         runSourceAction(source, sourceInstance, "pages") {
             val sourceChapter = chapter.toSChapter()
             val pages = sourceInstance.getPageList(sourceChapter)
+            if (source.contentKind == com.tankobun.core.model.ReadingContentKind.NOVEL) {
+                check(sourceInstance.readingContentKind() == com.tankobun.core.model.ReadingContentKind.NOVEL)
+                val html = pages.joinToStringText { page ->
+                    if (sourceInstance is eu.kanade.tachiyomi.source.NovelSource) sourceInstance.fetchPageText(page)
+                    else sourceInstance.fetchPageText(page)
+                }
+                val textHeaders = (sourceInstance as? HttpSource)?.headers?.toMap().orEmpty()
+                val base = (sourceInstance as? HttpSource)?.getChapterUrl(sourceChapter) ?: chapter.url
+                return@runSourceAction com.tankobun.core.extensions.novel.NovelDocument.parse(html, base, textHeaders)
+            }
             val headers = (sourceInstance as? HttpSource)?.headers?.let { values ->
                 values.names().associateWith { values[it].orEmpty() }
             }.orEmpty()
@@ -153,10 +176,12 @@ class TachiyomiSourceHost(
         maxAttempts: Int = SOURCE_IMAGE_RETRY_ATTEMPTS,
     ): ByteArray = withContext(Dispatchers.IO) {
         val sourceInstance = findSource(source) ?: error("Source is not installed")
+        if (sourceInstance is com.tankobun.core.extensions.novel.LnReaderSource) sourceInstance.ensureImageHeaders()
         page.sourcePageUri?.takeIf { it.isLocalPageUri() }?.let { uri ->
-            return@withContext runInterruptible {
-                appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() }
+            return@withContext kotlinx.coroutines.withTimeout(SOURCE_IMAGE_TIMEOUT_MILLIS) {
+                val input = runInterruptible { appContext.contentResolver.openInputStream(Uri.parse(uri)) }
                     ?: throw java.io.FileNotFoundException(uri)
+                input.readBytesCancellable(TransferLimits.IMAGE_BYTES, SOURCE_IMAGE_TIMEOUT_MILLIS)
             }
         }
         if (sourceInstance !is HttpSource) {
@@ -233,13 +258,13 @@ class TachiyomiSourceHost(
             rateLimiter.recordResponse(it.headers, it.code)
             if (!it.isSuccessful) throw SourceImageHttpException(page.index, it.code)
             val contentType = it.body.contentType()?.toString().orEmpty()
-            it.body.bytes().also { bytes ->
+            it.body.readBytesLimited(TransferLimits.IMAGE_BYTES).also { bytes ->
                 check(bytes.looksLikeImage() || contentType.startsWith("image/", ignoreCase = true)) {
                     "Page ${page.index + 1} did not return an image"
                 }
             }
         }
-    }.awaitSourceValue()
+    }.withImageDeadline().awaitSourceValue()
 
     private fun SourceDescriptor.imageFetchKey(): String = "$packageName:$id"
 
@@ -263,7 +288,8 @@ class TachiyomiSourceHost(
         val classLoader = PathClassLoader(appInfo.sourceDir, appContext.classLoader)
         val metadata = appInfo.metaData
 
-        val declared = metadata?.getString("tachiyomi.extension.class")
+        val declared = (metadata?.getString("tachiyomi.extension.class")
+            ?: metadata?.getString("tachiyomi.novelextension.class"))
             ?.split(';', ',')
             ?.map { it.trim() }
             ?.filter { it.isNotBlank() }
@@ -287,7 +313,7 @@ class TachiyomiSourceHost(
     private fun packageInfo(packageName: String): PackageInfo? =
         runCatching {
             @Suppress("DEPRECATION")
-            appContext.packageManager.getPackageInfo(packageName, EXTENSION_PACKAGE_FLAGS)
+            ExtensionPackageStore(appContext).packageInfo(packageName)
         }.onFailure { error ->
             logSourceFailure(
                 action = "packageInfo",
@@ -307,6 +333,12 @@ class TachiyomiSourceHost(
     }
 }
 
+private const val SOURCE_IMAGE_TIMEOUT_MILLIS = 120_000L
+
+/** Timeout includes response headers and body; unsubscription cancels the source call. */
+internal fun rx.Observable<ByteArray>.withImageDeadline(timeoutMillis: Long = SOURCE_IMAGE_TIMEOUT_MILLIS): rx.Observable<ByteArray> =
+    timeout(timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+
 private data class CachedSources(
     val cacheKey: String,
     val sources: List<Source>,
@@ -325,6 +357,7 @@ private class SourceImageHttpException(
 internal fun Throwable.isTransientSourceImageFailure(): Boolean =
     causeChain().firstNotNullOfOrNull { error ->
         when (error) {
+            is InputLimitExceededException, is TransferLimitException -> false
             is SourceImageHttpException -> error.statusCode in TRANSIENT_SOURCE_IMAGE_STATUS_CODES
             is eu.kanade.tachiyomi.network.HttpException -> error.code in TRANSIENT_SOURCE_IMAGE_STATUS_CODES
             is IOException -> true
@@ -439,3 +472,7 @@ internal fun String.toFullyQualifiedSourceClassName(packageName: String): String
         '.' in this -> this
         else -> "$packageName.$this"
     }
+
+private suspend fun List<Page>.joinToStringText(fetch: suspend (Page) -> String): String = buildString {
+    for (page in this@joinToStringText) { append(fetch(page)); append("<hr>") }
+}

@@ -1,5 +1,7 @@
 package com.tankobun.app.ui.downloads
 
+import com.tankobun.core.model.readingContentKind
+
 import com.tankobun.app.ui.icons.TankobunIcons
 
 import android.content.Context
@@ -301,6 +303,7 @@ internal fun DownloadsScreen(
             items(state.downloads, key = { it.id }) { job ->
                 DownloadJobRow(
                     job = job,
+                    novel = state.allInstalledSources.any { it.id == job.sourceId && it.contentKind == com.tankobun.core.model.ReadingContentKind.NOVEL } || state.libraryItems.any { it.media.id == job.mediaId && it.media.readingContentKind == com.tankobun.core.model.ReadingContentKind.NOVEL },
                     onPause = { viewModel.pauseDownload(job.id) },
                     onResume = { viewModel.resumeDownload(job.id) },
                     onRetry = { viewModel.retryDownload(job.id) },
@@ -314,6 +317,7 @@ internal fun DownloadsScreen(
 @Composable
 internal fun DownloadJobRow(
     job: DownloadJob,
+    novel: Boolean = false,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onRetry: () -> Unit,
@@ -326,7 +330,7 @@ internal fun DownloadJobRow(
                 supportingContent = {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            job.downloadStatusLine(),
+                            job.downloadStatusLine(novel),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -367,9 +371,10 @@ internal fun DownloadJobRow(
 }
 
 @Composable
-internal fun DownloadJob.downloadStatusLine(): String {
+internal fun DownloadJob.downloadStatusLine(novel: Boolean = false): String {
     val status = state.statusLabel()
     val progress = when {
+        novel && pageCount > 0 -> " / ${(completedPages * 100L / pageCount).coerceIn(0, 100)}%"
         pageCount > 0 -> " / ${tankobunString(R.string.downloads_pages_progress, completedPages, pageCount)}"
         completedPages > 0 -> " / ${tankobunQuantityString(R.plurals.page_count, completedPages, completedPages)}"
         else -> ""
