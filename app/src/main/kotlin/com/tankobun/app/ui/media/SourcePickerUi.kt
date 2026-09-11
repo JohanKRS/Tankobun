@@ -68,6 +68,9 @@ import com.tankobun.app.SourceThumbnailImageModel
 import com.tankobun.app.tankobunQuantityString
 import com.tankobun.app.tankobunString
 import com.tankobun.app.logic.sourceMatchKey
+import com.tankobun.app.logic.sourcePickerMatches
+import com.tankobun.app.logic.sourcePickerSources
+import com.tankobun.app.logic.sourcePickerUntrustedExtensions
 import com.tankobun.app.logic.sourceSettingsKey
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.app.ui.components.TankobunDialogSurface
@@ -75,9 +78,7 @@ import com.tankobun.app.ui.components.TankobunIconActionButton
 import com.tankobun.app.ui.components.TankobunMessageBanner
 import com.tankobun.app.ui.settings.ExtensionIcon
 import com.tankobun.app.ui.settings.extensionInitials
-import com.tankobun.app.ui.settings.normalizedSourceLanguage
 import com.tankobun.app.ui.settings.sourceLanguageDisplay
-import com.tankobun.app.ui.settings.sourceLanguageSortPriority
 import com.tankobun.app.ui.settings.sourceMetadata
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.SourceDescriptor
@@ -431,30 +432,9 @@ private fun Bitmap.visibleAlphaBounds(alphaThreshold: Int = 8): Rect? {
 @Composable
 internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia, onSetupSources: () -> Unit) {
     val context = LocalContext.current
-    val matches = state.sourceMatches.filter { match ->
-        match.source.installed && state.untrustedExtensions.none { it.descriptor.packageName == match.source.packageName } &&
-        state.sourceMatchChapterCounts[match.source.sourceMatchKey(match.manga.url)] != null
-    }
-    val availableSources = remember(state.installedSources, state.selectedSourceId, state.selectedSourcePackageName) {
-        state.installedSources
-            .distinctBy { it.sourceSettingsKey() }
-            .sortedWith(
-                compareBy<SourceDescriptor> {
-                    if (
-                        it.id == state.selectedSourceId &&
-                        (state.selectedSourcePackageName == null ||
-                            state.selectedSourcePackageName == it.packageName)
-                    ) {
-                        0
-                    } else {
-                        1
-                    }
-                }
-                    .thenBy { sourceLanguageSortPriority(it.lang.normalizedSourceLanguage()) }
-                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
-                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.lang },
-            )
-    }
+    val matches = state.sourcePickerMatches()
+    val availableSources = state.sourcePickerSources()
+    val pendingExtensions = state.sourcePickerUntrustedExtensions()
     val matchSourceKeys = remember(matches) {
         matches.mapTo(mutableSetOf()) { it.source.sourceSettingsKey() }
     }
@@ -501,7 +481,7 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                 )
             }
 
-            if (matches.isEmpty() && availableSources.isEmpty() && state.untrustedExtensions.isEmpty() && !state.sourcePickerLoading) {
+            if (matches.isEmpty() && availableSources.isEmpty() && pendingExtensions.isEmpty() && !state.sourcePickerLoading) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     if (state.hasNoInstalledSources) {
                         SourceSetupCard(onSetupSources)
@@ -519,14 +499,14 @@ internal fun SourcePickerDialog(state: TankobunUiState, viewModel: MainViewModel
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (state.untrustedExtensions.isNotEmpty()) {
+                    if (pendingExtensions.isNotEmpty()) {
                         item(key = "pending-review-title") {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(tankobunString(R.string.sources_trust_section), style = MaterialTheme.typography.titleMedium)
                                 Text(tankobunString(R.string.sources_trust_group_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        items(state.untrustedExtensions, key = { "review:${it.descriptor.packageName}" }) { candidate ->
+                        items(pendingExtensions, key = { "review:${it.descriptor.packageName}" }) { candidate ->
                             Surface(shape = LocalTankobunStyle.current.themeShapes.panel, color = LocalTankobunStyle.current.colors.panel) {
                                 SourceSettingsRow(
                                     source = candidate.descriptor,

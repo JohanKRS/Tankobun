@@ -1295,4 +1295,16 @@
     <string name="sources_no_repository_extensions">No extensions are available in the added repositories.</string>
     <string name="sources_hide_repository">Hide extensions from %1$s</string>
     <string name="sources_show_repository">Show extensions from %1$s</string>
+    <string name="reader_show_controls">Show controls</string>
+    <string name="reader_hide_controls">Hide controls</string>
+    <string name="novel_reading_mode">Reading mode</string>
+    <string name="novel_scroll">Vertical scroll</string>
+    <string name="novel_continuous">Continuous reading</string>
+    <string name="novel_continuous_hint">Load nearby chapters to keep reading in either direction.</string>
+    <string name="novel_text_width">Maximum text width</string>
+    <string name="novel_controls_hint">Tap the center to show or hide controls</string>
+    <string name="novel_illustration">Chapter illustration</string>
+    <string name="novel_previous_page">Previous page</string>
+    <string name="novel_next_page">Next page</string>
+    <string name="novel_two_pages">Two pages in landscape</string>
 </resources>

@@ -1294,4 +1294,16 @@
     <string name="sources_repository_name_automatic">留空则使用自动名称。</string>
     <string name="sources_hide_repository">隐藏 %1$s 中的扩展</string>
     <string name="sources_show_repository">显示 %1$s 中的扩展</string>
+    <string name="reader_show_controls">显示控制栏</string>
+    <string name="reader_hide_controls">隐藏控制栏</string>
+    <string name="novel_reading_mode">阅读模式</string>
+    <string name="novel_scroll">纵向滚动</string>
+    <string name="novel_continuous">连续阅读</string>
+    <string name="novel_continuous_hint">加载相邻章节，向前或向后连续阅读。</string>
+    <string name="novel_text_width">最大文本宽度</string>
+    <string name="novel_controls_hint">轻触屏幕中央以显示或隐藏控制栏</string>
+    <string name="novel_illustration">章节插图</string>
+    <string name="novel_previous_page">上一页</string>
+    <string name="novel_next_page">下一页</string>
+    <string name="novel_two_pages">横屏显示双页</string>
 </resources>

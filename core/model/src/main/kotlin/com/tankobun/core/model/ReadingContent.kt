@@ -19,6 +19,7 @@ data class NovelBlock(
 
 enum class NovelFont { SERIF, SANS_SERIF, MONOSPACE }
 enum class NovelTheme { SYSTEM, LIGHT, SEPIA, DARK, BLACK }
+enum class NovelReadingMode { SCROLL, PAGED }
 
 @kotlinx.serialization.Serializable
 data class NovelReaderPreferences(
@@ -30,11 +31,16 @@ data class NovelReaderPreferences(
     val margin: Int = 20,
     val justified: Boolean = false,
     val keepScreenOn: Boolean = true,
+    val readingMode: NovelReadingMode = NovelReadingMode.SCROLL,
+    val continuousReading: Boolean = true,
+    val maxTextWidth: Int = 720,
+    val landscapeTwoPages: Boolean = true,
 ) {
     fun normalized() = copy(
         fontSize = fontSize.coerceIn(14, 36),
         lineHeightPercent = lineHeightPercent.coerceIn(120, 220),
         paragraphSpacing = paragraphSpacing.coerceIn(0, 32),
         margin = margin.coerceIn(8, 48),
+        maxTextWidth = maxTextWidth.coerceIn(400, 1000),
     )
 }

@@ -1296,4 +1296,16 @@
     <string name="sources_repository_name_automatic">Déjalo vacío para usar el nombre automático.</string>
     <string name="sources_hide_repository">Ocultar extensiones de %1$s</string>
     <string name="sources_show_repository">Mostrar extensiones de %1$s</string>
+    <string name="reader_show_controls">Mostrar controles</string>
+    <string name="reader_hide_controls">Ocultar controles</string>
+    <string name="novel_reading_mode">Modo de lectura</string>
+    <string name="novel_scroll">Desplazamiento vertical</string>
+    <string name="novel_continuous">Lectura continua</string>
+    <string name="novel_continuous_hint">Carga capítulos cercanos para seguir leyendo en ambas direcciones.</string>
+    <string name="novel_text_width">Ancho máximo del texto</string>
+    <string name="novel_controls_hint">Toca el centro para mostrar u ocultar los controles</string>
+    <string name="novel_illustration">Ilustración del capítulo</string>
+    <string name="novel_previous_page">Página anterior</string>
+    <string name="novel_next_page">Página siguiente</string>
+    <string name="novel_two_pages">Dos páginas en horizontal</string>
 </resources>

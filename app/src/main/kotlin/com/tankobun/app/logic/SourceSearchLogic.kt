@@ -4,6 +4,7 @@ import com.tankobun.core.model.supports
 import android.content.Context
 import com.tankobun.app.R
 import com.tankobun.app.state.TankobunUiState
+import com.tankobun.core.extensions.UntrustedExtension
 import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.SourceChapter
@@ -86,6 +87,17 @@ internal fun TankobunUiState.sourcePickerSources(): List<SourceDescriptor> =
                 .thenBy(String.CASE_INSENSITIVE_ORDER) { it.lang },
         )
 
+internal fun TankobunUiState.sourcePickerMatches(): List<SourceSearchResult> =
+    sourceMatches.filter { match ->
+        match.source.installed &&
+            selectedMedia?.let(match.source::supports) != false &&
+            untrustedExtensions.none { it.descriptor.packageName == match.source.packageName } &&
+            sourceMatchChapterCounts[match.sourceMatchKey()] != null
+    }
+
+internal fun TankobunUiState.sourcePickerUntrustedExtensions(): List<UntrustedExtension> =
+    untrustedExtensions.filter { selectedMedia?.let(it.descriptor::supports) != false }
+
 internal fun TankobunUiState.withSourcePickerOpened(media: AnilistMedia): TankobunUiState =
     copy(
         sourcePickerOpen = true,
@@ -96,7 +108,7 @@ internal fun TankobunUiState.withSourcePickerOpened(media: AnilistMedia): Tankob
     )
 
 internal fun TankobunUiState.withSourcePickerNoSources(context: Context): TankobunUiState =
-    if (sourcePickerOpen && untrustedExtensions.isNotEmpty()) {
+    if (sourcePickerOpen && sourcePickerUntrustedExtensions().isNotEmpty()) {
         copy(sourcePickerMessage = null)
     } else context.getString(R.string.source_picker_no_sources).let { pickerMessage ->
         copy(
@@ -106,7 +118,7 @@ internal fun TankobunUiState.withSourcePickerNoSources(context: Context): Tankob
     }
 
 internal fun TankobunUiState.withSourcePickerNoSources(): TankobunUiState =
-    if (sourcePickerOpen && untrustedExtensions.isNotEmpty()) {
+    if (sourcePickerOpen && sourcePickerUntrustedExtensions().isNotEmpty()) {
         copy(sourcePickerMessage = null)
     } else copy(
         sourcePickerMessage = SOURCE_PICKER_NO_SOURCES_MESSAGE,
@@ -178,6 +190,7 @@ internal fun TankobunUiState.withSourcePickerSearchCompleted(
             selectedSourceManga?.url == match.manga.url
     }
     val nextMatches = (selectedMatches + verified.matches)
+        .filter { selectedMedia?.let(it.source::supports) != false }
         .distinctSourceMatches()
         .sortedByDescending { match -> match.score }
     return copy(
@@ -200,6 +213,7 @@ internal fun TankobunUiState.withSourcePickerSearchCompleted(
             selectedSourceManga?.url == match.manga.url
     }
     val nextMatches = (selectedMatches + verified.matches)
+        .filter { selectedMedia?.let(it.source::supports) != false }
         .distinctSourceMatches()
         .sortedByDescending { match -> match.score }
     return copy(
@@ -218,6 +232,7 @@ internal fun TankobunUiState.withSourcePickerMatchPublished(
     chapterCount: Int,
 ): TankobunUiState {
     val nextMatches = (sourceMatches + match)
+        .filter { selectedMedia?.let(it.source::supports) != false }
         .distinctSourceMatches()
         .sortedByDescending { result -> result.score }
     return copy(

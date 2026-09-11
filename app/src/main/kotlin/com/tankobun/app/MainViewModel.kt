@@ -1056,6 +1056,8 @@ class MainViewModel(
     fun setNovelReaderPreferences(value: com.tankobun.core.model.NovelReaderPreferences) {
         container.settingsStore.saveNovelReaderPreferences(value)
         _state.update { it.copy(novelReaderPreferences = value.normalized()) }
+        if (value.continuousReading) ensureNovelReaderSegmentsLoaded()
+        else if (_state.value.readerPages.any { it.novelBlock != null }) cancelReaderAdjacentLoadJobs()
     }
 
     fun extensionApkUrl(entry: ExtensionIndexEntry): String =
@@ -4418,8 +4420,28 @@ class MainViewModel(
         )
     }
 
+    fun ensureNovelReaderSegmentsLoaded() {
+        val snapshot = _state.value
+        if (!snapshot.novelReaderPreferences.continuousReading || snapshot.readerPages.none { it.novelBlock != null }) return
+        val media = snapshot.selectedMedia ?: return
+        val chapter = snapshot.activeChapter ?: return
+        snapshot.sourceChapters.previousInReadingOrderBefore(chapter)?.let {
+            startAdjacentReaderSegmentLoad(media.id, chapter, it, ReaderSegmentDirection.PREVIOUS)
+        }
+        snapshot.sourceChapters.nextInReadingOrderAfter(chapter)?.let {
+            startAdjacentReaderSegmentLoad(media.id, chapter, it, ReaderSegmentDirection.NEXT)
+        }
+    }
+
+    /** Novel offsets are characters, not pixels. Keep them in state as well as the persisted anchor. */
+    fun setNovelReaderPosition(chapterUrl: String, blockIndex: Int, character: Int) {
+        if (_state.value.activeChapter?.url == chapterUrl) setReaderPage(blockIndex, character)
+        else setWebtoonReaderPosition(chapterUrl, blockIndex, character)
+    }
+
     private fun loadAdjacentReaderSegments(mediaId: Int, chapter: SourceChapter) {
         val snapshot = _state.value
+        if (snapshot.readerPages.any { it.novelBlock != null } && !snapshot.novelReaderPreferences.continuousReading) return
         val previousChapter = snapshot.sourceChapters.previousInReadingOrderBefore(chapter)
         val nextChapter = snapshot.sourceChapters.nextInReadingOrderAfter(chapter)
         cancelReaderAdjacentLoadJobs()
@@ -4459,25 +4481,33 @@ class MainViewModel(
             setAdjacentReaderLoadJob(direction, null)
         }
 
+        val novel = snapshot.readerPages.any { it.novelBlock != null }
+        if (novel) _state.update { if (direction == ReaderSegmentDirection.PREVIOUS) it.copy(novelPreviousLoading = true) else it.copy(novelNextLoading = true) }
         val job = viewModelScope.launch {
-            val source = _state.value.readerSourceForChapter(adjacentChapter)
-            val segment = loadAdjacentReaderSegment(mediaId, adjacentChapter, source) ?: return@launch
-            if (_state.value.activeChapter?.url != activeChapter.url) return@launch
-            startReaderPageCache(
-                source = source,
-                mediaId = mediaId,
-                chapter = segment.chapter,
-                pages = when (direction) {
-                    ReaderSegmentDirection.PREVIOUS -> readerDataSource.adjacentTailPages(segment.pages)
-                    ReaderSegmentDirection.NEXT -> readerDataSource.adjacentHeadPages(segment.pages)
-                },
-                cacheKeySuffix = when (direction) {
-                    ReaderSegmentDirection.PREVIOUS -> "tail"
-                    ReaderSegmentDirection.NEXT -> "head"
-                },
-                initialDelayMillis = ReaderDataSource.ADJACENT_CACHE_INITIAL_DELAY_MILLIS,
-            )
-            _state.update { it.withReaderAdjacentSegment(activeChapter, segment, direction) }
+            try {
+                val source = _state.value.readerSourceForChapter(adjacentChapter)
+                val segment = loadAdjacentReaderSegment(mediaId, adjacentChapter, source) ?: return@launch
+                if (_state.value.activeChapter?.url != activeChapter.url) return@launch
+                startReaderPageCache(
+                    source = source,
+                    mediaId = mediaId,
+                    chapter = segment.chapter,
+                    pages = when (direction) {
+                        ReaderSegmentDirection.PREVIOUS -> readerDataSource.adjacentTailPages(segment.pages)
+                        ReaderSegmentDirection.NEXT -> readerDataSource.adjacentHeadPages(segment.pages)
+                    },
+                    cacheKeySuffix = when (direction) {
+                        ReaderSegmentDirection.PREVIOUS -> "tail"
+                        ReaderSegmentDirection.NEXT -> "head"
+                    },
+                    initialDelayMillis = ReaderDataSource.ADJACENT_CACHE_INITIAL_DELAY_MILLIS,
+                )
+                _state.update { it.withReaderAdjacentSegment(activeChapter, segment, direction) }
+            } finally {
+                if (novel && _state.value.activeChapter?.url == activeChapter.url && adjacentReaderLoadJob(direction)?.job == coroutineContext[Job]) {
+                    _state.update { if (direction == ReaderSegmentDirection.PREVIOUS) it.copy(novelPreviousLoading = false) else it.copy(novelNextLoading = false) }
+                }
+            }
         }
         setAdjacentReaderLoadJob(
             direction = direction,
@@ -4539,6 +4569,7 @@ class MainViewModel(
         readerPreviousAdjacentLoadJob = null
         readerNextAdjacentLoadJob?.job?.cancel()
         readerNextAdjacentLoadJob = null
+        _state.update { it.copy(novelPreviousLoading = false, novelNextLoading = false) }
     }
 
     fun openRecentProgress(item: RecentReadingProgress) {

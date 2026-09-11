@@ -53,7 +53,7 @@ Tankobun is not a content service, content host, extension repository, or manga 
 - Profile dashboard with reading activity, library statistics, genre insights, and achievements.
 - Fourteen color palettes with independent Defined or Rounded component shapes.
 - Manga list browsing, status management, scoring, custom lists, and progress updates.
-- Reader interface with paged and webtoon modes for manga, and adjustable typography and themes for novels.
+- Reader interface with paged and webtoon modes for manga, plus scrolling or page-turn reading for novels, with adjustable typography and themes.
 - A shared library, catalog search, and details page for manga and novels. Source matching follows the work’s format.
 - Multiple user-managed extension repositories, including compatible manga/NovelSource APKs and LNReader JavaScript plugins.
 - Update all pending extension updates from the source manager, with sequential installation, progress and a stop control. Updates to APKs still installed in Android use its installer confirmation.
@@ -84,7 +84,9 @@ Extensions awaiting approval stay visible in the extension manager. A manga with
 
 Novel support uses the community LNReader plugin contract and the NovelSource text API. There is no Tankobun-specific source repository format. The same source manager accepts user-entered repository indexes; installing an LNReader plugin stores that selected plugin privately in the app. Installing a plugin authorizes its code to run. Updates keep its source identity; removing a repository does not delete reading progress or installed sources. JavaScript plugins are not automatically installed by restoring a backup.
 
-The novel reader offers serif, sans-serif and monospace fonts, text size, line/paragraph spacing, margins, alignment, five color modes, text selection, text search, chapter selection and precise resume after reflow. Text and illustrations share the reader cache quota and download manager. Library backups retain catalog format, source identity, chapter and text position; settings backups retain typography and repository addresses. Downloaded reading content and plugin executables are not embedded in library/settings backups.
+The novel reader supports vertical scrolling or screen-sized pages turned with side taps and horizontal swipes. Center taps show or hide all controls, matching the manga reader. Wide landscape screens can show two pages side by side. Optional continuous reading loads the previous and next chapters through the existing cache and offline downloads.
+
+It also offers serif, sans-serif and monospace fonts, text size, line/paragraph spacing, margins, maximum text width, alignment, five color modes, text selection, text search, chapter selection and precise resume after reflow. Text and illustrations share the reader cache quota and download manager. Library backups retain catalog format, source identity, chapter and text position; settings backups retain typography, reading mode, landscape layout, continuous-reading preference and repository addresses. Downloaded reading content and plugin executables are not embedded in library/settings backups.
 
 Each installed LNReader plugin has a settings button for its text, switch, select and checkbox options. Its website can be opened inside Tankobun for sign-in; cookies stay in Android's website store, while local/session storage snapshots are scoped to that plugin and the source's origin. Reader requests use the resulting session. Settings backups preserve switches and selection preferences; free-text fields and browser sessions stay on the device because they can contain credentials.
 

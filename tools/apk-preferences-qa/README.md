@@ -108,3 +108,20 @@ saved catalog preference and no account. A healthy AniList must supply both
 screens without requesting MangaBaka; a failed AniList must be attempted before
 the MangaBaka fallback. Saved MangaBaka and Combined choices must remain effective.
 The contract restores the previous preference and catalog clients afterward.
+
+
+## Novel reader interaction and pagination
+
+Run the isolated instrumentation with `-e novelReader true` to verify real offline
+chapter loads without installed sources, promotion in both directions, eviction
+back to a three-chapter window, character anchors, reopening and preference
+backup/restore. The fixture contains four original chapters, including a long
+paragraph that spans multiple screen pages.
+
+Launch `com.tankobun.app.NovelReaderQaActivity` with optional `--ei chapter 2`
+and `--ei block 13` for visual checks. Use center taps to toggle chrome, side taps
+and horizontal swipes to turn pages, and **Aa** to switch modes and typography.
+Check text selection, page seeking, continuous navigation in both directions,
+landscape pairs, the one-page preference, and rotation back to portrait without
+losing the paragraph. Repeat at phone and tablet widths. All fixture text and
+files are debug-only and excluded from release builds.

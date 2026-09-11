@@ -144,6 +144,8 @@ data class TankobunUiState(
     val hiddenExtensionRepositories: Set<String> = emptySet(),
     val extensionRepositoryLoading: Boolean = false,
     val novelReaderPreferences: com.tankobun.core.model.NovelReaderPreferences = com.tankobun.core.model.NovelReaderPreferences(),
+    val novelPreviousLoading: Boolean = false,
+    val novelNextLoading: Boolean = false,
     val availableExtensions: List<ExtensionIndexEntry> = emptyList(),
     val installingExtensionPackageName: String? = null,
     val extensionInstallRequest: ExtensionInstallRequest? = null,
