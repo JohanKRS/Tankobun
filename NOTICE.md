@@ -27,6 +27,11 @@ The interface iconography uses Tabler Icons through the Compose Icons adapter.
 Both projects are MIT-licensed; their license texts are included at
 `docs/licenses/TABLER-ICONS-MIT.txt` and `docs/licenses/COMPOSE-ICONS-MIT.txt`.
 
+Every app build also packages this notice, Tankobun's MIT license, and the four
+license texts above under `assets/licenses/`. Settings → About displays these
+bundled copies without requiring a network connection. The build copies only
+these named license files, not website assets, screenshots, or test fixtures.
+
 Tankobun-specific changes include integration with Tankobun's extension scanner,
 source host, dependency registry, browser-like user-agent handling, shared Android
 WebView cookies, supported content-encoding handling, Cloudflare retry behavior,

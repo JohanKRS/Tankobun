@@ -225,6 +225,8 @@ If you distribute a modified version, please use a clearly different app name, p
 
 Tankobun code is licensed under the [MIT License](LICENCE.md). Catalog data, images, and third-party components retain their own rights and licenses; they are not relicensed under MIT. See [NOTICE.md](NOTICE.md) for attribution.
 
+The APK bundles the project license, third-party notices, and the license texts for its compatibility layer, typography, icons, and novel runtime. Settings → About makes these texts available offline. App branding and licensed UI resources are included; manga covers and other catalog artwork are obtained from the selected catalog at runtime, not shipped as a built-in content collection.
+
 ## Third-Party Notices
 
 Some extension compatibility behavior is adapted from the Mihon/Tachiyomi-compatible network and extension host ecosystem under the Apache License 2.0. See `NOTICE.md` for attribution and license details.

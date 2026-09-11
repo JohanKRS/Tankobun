@@ -336,11 +336,20 @@ private fun AboutCatalogCredits(onOpenUrl: (String) -> Unit) {
             TextButton(onClick = { onOpenUrl(MANGA_BAKA_PRIVACY_URL) }) { Text(tankobunString(R.string.about_mangabaka_privacy)) }
         }
         AboutParagraph(tankobunString(R.string.about_novel_compatibility))
-        NovelRuntimeLicenseButton()
+        BundledLicenseButton(tankobunString(R.string.about_novel_licenses), listOf("novel/LICENSES.txt"))
         AboutParagraph(tankobunString(R.string.about_code_license))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            TextButton(onClick = { onOpenUrl("https://github.com/JohanKRS/Tankobun/blob/main/LICENCE.md") }) { Text("MIT") }
-            TextButton(onClick = { onOpenUrl("https://github.com/JohanKRS/Tankobun/blob/main/NOTICE.md") }) { Text(tankobunString(R.string.about_third_party_notices)) }
+            BundledLicenseButton("MIT", listOf("licenses/LICENCE.md"))
+            BundledLicenseButton(
+                tankobunString(R.string.about_third_party_notices),
+                listOf(
+                    "licenses/NOTICE.md",
+                    "licenses/APACHE-2.0.txt",
+                    "licenses/OFL-1.1.txt",
+                    "licenses/TABLER-ICONS-MIT.txt",
+                    "licenses/COMPOSE-ICONS-MIT.txt",
+                ),
+            )
         }
     }
 }
@@ -557,15 +566,19 @@ internal fun downloadedAppUpdateInstallIntent(installRequest: AppUpdateInstallRe
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
 @Composable
-private fun NovelRuntimeLicenseButton() {
+private fun BundledLicenseButton(title: String, assetPaths: List<String>) {
     var open by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    TextButton(onClick = { open = true }) { Text(tankobunString(R.string.about_novel_licenses)) }
+    TextButton(onClick = { open = true }) { Text(title) }
     if (open) {
-        val notices by produceState(initialValue = "", context) {
-            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { context.assets.open("novel/LICENSES.txt").bufferedReader().use { it.readText() } }
+        val notices by produceState(initialValue = "", context, assetPaths) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                assetPaths.joinToString("\n\n") { path ->
+                    context.assets.open(path).bufferedReader(Charsets.UTF_8).use { it.readText() }
+                }
+            }
         }
-        AlertDialog(onDismissRequest = { open = false }, title = { Text(tankobunString(R.string.about_novel_licenses)) },
+        AlertDialog(onDismissRequest = { open = false }, title = { Text(title) },
             text = { androidx.compose.foundation.text.selection.SelectionContainer { Text(notices, Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), style = MaterialTheme.typography.bodySmall) } },
             confirmButton = { TextButton(onClick = { open = false }) { Text(tankobunString(R.string.common_close)) } })
     }

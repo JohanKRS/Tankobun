@@ -1,4 +1,7 @@
 import java.util.Properties
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.FileSystemOperations
 
 plugins {
     alias(libs.plugins.android.application)
@@ -39,6 +42,38 @@ val hasReleaseSigning = listOf(
     releaseKeyAlias,
     releaseKeyPassword,
 ).all { !it.isNullOrBlank() }
+
+abstract class BundleLicenseAssets : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val licenseFiles: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @get:javax.inject.Inject
+    abstract val fileSystemOperations: FileSystemOperations
+
+    @TaskAction
+    fun bundle() {
+        fileSystemOperations.sync {
+            from(licenseFiles)
+            into(outputDirectory.dir("licenses"))
+        }
+    }
+}
+
+val bundleLicenseAssets = tasks.register<BundleLicenseAssets>("bundleLicenseAssets") {
+    outputDirectory.set(layout.buildDirectory.dir("generated/licenseAssets"))
+    licenseFiles.from(
+        rootProject.file("LICENCE.md"),
+        rootProject.file("NOTICE.md"),
+        rootProject.file("docs/licenses/APACHE-2.0.txt"),
+        rootProject.file("docs/licenses/OFL-1.1.txt"),
+        rootProject.file("docs/licenses/TABLER-ICONS-MIT.txt"),
+        rootProject.file("docs/licenses/COMPOSE-ICONS-MIT.txt"),
+    )
+}
 
 android {
     namespace = "com.tankobun.app"
@@ -93,6 +128,10 @@ android {
             isDebuggable = false
         }
     }
+}
+
+androidComponents.onVariants { variant ->
+    variant.sources.assets?.addGeneratedSourceDirectory(bundleLicenseAssets, BundleLicenseAssets::outputDirectory)
 }
 
 dependencies {
