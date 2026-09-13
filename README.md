@@ -59,6 +59,7 @@ Tankobun is not a content service, content host, extension repository, or manga 
 - Update all pending extension updates from the source manager, with sequential installation, progress and a stop control. Updates to APKs still installed in Android use its installer confirmation.
 - Local reading state, caching, and optional offline storage for user-selected sources where permitted by the source and applicable law.
 - Source selection through extensions installed by the user.
+- Discreet translation-group credits from chapter metadata, with optional preferred-group selection and one version per chapter. Missing chapters fall back to other groups from the same source; uncertain numbering and specials remain separate.
 - Complete native Tankobun JSON backups for local and synced libraries, including both catalog identities.
 - Additional MyAnimeList-compatible XML export for matched AniList titles.
 - In-app restore tools for supported backup files.
@@ -72,6 +73,8 @@ Tankobun does not host, upload, index, provide, sell, bundle, or distribute mang
 Tankobun does not include a default extension repository. It does not recommend source repositories, source websites, or places to obtain manga content.
 
 Any source extension used with Tankobun must be added and installed by the user. The user is solely responsible for choosing which extensions, repositories, websites, or services they use, and for making sure their use complies with applicable laws, site terms, publisher rights, and creator rights.
+
+Chapter translation credits are displayed only when supplied by the installed extension. The Translations control can prioritize a group while keeping chapters available from other groups. Turning off “One version per chapter” restores every release. These preferences are saved per work/source and included in personal settings backups; they also apply to reader navigation and batch downloads. Filtering uses the loaded metadata without additional source requests and does not delete cached chapters, downloads, or reading progress. Chapters with missing/ambiguous numbering, specials, parts, or repeated numbers within the same credited group are kept separate. Structured volume and chapter-number metadata is retained when provided by the extension.
 
 Before loading an installed APK extension, Tankobun asks the user to trust its package and current signing identity. Existing extensions also need this initial approval; updates signed by the same identity retain it. A changed signer requires a new review. Extensions execute inside Tankobun's process: this approval is not a sandbox or a guarantee that an extension is safe.
 

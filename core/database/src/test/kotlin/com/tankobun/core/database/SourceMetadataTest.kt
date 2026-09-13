@@ -10,7 +10,8 @@ class SourceMetadataTest {
 
     @Test fun bindingAndChapterMetadataSurviveDatabaseMapping() {
         val binding = SourceBinding(1, 2, "fixture.package", "/manga", "Fixture", null, 10, memo)
-        val chapter = SourceChapter(2, "/manga", "/chapter", "Chapter", 1f, null, null, memo)
+        val chapter = SourceChapter(2, "/manga", "/chapter", "Chapter", 1f, "Paper", null, memo,
+            volume = "2", chapterNumberText = "1.0", scanlators = listOf("Paper", "Ink"))
         assertEquals(binding, binding.toEntity().toModel())
         assertEquals(chapter, chapter.toEntity(10).toModel())
     }
@@ -18,5 +19,6 @@ class SourceMetadataTest {
     @Test fun oldRowsWithoutMetadataRemainReadable() {
         assertNull(SourceBindingEntity(1, 2, "fixture.package", "/manga", "Fixture", null, 10).toModel().memoJson)
         assertNull(SourceChapterEntity(2, "/manga", "/chapter", "Chapter", 1f, null, null, 10).toModel().memoJson)
+        assertTrue(SourceChapterEntity(2, "/manga", "/chapter", "Chapter", 1f, null, null, 10).toModel().scanlators.isEmpty())
     }
 }

@@ -250,6 +250,9 @@ data class SourceChapter(
     val scanlator: String?,
     val uploadedAtEpochMillis: Long?,
     val memoJson: String? = null,
+    val volume: String? = null,
+    val chapterNumberText: String? = null,
+    val scanlators: List<String> = emptyList(),
 )
 
 @kotlinx.serialization.Serializable

@@ -17,7 +17,10 @@ internal fun JSONArray.lnReaderChapters(): List<SChapter> =
             chapter_number = row.optDouble("chapterNumber", -1.0).toFloat()
                 .takeIf { it.isFinite() } ?: -1f
             scanlator = when (val value = row.opt("scanlator")) {
-                is JSONArray -> (0 until value.length()).mapNotNull { value.optString(it).takeIf(String::isNotBlank) }.joinToString(", ")
+                is JSONArray -> {
+                    scanlators = (0 until value.length()).mapNotNull { (value.opt(it) as? String)?.takeIf(String::isNotBlank) }
+                    scanlators.joinToString(", ")
+                }
                 is String -> value
                 else -> null
             }

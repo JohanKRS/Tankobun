@@ -27,8 +27,17 @@ object DatabaseFactory {
                 MIGRATION_12_13,
                 MIGRATION_13_14,
                 MIGRATION_14_15,
+                MIGRATION_15_16,
             )
             .build()
+    }
+
+    internal val MIGRATION_15_16 = object : Migration(15, 16) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE source_chapters ADD COLUMN volume TEXT")
+            db.execSQL("ALTER TABLE source_chapters ADD COLUMN chapterNumberText TEXT")
+            db.execSQL("ALTER TABLE source_chapters ADD COLUMN scanlators TEXT NOT NULL DEFAULT ''")
+        }
     }
 
     internal val MIGRATION_14_15 = object : Migration(14, 15) {

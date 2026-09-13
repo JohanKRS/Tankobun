@@ -153,6 +153,9 @@ fun SourceChapter.toEntity(fetchedAtEpochMillis: Long): SourceChapterEntity =
         uploadedAtEpochMillis = uploadedAtEpochMillis,
         memoJson = memoJson,
         fetchedAtEpochMillis = fetchedAtEpochMillis,
+        volume = volume,
+        chapterNumberText = chapterNumberText,
+        scanlators = scanlators,
     )
 
 fun SourceChapterEntity.toModel(): SourceChapter =
@@ -165,6 +168,9 @@ fun SourceChapterEntity.toModel(): SourceChapter =
         scanlator = scanlator,
         uploadedAtEpochMillis = uploadedAtEpochMillis,
         memoJson = memoJson,
+        volume = volume,
+        chapterNumberText = chapterNumberText,
+        scanlators = scanlators,
     )
 
 fun ReadingProgress.toEntity(): ReadingProgressEntity =

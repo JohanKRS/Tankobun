@@ -269,7 +269,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     val pageCount = state.readerPages.size
     val lastPageIndex = (pageCount - 1).coerceAtLeast(0)
     val nextChapter = state.nextReaderChapter()
-    val previousChapter = state.sourceChapters.previousInReadingOrderBefore(chapter)
+    val previousChapter = state.readingChapters.previousInReadingOrderBefore(chapter)
     val webtoonPageItems = remember(state.readerPreviousSegment, chapter, state.readerPages, state.readerNextSegment) {
         webtoonReaderPageItems(
             previousSegment = state.readerPreviousSegment,

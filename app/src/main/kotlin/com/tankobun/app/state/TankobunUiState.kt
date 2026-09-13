@@ -178,6 +178,7 @@ data class TankobunUiState(
     val sourcePickerSearchTitle: String = "",
     val selectedSourceManga: SourceManga? = null,
     val sourceChapters: List<SourceChapter> = emptyList(),
+    val chapterGroupPreferences: Map<String, com.tankobun.core.model.ChapterGroupPreference> = emptyMap(),
     val chapterListStartsAtFirst: Boolean = true,
     val latestProgress: ReadingProgress? = null,
     val chapterProgress: Map<String, ReadingProgress> = emptyMap(),
@@ -213,6 +214,19 @@ data class TankobunUiState(
     val busy: Boolean = false,
     val message: String? = null,
 ) {
+    val chapterGroupPreferenceKey: String?
+        get() = com.tankobun.app.logic.chapterGroupPreferenceKey(selectedSourcePackageName, selectedSourceId, selectedSourceManga?.url)
+
+    val chapterGroupPreference: com.tankobun.core.model.ChapterGroupPreference
+        get() = chapterGroupPreferences[chapterGroupPreferenceKey] ?: com.tankobun.core.model.ChapterGroupPreference()
+
+    val chapterGroupSelection: com.tankobun.app.logic.ChapterGroupSelection by lazy {
+        com.tankobun.app.logic.ChapterGroupSelectionCache.select(sourceChapters, chapterGroupPreference)
+    }
+
+    val readingChapters: List<SourceChapter>
+        get() = chapterGroupSelection.chapters
+
     val selectedSourceAwaitingTrust: com.tankobun.core.extensions.UntrustedExtension?
         get() = untrustedExtensions.firstOrNull {
             selectedSourceManga != null && it.descriptor.packageName == selectedSourcePackageName

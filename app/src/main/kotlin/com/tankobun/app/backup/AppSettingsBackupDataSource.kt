@@ -124,6 +124,7 @@ internal class AppSettingsBackupDataSource(
             .put("showWebtoonChapterDividers", snapshot.showWebtoonChapterDividers)
             .put("readerScreenOrientation", snapshot.readerScreenOrientation.name)
             .put("chapterListStartsAtFirst", snapshot.chapterListStartsAtFirst)
+            .put("chapterGroupPreferences", kotlinx.serialization.json.Json.encodeToString(snapshot.chapterGroupPreferences))
             .put("keepNextTenDownloads", snapshot.keepNextTenDownloads)
             .put("newChapterChecksEnabled", snapshot.newChapterChecksEnabled)
             .put("showNsfwContent", snapshot.showNsfwContent)
@@ -246,6 +247,10 @@ internal class AppSettingsBackupDataSource(
         settings.optIntOrNull("readerPageGapLevel")?.let(store::saveReaderPageGapLevel)
         settings.optBooleanOrNull("showWebtoonChapterDividers")?.let(store::saveShowWebtoonChapterDividers)
         settings.enumOrNull<ReaderScreenOrientation>("readerScreenOrientation")?.let(store::saveReaderScreenOrientation)
+        (settings.opt("chapterGroupPreferences") as? String)?.let { encoded ->
+            runCatching { kotlinx.serialization.json.Json.decodeFromString<Map<String, com.tankobun.core.model.ChapterGroupPreference>>(encoded) }
+                .getOrNull()?.let(store::saveChapterGroupPreferences)
+        }
         settings.optBooleanOrNull("chapterListStartsAtFirst")?.let(store::saveChapterListStartsAtFirst)
         settings.optBooleanOrNull("keepNextTenDownloads")?.let(store::saveKeepNextTenDownloads)
         settings.optBooleanOrNull("newChapterChecksEnabled")?.let(store::saveNewChapterChecksEnabled)
@@ -310,6 +315,7 @@ internal class AppSettingsBackupDataSource(
             showWebtoonChapterDividers = store.showWebtoonChapterDividers(),
             readerScreenOrientation = store.readerScreenOrientation(),
             chapterListStartsAtFirst = store.chapterListStartsAtFirst(),
+            chapterGroupPreferences = store.chapterGroupPreferences(),
             keepNextTenDownloads = store.keepNextTenDownloads(),
             newChapterChecksEnabled = store.newChapterChecksEnabled(),
             lastNewChapterCheckAtEpochMillis = store.lastNewChapterCheckAtEpochMillis(),

@@ -1311,4 +1311,11 @@
     <string name="sources_repository_identity_none">未提供签名身份</string>
     <string name="sources_repository_identity_review">%1$s\n\n原身份：%2$s\n新身份：%3$s\n\n此仓库的下载已暂停。请先向仓库发布者确认此更改，再批准。</string>
     <string name="sources_repository_identity_approve">批准新身份</string>
+    <string name="chapter_groups_title">翻译组</string>
+    <string name="chapter_groups_filtered">翻译组 · 已筛选</string>
+    <string name="chapter_groups_one_version">每章显示一个版本</string>
+    <string name="chapter_groups_fallback">优先选择指定翻译组。该组缺少某章时，使用此书源中其他组的版本。特别篇和编号不明确的章节保持独立。</string>
+    <string name="chapter_groups_preferred">首选翻译组</string>
+    <string name="chapter_groups_automatic">自动</string>
+    <string name="chapter_groups_missing">当前列表中没有此翻译组的章节</string>
 </resources>

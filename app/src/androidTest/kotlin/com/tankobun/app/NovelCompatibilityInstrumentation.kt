@@ -19,6 +19,12 @@ class NovelCompatibilityInstrumentation : Instrumentation() {
         val report = Bundle()
         try {
             check(targetContext.packageName.endsWith(".novelqa")) { "Use -PqaApplicationIdSuffix=.novelqa" }
+            if (options.getString("chapterGroups") == "true") {
+                runBlocking { checkChapterGroups(requireNotNull(options.getString("schema15"))) }
+                report.putString("stream", "PASS: chapter translation fallback, offline navigation, read-state changes, preference backup and database 15-to-16 migration\n")
+                finish(-1, report)
+                return
+            }
             if (options.getString("security") == "true") {
                 report.putString("stream", checkSecurityRegressions(targetContext) + "\n")
                 finish(-1, report)

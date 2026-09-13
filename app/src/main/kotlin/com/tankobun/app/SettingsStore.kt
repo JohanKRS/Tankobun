@@ -280,6 +280,16 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean(KEY_CHAPTER_LIST_STARTS_AT_FIRST, enabled).apply()
     }
 
+    fun chapterGroupPreferences(): Map<String, com.tankobun.core.model.ChapterGroupPreference> = runCatching {
+        kotlinx.serialization.json.Json.decodeFromString<Map<String, com.tankobun.core.model.ChapterGroupPreference>>(
+            preferences.getString("chapter.group.preferences", "{}").orEmpty(),
+        )
+    }.getOrDefault(emptyMap())
+
+    fun saveChapterGroupPreferences(value: Map<String, com.tankobun.core.model.ChapterGroupPreference>) {
+        preferences.edit().putString("chapter.group.preferences", kotlinx.serialization.json.Json.encodeToString(value)).apply()
+    }
+
     fun keepNextTenDownloads(): Boolean =
         preferences.getBoolean(KEY_KEEP_NEXT_TEN_DOWNLOADS, false)
 

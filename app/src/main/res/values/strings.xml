@@ -1312,4 +1312,11 @@
     <string name="sources_repository_identity_none">No signing identity provided</string>
     <string name="sources_repository_identity_review">%1$s\n\nPrevious: %2$s\nNew: %3$s\n\nDownloads from this repository are paused. Approve only if you have verified this change with the repository publisher.</string>
     <string name="sources_repository_identity_approve">Approve new identity</string>
+    <string name="chapter_groups_title">Translations</string>
+    <string name="chapter_groups_filtered">Translations · filtered</string>
+    <string name="chapter_groups_one_version">One version per chapter</string>
+    <string name="chapter_groups_fallback">Prefer the selected group. If it has no version of a chapter, use another group from this source. Specials and chapters with unclear numbering stay separate.</string>
+    <string name="chapter_groups_preferred">Preferred translation group</string>
+    <string name="chapter_groups_automatic">Automatic</string>
+    <string name="chapter_groups_missing">No chapters from this group in the current list</string>
 </resources>

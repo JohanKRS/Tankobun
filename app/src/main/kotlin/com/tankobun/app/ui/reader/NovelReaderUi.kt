@@ -1,5 +1,8 @@
 package com.tankobun.app.ui.reader
 
+import com.tankobun.app.logic.isChapterRead
+import com.tankobun.app.logic.translationCredit
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -146,7 +149,7 @@ internal fun NovelReader(state: TankobunUiState, viewModel: MainViewModel) {
                         })
                     }) {
                     val boundary: @Composable (SourceChapter, Boolean) -> Unit = { item, before ->
-                        val adjacent = if (before) state.sourceChapters.previousInReadingOrderBefore(item) else state.sourceChapters.nextInReadingOrderAfter(item)
+                        val adjacent = if (before) state.readingChapters.previousInReadingOrderBefore(item) else state.readingChapters.nextInReadingOrderAfter(item)
                         val present = segments.any { it.chapter.url == adjacent?.url }
                         val loading = if (before) state.novelPreviousLoading else state.novelNextLoading
                         if (!before || (item.url == chapter.url && adjacent != null && !present && p.continuousReading)) {
@@ -197,14 +200,14 @@ internal fun NovelReader(state: TankobunUiState, viewModel: MainViewModel) {
                     Surface(color = background.copy(alpha = 0.97f), modifier = Modifier.align(Alignment.BottomCenter)) {
                         Column(Modifier.navigationBarsPadding().padding(horizontal = 8.dp)) {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(enabled = state.sourceChapters.previousInReadingOrderBefore(chapter) != null, onClick = viewModel::openPreviousChapter) { Icon(TankobunIcons.ArrowBack, tankobunString(R.string.reader_previous_chapter)) }
+                                IconButton(enabled = state.readingChapters.previousInReadingOrderBefore(chapter) != null, onClick = viewModel::openPreviousChapter) { Icon(TankobunIcons.ArrowBack, tankobunString(R.string.reader_previous_chapter)) }
                                 val paged = p.readingMode == NovelReadingMode.PAGED
                                 Slider(if (paged) (pageNumber - 1).toFloat() else state.currentPageIndex.toFloat(), {
                                     if (paged) seekPage(it.roundToInt())
                                     else jump = NovelJump(NovelAnchor(chapter.url, it.roundToInt().coerceIn(0, state.readerPages.lastIndex)), ++request)
                                 }, valueRange = 0f..(if (paged) pageCount - 1 else state.readerPages.lastIndex).coerceAtLeast(1).toFloat(), modifier = Modifier.weight(1f))
                                 Text(if (p.readingMode == NovelReadingMode.PAGED) (if (lastPageNumber == pageNumber) "$pageNumber / $pageCount" else "$pageNumber–$lastPageNumber / $pageCount") else "${(state.currentPageIndex * 100f / state.readerPages.lastIndex.coerceAtLeast(1)).roundToInt()}%", style = MaterialTheme.typography.labelMedium)
-                                IconButton(enabled = state.sourceChapters.nextInReadingOrderAfter(chapter) != null, onClick = viewModel::openNextChapter) { Icon(TankobunIcons.ChevronRight, tankobunString(R.string.reader_next_chapter)) }
+                                IconButton(enabled = state.readingChapters.nextInReadingOrderAfter(chapter) != null, onClick = viewModel::openNextChapter) { Icon(TankobunIcons.ChevronRight, tankobunString(R.string.reader_next_chapter)) }
                             }
                             Text(tankobunString(R.string.novel_controls_hint), Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp), style = MaterialTheme.typography.labelSmall)
                         }
@@ -216,10 +219,15 @@ internal fun NovelReader(state: TankobunUiState, viewModel: MainViewModel) {
     if (settings) NovelReaderSettings(p, viewModel::setNovelReaderPreferences) { settings = false }
     if (chapters) ModalBottomSheet(onDismissRequest = { chapters = false }) {
         Text(tankobunString(R.string.novel_chapters), Modifier.padding(24.dp), style = MaterialTheme.typography.titleLarge)
-        val list = rememberLazyListState(initialFirstVisibleItemIndex = state.sourceChapters.indexOfFirst { it.url == chapter.url }.coerceAtLeast(0))
+        val list = rememberLazyListState(initialFirstVisibleItemIndex = state.readingChapters.indexOfFirst { it.url == chapter.url }.coerceAtLeast(0))
         LazyColumn(state = list, modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp)) {
-            itemsIndexed(state.sourceChapters, key = { _, item -> item.url }) { _, item ->
-                ListItem(headlineContent = { Text(item.name) }, supportingContent = { if (state.chapterProgress[item.url]?.completed == true) Text("✓") },
+            itemsIndexed(state.readingChapters, key = { _, item -> item.url }) { _, item ->
+                ListItem(headlineContent = { Text(item.name) }, supportingContent = {
+                    val credit = item.translationCredit()
+                    val read = state.isChapterRead(item)
+                    if (read || credit != null) Text(listOfNotNull("✓".takeIf { read }, credit).joinToString(" · "),
+                        style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                },
                     colors = ListItemDefaults.colors(containerColor = if (item.url == chapter.url) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent),
                     modifier = Modifier.clickable { chapters = false; viewModel.persistReaderProgress(); viewModel.openChapter(item) })
             }

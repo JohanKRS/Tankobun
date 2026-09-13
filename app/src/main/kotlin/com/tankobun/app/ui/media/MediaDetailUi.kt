@@ -1,5 +1,8 @@
 package com.tankobun.app.ui.media
 
+import com.tankobun.app.logic.isChapterRead
+import com.tankobun.app.logic.readingOrder
+
 import com.tankobun.app.ui.icons.TankobunIcons
 
 import android.content.Context
@@ -254,6 +257,7 @@ internal fun MangaDetailScreen(
             .build()
     }
     val listState = rememberLazyListState()
+    val orderedChapters = remember(state.readingChapters) { state.readingChapters.readingOrder() }
     val trackedStatuses = remember(state.libraryItems) { state.libraryItems.trackedMediaStatuses() }
     var coverZoomOpen by remember(media.id) { mutableStateOf(false) }
     var detailShareOpen by remember(media.id) { mutableStateOf(false) }
@@ -394,7 +398,11 @@ internal fun MangaDetailScreen(
                     Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
                         var downloadActionsOpen by remember { mutableStateOf(false) }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            DetailSectionTitle(tankobunString(R.string.common_chapters))
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween) {
+                                DetailSectionTitle(tankobunString(R.string.common_chapters), Modifier.weight(1f))
+                                ChapterGroupsButton(state, viewModel::setChapterGroupPreference)
+                            }
                             if (state.selectedSourceManga == null) {
                                 DetailPlaceholderCard(
                                     icon = TankobunIcons.MenuBook,
@@ -467,16 +475,16 @@ internal fun MangaDetailScreen(
                     }
                 } else {
                     val visibleChapters = if (state.chapterListStartsAtFirst) {
-                        state.sourceChapters
+                        orderedChapters
                     } else {
-                        state.sourceChapters.asReversed()
+                        orderedChapters.asReversed()
                     }
                     items(visibleChapters, key = { "${it.sourceId}:${it.url}" }) { chapter ->
                         Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
                             ChapterRow(
                                 chapter = chapter,
                                 viewModel = viewModel,
-                                read = chapter.isReadBy(state.chapterProgress),
+                                read = state.isChapterRead(chapter),
                                 download = state.downloadForChapter(chapter),
                                 selectingForDownload = state.selectingDownloadChapters,
                                 selectedForDownload = chapter.url in state.selectedDownloadChapterUrls,

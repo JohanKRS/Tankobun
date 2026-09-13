@@ -70,6 +70,9 @@ internal fun SChapter.toSourceChapter(sourceId: Long, mangaUrl: String): SourceC
         scanlator = scanlator,
         uploadedAtEpochMillis = date_upload.takeIf { it > 0 },
         memoJson = memo.takeIf { it.isNotEmpty() }?.toString(),
+        volume = runCatching { volume }.getOrNull(),
+        chapterNumberText = runCatching { number }.getOrNull(),
+        scanlators = runCatching { scanlators }.getOrDefault(emptyList()),
     )
 
 internal fun SourceChapter.toSChapter(): SChapter =
@@ -78,6 +81,9 @@ internal fun SourceChapter.toSChapter(): SChapter =
         it.name = name
         it.chapter_number = chapterNumber
         it.scanlator = scanlator
+        it.scanlators = scanlators
+        it.volume = volume
+        it.number = chapterNumberText
         it.date_upload = uploadedAtEpochMillis ?: 0L
         it.memo = memoJson.toSourceMemo()
     }

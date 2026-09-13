@@ -1,5 +1,7 @@
 package com.tankobun.app
 
+import com.tankobun.app.logic.isChapterRead
+
 import com.tankobun.core.model.supports
 
 import com.tankobun.app.backup.BackupDataSource
@@ -340,6 +342,7 @@ class MainViewModel(
             showWebtoonChapterDividers = container.settingsStore.showWebtoonChapterDividers(),
             readerScreenOrientation = container.settingsStore.readerScreenOrientation(),
             chapterListStartsAtFirst = container.settingsStore.chapterListStartsAtFirst(),
+            chapterGroupPreferences = container.settingsStore.chapterGroupPreferences(),
             keepNextTenDownloads = container.settingsStore.keepNextTenDownloads(),
             newChapterChecksEnabled = container.settingsStore.newChapterChecksEnabled(),
             lastNewChapterCheckAtEpochMillis = container.settingsStore.lastNewChapterCheckAtEpochMillis(),
@@ -1697,6 +1700,7 @@ class MainViewModel(
                 showWebtoonChapterDividers = store.showWebtoonChapterDividers(),
                 readerScreenOrientation = store.readerScreenOrientation(),
                 chapterListStartsAtFirst = store.chapterListStartsAtFirst(),
+                chapterGroupPreferences = store.chapterGroupPreferences(),
                 keepNextTenDownloads = store.keepNextTenDownloads(),
                 newChapterChecksEnabled = store.newChapterChecksEnabled(),
                 lastNewChapterCheckAtEpochMillis = store.lastNewChapterCheckAtEpochMillis(),
@@ -2823,6 +2827,22 @@ class MainViewModel(
     fun setReaderScreenOrientation(orientation: ReaderScreenOrientation) {
         container.settingsStore.saveReaderScreenOrientation(orientation)
         _state.update { it.copy(readerScreenOrientation = orientation) }
+    }
+
+    fun setChapterGroupPreference(preference: com.tankobun.core.model.ChapterGroupPreference) {
+        val snapshot = _state.value
+        val key = snapshot.chapterGroupPreferenceKey ?: return
+        val saved = snapshot.chapterGroupPreferences + (key to preference)
+        container.settingsStore.saveChapterGroupPreferences(saved)
+        cancelReaderAdjacentLoadJobs()
+        _state.update {
+            it.copy(
+                chapterGroupPreferences = saved,
+                selectedDownloadChapterUrls = emptySet(),
+                readerPreviousSegment = null,
+                readerNextSegment = null,
+            )
+        }
     }
 
     fun toggleChapterListOrder() {
@@ -4436,7 +4456,7 @@ class MainViewModel(
         if (snapshot.readerMode != ReaderMode.WEBTOON) return
         val media = snapshot.selectedMedia ?: return
         val activeChapter = snapshot.activeChapter ?: return
-        val nextChapter = snapshot.sourceChapters.nextInReadingOrderAfter(activeChapter) ?: return
+        val nextChapter = snapshot.readingChapters.nextInReadingOrderAfter(activeChapter) ?: return
         val currentNextSegment = snapshot.readerNextSegment
         if (currentNextSegment?.chapter?.url == nextChapter.url &&
             currentNextSegment.pages.isNotEmpty()
@@ -4456,10 +4476,10 @@ class MainViewModel(
         if (!snapshot.novelReaderPreferences.continuousReading || snapshot.readerPages.none { it.novelBlock != null }) return
         val media = snapshot.selectedMedia ?: return
         val chapter = snapshot.activeChapter ?: return
-        snapshot.sourceChapters.previousInReadingOrderBefore(chapter)?.let {
+        snapshot.readingChapters.previousInReadingOrderBefore(chapter)?.let {
             startAdjacentReaderSegmentLoad(media.id, chapter, it, ReaderSegmentDirection.PREVIOUS)
         }
-        snapshot.sourceChapters.nextInReadingOrderAfter(chapter)?.let {
+        snapshot.readingChapters.nextInReadingOrderAfter(chapter)?.let {
             startAdjacentReaderSegmentLoad(media.id, chapter, it, ReaderSegmentDirection.NEXT)
         }
     }
@@ -4473,8 +4493,8 @@ class MainViewModel(
     private fun loadAdjacentReaderSegments(mediaId: Int, chapter: SourceChapter) {
         val snapshot = _state.value
         if (snapshot.readerPages.any { it.novelBlock != null } && !snapshot.novelReaderPreferences.continuousReading) return
-        val previousChapter = snapshot.sourceChapters.previousInReadingOrderBefore(chapter)
-        val nextChapter = snapshot.sourceChapters.nextInReadingOrderAfter(chapter)
+        val previousChapter = snapshot.readingChapters.previousInReadingOrderBefore(chapter)
+        val nextChapter = snapshot.readingChapters.nextInReadingOrderAfter(chapter)
         cancelReaderAdjacentLoadJobs()
         if (previousChapter == null && nextChapter == null) return
         previousChapter?.let { adjacentChapter ->
@@ -4720,8 +4740,8 @@ class MainViewModel(
         val snapshot = _state.value
         val activeChapter = snapshot.activeChapter ?: return
         when (chapterUrl) {
-            snapshot.sourceChapters.previousInReadingOrderBefore(activeChapter)?.url -> openPreviousChapter()
-            snapshot.sourceChapters.nextInReadingOrderAfter(activeChapter)?.url -> openNextChapter()
+            snapshot.readingChapters.previousInReadingOrderBefore(activeChapter)?.url -> openPreviousChapter()
+            snapshot.readingChapters.nextInReadingOrderAfter(activeChapter)?.url -> openNextChapter()
         }
     }
 
@@ -4881,7 +4901,7 @@ class MainViewModel(
 
     fun openNextChapter() {
         val snapshot = _state.value
-        val nextChapter = snapshot.sourceChapters.nextInReadingOrderAfter(snapshot.activeChapter ?: return) ?: return
+        val nextChapter = snapshot.readingChapters.nextInReadingOrderAfter(snapshot.activeChapter ?: return) ?: return
         if (snapshot.readerPages.isNotEmpty()) {
             _state.update { it.withReaderPagePosition(snapshot.readerPages.lastIndex, 0) }
         }
@@ -4891,7 +4911,7 @@ class MainViewModel(
 
     fun openPreviousChapter() {
         val snapshot = _state.value
-        val previousChapter = snapshot.sourceChapters.previousInReadingOrderBefore(snapshot.activeChapter ?: return) ?: return
+        val previousChapter = snapshot.readingChapters.previousInReadingOrderBefore(snapshot.activeChapter ?: return) ?: return
         snapshot.readerPreviousSegment
             ?.takeIf { it.chapter.url == previousChapter.url && it.pages.isNotEmpty() }
             ?.let { previousSegment ->
@@ -4915,8 +4935,15 @@ class MainViewModel(
     }
 
     fun setChapterRead(chapter: SourceChapter, read: Boolean) {
-        val media = _state.value.selectedMedia ?: return
+        val snapshot = _state.value
+        val media = snapshot.selectedMedia ?: return
+        val versions = snapshot.chapterGroupSelection.versionsOf(chapter)
         viewModelScope.launch {
+            if (!read) {
+                versions.filter { it.url != chapter.url }.forEach { other ->
+                    readerDataSource.markChapterRead(media.id, other, false, snapshot.readerMode, System.currentTimeMillis())
+                }
+            }
             val result = readerDataSource.markChapterRead(
                 mediaId = media.id,
                 chapter = chapter,
@@ -4925,7 +4952,7 @@ class MainViewModel(
                 nowMillis = System.currentTimeMillis(),
             )
             val syncProgress = result.syncProgress
-                ?: chapter.takeIf { read }?.let { _state.value.sourceChapters.trackerProgressForChapter(it) }
+                ?: chapter.takeIf { read }?.let { _state.value.readingChapters.trackerProgressForChapter(it) }
             if (syncProgress != null) {
                 val trackedProgress = _state.value.trackedProgressFor(media.id)
                 if (syncProgress > trackedProgress) {
@@ -4989,13 +5016,13 @@ class MainViewModel(
     }
 
     fun downloadAllChapters() {
-        val chapters = _state.value.sourceChapters
+        val chapters = _state.value.readingChapters
         enqueueVisibleChapterDownloads(chapters, R.string.download_label_all_chapters)
     }
 
     fun downloadUnreadChapters() {
         val snapshot = _state.value
-        val chapters = snapshot.sourceChapters.filterNot { snapshot.chapterProgress[it.url]?.completed == true }
+        val chapters = snapshot.readingChapters.filterNot { snapshot.isChapterRead(it) }
         enqueueVisibleChapterDownloads(chapters, R.string.download_label_unread_chapters)
     }
 
@@ -5056,7 +5083,7 @@ class MainViewModel(
 
     fun downloadSelectedChapters() {
         val snapshot = _state.value
-        val chapters = snapshot.sourceChapters.filter { it.url in snapshot.selectedDownloadChapterUrls }
+        val chapters = snapshot.readingChapters.filter { it.url in snapshot.selectedDownloadChapterUrls }
         enqueueVisibleChapterDownloads(chapters, R.string.download_label_selected_chapters) {
             it.copy(
                 selectingDownloadChapters = false,
@@ -5326,7 +5353,7 @@ class MainViewModel(
             pages = pages,
             mediaStatus = media.status,
             chapter = chapter,
-            sourceChapters = snapshot.sourceChapters,
+            sourceChapters = snapshot.readingChapters,
             currentStatus = snapshot.trackedListEntryFor(media.id)?.status,
             enabled = snapshot.autoUpdateStatusFromReading,
         ) ?: return
@@ -5387,7 +5414,7 @@ class MainViewModel(
             }
             val snapshot = _state.value
             val syncProgress = if (progress.completed) {
-                snapshot.sourceChapters.trackerProgressForChapter(chapter)
+                snapshot.readingChapters.trackerProgressForChapter(chapter)
             } else {
                 null
             }
@@ -5396,7 +5423,7 @@ class MainViewModel(
                 totalPages = progress.totalPages,
                 mediaStatus = media.status,
                 chapter = chapter,
-                sourceChapters = snapshot.sourceChapters,
+                sourceChapters = snapshot.readingChapters,
                 currentStatus = snapshot.trackedListEntryFor(media.id)?.status,
                 enabled = snapshot.autoUpdateStatusFromReading,
             )

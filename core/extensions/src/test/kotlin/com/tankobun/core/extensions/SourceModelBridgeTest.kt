@@ -10,6 +10,19 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SourceModelBridgeTest {
+    @Test fun chapterCreditsAndVolumeSurviveTheSourceBridge() {
+        val original = SChapter.create().apply {
+            url = "/chapter"; name = "Chapter 1"; volume = "2"; number = "1.5"; chapter_number = 1.5f
+            scanlator = "Original credit"; scanlators = listOf("Paper", "Ink")
+        }
+        val model = original.toSourceChapter(7, "/manga")
+        val restored = model.toSChapter()
+        assertEquals(original.volume, restored.volume)
+        assertEquals(original.number, restored.number)
+        assertEquals(original.scanlator, restored.scanlator)
+        assertEquals(original.scanlators, restored.scanlators)
+    }
+
     private val manga = SourceManga(7, "/manga", "Fixture", null, null, null, null, null,
         """{"cursor":[1,"two"],"config":{"enabled":true},"nullable":null}""")
 

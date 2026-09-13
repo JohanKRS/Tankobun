@@ -9,8 +9,8 @@ internal const val NEXT_DOWNLOAD_WINDOW_SIZE = 10
 
 internal fun List<SourceChapter>.nextInReadingOrderAfter(chapter: SourceChapter): SourceChapter? {
     if (chapter.chapterNumber > 0f) {
-        return filter { it.chapterNumber > chapter.chapterNumber }
-            .minByOrNull { it.chapterNumber }
+        return filter { it.chapterNumber > 0f && chapterReadingComparator.compare(it, chapter) > 0 }
+            .minWithOrNull(chapterReadingComparator)
     }
 
     val currentIndex = indexOfFirst { it.sourceId == chapter.sourceId && it.url == chapter.url }
@@ -19,8 +19,8 @@ internal fun List<SourceChapter>.nextInReadingOrderAfter(chapter: SourceChapter)
 
 internal fun List<SourceChapter>.previousInReadingOrderBefore(chapter: SourceChapter): SourceChapter? {
     if (chapter.chapterNumber > 0f) {
-        return filter { it.chapterNumber < chapter.chapterNumber }
-            .maxByOrNull { it.chapterNumber }
+        return filter { it.chapterNumber > 0f && chapterReadingComparator.compare(it, chapter) < 0 }
+            .maxWithOrNull(chapterReadingComparator)
     }
 
     val currentIndex = indexOfFirst { it.sourceId == chapter.sourceId && it.url == chapter.url }
@@ -45,17 +45,19 @@ internal fun List<SourceChapter>.chapterNearProgress(progress: ReadingProgress):
 
 internal fun List<SourceChapter>.firstInReadingOrder(): SourceChapter? =
     filter { it.chapterNumber > 0f }
-        .minByOrNull { it.chapterNumber }
+        .minWithOrNull(chapterReadingComparator)
         ?: lastOrNull()
 
 internal fun nextTenDownloadCandidates(state: TankobunUiState): List<SourceChapter> {
-    val chapters = state.sourceChapters.readingOrder()
+    val chapters = state.readingChapters.readingOrder()
     if (chapters.isEmpty()) return emptyList()
     val progress = state.latestProgress
     val startIndex = if (progress == null) {
         0
     } else {
-        val exactIndex = chapters.indexOfFirst { it.url == progress.chapterUrl }
+        val equivalentUrls = state.sourceChapters.firstOrNull { it.url == progress.chapterUrl }
+            ?.let { state.chapterGroupSelection.versionsOf(it).map { version -> version.url }.toSet() }.orEmpty()
+        val exactIndex = chapters.indexOfFirst { it.url == progress.chapterUrl || it.url in equivalentUrls }
         when {
             exactIndex >= 0 && progress.completed -> exactIndex + 1
             exactIndex >= 0 -> exactIndex
@@ -67,7 +69,7 @@ internal fun nextTenDownloadCandidates(state: TankobunUiState): List<SourceChapt
 
     return chapters
         .drop(startIndex)
-        .filterNot { state.chapterProgress[it.url]?.completed == true }
+        .filterNot { state.isChapterRead(it) }
         .take(NEXT_DOWNLOAD_WINDOW_SIZE)
 }
 
@@ -82,8 +84,26 @@ internal fun List<SourceChapter>.trackerProgressForChapter(chapter: SourceChapte
 
 internal fun List<SourceChapter>.readingOrder(): List<SourceChapter> =
     if (any { it.chapterNumber > 0f }) {
-        sortedWith(compareBy<SourceChapter> { it.chapterNumber.takeIf { number -> number > 0f } ?: Float.MAX_VALUE }
-            .thenBy { it.name })
+        sortedWith(compareBy<SourceChapter> { it.chapterNumber <= 0f || !it.chapterNumber.isFinite() }
+            .then(chapterReadingComparator).thenBy { it.name })
     } else {
         asReversed()
     }
+
+private val chapterReadingComparator = Comparator<SourceChapter> { left, right ->
+    val leftVolume = left.chapterVolumeKey()
+    val rightVolume = right.chapterVolumeKey()
+    val leftVolumeNumber = leftVolume.toBigDecimalOrNull()
+    val rightVolumeNumber = rightVolume.toBigDecimalOrNull()
+    val numericVolumeOrder = compareValues(leftVolumeNumber ?: java.math.BigDecimal.ZERO,
+        rightVolumeNumber ?: java.math.BigDecimal.ZERO)
+    val volumeOrder = when {
+        numericVolumeOrder != 0 -> numericVolumeOrder
+        leftVolumeNumber != null && rightVolumeNumber != null -> 0
+        else -> leftVolume.compareTo(rightVolume)
+    }
+    if (volumeOrder != 0) volumeOrder else compareValues(
+        left.chapterNumberText?.toBigDecimalOrNull() ?: left.chapterNumber.toString().toBigDecimalOrNull(),
+        right.chapterNumberText?.toBigDecimalOrNull() ?: right.chapterNumber.toString().toBigDecimalOrNull(),
+    )
+}

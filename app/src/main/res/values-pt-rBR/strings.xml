@@ -1313,4 +1313,11 @@
     <string name="sources_repository_identity_none">Sem identidade de assinatura informada</string>
     <string name="sources_repository_identity_review">%1$s\n\nAnterior: %2$s\nNova: %3$s\n\nOs downloads deste repositório estão pausados. Aprove apenas se você confirmou a mudança com o responsável pelo repositório.</string>
     <string name="sources_repository_identity_approve">Aprovar nova identidade</string>
+    <string name="chapter_groups_title">Traduções</string>
+    <string name="chapter_groups_filtered">Traduções · filtradas</string>
+    <string name="chapter_groups_one_version">Uma versão por capítulo</string>
+    <string name="chapter_groups_fallback">Prioriza o grupo escolhido. Se faltar algum capítulo, usa outro grupo desta fonte. Especiais e capítulos com numeração incerta ficam separados.</string>
+    <string name="chapter_groups_preferred">Grupo de tradução preferido</string>
+    <string name="chapter_groups_automatic">Automático</string>
+    <string name="chapter_groups_missing">Sem capítulos deste grupo na lista atual</string>
 </resources>

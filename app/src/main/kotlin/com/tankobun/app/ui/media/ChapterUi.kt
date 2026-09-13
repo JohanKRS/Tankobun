@@ -63,6 +63,7 @@ import com.tankobun.app.R
 import com.tankobun.app.TankobunDisplayFontFamily
 import com.tankobun.app.tankobunString
 import com.tankobun.app.logic.chapterNearProgress
+import com.tankobun.app.logic.translationCredit
 import com.tankobun.app.logic.firstInReadingOrder
 import com.tankobun.app.logic.nextInReadingOrderAfter
 import com.tankobun.app.state.TankobunUiState
@@ -318,12 +319,12 @@ internal fun TankobunUiState.primaryReadingActionChapter(): SourceChapter? =
     latestProgress?.let { progress ->
         val exactChapter = sourceChapters.firstOrNull { it.url == progress.chapterUrl }
         if (exactChapter != null) exactChapter else {
-            sourceChapters.chapterNearProgress(progress)
+            readingChapters.chapterNearProgress(progress)
         }
-    } ?: sourceChapters.firstInReadingOrder()
+    } ?: readingChapters.firstInReadingOrder()
 
 internal fun TankobunUiState.nextReaderChapter(): SourceChapter? =
-    sourceChapters.nextInReadingOrderAfter(activeChapter ?: return null)
+    readingChapters.nextInReadingOrderAfter(activeChapter ?: return null)
 
 internal fun SourceChapter.isReadBy(progressByChapter: Map<String, ReadingProgress>): Boolean =
     progressByChapter[url]?.completed == true
@@ -420,6 +421,17 @@ internal fun ChapterRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                    },
+                    supportingContent = chapter.translationCredit()?.let { credit ->
+                        {
+                            Text(
+                                credit,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     },
                     trailingContent = {
                         ChapterDownloadIndicator(

@@ -120,7 +120,7 @@ internal fun SourceSummarySection(state: TankobunUiState, viewModel: MainViewMod
                 chapterLine = if (state.sourceChapters.isEmpty()) {
                     tankobunString(R.string.source_no_chapters_loaded)
                 } else {
-                    tankobunQuantityString(R.plurals.chapter_count, state.sourceChapters.size, state.sourceChapters.size)
+                    tankobunQuantityString(R.plurals.chapter_count, state.readingChapters.size, state.readingChapters.size)
                 },
                 onChange = viewModel::openSourcePicker,
             )

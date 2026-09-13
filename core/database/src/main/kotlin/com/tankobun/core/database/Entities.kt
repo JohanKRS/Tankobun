@@ -145,6 +145,9 @@ data class SourceChapterEntity(
     val uploadedAtEpochMillis: Long?,
     val fetchedAtEpochMillis: Long,
     val memoJson: String? = null,
+    val volume: String? = null,
+    val chapterNumberText: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "''") val scanlators: List<String> = emptyList(),
 )
 
 @Entity(
