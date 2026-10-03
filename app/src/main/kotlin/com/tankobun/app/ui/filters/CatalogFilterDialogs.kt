@@ -28,6 +28,7 @@ import com.tankobun.app.ui.icons.TankobunIcons
 import com.tankobun.app.ui.icons.genreIcon
 import com.tankobun.core.model.CatalogTag
 import com.tankobun.core.model.CatalogTaxonomy
+import java.text.Collator
 import java.text.Normalizer
 import java.util.Locale
 
@@ -186,11 +187,14 @@ internal fun CatalogFilterDialog(
     val genreNames = remember(allowed) { allowed.filter { it.isGenre }.map { it.name }.distinct() }
     val categoryLabels = categoryNames.associateWith { filterCategoryLabel(it) }
     val genreLabels = genreNames.associateWith { browseGenreLabel(it) }
-    val labels = remember(allowed, categoryLabels, genreLabels) { allowed.map { tag ->
+    // Localized labels sort by the app language's rules, so "Ação" comes before "Aventura".
+    val locale = LocalConfiguration.current.locales[0]
+    val collator = remember(locale) { Collator.getInstance(locale).apply { strength = Collator.SECONDARY } }
+    val labels = remember(allowed, categoryLabels, genreLabels, collator) { allowed.map { tag ->
         val label = genreLabels[tag.name] ?: tag.name
         val group = categoryLabels.getValue(tag.filterCategory())
         FilterTagLabel(tag, label, group, "$label ${tag.name} $group ${tag.category.orEmpty()}".filterSearchKey())
-    }.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.label })
+    }.sortedWith(compareBy(collator) { it.label })
     }
     val search = query.filterSearchKey()
     val selectedFilter = if (selectedOnly) draft else emptySet()
@@ -199,7 +203,7 @@ internal fun CatalogFilterDialog(
             (!selectedOnly || item.tag.key in draft) && (search.isBlank() || search in item.searchText)
         }
     }
-    val groups = remember(visible) { visible.groupBy { it.group }.toSortedMap(String.CASE_INSENSITIVE_ORDER) }
+    val groups = remember(visible, collator) { visible.groupBy { it.group }.toSortedMap(collator) }
     fun toggle(key: String) { draft = if (key in draft) draft - key else draft + key }
 
     FilterDialogFrame(title, onDismiss, expanded = true, footer = {
@@ -219,26 +223,32 @@ internal fun CatalogFilterDialog(
                 }
             }
         }
-        if (!genresOnly && draft.isNotEmpty()) {
-            val labelByKey = remember(labels) { labels.associate { it.tag.key to it.label } }
-            // Selected tags stay visible and removable while browsing collapsed categories.
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(draft.toList(), key = { it }) { key ->
-                    InputChip(
-                        selected = true,
-                        onClick = { toggle(key) },
-                        label = { Text(labelByKey[key] ?: key, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        trailingIcon = {
-                            Icon(TankobunIcons.Close, contentDescription = tankobunString(R.string.common_remove), modifier = Modifier.size(16.dp))
-                        },
-                        modifier = Modifier.widthIn(max = 220.dp),
-                    )
+        // A fixed-height row: the first selection must not push the options away from the finger.
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (!genresOnly && draft.isNotEmpty()) {
+                val labelByKey = remember(labels) { labels.associate { it.tag.key to it.label } }
+                // Selected tags stay visible and removable while browsing collapsed categories.
+                LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(draft.toList(), key = { it }) { key ->
+                        InputChip(
+                            selected = true,
+                            onClick = { toggle(key) },
+                            label = { Text(labelByKey[key] ?: key, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            trailingIcon = {
+                                Icon(TankobunIcons.Close, contentDescription = tankobunString(R.string.common_remove), modifier = Modifier.size(16.dp))
+                            },
+                            modifier = Modifier.widthIn(max = 220.dp),
+                        )
+                    }
                 }
+            } else {
+                Text(tankobunString(R.string.filters_option_count, visible.size), Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(tankobunString(R.string.filters_option_count, visible.size), Modifier.weight(1f),
-                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (draft.isNotEmpty()) {
                 FilterChip(selected = selectedOnly, onClick = { selectedOnly = !selectedOnly },
                     label = { Text(tankobunString(R.string.filters_selected_count, draft.size)) })
