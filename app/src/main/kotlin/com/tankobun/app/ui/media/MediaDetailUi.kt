@@ -1606,7 +1606,7 @@ internal fun MangaDescriptionAndTags(
             }
         }
         if (tags.isNotEmpty()) {
-            FlowRowCompat {
+            JustifiedTagFlow {
                 tags.take(if (compact) 7 else 12).forEach { tag ->
                     mangaTagPill(tag = tag, compact = compact, onClick = { onTagClick(tag) })
                 }

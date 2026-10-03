@@ -51,6 +51,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.tankobun.app.logic.justifiedTagRows
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.graphics.Shape
@@ -583,16 +586,47 @@ internal fun TankobunTag(
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
     ) {
-        Text(
-            label,
-            modifier = Modifier.padding(
-                horizontal = if (compact) 10.dp else 12.dp,
-                vertical = if (compact) 6.dp else 7.dp,
-            ),
-            style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // Centered, so a tag stretched by [JustifiedTagFlow] keeps its label in the middle.
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                label,
+                modifier = Modifier.padding(
+                    horizontal = if (compact) 10.dp else 12.dp,
+                    vertical = if (compact) 6.dp else 7.dp,
+                ),
+                style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Tags packed with few ragged gaps: full rows reach both edges (see [justifiedTagRows]). */
+@Composable
+internal fun JustifiedTagFlow(
+    modifier: Modifier = Modifier,
+    spacing: Dp = LocalTankobunStyle.current.spacing.dense,
+    content: @Composable () -> Unit,
+) {
+    Layout(content = content, modifier = modifier.fillMaxWidth()) { measurables, constraints ->
+        val gap = spacing.roundToPx()
+        val widths = measurables.map { it.maxIntrinsicWidth(Constraints.Infinity) }
+        val rows = justifiedTagRows(widths, constraints.maxWidth, gap)
+        val placed = rows.map { row -> row.map { slot -> measurables[slot.index].measure(Constraints.fixedWidth(slot.width)) } }
+        val rowHeights = placed.map { row -> row.maxOfOrNull { it.height } ?: 0 }
+        val height = rowHeights.sum() + gap * (rows.size - 1).coerceAtLeast(0)
+        layout(constraints.maxWidth, height.coerceIn(constraints.minHeight, constraints.maxHeight)) {
+            var y = 0
+            placed.forEachIndexed { rowIndex, row ->
+                var x = 0
+                row.forEach { placeable ->
+                    placeable.placeRelative(x, y + (rowHeights[rowIndex] - placeable.height) / 2)
+                    x += placeable.width + gap
+                }
+                y += rowHeights[rowIndex] + gap
+            }
+        }
     }
 }
 
