@@ -1343,4 +1343,6 @@
     <string name="detail_remove_from_library_body">O progresso de leitura e os downloads continuam neste aparelho.</string>
     <string name="msg_detail_removed_from_library">Removido da biblioteca.</string>
     <string name="common_remove">Remover</string>
+    <string name="settings_navigation_badges">Indicadores na navegação</string>
+    <string name="settings_navigation_badges_desc">Mostra capítulos novos e downloads em andamento nos ícones do dock.</string>
 </resources>

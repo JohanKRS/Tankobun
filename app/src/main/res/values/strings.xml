@@ -1342,4 +1342,6 @@
     <string name="detail_remove_from_library_body">Reading progress and downloads stay on this device.</string>
     <string name="msg_detail_removed_from_library">Removed from library.</string>
     <string name="common_remove">Remove</string>
+    <string name="settings_navigation_badges">Navigation badges</string>
+    <string name="settings_navigation_badges_desc">Show new chapters and active downloads on the dock icons.</string>
 </resources>

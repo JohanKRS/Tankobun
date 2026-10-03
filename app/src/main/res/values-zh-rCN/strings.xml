@@ -1341,4 +1341,6 @@
     <string name="detail_remove_from_library_body">阅读进度和下载内容会保留在此设备上。</string>
     <string name="msg_detail_removed_from_library">已从书架移除。</string>
     <string name="common_remove">移除</string>
+    <string name="settings_navigation_badges">导航提示标记</string>
+    <string name="settings_navigation_badges_desc">在底部栏图标上显示新章节和进行中的下载。</string>
 </resources>

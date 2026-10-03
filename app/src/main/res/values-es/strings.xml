@@ -1343,4 +1343,6 @@
     <string name="detail_remove_from_library_body">El progreso de lectura y las descargas se quedan en este dispositivo.</string>
     <string name="msg_detail_removed_from_library">Quitado de la biblioteca.</string>
     <string name="common_remove">Quitar</string>
+    <string name="settings_navigation_badges">Indicadores en la navegación</string>
+    <string name="settings_navigation_badges_desc">Muestra capítulos nuevos y descargas en curso en los iconos del dock.</string>
 </resources>

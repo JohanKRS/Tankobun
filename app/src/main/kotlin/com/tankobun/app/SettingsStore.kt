@@ -155,6 +155,13 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean(KEY_NAVIGATION_RAIL, enabled).apply()
     }
 
+    fun showNavigationBadges(): Boolean =
+        preferences.getBoolean(KEY_NAVIGATION_BADGES, true)
+
+    fun saveShowNavigationBadges(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_NAVIGATION_BADGES, enabled).apply()
+    }
+
     fun libraryMode(): LibraryMode =
         preferences.getString(KEY_LIBRARY_MODE, null)
             ?.let { stored -> runCatching { LibraryMode.valueOf(stored) }.getOrNull() }
@@ -721,6 +728,7 @@ class SettingsStore(context: Context) {
         const val KEY_IGNORE_DISPLAY_CUTOUT = "layout.ignore.display.cutout"
         const val KEY_SHOW_APP_STATUS_BAR = "layout.show.app.status.bar"
         const val KEY_NAVIGATION_RAIL = "layout.navigation.rail"
+        const val KEY_NAVIGATION_BADGES = "layout.navigation.badges"
         const val KEY_LIBRARY_MODE = "library.mode"
         const val KEY_ONBOARDING_VERSION = "onboarding.version"
         const val KEY_ONBOARDING_COMPLETED = "onboarding.completed"

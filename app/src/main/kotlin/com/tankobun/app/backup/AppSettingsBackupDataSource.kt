@@ -111,6 +111,7 @@ internal class AppSettingsBackupDataSource(
             .put("ignoreDisplayCutout", snapshot.ignoreDisplayCutout)
             .put("showAppStatusBar", snapshot.showAppStatusBar)
             .put("navigationRail", snapshot.useNavigationRail)
+            .put("navigationBadges", snapshot.showNavigationBadges)
             .put("catalogMode", snapshot.catalogMode.name)
             .put("libraryMode", snapshot.libraryMode.name)
             .put("libraryViewMode", snapshot.libraryViewMode.name)
@@ -242,6 +243,7 @@ internal class AppSettingsBackupDataSource(
         settings.optBooleanOrNull("ignoreDisplayCutout")?.let(store::saveIgnoreDisplayCutout)
         settings.optBooleanOrNull("showAppStatusBar")?.let(store::saveShowAppStatusBar)
         settings.optBooleanOrNull("navigationRail")?.let(store::saveUseNavigationRail)
+        settings.optBooleanOrNull("navigationBadges")?.let(store::saveShowNavigationBadges)
         settings.enumOrNull<com.tankobun.app.LibraryMode>("libraryMode")?.let(store::saveLibraryMode)
         settings.enumOrNull<CatalogMode>("catalogMode")?.let(store::saveCatalogMode)
         settings.enumOrNull<MediaViewMode>("libraryViewMode")?.let(store::saveLibraryViewMode)
@@ -309,6 +311,7 @@ internal class AppSettingsBackupDataSource(
             ignoreDisplayCutout = store.ignoreDisplayCutout(),
             showAppStatusBar = store.showAppStatusBar(),
             useNavigationRail = store.useNavigationRail(),
+            showNavigationBadges = store.showNavigationBadges(),
             libraryViewMode = store.libraryViewMode(),
             libraryCoverColumns = store.libraryCoverColumns(),
             libraryShowWholeCovers = store.libraryShowWholeCovers(),

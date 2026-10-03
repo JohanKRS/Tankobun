@@ -400,6 +400,12 @@ internal fun SettingsDetailContent(
                     onUseRailChange = viewModel::setUseNavigationRail,
                 )
             }
+            SettingsToggleRow(
+                title = tankobunString(R.string.settings_navigation_badges),
+                subtitle = tankobunString(R.string.settings_navigation_badges_desc),
+                checked = state.showNavigationBadges,
+                onCheckedChange = viewModel::setShowNavigationBadges,
+            )
             Text(tankobunString(R.string.settings_system_ui), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             SettingsToggleRow(
                 title = tankobunString(R.string.settings_show_android_status_bar),

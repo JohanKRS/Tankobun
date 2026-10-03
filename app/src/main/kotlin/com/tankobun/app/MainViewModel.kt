@@ -330,6 +330,7 @@ class MainViewModel(
             ignoreDisplayCutout = container.settingsStore.ignoreDisplayCutout(),
             showAppStatusBar = container.settingsStore.showAppStatusBar(),
             useNavigationRail = container.settingsStore.useNavigationRail(),
+            showNavigationBadges = container.settingsStore.showNavigationBadges(),
             onboardingVisible = shouldShowOnboarding(initialOnboardingVersion),
             readerTutorialVisible = !container.settingsStore.readerTutorialCompleted(),
             readerMode = container.settingsStore.readerMode(),
@@ -786,6 +787,11 @@ class MainViewModel(
     fun setUseNavigationRail(enabled: Boolean) {
         container.settingsStore.saveUseNavigationRail(enabled)
         _state.update { it.copy(useNavigationRail = enabled) }
+    }
+
+    fun setShowNavigationBadges(enabled: Boolean) {
+        container.settingsStore.saveShowNavigationBadges(enabled)
+        _state.update { it.copy(showNavigationBadges = enabled) }
     }
 
     fun setLibraryViewMode(mode: MediaViewMode) {
@@ -1677,6 +1683,7 @@ class MainViewModel(
                 ignoreDisplayCutout = store.ignoreDisplayCutout(),
                 showAppStatusBar = store.showAppStatusBar(),
                 useNavigationRail = store.useNavigationRail(),
+                showNavigationBadges = store.showNavigationBadges(),
                 libraryMode = store.libraryMode(),
                 libraryViewMode = store.libraryViewMode(),
                 libraryCoverColumns = store.libraryCoverColumns(),

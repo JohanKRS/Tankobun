@@ -790,9 +790,13 @@ internal fun TankobunScaffold(
     val chromeInsets = TankobunChromeInsets(top = topChromeInset, bottom = bottomChromeInset)
     val chromeHazeState = remember { HazeState() }
     val selectedDestination = TankobunDestination.forTab(selectedTab)
-    val badges = TankobunDestinationBadges(
-        downloadsActive = state.downloads.any { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING },
-    )
+    val downloadsActive = state.downloads.any { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }
+    // Dock and rail badges are optional; the Library top bar keeps its own indicators.
+    val badges = if (state.showNavigationBadges) {
+        TankobunDestinationBadges(downloadsActive = downloadsActive)
+    } else {
+        TankobunDestinationBadges()
+    }
 
     // The dock steps aside while content scrolls down and returns as soon as it scrolls back.
     var dockHidden by remember { mutableStateOf(false) }
@@ -906,13 +910,13 @@ internal fun TankobunScaffold(
                     if (selectedMedia == null && selectedTab == 1) {
                         TopBarActionButton(
                             icon = TankobunIcons.Download,
-                            contentDescription = if (badges.downloadsActive) {
+                            contentDescription = if (downloadsActive) {
                                 tankobunString(R.string.nav_you_downloads_badge, tankobunString(R.string.common_downloads))
                             } else {
                                 tankobunString(R.string.common_downloads)
                             },
                             onClick = { onOpenSettingsRoute(SettingsRoute.DOWNLOADS) },
-                            badgeDot = badges.downloadsActive,
+                            badgeDot = downloadsActive,
                         )
                     }
                 },

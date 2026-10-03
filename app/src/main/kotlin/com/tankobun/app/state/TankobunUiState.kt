@@ -55,6 +55,7 @@ data class TankobunUiState(
     val ignoreDisplayCutout: Boolean = true,
     val showAppStatusBar: Boolean = true,
     val useNavigationRail: Boolean = false,
+    val showNavigationBadges: Boolean = true,
     val catalogMode: CatalogMode = CatalogMode.ANILIST,
     val libraryMode: LibraryMode = LibraryMode.LOCAL,
     val onboardingVisible: Boolean = false,
