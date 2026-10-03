@@ -88,3 +88,8 @@ internal fun tankobunQuantityString(@PluralsRes id: Int, quantity: Int, vararg a
 @ReadOnlyComposable
 private fun tankobunStringContext(): Context =
     LocalTankobunStringContext.current ?: LocalContext.current
+
+/** The app language's locale. Unlike LocalConfiguration, it also holds inside dialogs and sheets. */
+@Composable
+@ReadOnlyComposable
+internal fun tankobunLocale(): Locale = tankobunStringContext().resources.configuration.locales[0] ?: Locale.getDefault()

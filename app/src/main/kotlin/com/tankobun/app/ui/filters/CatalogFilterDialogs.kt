@@ -22,6 +22,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.R
 import com.tankobun.app.tankobunString
+import com.tankobun.app.tankobunLocale
 import com.tankobun.app.ui.browse.*
 import com.tankobun.app.ui.components.*
 import com.tankobun.app.ui.icons.TankobunIcons
@@ -188,7 +189,7 @@ internal fun CatalogFilterDialog(
     val categoryLabels = categoryNames.associateWith { filterCategoryLabel(it) }
     val genreLabels = genreNames.associateWith { browseGenreLabel(it) }
     // Localized labels sort by the app language's rules, so "Ação" comes before "Aventura".
-    val locale = LocalConfiguration.current.locales[0]
+    val locale = tankobunLocale()
     val collator = remember(locale) { Collator.getInstance(locale).apply { strength = Collator.SECONDARY } }
     val labels = remember(allowed, categoryLabels, genreLabels, collator) { allowed.map { tag ->
         val label = genreLabels[tag.name] ?: tag.name

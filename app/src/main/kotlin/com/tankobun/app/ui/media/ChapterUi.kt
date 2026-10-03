@@ -50,7 +50,6 @@ import java.time.temporal.ChronoUnit
 import java.time.ZoneId
 import java.time.Instant
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
@@ -75,6 +74,7 @@ import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.MainViewModel
 import com.tankobun.app.R
 import com.tankobun.app.tankobunString
+import com.tankobun.app.tankobunLocale
 import com.tankobun.app.logic.chapterNearProgress
 import com.tankobun.app.logic.translationCredit
 import com.tankobun.app.logic.firstInReadingOrder
@@ -597,7 +597,7 @@ private fun ChapterActionsMenu(
 @Composable
 internal fun chapterDateLabel(epochMillis: Long?): String? {
     if (epochMillis == null || epochMillis <= 0L) return null
-    val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
+    val locale = tankobunLocale()
     return remember(epochMillis, locale) {
         runCatching { formatChapterDate(epochMillis, locale, System.currentTimeMillis()) }.getOrNull()
     }
