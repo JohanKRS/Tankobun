@@ -13,11 +13,12 @@ internal fun homeArtworkNeedsRefresh(checkedAt: Long?, attemptedAt: Long?, now: 
         (attemptedAt == null || now - attemptedAt >= HOME_ARTWORK_RETRY_MILLIS)
 
 internal class HomeArtworkDataSource(private val container: AppContainer, private val cachePolicy: CachePolicy) {
-    suspend fun enrich(feed: AnilistHomeFeed, includeAdult: Boolean): AnilistHomeFeed {
+    suspend fun enrich(feed: AnilistHomeFeed, includeAdult: Boolean, mode: CatalogMode): AnilistHomeFeed {
         val bounded = feed.withHomeTrendingLimit()
         val now = System.currentTimeMillis()
         val dao = container.database.catalogDao()
-        fun key(id: Int) = "home:artwork:v1:$id|adult=$includeAdult"
+        // Each catalog checks artwork on its own, so one mode never writes the other's banners.
+        fun key(id: Int) = "home:artwork:v2:${mode.name}:$id|adult=$includeAdult"
         val candidates = bounded.trending.filter { media ->
             media.mangaBakaId != null && (includeAdult || !media.isAdult) && homeArtworkNeedsRefresh(
                 dao.page(key(media.id))?.fetchedAtEpochMillis,
@@ -26,7 +27,7 @@ internal class HomeArtworkDataSource(private val container: AppContainer, privat
             )
         }
         if (candidates.isEmpty()) return bounded
-        val updated = container.catalog.homeArtwork(candidates, includeAdult, container.tokenStore.accessToken()).associateBy { it.id }
+        val updated = container.catalog.homeArtwork(candidates, includeAdult, container.tokenStore.accessToken(), mode).associateBy { it.id }
         container.database.withTransaction {
             container.database.mediaDao().upsertMedia(updated.values.map { it.toEntity(now) })
             candidates.forEach { media ->

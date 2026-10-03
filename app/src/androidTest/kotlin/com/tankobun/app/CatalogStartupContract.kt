@@ -52,22 +52,26 @@ internal suspend fun Instrumentation.checkCatalogStartup() {
                     replace("anilistRepository", AnilistRepository(AnilistGraphQlClient(client, RespectfulRateLimiter(0), "https://example.invalid/graphql")))
                     replace("mangaBakaRepository", MangaBakaRepository(client, baseUrl = "https://example.invalid"))
                     val catalog = CatalogDataSource(container)
-                    val trending = if (browse) catalog.browseLanding(10, null, false, mode).trending
+                    val result = runCatching {
+                        if (browse) catalog.browseLanding(10, null, false, mode).trending
                         else catalog.homeFeed(emptyList(), null, false, mode).trending
-                    check(trending.isNotEmpty())
+                    }
                     when (mode) {
+                        // Only the selected catalog is asked, even when it fails.
                         CatalogMode.ANILIST -> {
-                            check(requests.first() == "AniList")
+                            check(requests.isNotEmpty() && requests.all { it == "AniList" })
                             if (failAniList) {
-                                check(requests.drop(1).isNotEmpty() && requests.drop(1).all { it == "MangaBaka" })
-                                check(trending.all { it.mangaBakaId == 700002 })
+                                check(result.isFailure)
                             } else {
-                                check(requests == listOf("AniList"))
-                                check(trending.all { it.id == 700001 })
+                                val trending = result.getOrThrow()
+                                check(trending.isNotEmpty() && trending.all { it.id == 700001 })
                             }
                         }
-                        CatalogMode.MANGABAKA -> check(requests.all { it == "MangaBaka" })
-                        CatalogMode.COMBINED -> check(requests.toSet() == setOf("AniList", "MangaBaka") && trending.size == 2)
+                        CatalogMode.MANGABAKA -> {
+                            check(requests.all { it == "MangaBaka" })
+                            check(result.getOrThrow().isNotEmpty())
+                        }
+                        CatalogMode.COMBINED -> check(requests.toSet() == setOf("AniList", "MangaBaka") && result.getOrThrow().size == 2)
                     }
                     check(SettingsStore(targetContext).catalogMode() == mode)
                 }

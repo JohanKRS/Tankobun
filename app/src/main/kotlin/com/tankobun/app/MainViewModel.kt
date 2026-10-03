@@ -167,6 +167,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import com.tankobun.app.catalog.usesMangaBaka
+import com.tankobun.app.catalog.usesAniList
 import com.tankobun.core.database.ChapterUpdateEntity
 import com.tankobun.app.updates.toSourceChapter
 import com.tankobun.app.updates.libraryChapterStandings
@@ -561,6 +563,8 @@ class MainViewModel(
         homeFeedRefreshJob?.cancel()
         homeFeedRefreshJob = null
         _state.update { it.withCatalogMode(mode) }
+        catalogTaxonomyJob?.cancel()
+        loadBrowseTags()
         loadHomeFeed()
         if (_state.value.hasBrowseQueryOrFilters()) searchAniList(recordHistory = false) else loadBrowseLanding()
     }
@@ -2309,6 +2313,12 @@ class MainViewModel(
     }
 
     private fun loadBrowseMix(force: Boolean) {
+        if (!_state.value.catalogMode.usesMangaBaka) {
+            // "For you" is MangaBaka's Mix; AniList alone has no equivalent.
+            browseMixJob?.cancel()
+            _state.update { it.copy(browseForYou = emptyList(), browseForYouRefreshing = false) }
+            return
+        }
         if (browseMixJob?.isActive == true && !force) return
         browseMixJob?.cancel()
         browseMixJob = viewModelScope.launch {
@@ -2557,7 +2567,7 @@ class MainViewModel(
 
     private suspend fun enrichHomeArtwork(feed: com.tankobun.core.model.AnilistHomeFeed, includeAdult: Boolean, mode: CatalogMode) {
         try {
-            val enriched = homeArtworkDataSource.enrich(feed, includeAdult)
+            val enriched = homeArtworkDataSource.enrich(feed, includeAdult, mode)
             if (_state.value.catalogMode == mode && _state.value.showNsfwContent == includeAdult) applyHomeFeed(enriched)
         } catch (error: Exception) {
             if (error is CancellationException) throw error
@@ -2572,6 +2582,8 @@ class MainViewModel(
             .filter { genre -> includeAdult || !genre.equals("Hentai", ignoreCase = true) }
 
     private suspend fun refreshHomeGenresIfStale(force: Boolean) {
+        // MangaBaka navigation keeps the cached or built-in genre names and never asks AniList.
+        if (!_state.value.catalogMode.usesAniList) return
         val cached = container.settingsStore.anilistGenres()
         val cachedAt = container.settingsStore.anilistGenresCachedAtEpochMillis()
         val cacheFresh = cached.isNotEmpty() &&
@@ -2656,6 +2668,8 @@ class MainViewModel(
             _state.update { it.copy(catalogTaxonomyLoading = true) }
             try {
                 val settings = container.settingsStore
+                // Filters only offer what the selected catalog can search.
+                val mode = _state.value.catalogMode
                 var alTags = settings.anilistTags()
                 var mbTags = withContext(Dispatchers.IO) { settings.mangaBakaTags() }
                 var publication = 0
@@ -2664,13 +2678,18 @@ class MainViewModel(
                     val alSnapshot = alTags
                     val mbSnapshot = mbTags
                     val taxonomy = withContext(Dispatchers.Default) {
-                        com.tankobun.core.model.CatalogTaxonomy.merge(alSnapshot, settings.anilistGenres().ifEmpty { FALLBACK_HOME_GENRES }, mbSnapshot)
+                        com.tankobun.core.model.CatalogTaxonomy.merge(
+                            if (mode.usesAniList) alSnapshot else emptyList(),
+                            if (mode.usesAniList) settings.anilistGenres().ifEmpty { FALLBACK_HOME_GENRES } else emptyList(),
+                            if (mode.usesMangaBaka) mbSnapshot else emptyList(),
+                        )
                     }
                     if (publication == revision) _state.update { it.copy(browseAvailableTags = alSnapshot, catalogTaxonomy = taxonomy) }
                 }
                 publish()
                 kotlinx.coroutines.coroutineScope {
                     launch {
+                        if (!mode.usesAniList) return@launch
                         if (!force && alTags.isNotEmpty() && System.currentTimeMillis() - settings.anilistTagsCachedAtEpochMillis() <= cachePolicy.anilistTagsTtlMillis) return@launch
                         runCatching { container.anilistRepository.mediaTags() }.onSuccess { tags ->
                             if (tags.isNotEmpty()) {
@@ -2681,6 +2700,7 @@ class MainViewModel(
                         }.onFailure { if (it is CancellationException) throw it else Log.w(TAG, "AniList taxonomy unavailable", it) }
                     }
                     launch {
+                        if (!mode.usesMangaBaka) return@launch
                         if (!force && mbTags.isNotEmpty() && System.currentTimeMillis() - settings.mangaBakaTagsCachedAtEpochMillis() <= cachePolicy.anilistTaxonomyTtlMillis) return@launch
                         runCatching { container.mangaBakaRepository.tags(forceRefresh = force) }.onSuccess { tags ->
                             if (tags.isNotEmpty()) {

@@ -92,10 +92,11 @@ internal class HomeDataSource(
     }
 
     private fun trendingKey(includeAdult: Boolean, mode: CatalogMode): String =
-        "home:v7:${mode.name}:${adultCacheSegment(includeAdult)}:trending"
+        // v8: feeds saved before catalogs were kept separate may hold another catalog's fallback.
+        "home:v8:${mode.name}:${adultCacheSegment(includeAdult)}:trending"
 
     private fun genreKey(genre: String, includeAdult: Boolean, mode: CatalogMode): String =
-        "home:v7:${mode.name}:${adultCacheSegment(includeAdult)}:genre:$genre"
+        "home:v8:${mode.name}:${adultCacheSegment(includeAdult)}:genre:$genre"
 
     private fun adultCacheSegment(includeAdult: Boolean): String = if (includeAdult) "nsfw" else "safe"
 }

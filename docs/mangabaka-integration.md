@@ -4,6 +4,13 @@ Implementação nova na branch `mangabaka`, partindo de `6cec832`, em 7 de setem
 
 ## Comportamento no aplicativo
 
+> **Atualização (outubro de 2026): só o catálogo selecionado.** Em Configurações → Catálogos e contas, o modo AniList não consulta o MangaBaka, e o modo MangaBaka não consulta o AniList. Isso vale para Início, Explorar, busca, artes da Home, detalhes, recomendações, Para você e taxonomia dos filtros. O modo Combinado mantém o comportamento descrito abaixo. Exceções:
+>
+> - Uma obra que só o outro catálogo conhece (por exemplo, na biblioteca) continua abrindo por ele.
+> - Uma busca que o AniList não consegue representar recorre ao MangaBaka.
+>
+> Sem catálogo de reserva, o AniList tem até 30 s para responder (no Combinado continuam 10 s com pausa de um minuto após falha), já que as requisições podem esperar na fila do limitador durante a inicialização. Falhas mantêm o cache anterior em vez de trocar de catálogo. O cache da Home passou para `home:v8`, descartando feeds antigos que guardavam o fallback de outro catálogo. A verificação de artes da Home é separada por modo. O tracking MangaBaka continua dependendo apenas da conta conectada. As seções abaixo descrevem o modo Combinado.
+
 - **Busca e listas de Explorar:** consultam AniList e MangaBaka; AniList vem primeiro, com complementos do MangaBaka. Correspondências oficiais compartilham a identidade local. Não há nova etapa de seleção de catálogo.
 - **Seções iniciais de Explorar:** as quatro seções existentes priorizam AniList. Se ele estiver indisponível, o MangaBaka pode fornecer as listas equivalentes. Todas as linhas mostram até dez obras e oferecem Ver todos.
 - **Para você:** segunda linha, logo abaixo de Em alta agora, com prévia de dez obras e Ver todos para abrir a seleção completa de até 36 sugestões do Mix. Usa até três obras em leitura, releitura ou concluídas da biblioteca, priorizando leituras atuais, notas e alterações recentes. Pode usar obras dos dois catálogos, desde que tenham correspondência MangaBaka confirmada. Exclui obras já na biblioteca e respeita o filtro de conteúdo adulto. Não exige conta MangaBaka; não aparece sem sementes ou resultados. O cache de 24 horas é verificado ao abrir Explorar; mudar as sementes ou a opção de conteúdo adulto usa outra chave. Atualizar na lista completa renova a consulta, sem apagar outros caches. Uma renovação pode retornar as mesmas sugestões.

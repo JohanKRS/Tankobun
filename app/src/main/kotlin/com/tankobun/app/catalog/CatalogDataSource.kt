@@ -9,14 +9,35 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
-/** Navigation follows the preference; linked titles retain the richest available presentation. */
+/** AniList and Combined navigation may call AniList. */
+internal val CatalogMode.usesAniList: Boolean get() = this != CatalogMode.MANGABAKA
+
+/** MangaBaka and Combined navigation may call MangaBaka. */
+internal val CatalogMode.usesMangaBaka: Boolean get() = this != CatalogMode.ANILIST
+
+/**
+ * Navigation uses only the selected catalog; Combined uses both. A work that only the other
+ * catalog knows still opens from it, so library entries never become unreachable.
+ */
 internal class CatalogDataSource(private val container: AppContainer) {
     @Volatile private var aniListRetryAt = 0L
 
-    private suspend fun <T> aniList(block: suspend () -> T): T? {
-        if (System.currentTimeMillis() < aniListRetryAt) return null
-        return try { withTimeoutOrNull(10_000L) { block() }.also { if (it == null) aniListRetryAt = System.currentTimeMillis() + 60_000L } }
-        catch (error: Exception) { if (error is CancellationException) throw error; aniListRetryAt = System.currentTimeMillis() + 60_000L; null }
+    /**
+     * With a fallback (Combined), a slow AniList is cut short and skipped for a minute. Alone it
+     * gets time to answer: its requests can queue behind startup syncs in the shared rate limiter.
+     */
+    private suspend fun <T> aniList(withFallback: Boolean = true, block: suspend () -> T): T? {
+        if (withFallback && System.currentTimeMillis() < aniListRetryAt) return null
+        val timeoutMillis = if (withFallback) 10_000L else 30_000L
+        return try {
+            withTimeoutOrNull(timeoutMillis) { block() }.also {
+                if (it == null && withFallback) aniListRetryAt = System.currentTimeMillis() + 60_000L
+            }
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            if (withFallback) aniListRetryAt = System.currentTimeMillis() + 60_000L
+            null
+        }
     }
 
     suspend fun search(
@@ -26,8 +47,9 @@ internal class CatalogDataSource(private val container: AppContainer) {
         mode: CatalogMode,
     ): AnilistMediaPage {
         val (main, additional) = navigationCatalogs(mode,
-            aniList = { primary?.let { aniList { it() } } },
-            mangaBaka = { optional { secondary() } },
+            aniList = { if (mode.usesAniList) primary?.let { aniList(withFallback = mode == CatalogMode.COMBINED) { it() } } else null },
+            // AniList mode still asks MangaBaka when AniList cannot express the query at all.
+            mangaBaka = { if (mode.usesMangaBaka || primary == null) optional { secondary() } else null },
             supplementWaitMillis = if (mode == CatalogMode.COMBINED) 12_000L else 4_000L,
             hasContent = { it.media.isNotEmpty() },
         )
@@ -47,44 +69,87 @@ internal class CatalogDataSource(private val container: AppContainer) {
     }
 
     suspend fun details(mediaId: Int, accessToken: String?, scoreFormat: AnilistScoreFormat): AnilistMediaDetails = coroutineScope {
+        val mode = container.settingsStore.catalogMode()
         val cached = container.database.mediaDao().cachedMedia(mediaId)?.toModel()
         val remoteId = container.catalogIdentity.anilistId(mediaId)
-        val extra = async {
-            optional {
-                val linked = cached?.mangaBakaId ?: container.database.catalogDao().byLocalId(mediaId)?.mangaBakaId
-                    ?: remoteId?.let { container.mangaBakaRepository.findByAniList(it)?.mangaBakaId }
-                linked?.let { container.mangaBakaRepository.details(it, container.settingsStore.showNsfwContent()) }
+        suspend fun fromMangaBaka(): AnilistMedia? = optional {
+            val linked = cached?.mangaBakaId ?: container.database.catalogDao().byLocalId(mediaId)?.mangaBakaId
+                ?: remoteId?.let { container.mangaBakaRepository.findByAniList(it)?.mangaBakaId }
+            linked?.let { container.mangaBakaRepository.details(it, container.settingsStore.showNsfwContent()) }
+        }
+        suspend fun fromAniList(withFallback: Boolean) = remoteId?.let {
+            aniList(withFallback) { container.anilistRepository.mediaDetailsWithEntry(mediaId, accessToken, scoreFormat) }
+        }
+        val (primary, supplement) = when (mode) {
+            CatalogMode.COMBINED -> {
+                val extra = async { fromMangaBaka() }
+                val primary = fromAniList(withFallback = true)
+                val fallback = try { withTimeoutOrNull(if (primary != null) 3_000L else 12_000L) { extra.await() } } finally { extra.cancel() }
+                primary to fallback
+            }
+            // MangaBaka is only asked about works AniList does not know.
+            CatalogMode.ANILIST -> {
+                val primary = fromAniList(withFallback = false)
+                primary to if (primary == null && remoteId == null) fromMangaBaka() else null
+            }
+            // AniList is only asked about works MangaBaka cannot match.
+            CatalogMode.MANGABAKA -> {
+                val supplement = fromMangaBaka()
+                (if (supplement == null) fromAniList(withFallback = false) else null) to supplement
             }
         }
-        val primary = remoteId?.let { aniList { container.anilistRepository.mediaDetailsWithEntry(mediaId, accessToken, scoreFormat) } }
-        val fallback = try { withTimeoutOrNull(if (primary != null) 3_000L else 12_000L) { extra.await() } } finally { extra.cancel() }
-        val media = (primary?.media ?: fallback ?: error("Title unavailable"))
-            .withFallbackDetails(fallback).withFallbackDetails(cached)
+        val media = (primary?.media ?: supplement ?: cached ?: error("Title unavailable"))
+            .withFallbackDetails(supplement).withFallbackDetails(cached)
         val entry = primary?.listEntry ?: container.database.listEntryDao().cachedEntry(media.id)?.toModel()
         val recommendations = recommendations(media.id, 1, accessToken, primary?.recommendationPage)
         return@coroutineScope AnilistMediaDetails(media, entry, recommendations)
     }
 
     suspend fun recommendations(mediaId: Int, page: Int, accessToken: String?, preloaded: AnilistRecommendationPage? = null): AnilistRecommendationPage = coroutineScope {
-        val supplemental = async {
-            if (page != 1) return@async emptyList<AnilistRecommendation>()
-            optional {
-                val mb = container.database.catalogDao().byLocalId(mediaId)?.mangaBakaId
-                    ?: container.catalogIdentity.anilistId(mediaId)?.let { container.mangaBakaRepository.findByAniList(it)?.mangaBakaId }
-                    ?: return@optional emptyList<AnilistRecommendation>()
-                val adult = container.settingsStore.showNsfwContent()
-                val similar = async { optional { container.mangaBakaRepository.recommendations(mb, 1, adult).recommendations }.orEmpty() }
-                val mixed = async { optional { container.mangaBakaRepository.mix(listOf(mb) + mixSeeds(resolveMissing = false).take(2), adult, 24) }.orEmpty() }
-                val owned = container.database.listEntryDao().cachedEntries().mapTo(hashSetOf()) { it.mediaId }
-                similar.await() + mixed.await().filter { it.id !in owned }.map { AnilistRecommendation(it, null) }
+        val mode = container.settingsStore.catalogMode()
+        val adult = container.settingsStore.showNsfwContent()
+        val anilistId = container.catalogIdentity.anilistId(mediaId)
+        suspend fun mangaBakaId(): Int? = container.database.catalogDao().byLocalId(mediaId)?.mangaBakaId
+            ?: anilistId?.let { optional { container.mangaBakaRepository.findByAniList(it)?.mangaBakaId } }
+        suspend fun fromMangaBaka(mb: Int): List<AnilistRecommendation> = coroutineScope {
+            val similar = async { optional { container.mangaBakaRepository.recommendations(mb, 1, adult).recommendations }.orEmpty() }
+            val mixed = async { optional { container.mangaBakaRepository.mix(listOf(mb) + mixSeeds(resolveMissing = false).take(2), adult, 24) }.orEmpty() }
+            val owned = container.database.listEntryDao().cachedEntries().mapTo(hashSetOf()) { it.mediaId }
+            similar.await() + mixed.await().filter { it.id !in owned }.map { AnilistRecommendation(it, null) }
+        }
+        suspend fun fromAniList(withFallback: Boolean) = preloaded ?: anilistId?.let {
+            aniList(withFallback) { container.anilistRepository.mediaRecommendations(mediaId, page, accessToken = accessToken) }
+        }
+        when (mode) {
+            CatalogMode.COMBINED -> {
+                val supplemental = async {
+                    if (page != 1) return@async emptyList<AnilistRecommendation>()
+                    optional { mangaBakaId()?.let { fromMangaBaka(it) }.orEmpty() }
+                }
+                val main = fromAniList(withFallback = true)
+                if (page > 1 && main == null) error("Recommendations unavailable")
+                val extra = try { withTimeoutOrNull(if (main != null) 2_000L else 12_000L) { supplemental.await() } } finally { supplemental.cancel() }
+                mergeRecommendations(mediaId, page, main, extra.orEmpty(), adult)
+            }
+            CatalogMode.ANILIST -> if (anilistId != null) {
+                val main = fromAniList(withFallback = false) ?: error("Recommendations unavailable")
+                mergeRecommendations(mediaId, page, main, emptyList(), adult)
+            } else {
+                // A MangaBaka-only work has no AniList suggestions to show.
+                val extra = if (page == 1) optional { mangaBakaId()?.let { fromMangaBaka(it) } }.orEmpty() else emptyList()
+                mergeRecommendations(mediaId, page, null, extra, adult)
+            }
+            CatalogMode.MANGABAKA -> {
+                val mb = if (page == 1) mangaBakaId() else null
+                if (mb != null) {
+                    mergeRecommendations(mediaId, page, null, optional { fromMangaBaka(mb) }.orEmpty(), adult)
+                } else {
+                    // Only works MangaBaka cannot match fall back to AniList suggestions.
+                    val main = fromAniList(withFallback = false) ?: error("Recommendations unavailable")
+                    mergeRecommendations(mediaId, page, main, emptyList(), adult)
+                }
             }
         }
-        val main = preloaded ?: if (container.catalogIdentity.anilistId(mediaId) != null) {
-            aniList { container.anilistRepository.mediaRecommendations(mediaId, page, accessToken = accessToken) }
-        } else null
-        if (page > 1 && main == null) error("Recommendations unavailable")
-        val extra = try { withTimeoutOrNull(if (main != null) 2_000L else 12_000L) { supplemental.await() } } finally { supplemental.cancel() }
-        mergeRecommendations(mediaId, page, main, extra.orEmpty(), container.settingsStore.showNsfwContent())
     }
 
     suspend fun mixSeeds(resolveMissing: Boolean = true): List<Int> {
@@ -99,17 +164,21 @@ internal class CatalogDataSource(private val container: AppContainer) {
         }.distinct()
     }
 
-    suspend fun homeArtwork(media: List<AnilistMedia>, includeAdult: Boolean, accessToken: String?): List<AnilistMedia> = coroutineScope {
+    suspend fun homeArtwork(media: List<AnilistMedia>, includeAdult: Boolean, accessToken: String?, mode: CatalogMode): List<AnilistMedia> = coroutineScope {
         val visible = media.distinctBy { it.id }.take(com.tankobun.app.home.HOME_TRENDING_LIMIT)
             .filter { includeAdult || !it.isAdult }
-        val primary = aniList {
-            container.anilistRepository.mangaByIds(visible.map { it.id }, accessToken, includeCharacters = true)
-        }.orEmpty().filter { includeAdult || !it.isAdult }.associateBy { it.id }
+        val primary = if (mode.usesAniList) {
+            aniList(withFallback = mode == CatalogMode.COMBINED) {
+                container.anilistRepository.mangaByIds(visible.map { it.id }, accessToken, includeCharacters = true)
+            }.orEmpty().filter { includeAdult || !it.isAdult }.associateBy { it.id }
+        } else {
+            emptyMap()
+        }
         val permits = Semaphore(2)
         visible.map { original -> async {
             val al = primary[original.id]
             val hasPresentation = al?.let { it.bannerImage != null || it.mainCharacterImage != null || it.characterImages.isNotEmpty() } == true
-            val mb = if (hasPresentation) null else permits.withPermit {
+            val mb = if (hasPresentation || !mode.usesMangaBaka) null else permits.withPermit {
                 optional { container.mangaBakaRepository.artwork(original, includeAdult) }
             }
             (al ?: mb)?.withFallbackDetails(mb)?.withFallbackDetails(original)
@@ -121,7 +190,7 @@ internal class CatalogDataSource(private val container: AppContainer) {
         onTrendingLoaded: (List<AnilistMedia>) -> Unit = {},
         onGenreHighlightsLoaded: (List<AnilistGenreHighlight>) -> Unit = {},
     ): AnilistHomeFeed {
-        suspend fun fromAniList() = aniList {
+        suspend fun fromAniList() = aniList(withFallback = mode == CatalogMode.COMBINED) {
             container.anilistRepository.homeCandidates(genres, accessToken, includeAdult) { candidates ->
                 if (mode == CatalogMode.ANILIST) {
                     onTrendingLoaded(candidates.trending.take(com.tankobun.app.home.HOME_TRENDING_LIMIT))
@@ -149,14 +218,8 @@ internal class CatalogDataSource(private val container: AppContainer) {
             )
         }
         val (al, mb) = when (mode) {
-            CatalogMode.ANILIST -> {
-                val primary = fromAniList()
-                primary to if (primary == null) fromMangaBaka() else null
-            }
-            CatalogMode.MANGABAKA -> {
-                val primary = fromMangaBaka()
-                (if (primary == null) fromAniList() else null) to primary
-            }
+            CatalogMode.ANILIST -> fromAniList() to null
+            CatalogMode.MANGABAKA -> null to fromMangaBaka()
             CatalogMode.COMBINED -> navigationCatalogs(mode, ::fromAniList, ::fromMangaBaka, supplementWaitMillis = 12_000L)
         }
         check(al != null || mb != null) { "Catalogs unavailable" }
@@ -178,7 +241,9 @@ internal class CatalogDataSource(private val container: AppContainer) {
     }
 
     suspend fun browseLanding(perPage: Int, accessToken: String?, includeAdult: Boolean, mode: CatalogMode): AnilistBrowseLanding {
-        suspend fun fromAniList() = aniList { container.anilistRepository.browseLanding(perPage, accessToken, includeAdult) }
+        suspend fun fromAniList() = aniList(withFallback = mode == CatalogMode.COMBINED) {
+            container.anilistRepository.browseLanding(perPage, accessToken, includeAdult)
+        }
         // Four searches share MangaBaka's 2.2 s request spacing, also with Home.
         // Give that queue time to finish instead of consistently dropping it from Combined.
         suspend fun fromMangaBaka(): AnilistBrowseLanding? = optional(timeoutMillis = 20_000L) {
@@ -192,14 +257,8 @@ internal class CatalogDataSource(private val container: AppContainer) {
             }
         }
         val (al, mb) = when (mode) {
-            CatalogMode.ANILIST -> {
-                val primary = fromAniList()
-                primary to if (primary == null) fromMangaBaka() else null
-            }
-            CatalogMode.MANGABAKA -> {
-                val primary = fromMangaBaka()
-                (if (primary == null) fromAniList() else null) to primary
-            }
+            CatalogMode.ANILIST -> fromAniList() to null
+            CatalogMode.MANGABAKA -> null to fromMangaBaka()
             CatalogMode.COMBINED -> navigationCatalogs(mode, ::fromAniList, ::fromMangaBaka, supplementWaitMillis = 20_000L)
         }
         check(al != null || mb != null) { "Catalogs unavailable" }
