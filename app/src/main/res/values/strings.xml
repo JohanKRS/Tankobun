@@ -496,6 +496,7 @@
     <string name="detail_chapter_stat_short">CH.</string>
     <string name="detail_chapter_stat">Chapters</string>
     <string name="detail_volume_stat_short">VOL.</string>
+    <string name="detail_score_stat_short">Score</string>
     <string name="detail_volume_stat">Volumes</string>
     <string name="detail_author">Author</string>
     <string name="detail_years">Years</string>

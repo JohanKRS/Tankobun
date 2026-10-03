@@ -495,6 +495,7 @@
     <string name="detail_chapter_stat_short">章</string>
     <string name="detail_chapter_stat">章节</string>
     <string name="detail_volume_stat_short">卷</string>
+    <string name="detail_score_stat_short">评分</string>
     <string name="detail_volume_stat">卷数</string>
     <string name="detail_author">作者</string>
     <string name="detail_years">年份</string>

@@ -492,6 +492,7 @@
     <string name="detail_chapter_stat_short">CAP.</string>
     <string name="detail_chapter_stat">Capítulos</string>
     <string name="detail_volume_stat_short">VOL.</string>
+    <string name="detail_score_stat_short">Nota</string>
     <string name="detail_volume_stat">Volúmenes</string>
     <string name="detail_author">Autor</string>
     <string name="detail_years">Años</string>

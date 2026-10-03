@@ -169,14 +169,14 @@ internal fun TankobunHeadingLead(
             overflow = TextOverflow.Ellipsis,
             style = textStyle,
             color = titleColor,
-            autoSize = if (shrinkToFit && textStyle.fontSize.isSp) {
-                TextAutoSize.StepBased(minFontSize = textStyle.fontSize * 0.8f, maxFontSize = textStyle.fontSize, stepSize = 0.5.sp)
-            } else {
-                null
-            },
+            autoSize = if (shrinkToFit) textStyle.shrinkToFit() else null,
         )
     }
 }
+
+/** Steps one-line text down to 80% before it ellipsizes, for tight rows at large font scales. */
+internal fun TextStyle.shrinkToFit(): TextAutoSize? =
+    if (fontSize.isSp) TextAutoSize.StepBased(minFontSize = fontSize * 0.8f, maxFontSize = fontSize, stepSize = 0.5.sp) else null
 
 /**
  * Tabler glyphs share a 24x24 viewport, but not the same visible bottom edge.

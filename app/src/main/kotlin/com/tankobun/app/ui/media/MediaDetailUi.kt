@@ -1416,20 +1416,22 @@ private fun measuredTitleHeight(
 
 @Composable
 internal fun MangaHeroMetaLine(media: AnilistMedia, compact: Boolean) {
+    val style = if (compact) {
+        MaterialTheme.typography.labelMedium
+    } else {
+        MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp, lineHeight = 16.sp)
+    }
     Text(
         listOfNotNull(
             media.mediaTypeLabel(),
             media.status.statusLabel(),
         ).joinToString("  /  ").uppercase(Locale.ROOT),
-        style = if (compact) {
-            MaterialTheme.typography.labelMedium
-        } else {
-            MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp, lineHeight = 16.sp)
-        },
+        style = style,
         color = mediaDetailAccentColor(),
         fontWeight = FontWeight.Bold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
+        autoSize = style.shrinkToFit(),
     )
 }
 
@@ -1438,7 +1440,7 @@ internal fun MangaStatRow(media: AnilistMedia, compact: Boolean) {
     val stats = listOf(
         (if (compact) tankobunString(R.string.detail_chapter_stat_short) else tankobunString(R.string.detail_chapter_stat)) to (media.chapters?.toString() ?: "--"),
         (if (compact) tankobunString(R.string.detail_volume_stat_short) else tankobunString(R.string.detail_volume_stat)) to (media.volumes?.toString() ?: "--"),
-        tankobunString(R.string.common_score) to (media.averageScore?.let { "$it%" } ?: "--"),
+        (if (compact) tankobunString(R.string.detail_score_stat_short) else tankobunString(R.string.common_score)) to (media.averageScore?.let { "$it%" } ?: "--"),
     )
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1456,12 +1458,14 @@ internal fun MangaStatRow(media: AnilistMedia, compact: Boolean) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                val labelStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, lineHeight = 12.sp)
                 Text(
                     label.uppercase(Locale.ROOT),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, lineHeight = 12.sp),
+                    style = labelStyle,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    autoSize = labelStyle.shrinkToFit(),
                 )
             }
             if (index < stats.lastIndex) {
@@ -1541,12 +1545,14 @@ private fun MangaInfoChip(item: MangaInfoItem, compact: Boolean, modifier: Modif
         ) {
             DetailIconBadge(icon = item.icon, modifier = Modifier.size(if (compact) 26.dp else 30.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                val labelStyle = MaterialTheme.typography.labelSmall.copy(fontSize = if (compact) 10.sp else 11.sp, lineHeight = 12.sp)
                 Text(
                     item.label,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = if (compact) 10.sp else 11.sp, lineHeight = 12.sp),
+                    style = labelStyle,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    autoSize = labelStyle.shrinkToFit(),
                 )
                 Text(
                     item.value,
