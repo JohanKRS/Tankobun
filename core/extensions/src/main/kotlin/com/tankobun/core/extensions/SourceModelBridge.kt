@@ -3,6 +3,7 @@ package com.tankobun.core.extensions
 import com.tankobun.core.model.SourceManga
 import com.tankobun.core.model.SourceMangaUpdate
 import com.tankobun.core.model.SourceChapter
+import com.tankobun.core.model.withRecognizedNumber
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.source.model.SManga
@@ -73,7 +74,7 @@ internal fun SChapter.toSourceChapter(sourceId: Long, mangaUrl: String): SourceC
         volume = runCatching { volume }.getOrNull(),
         chapterNumberText = runCatching { number }.getOrNull(),
         scanlators = runCatching { scanlators }.getOrDefault(emptyList()),
-    )
+    ).withRecognizedNumber()
 
 internal fun SourceChapter.toSChapter(): SChapter =
     SChapter.create().also {

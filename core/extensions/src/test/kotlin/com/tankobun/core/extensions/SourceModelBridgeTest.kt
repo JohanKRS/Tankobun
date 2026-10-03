@@ -23,6 +23,25 @@ class SourceModelBridgeTest {
         assertEquals(original.scanlators, restored.scanlators)
     }
 
+    @Test fun chapterNumbersMissingFromTheSourceComeFromAnExplicitChapterKeyword() {
+        fun recognized(name: String, number: Float = -1f, text: String? = null) =
+            SChapter.create().apply { url = "/$name"; this.name = name; chapter_number = number; this.number = text }
+                .toSourceChapter(7, "/manga").chapterNumber
+
+        assertEquals(214f, recognized("Chapter 214"))
+        assertEquals(12.5f, recognized("Vol.2 Ch.12.5 - The Return"))
+        assertEquals(3f, recognized("Capítulo 3"))
+        assertEquals(7f, recognized("Episode 7"))
+        assertEquals(42f, recognized("第42話"))
+        // Without a keyword, or with a suffix the number does not explain, it stays unnumbered.
+        assertEquals(-1f, recognized("Volume 2"))
+        assertEquals(-1f, recognized("The 100 Days"))
+        assertEquals(-1f, recognized("Chapter 12a"))
+        // A number the source sent always wins.
+        assertEquals(9f, recognized("Chapter 214", number = 9f))
+        assertEquals(-1f, recognized("Chapter 214", text = "214"))
+    }
+
     private val manga = SourceManga(7, "/manga", "Fixture", null, null, null, null, null,
         """{"cursor":[1,"two"],"config":{"enabled":true},"nullable":null}""")
 

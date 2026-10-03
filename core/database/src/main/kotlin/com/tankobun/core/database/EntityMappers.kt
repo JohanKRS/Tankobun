@@ -5,6 +5,7 @@ import com.tankobun.core.model.AnilistMedia
 import com.tankobun.core.model.AnilistTitleLanguage
 import com.tankobun.core.model.AnilistRecommendation
 import com.tankobun.core.model.AnilistTitle
+import com.tankobun.core.model.withRecognizedNumber
 import com.tankobun.core.model.DownloadJob
 import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.ReaderPage
@@ -172,6 +173,8 @@ fun SourceChapterEntity.toModel(): SourceChapter =
         chapterNumberText = chapterNumberText,
         scanlators = scanlators,
     )
+        // Lists cached before recognition existed still carry the source's -1.
+        .withRecognizedNumber()
 
 fun ReadingProgress.toEntity(): ReadingProgressEntity =
     ReadingProgressEntity(mediaId, chapterUrl, chapterNumber, pageIndex, pageScrollOffset, totalPages, readerMode, completed, updatedAtEpochMillis)
