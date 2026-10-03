@@ -1217,8 +1217,8 @@
     <string name="catalog_navigation">Catálogo de navegación</string>
     <string name="catalog_navigation_description">Elige cómo se ordenan los títulos en Inicio, Explorar y la búsqueda. Las fuentes de lectura y la sincronización se configuran por separado.</string>
     <string name="catalog_combined">Combinado</string>
-    <string name="catalog_priority_anilist">Prioriza AniList, con MangaBaka como complemento y alternativa.</string>
-    <string name="catalog_priority_mangabaka">Prioriza MangaBaka, con AniList como complemento y alternativa.</string>
+    <string name="catalog_priority_anilist">Inicio, Explorar y la búsqueda usan solo AniList.</string>
+    <string name="catalog_priority_mangabaka">Inicio, Explorar y la búsqueda usan solo MangaBaka.</string>
     <string name="catalog_priority_combined">Alterna títulos de ambos catálogos y reúne resultados de la misma obra.</string>
     <string name="novel_remove_repository" formatted="false">Quitar</string>
     <string name="novel_chapters" formatted="false">Capítulos</string>

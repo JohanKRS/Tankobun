@@ -1215,8 +1215,8 @@
     <string name="catalog_navigation">浏览目录</string>
     <string name="catalog_navigation_description">选择首页、探索和搜索中的作品排序方式。阅读来源和账号同步单独设置。</string>
     <string name="catalog_combined">合并</string>
-    <string name="catalog_priority_anilist">优先使用 AniList，MangaBaka 提供补充和备用内容。</string>
-    <string name="catalog_priority_mangabaka">优先使用 MangaBaka，AniList 提供补充和备用内容。</string>
+    <string name="catalog_priority_anilist">主页、浏览和搜索仅使用 AniList。</string>
+    <string name="catalog_priority_mangabaka">主页、浏览和搜索仅使用 MangaBaka。</string>
     <string name="catalog_priority_combined">交替显示两个目录的作品，合并同一作品的结果。</string>
     <string name="novel_remove_repository" formatted="false">移除</string>
     <string name="novel_chapters" formatted="false">章节</string>

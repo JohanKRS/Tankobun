@@ -1216,8 +1216,8 @@
     <string name="catalog_navigation">Navigation catalog</string>
     <string name="catalog_navigation_description">Choose how titles are ordered in Home, Browse and search. Reading sources and account sync are configured separately.</string>
     <string name="catalog_combined">Combined</string>
-    <string name="catalog_priority_anilist">Prioritize AniList, with MangaBaka as a complement and fallback.</string>
-    <string name="catalog_priority_mangabaka">Prioritize MangaBaka, with AniList as a complement and fallback.</string>
+    <string name="catalog_priority_anilist">Home, Browse and search use only AniList.</string>
+    <string name="catalog_priority_mangabaka">Home, Browse and search use only MangaBaka.</string>
     <string name="catalog_priority_combined">Alternate titles from both catalogs and combine results for the same work.</string>
     <string name="novel_remove_repository" formatted="false">Remove</string>
     <string name="novel_chapters" formatted="false">Chapters</string>
