@@ -76,8 +76,6 @@
     <string name="nav_library">Biblioteca</string>
     <string name="nav_browse">Explorar</string>
     <string name="nav_downloads">Descargas</string>
-    <string name="nav_profile">Perfil</string>
-    <string name="nav_settings">Ajustes</string>
 
     <string name="settings_appearance">Apariencia</string>
     <string name="settings_languages">Idiomas</string>
@@ -107,13 +105,8 @@
     <string name="settings_about_subtitle">Un poco de contexto sobre qué es y qué no es Tankobun.</string>
     <string name="settings_downloads_subtitle">Revisa el almacenamiento local de capítulos y elimina manga descargado.</string>
     <string name="settings_theme_section">Tema</string>
-    <string name="settings_theme_automatic">Seguir claro/oscuro</string>
     <string name="settings_theme_custom">Personalizado</string>
-    <string name="settings_theme_art_direction">Forma de los componentes</string>
     <string name="settings_theme_palette">Paleta de colores</string>
-    <string name="settings_theme_preview">Muestra en vivo</string>
-    <string name="settings_theme_automatic_pair">Melocotón / Ciruela</string>
-    <string name="settings_theme_automatic_preview">Claro / oscuro</string>
     <string name="settings_theme_sample_tag">Etiqueta</string>
     <string name="settings_theme_sample_action">Acción</string>
     <string name="theme_direction_original">Definido</string>
@@ -129,20 +122,8 @@
     <string name="theme_direction_neon">Neón</string>
     <string name="theme_direction_neon_desc">Brillante, luminoso y fluido</string>
     <string name="theme_palette_matcha">Matcha</string>
-    <string name="theme_palette_peach">Melocotón</string>
     <string name="theme_palette_yuzu">Yuzu</string>
-    <string name="theme_palette_berry">Frutos rojos</string>
     <string name="theme_palette_sakura">Sakura</string>
-    <string name="theme_palette_cobalt">Cobalto</string>
-    <string name="theme_palette_redline">Línea roja</string>
-    <string name="theme_palette_ultraviolet">Ultravioleta</string>
-    <string name="theme_palette_citrus">Cítrico</string>
-    <string name="theme_palette_charcoal">Carbón</string>
-    <string name="theme_palette_plum">Ciruela</string>
-    <string name="theme_palette_ink">Tinta</string>
-    <string name="theme_palette_koi">Koi</string>
-    <string name="theme_palette_moonlight">Luz de luna</string>
-    <string name="theme_palette_aurora">Aurora</string>
     <string name="theme_palette_sumi">Sumi</string>
     <string name="theme_palette_aizome">Aizome</string>
     <string name="theme_palette_ambar">Ámbar</string>
@@ -445,7 +426,6 @@
     <string name="country_taiwan">Taiwán</string>
 
     <string name="library_search_placeholder">Buscar en tu biblioteca</string>
-    <string name="library_options">Opciones de biblioteca</string>
     <string name="library_connect_anilist">Conectar AniList</string>
     <string name="library_anilist_setup_needed">Hace falta configurar AniList</string>
     <string name="library_sign_in_desc">Inicia sesión para mostrar tus listas aquí.</string>
@@ -459,7 +439,6 @@
 
     <string name="chapter_resume_reading">Continuar leyendo</string>
     <string name="chapter_start_reading">Empezar a leer</string>
-    <string name="chapter_resume">Continuar</string>
     <string name="chapter_first">Primero</string>
     <string name="chapter_last">Último</string>
     <string name="chapter_show_latest_first">Mostrar el capítulo más reciente primero</string>
@@ -521,8 +500,6 @@
     <string name="detail_read_more">Leer más</string>
     <string name="detail_show_less">Mostrar menos</string>
     <string name="detail_add_to_library">Agregar a biblioteca</string>
-    <string name="detail_add_to_library_compact">Agregar</string>
-    <string name="detail_category_dropdown_cd">Elegir categoría de biblioteca</string>
     <string name="detail_share_manga">Compartir manga</string>
     <string name="detail_track_manga">Seguir</string>
     <string name="detail_choose_status">Elige un estado</string>
@@ -541,11 +518,8 @@
     <string name="reader_webtoon">Webtoon</string>
     <string name="reader_close">Cerrar lector</string>
     <string name="reader_previous_chapter">Capítulo anterior</string>
-    <string name="reader_previous_page">Página anterior</string>
     <string name="reader_next_chapter">Capítulo siguiente</string>
-    <string name="reader_next_page">Página siguiente</string>
     <string name="reader_page_fraction">Página %1$d/%2$d</string>
-    <string name="reader_chapter_number">Capítulo %1$s</string>
     <string name="reader_saved_chapter">Capítulo guardado</string>
     <string name="reader_open_manga">Abrir manga</string>
     <string name="reader_reset_zoom">Restablecer zoom</string>
@@ -565,7 +539,6 @@
     <string name="toast_back_exit_reader">Pulsa atrás otra vez para salir del lector</string>
     <string name="toast_back_exit">Pulsa atrás otra vez para salir</string>
 
-    <string name="downloads_storage_manager">Gestor de almacenamiento</string>
     <string name="downloads_pause_active">Pausar activos</string>
     <string name="downloads_resume_paused">Reanudar pausados</string>
     <string name="downloads_retry_failed">Reintentar fallidos</string>
@@ -574,7 +547,6 @@
     <string name="downloads_retry_download">Reintentar descarga</string>
     <string name="downloads_remove_download">Eliminar descarga</string>
     <string name="downloads_empty">Aún no hay descargas.</string>
-    <string name="downloads_no_queued">No hay descargas en cola.</string>
     <string name="downloads_status_downloading">Descargando</string>
     <string name="downloads_status_complete">Completo</string>
     <string name="downloads_pages_progress">%1$d de %2$d páginas</string>
@@ -1268,7 +1240,6 @@
     <string name="novel_keep_awake" formatted="false">Mantener pantalla encendida</string>
     <string name="about_novel_licenses">Licencias del lector de novelas</string>
     <string name="about_novel_compatibility">La compatibilidad con fuentes de novelas sigue las API de LNReader y NovelSource. Tankobun no incluye fuentes, contenido de lectura ni direcciones de repositorios.</string>
-    <string name="novel_read_progress">%1$d%% del capítulo</string>
     <string name="novel_source_settings">Ajustes de %1$s</string>
     <string name="novel_source_no_settings">Esta extensión no ofrece ajustes adicionales.</string>
     <string name="novel_source_website">Abrir sitio de la fuente</string>

@@ -328,6 +328,11 @@ internal fun LibraryScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         val chromeInsets = LocalTankobunChromeInsets.current
+        TankobunPullToRefresh(
+            working = state.busy,
+            onRefresh = viewModel::refreshLibrary,
+            modifier = Modifier.fillMaxSize(),
+        ) {
         LibraryPager(
             onOpenBrowse = onOpenBrowse,
             sections = sections,
@@ -354,6 +359,7 @@ internal fun LibraryScreen(
                 null
             },
         )
+        }
         AnimatedVisibility(
             visible = selectedCount > 0,
             modifier = Modifier

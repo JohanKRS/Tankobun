@@ -859,6 +859,7 @@ internal fun TankobunScaffold(
                                 onSelectTab(1)
                             },
                             onOpenBrowse = { onSelectTab(2) },
+                            onRefresh = { viewModel.loadHomeFeed(force = true) },
                         )
                         1 -> LibraryScreen(state, viewModel, onOpenBrowse = { onSelectTab(2) }, onSelectMedia = onSelectMedia)
                         2 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)

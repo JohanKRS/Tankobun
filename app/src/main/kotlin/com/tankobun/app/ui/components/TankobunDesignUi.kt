@@ -436,7 +436,8 @@ internal fun TankobunFilterRow(content: @Composable () -> Unit) {
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(LocalTankobunStyle.current.spacing.dense),
-        verticalArrangement = Arrangement.spacedBy(LocalTankobunStyle.current.spacing.dense),
+        // Chip touch targets already add 16dp around each 32dp chip.
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         content()
     }
@@ -489,15 +490,20 @@ internal fun TankobunChip(
     } else {
         MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
     }
+    // The selectable Surface clips its ripple to the chip, announces the selected state and
+    // keeps a 48dp touch target around the 32dp chip.
     Surface(
+        selected = selected,
+        onClick = onClick,
         modifier = modifier
-            .heightIn(min = 32.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick),
+            .heightIn(min = 32.dp),
+        enabled = enabled,
         shape = style.themeShapes.chip,
         color = if (enabled) backgroundColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
         contentColor = if (enabled) contentColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
         border = BorderStroke(style.strokes.defaultWidth, borderColor),
+        interactionSource = interactionSource,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),

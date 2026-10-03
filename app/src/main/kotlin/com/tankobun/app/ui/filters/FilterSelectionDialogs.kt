@@ -97,7 +97,7 @@ internal fun FilterYearDialog(selected: PublicationYears?, onApply: (Publication
     val upper by remember { derivedStateOf { if (toUnlimited) null else toState.centeredYear(currentYear) } }
     val valid = lower == null || upper == null || lower!! <= upper!!
     val scrolling = fromState.isScrollInProgress || toState.isScrollInProgress
-    FilterDialogFrame(tankobunString(R.string.filters_year_range), onDismiss, footer = {
+    FilterDialogFrame(tankobunString(R.string.filters_year_range), onDismiss, sheetOnPhone = false, footer = {
         FilterDialogActions(enabled = valid && !scrolling, onClear = { fromUnlimited = true; toUnlimited = true }, onApply = {
             onApply(if (lower == null && upper == null) null else PublicationYears(lower, upper))
             onDismiss()

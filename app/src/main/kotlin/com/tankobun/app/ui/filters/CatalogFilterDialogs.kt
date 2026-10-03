@@ -3,6 +3,7 @@ package com.tankobun.app.ui.filters
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -30,15 +31,54 @@ import com.tankobun.core.model.CatalogTaxonomy
 import java.text.Normalizer
 import java.util.Locale
 
+/**
+ * Phones get a bottom sheet within thumb reach; tablets keep a centered dialog. Wheel pickers
+ * opt out of the sheet so their vertical drags never fight the sheet's own drag.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun FilterDialogFrame(
     title: String,
     onDismiss: () -> Unit,
     expanded: Boolean = false,
     fitContent: Boolean = false,
+    sheetOnPhone: Boolean = true,
     footer: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val configuration = LocalConfiguration.current
+    if (sheetOnPhone && configuration.smallestScreenWidthDp in 1 until 600) {
+        val maxSheetHeight = configuration.screenHeightDp.dp * 0.88f
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = LocalTankobunStyle.current.colors.panel,
+            contentColor = LocalTankobunStyle.current.colors.panelContent,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (expanded) Modifier.height(maxSheetHeight) else Modifier.heightIn(max = maxSheetHeight))
+                    .imePadding()
+                    .padding(start = 18.dp, end = 18.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Column(Modifier.weight(1f, fill = expanded), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+                if (footer != null) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+                    footer()
+                }
+            }
+        }
+        return
+    }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         BoxWithConstraints(Modifier.imePadding(), contentAlignment = Alignment.Center) {
             // Base the options height on the screen, not the dialog's own wrap-content measurement.
@@ -179,6 +219,23 @@ internal fun CatalogFilterDialog(
                 }
             }
         }
+        if (!genresOnly && draft.isNotEmpty()) {
+            val labelByKey = remember(labels) { labels.associate { it.tag.key to it.label } }
+            // Selected tags stay visible and removable while browsing collapsed categories.
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(draft.toList(), key = { it }) { key ->
+                    InputChip(
+                        selected = true,
+                        onClick = { toggle(key) },
+                        label = { Text(labelByKey[key] ?: key, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        trailingIcon = {
+                            Icon(TankobunIcons.Close, contentDescription = tankobunString(R.string.common_remove), modifier = Modifier.size(16.dp))
+                        },
+                        modifier = Modifier.widthIn(max = 220.dp),
+                    )
+                }
+            }
+        }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(tankobunString(R.string.filters_option_count, visible.size), Modifier.weight(1f),
                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -191,7 +248,24 @@ internal fun CatalogFilterDialog(
             if (visible.isEmpty()) {
                 item { Text(tankobunString(if (loading) R.string.filters_loading else R.string.filters_no_matches),
                     Modifier.padding(vertical = 20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            } else if (genresOnly || search.isNotBlank() || selectedOnly) {
+            } else if (genresOnly) {
+                item(key = "genre-grid") {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        visible.forEach { item ->
+                            val selectedGenre = item.tag.key in draft
+                            FilterChip(
+                                selected = selectedGenre,
+                                onClick = { toggle(item.tag.key) },
+                                label = { Text(item.label, maxLines = 1) },
+                                leadingIcon = { Icon(genreIcon(item.tag.name), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            )
+                        }
+                    }
+                }
+            } else if (search.isNotBlank() || selectedOnly) {
                 items(visible, key = { it.tag.key }) { item -> FilterTagRow(item, item.tag.key in draft, genresOnly) { toggle(item.tag.key) } }
             } else {
                 for ((group, children) in groups) {

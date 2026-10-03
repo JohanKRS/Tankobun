@@ -77,8 +77,6 @@
     <string name="nav_library">书架</string>
     <string name="nav_browse">浏览</string>
     <string name="nav_downloads">下载</string>
-    <string name="nav_profile">个人资料</string>
-    <string name="nav_settings">设置</string>
 
     <string name="settings_appearance">外观</string>
     <string name="settings_languages">语言</string>
@@ -108,13 +106,8 @@
     <string name="settings_about_subtitle">说明 Tankobun 是什么，以及不是什么。</string>
     <string name="settings_downloads_subtitle">查看本地章节存储并移除已下载漫画。</string>
     <string name="settings_theme_section">主题</string>
-    <string name="settings_theme_automatic">跟随系统深浅色</string>
     <string name="settings_theme_custom">自定义</string>
-    <string name="settings_theme_art_direction">组件形状</string>
     <string name="settings_theme_palette">调色板</string>
-    <string name="settings_theme_preview">实时预览</string>
-    <string name="settings_theme_automatic_pair">桃色 / 梅紫</string>
-    <string name="settings_theme_automatic_preview">系统浅色 / 深色</string>
     <string name="settings_theme_sample_tag">标签</string>
     <string name="settings_theme_sample_action">操作</string>
     <string name="theme_direction_original">利落</string>
@@ -130,20 +123,8 @@
     <string name="theme_direction_neon">霓虹</string>
     <string name="theme_direction_neon_desc">亮泽、发光、流动感</string>
     <string name="theme_palette_matcha">抹茶</string>
-    <string name="theme_palette_peach">桃色</string>
     <string name="theme_palette_yuzu">柚子</string>
-    <string name="theme_palette_berry">莓果</string>
     <string name="theme_palette_sakura">樱花</string>
-    <string name="theme_palette_cobalt">钴蓝</string>
-    <string name="theme_palette_redline">红线</string>
-    <string name="theme_palette_ultraviolet">紫外光</string>
-    <string name="theme_palette_citrus">柑橘</string>
-    <string name="theme_palette_charcoal">炭黑</string>
-    <string name="theme_palette_plum">梅紫</string>
-    <string name="theme_palette_ink">墨色</string>
-    <string name="theme_palette_koi">锦鲤</string>
-    <string name="theme_palette_moonlight">月光</string>
-    <string name="theme_palette_aurora">极光</string>
     <string name="theme_palette_sumi">墨</string>
     <string name="theme_palette_aizome">蓝染</string>
     <string name="theme_palette_ambar">琥珀</string>
@@ -448,7 +429,6 @@
     <string name="country_taiwan">台湾</string>
 
     <string name="library_search_placeholder">搜索你的书架</string>
-    <string name="library_options">书架选项</string>
     <string name="library_connect_anilist">连接 AniList</string>
     <string name="library_anilist_setup_needed">需要设置 AniList</string>
     <string name="library_sign_in_desc">登录后可在这里显示你的列表。</string>
@@ -462,7 +442,6 @@
 
     <string name="chapter_resume_reading">继续阅读</string>
     <string name="chapter_start_reading">开始阅读</string>
-    <string name="chapter_resume">继续</string>
     <string name="chapter_first">第一章</string>
     <string name="chapter_last">最后一章</string>
     <string name="chapter_show_latest_first">最新章节优先</string>
@@ -524,8 +503,6 @@
     <string name="detail_read_more">阅读更多</string>
     <string name="detail_show_less">收起</string>
     <string name="detail_add_to_library">添加到书架</string>
-    <string name="detail_add_to_library_compact">添加</string>
-    <string name="detail_category_dropdown_cd">选择书架分类</string>
     <string name="detail_share_manga">分享漫画</string>
     <string name="detail_track_manga">追踪</string>
     <string name="detail_choose_status">选择状态</string>
@@ -545,11 +522,8 @@
     <string name="reader_webtoon">Webtoon</string>
     <string name="reader_close">关闭阅读器</string>
     <string name="reader_previous_chapter">上一章</string>
-    <string name="reader_previous_page">上一页</string>
     <string name="reader_next_chapter">下一章</string>
-    <string name="reader_next_page">下一页</string>
     <string name="reader_page_fraction">第 %1$d/%2$d 页</string>
-    <string name="reader_chapter_number">第 %1$s 章</string>
     <string name="reader_saved_chapter">已保存章节</string>
     <string name="reader_open_manga">打开漫画</string>
     <string name="reader_reset_zoom">重置缩放</string>
@@ -569,7 +543,6 @@
     <string name="toast_back_exit_reader">再次按返回退出阅读器</string>
     <string name="toast_back_exit">再次按返回退出</string>
 
-    <string name="downloads_storage_manager">存储管理</string>
     <string name="downloads_pause_active">暂停活动项</string>
     <string name="downloads_resume_paused">继续已暂停项</string>
     <string name="downloads_retry_failed">重试失败项</string>
@@ -578,7 +551,6 @@
     <string name="downloads_retry_download">重试下载</string>
     <string name="downloads_remove_download">移除下载</string>
     <string name="downloads_empty">还没有下载。</string>
-    <string name="downloads_no_queued">没有排队中的下载。</string>
     <string name="downloads_status_downloading">正在下载</string>
     <string name="downloads_status_complete">完成</string>
     <string name="downloads_pages_progress">%1$d / %2$d 页</string>
@@ -1266,7 +1238,6 @@
     <string name="novel_keep_awake" formatted="false">保持屏幕常亮</string>
     <string name="about_novel_licenses">小说阅读器许可证</string>
     <string name="about_novel_compatibility">小说来源兼容遵循 LNReader 和 NovelSource 社区 API。Tankobun 不包含来源、阅读内容或仓库地址。</string>
-    <string name="novel_read_progress">本章 %1$d%%</string>
     <string name="novel_source_settings">%1$s 设置</string>
     <string name="novel_source_no_settings">此扩展没有其他设置。</string>
     <string name="novel_source_website">打开来源网站</string>

@@ -1,5 +1,6 @@
 package com.tankobun.app.ui.home
 
+import com.tankobun.app.ui.components.TankobunPullToRefresh
 import com.tankobun.app.progressLabel
 import com.tankobun.app.ui.icons.TankobunIcons
 
@@ -113,6 +114,7 @@ internal fun HomeScreen(
     onOpenRecentProgress: (RecentReadingProgress) -> Unit,
     onOpenLibrary: () -> Unit,
     onOpenBrowse: () -> Unit,
+    onRefresh: () -> Unit = {},
 ) {
     val chromeInsets = LocalTankobunChromeInsets.current
     val expanded = androidx.compose.ui.platform.LocalConfiguration.current.smallestScreenWidthDp >= 600
@@ -144,6 +146,11 @@ internal fun HomeScreen(
         }
     }
 
+    TankobunPullToRefresh(
+        working = state.homeTrendingRefreshing || state.homeGenreHighlightsRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+    ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -240,7 +247,7 @@ internal fun HomeScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = horizontalPadding, vertical = 1.5.dp),
+                        .padding(horizontal = horizontalPadding, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     row.forEach { highlight ->
@@ -262,6 +269,7 @@ internal fun HomeScreen(
                 }
             }
         }
+    }
     }
 }
 
@@ -888,11 +896,12 @@ private fun GenreHighlightCard(
     }
     var imageIndex by remember(imageCandidates) { mutableIntStateOf(0) }
     val style = LocalTankobunStyle.current
+    // Surface's own click keeps the ripple inside the rounded card.
     Surface(
+        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (expanded) 70.dp else 74.dp)
-            .clickable(onClick = onClick),
+            .height(if (expanded) 70.dp else 74.dp),
         shape = style.themeShapes.panel,
         color = style.colors.panel,
         contentColor = style.colors.panelContent,

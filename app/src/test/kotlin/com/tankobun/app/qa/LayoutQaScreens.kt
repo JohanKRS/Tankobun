@@ -44,6 +44,7 @@ abstract class LayoutQaScreens(private val language: AppLanguage) {
         name: String,
         width: Dp = 360.dp,
         dark: Boolean = false,
+        topWindow: Boolean = false,
         content: @Composable () -> Unit,
     ) {
         assumeTrue(System.getProperty("tankobun.qaScreens") == "true")
@@ -57,13 +58,21 @@ abstract class LayoutQaScreens(private val language: AppLanguage) {
             }
         }
         compose.waitForIdle()
-        val view = compose.activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+        // Sheets and dialogs live in their own windows; the newest root view is the one on top.
+        val view = if (topWindow) topWindowRootView() else compose.activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
         val bitmap = Bitmap.createBitmap(view.width.coerceAtLeast(1), view.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         view.draw(android.graphics.Canvas(bitmap))
         val directory = File(System.getProperty("tankobun.qaScreensDir") ?: "build/qa-screens").apply { mkdirs() }
         File(directory, "$name-${language.storageValue}${if (dark) "-dark" else ""}.png").outputStream().use {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
         }
+    }
+
+    private fun topWindowRootView(): View {
+        val global = Class.forName("android.view.WindowManagerGlobal").getMethod("getInstance").invoke(null)
+        val field = global.javaClass.getDeclaredField("mViews").apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST")
+        return (field.get(global) as List<View>).last()
     }
 
     companion object {
