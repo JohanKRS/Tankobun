@@ -9,6 +9,13 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 
 import com.tankobun.app.ui.icons.TankobunIcons
 
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.IntOffset
+import dev.chrisbanes.haze.hazeSource
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -142,6 +149,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -307,11 +318,6 @@ internal fun SettingsRoute.pageIcon(): ImageVector =
         SettingsRoute.SOURCES, SettingsRoute.SOURCE_REPOSITORY -> TankobunIcons.Extension
     }
 
-internal enum class QuickDrawerMode {
-    CLOSED,
-    OVERLAY,
-}
-
 private const val BackPressRepeatWindowMillis = 1800L
 
 private data class TankobunRoute(
@@ -328,25 +334,13 @@ private data class TankobunRoute(
             media?.id == other.media?.id
 }
 
-internal val QuickDrawerOverlayWidth = 340.dp
-internal val QuickDrawerHandleSlotWidth = 40.dp
-private val FrostedDockHorizontalMargin = 16.dp
-private val FrostedDockTopMargin = 8.dp
-private val FrostedDockBottomMargin = 8.dp
-private val FrostedDockHeight = 56.dp
-private val FrostedDockWidth = 272.dp
-private val FrostedDockWithQuickActionsWidth = 336.dp
-private val FrostedGlassBlur = 88.dp
-private val FrostedTopBarShape = RoundedCornerShape(0.dp)
-private val FrostedDockShape = RoundedCornerShape(percent = 50)
-private const val FrostedGlassInputScale = 0.33f
-private const val FrostedGlassTintAlpha = 0.34f
-private const val FrostedGlassDimAlpha = 0.30f
-private const val FrostedGlassWashAlpha = 0.18f
-private const val FrostedGlassNoiseFactor = 0f
-internal const val QuickDrawerSnapMillis = 240
-internal const val QuickDrawerScrimAlpha = 0.20f
-internal const val QuickDrawerBackdropBlurDp = 6f
+private val DockTopMargin = 8.dp
+private val DockBottomMargin = 12.dp
+private val DockSideMargin = 12.dp
+private val RailStartMargin = 12.dp
+private val TopBarFadeHeight = 18.dp
+internal const val ChromeTransitionMillis = 240
+internal const val ChromeBackdropBlurDp = 6f
 
 internal data class TankobunChromeInsets(
     val top: Dp = 0.dp,
@@ -354,7 +348,6 @@ internal data class TankobunChromeInsets(
 )
 
 internal val LocalTankobunChromeInsets = staticCompositionLocalOf { TankobunChromeInsets() }
-internal const val QuickDrawerElasticLimitDp = 36f
 
 internal enum class LibraryPicker {
     FORMAT,
@@ -402,7 +395,6 @@ private fun TankobunAppRootContent(
     val appBackToast = tankobunString(R.string.toast_back_exit)
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var settingsRoute by rememberSaveable { mutableStateOf(SettingsRoute.MAIN) }
-    var quickDrawerMode by remember { mutableStateOf(QuickDrawerMode.CLOSED) }
     var routeHistory by remember { mutableStateOf<List<TankobunRoute>>(emptyList()) }
     var lastHomeBackPressAt by remember { mutableLongStateOf(0L) }
     var lastReaderBackPressAt by remember { mutableLongStateOf(0L) }
@@ -432,7 +424,6 @@ private fun TankobunAppRootContent(
         val currentMedia = latestSelectedMedia.value
         selectedTab = normalized.tab
         settingsRoute = normalized.settingsRoute
-        quickDrawerMode = QuickDrawerMode.CLOSED
         when {
             normalized.media == null -> viewModel.clearSelectedMedia()
             currentMedia?.id != normalized.media.id -> viewModel.selectMedia(normalized.media)
@@ -446,10 +437,7 @@ private fun TankobunAppRootContent(
     fun navigateTo(route: TankobunRoute) {
         val normalized = route.normalized()
         val routeNow = latestCurrentRoute.value
-        if (normalized.sameDestination(routeNow)) {
-            quickDrawerMode = QuickDrawerMode.CLOSED
-            return
-        }
+        if (normalized.sameDestination(routeNow)) return
         routeHistory = routeHistory + routeNow
         applyRoute(normalized)
     }
@@ -462,7 +450,6 @@ private fun TankobunAppRootContent(
         val routeNow = latestCurrentRoute.value
         routeHistory = emptyList()
         if (normalized.sameDestination(routeNow)) {
-            quickDrawerMode = QuickDrawerMode.CLOSED
             resetBackPressWindows()
         } else {
             applyRoute(normalized)
@@ -480,7 +467,6 @@ private fun TankobunAppRootContent(
                 AppTourStep.SETTINGS -> TankobunRoute(tab = 4, settingsRoute = SettingsRoute.MAIN)
             },
         )
-        quickDrawerMode = QuickDrawerMode.CLOSED
     }
 
     fun popRoute(): Boolean {
@@ -502,10 +488,6 @@ private fun TankobunAppRootContent(
     }
 
     fun handleAppBack() {
-        if (quickDrawerMode != QuickDrawerMode.CLOSED) {
-            quickDrawerMode = QuickDrawerMode.CLOSED
-            return
-        }
         if (browseCanNavigateBack && viewModel.navigateBrowseBack()) {
             resetBackPressWindows()
             return
@@ -516,9 +498,8 @@ private fun TankobunAppRootContent(
                 viewModel.clearSelectedMedia()
                 resetBackPressWindows()
             }
-            selectedTab == 4 && settingsRoute != SettingsRoute.MAIN -> {
-                settingsRoute = SettingsRoute.MAIN
-                resetBackPressWindows()
+            selectedTab == 4 -> {
+                applyRoute(TankobunRoute(tab = 3))
             }
             selectedTab != 0 -> {
                 applyRoute(TankobunRoute(tab = 0))
@@ -563,7 +544,6 @@ private fun TankobunAppRootContent(
 
     TankobunTheme(preference = state.themePreference) {
         val effectiveIgnoreDisplayCutout = effectiveIgnoreDisplayCutout(state.ignoreDisplayCutout)
-        val cutoutEndPadding = displayCutoutEndPadding(ignoreDisplayCutout = effectiveIgnoreDisplayCutout)
         Box(
             Modifier
                 .fillMaxSize()
@@ -576,7 +556,7 @@ private fun TankobunAppRootContent(
                 onSelectTab = ::navigateToRootTab,
                 canNavigateBack = selectedMedia != null ||
                     browseCanNavigateBack ||
-                    (selectedTab == 4 && settingsRoute != SettingsRoute.MAIN),
+                    selectedTab == 4,
                 onNavigateBack = { handleAppBack() },
                 onSelectMedia = { media -> navigateTo(TankobunRoute(tab = selectedTab, media = media)) },
                 selectedMedia = selectedMedia,
@@ -596,26 +576,13 @@ private fun TankobunAppRootContent(
                     if (!recentRoute.sameDestination(routeNow)) {
                         routeHistory = routeHistory + routeNow
                     }
-                    quickDrawerMode = QuickDrawerMode.CLOSED
                     resetBackPressWindows()
                     viewModel.openRecentProgress(item)
                 },
-                quickDrawerMode = quickDrawerMode,
                 showStatusBar = state.showAppStatusBar,
                 ignoreDisplayCutout = effectiveIgnoreDisplayCutout,
-                showQuickActionsButton = !readerOpen,
-                onOpenQuickDrawer = { quickDrawerMode = QuickDrawerMode.OVERLAY },
-                onCloseQuickDrawer = { quickDrawerMode = QuickDrawerMode.CLOSED },
+                showNavigation = !readerOpen,
             )
-            if (!readerOpen && quickDrawerMode != QuickDrawerMode.CLOSED && cutoutEndPadding > 0.dp) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight()
-                        .width(cutoutEndPadding)
-                        .background(LocalTankobunTokens.current.elevatedSurface),
-                )
-            }
             if (readerOpen) {
                 FullScreenReader(state, viewModel)
             }
@@ -779,7 +746,6 @@ private tailrec fun Context.findActivity(): Activity? =
         else -> null
     }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TankobunScaffold(
     state: TankobunUiState,
@@ -795,373 +761,261 @@ internal fun TankobunScaffold(
     onBrowseTag: (String) -> Unit,
     onBrowseAuthor: (String) -> Unit,
     onOpenRecentProgress: (RecentReadingProgress) -> Unit,
-    quickDrawerMode: QuickDrawerMode,
     showStatusBar: Boolean,
     ignoreDisplayCutout: Boolean,
-    showQuickActionsButton: Boolean,
-    onOpenQuickDrawer: () -> Unit,
-    onCloseQuickDrawer: () -> Unit,
+    showNavigation: Boolean,
 ) {
     val cutoutStartPadding = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout)
     val cutoutEndPadding = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout)
-    val density = LocalDensity.current
-    val drawerTravelPx = with(density) { (QuickDrawerOverlayWidth + cutoutEndPadding).toPx() }
-    val drawerSnapThresholdPx = with(density) { 72.dp.toPx() }
-    val drawerElasticLimitPx = with(density) { QuickDrawerElasticLimitDp.dp.toPx() }
-    val drawerScope = rememberCoroutineScope()
-    var overlayDrawerDragOffsetPx by remember { mutableFloatStateOf(0f) }
-    var overlayDrawerDragging by remember { mutableStateOf(false) }
-    val overlayDrawerOffsetPx by animateFloatAsState(
-        targetValue = overlayDrawerDragOffsetPx,
-        animationSpec = tween(durationMillis = if (overlayDrawerDragging) 0 else QuickDrawerSnapMillis),
-        label = "Overlay drawer drag offset",
-    )
-    val overlayDrawerTranslationPx = if (overlayDrawerDragging) {
-        overlayDrawerDragOffsetPx
-    } else {
-        overlayDrawerOffsetPx
-    }
-    val overlayDrawerRevealFraction = if (quickDrawerMode == QuickDrawerMode.OVERLAY && drawerTravelPx > 0f) {
-        (1f - (overlayDrawerTranslationPx / drawerTravelPx)).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-    val quickDrawerBackdropRevealFraction = overlayDrawerRevealFraction
-    val drawerScrimAlpha = QuickDrawerScrimAlpha * quickDrawerBackdropRevealFraction
-    val drawerBackdropBlur = (QuickDrawerBackdropBlurDp * quickDrawerBackdropRevealFraction).dp
-    val mediaDetailActive = selectedMedia != null
     val tabStateHolder = rememberSaveableStateHolder()
     val compactLayout = LocalConfiguration.current.smallestScreenWidthDp in 1 until 600
+    val configuration = LocalConfiguration.current
+    // The rail only earns its width in landscape; a portrait tablet keeps the bottom dock.
+    val landscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val useRail = showNavigation && state.useNavigationRail && !compactLayout && landscape
     val routeBackdropColor = LocalTankobunTokens.current.appBackdrop
-    val routeContentColor = MaterialTheme.colorScheme.onSurface
     val statusBarInset = if (showStatusBar) {
         WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     } else {
         0.dp
     }
+    val safeBottomInset = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding()
+    val railInset = if (useRail) RailStartMargin + GlassRailWidth else 0.dp
     val topChromeInset = statusBarInset + if (compactLayout) 48.dp else 72.dp
-    val bottomChromeInset = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() +
-        FrostedDockBottomMargin +
-        FrostedDockHeight +
-        FrostedDockTopMargin
+    val bottomChromeInset = if (useRail) {
+        safeBottomInset + 16.dp
+    } else {
+        safeBottomInset + DockBottomMargin + GlassDockHeight + DockTopMargin
+    }
     val chromeInsets = TankobunChromeInsets(top = topChromeInset, bottom = bottomChromeInset)
     val chromeHazeState = remember { HazeState() }
+    val selectedDestination = TankobunDestination.forTab(selectedTab)
+    val badges = TankobunDestinationBadges(
+        downloadsActive = state.downloads.any { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING },
+    )
 
-    LaunchedEffect(quickDrawerMode) {
-        if (quickDrawerMode != QuickDrawerMode.OVERLAY) {
-            overlayDrawerDragging = false
-            overlayDrawerDragOffsetPx = 0f
+    // The dock steps aside while content scrolls down and returns as soon as it scrolls back.
+    var dockHidden by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedTab, selectedMedia?.id, settingsRoute) { dockHidden = false }
+    val dockScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                when {
+                    consumed.y < -2f -> dockHidden = true
+                    consumed.y > 2f -> dockHidden = false
+                }
+                return Offset.Zero
+            }
         }
     }
-
-    fun openQuickDrawerFromClosed(initialTranslationPx: Float = drawerTravelPx) {
-        drawerScope.launch {
-            overlayDrawerDragging = true
-            overlayDrawerDragOffsetPx = initialTranslationPx
-            onOpenQuickDrawer()
-            withFrameNanos { }
-            withFrameNanos { }
-            overlayDrawerDragging = false
-            overlayDrawerDragOffsetPx = 0f
-        }
-    }
-
-    fun closeQuickDrawerFromOverlay(targetTranslationPx: Float = drawerTravelPx) {
-        overlayDrawerDragging = false
-        overlayDrawerDragOffsetPx = targetTranslationPx
-        drawerScope.launch {
-            delay(QuickDrawerSnapMillis.toLong())
-            onCloseQuickDrawer()
-            overlayDrawerDragOffsetPx = 0f
-        }
-    }
-
-    fun toggleQuickDrawer() {
-        when (quickDrawerMode) {
-            QuickDrawerMode.CLOSED -> openQuickDrawerFromClosed()
-            QuickDrawerMode.OVERLAY -> closeQuickDrawerFromOverlay()
-        }
-    }
+    val detailChrome = remember(selectedMedia?.id) { MediaDetailChromeState() }
+    val detailActions = rememberMediaDetailUiActions(
+        viewModel = viewModel,
+        onOpenTracking = { detailChrome.trackingSheetOpen = true },
+        onShareMedia = {},
+    )
+    val showDetailActions = selectedMedia != null && !detailChrome.heroActionsVisible
+    val dockOffset by animateDpAsState(
+        targetValue = if (dockHidden && !useRail && !showDetailActions) GlassDockHeight + DockBottomMargin + safeBottomInset + 16.dp else 0.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "Dock scroll offset",
+    )
 
     CompositionLocalProvider(LocalTankobunChromeInsets provides chromeInsets) {
-        Scaffold(
-            containerColor = routeBackdropColor,
-            contentWindowInsets = WindowInsets(0.dp),
-            topBar = {
-                TankobunTopBar(
-                    title = selectedMedia?.title?.userPreferred
-                        ?: when (selectedTab) {
-                            0 -> tankobunString(R.string.nav_home)
-                            1 -> tankobunString(R.string.common_library)
-                            2 -> tankobunString(R.string.common_browse)
-                            3 -> tankobunString(R.string.nav_profile)
-                            4 -> settingsRoute.settingsTitle()
-                            else -> tankobunString(R.string.app_name)
-                        },
-                    pageIcon = when (selectedTab) {
-                        1 -> TankobunIcons.LibraryBooks
-                        2 -> TankobunIcons.Explore
-                        3 -> TankobunIcons.AccountCircle
-                        4 -> settingsRoute.pageIcon()
-                        else -> TankobunIcons.Home
-                    },
-                    hazeState = chromeHazeState,
-                    showBack = canNavigateBack,
-                    ignoreDisplayCutout = ignoreDisplayCutout,
-                    showStatusBar = showStatusBar,
-                    mediaDetailActive = mediaDetailActive,
-                    onBack = onNavigateBack,
-                )
-            },
-            bottomBar = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            start = displayCutoutStartPadding(ignoreDisplayCutout = ignoreDisplayCutout),
-                            end = displayCutoutEndPadding(ignoreDisplayCutout = ignoreDisplayCutout),
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(routeBackdropColor),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(start = cutoutStartPadding + railInset, end = cutoutEndPadding)
+                    .background(routeBackdropColor)
+                    .hazeSource(state = chromeHazeState)
+                    .nestedScroll(dockScrollConnection),
+            ) {
+                tabStateHolder.SaveableStateProvider(selectedTab) {
+                    when (selectedTab) {
+                        0 -> HomeScreen(
+                            state = state,
+                            onSelectMedia = onSelectMedia,
+                            onOpenRecentProgress = onOpenRecentProgress,
+                            onOpenLibrary = {
+                                // Explicitly opening the reading list must not restore an old category or filters.
+                                tabStateHolder.removeState(1)
+                                viewModel.clearLibraryBatchSelection()
+                                onSelectTab(1)
+                            },
+                            onOpenBrowse = { onSelectTab(2) },
                         )
-                        .padding(
-                            start = FrostedDockHorizontalMargin,
-                            top = FrostedDockTopMargin,
-                            end = FrostedDockHorizontalMargin,
-                            bottom = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() +
-                                FrostedDockBottomMargin,
-                        ),
-                    contentAlignment = state.dockAlignment.dockContentAlignment(),
-                ) {
-                    TankobunGlassChrome(
-                        modifier = Modifier
-                            .width(if (showQuickActionsButton) FrostedDockWithQuickActionsWidth else FrostedDockWidth)
-                            .height(FrostedDockHeight),
-                        shape = FrostedDockShape,
-                        hazeState = chromeHazeState,
-                        contentColor = routeContentColor,
-                        baseColor = LocalTankobunTokens.current.dockSurface,
-                        bleedColor = LocalTankobunTokens.current.dockBleed,
-                        tintAlpha = FrostedGlassTintAlpha,
-                        blurLayerAlpha = FrostedGlassDimAlpha,
-                        borderAlpha = 0f,
-                        washAlpha = FrostedGlassWashAlpha,
-                        shadowElevation = 0.dp,
-                    ) {
-                        TankobunBottomNavigationBar(
-                            selectedTab = selectedTab,
-                            onSelectTab = onSelectTab,
-                            quickActionsVisible = showQuickActionsButton,
-                            quickActionsOpen = quickDrawerMode != QuickDrawerMode.CLOSED,
-                            onToggleQuickActions = ::toggleQuickDrawer,
-                            indicatorAnimation = state.dockIndicatorAnimation,
-                            modifier = Modifier.height(FrostedDockHeight),
+                        1 -> LibraryScreen(state, viewModel, onOpenBrowse = { onSelectTab(2) }, onSelectMedia = onSelectMedia)
+                        2 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
+                        3 -> ProfileScreen(
+                            state = state,
+                            viewModel = viewModel,
+                            onOpenSettingsRoute = onOpenSettingsRoute,
+                        )
+                        4 -> SettingsScreen(
+                            state = state,
+                            viewModel = viewModel,
+                            route = settingsRoute,
+                            onOpenRoute = onOpenSettingsRoute,
                         )
                     }
                 }
-            },
-        ) { padding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(
-                        start = padding.calculateStartPadding(LocalLayoutDirection.current),
-                        end = padding.calculateEndPadding(LocalLayoutDirection.current),
-                    ),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(start = cutoutStartPadding, end = cutoutEndPadding)
-                        .blur(drawerBackdropBlur)
-                        .background(routeBackdropColor)
-                        .hazeSource(state = chromeHazeState),
-                ) {
-                    Row(Modifier.fillMaxSize()) {
-                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            tabStateHolder.SaveableStateProvider(selectedTab) {
-                                when (selectedTab) {
-                                    0 -> HomeScreen(
-                                        state = state,
-                                        onSelectMedia = onSelectMedia,
-                                        onOpenRecentProgress = onOpenRecentProgress,
-                                        onOpenLibrary = {
-                                            // Explicitly opening the reading list must not restore an old category or filters.
-                                            tabStateHolder.removeState(1)
-                                            viewModel.clearLibraryBatchSelection()
-                                            onSelectTab(1)
-                                        },
-                                        onOpenBrowse = { onSelectTab(2) },
-                                    )
-                                    1 -> LibraryScreen(state, viewModel, onOpenBrowse = { onSelectTab(2) }, onSelectMedia = onSelectMedia)
-                                    2 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
-                                    3 -> ProfileScreen(state = state, viewModel = viewModel)
-                                    4 -> SettingsScreen(
-                                        state = state,
-                                        viewModel = viewModel,
-                                        route = settingsRoute,
-                                        onOpenRoute = onOpenSettingsRoute,
-                                    )
+                selectedMedia?.let { media ->
+                    MangaDetailScreen(
+                        state = state,
+                        viewModel = viewModel,
+                        media = media,
+                        onSelectMedia = onSelectMedia,
+                        onBrowseTag = onBrowseTag,
+                        onBrowseAuthor = onBrowseAuthor,
+                        onOpenSourceRepository = { onOpenSettingsRoute(SettingsRoute.SOURCE_REPOSITORY) },
+                        chrome = detailChrome,
+                    )
+                }
+            }
+
+            TankobunTopBar(
+                title = selectedMedia?.title?.userPreferred
+                    ?: when (selectedTab) {
+                        0 -> tankobunString(R.string.nav_home)
+                        1 -> tankobunString(R.string.common_library)
+                        2 -> tankobunString(R.string.common_browse)
+                        3 -> tankobunString(R.string.nav_you)
+                        4 -> settingsRoute.settingsTitle()
+                        else -> tankobunString(R.string.app_name)
+                    },
+                pageIcon = when (selectedTab) {
+                    1 -> TankobunIcons.LibraryBooks
+                    2 -> TankobunIcons.Explore
+                    3 -> TankobunIcons.AccountCircle
+                    4 -> settingsRoute.pageIcon()
+                    else -> TankobunIcons.Home
+                },
+                hazeState = chromeHazeState,
+                showBack = canNavigateBack,
+                ignoreDisplayCutout = ignoreDisplayCutout,
+                showStatusBar = showStatusBar,
+                mediaDetailActive = selectedMedia != null,
+                startInsetExtra = railInset,
+                onBack = onNavigateBack,
+                actions = {
+                    if (selectedMedia == null && selectedTab == 1) {
+                        TopBarActionButton(
+                            icon = TankobunIcons.Download,
+                            contentDescription = if (badges.downloadsActive) {
+                                tankobunString(R.string.nav_you_downloads_badge, tankobunString(R.string.common_downloads))
+                            } else {
+                                tankobunString(R.string.common_downloads)
+                            },
+                            onClick = { onOpenSettingsRoute(SettingsRoute.DOWNLOADS) },
+                            badgeDot = badges.downloadsActive,
+                        )
+                    }
+                },
+            )
+
+            if (showNavigation) {
+                if (useRail) {
+                    TankobunNavigationRail(
+                        selected = selectedDestination,
+                        badges = badges,
+                        hazeState = chromeHazeState,
+                        onSelect = { onSelectTab(it.tab) },
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = cutoutStartPadding + RailStartMargin),
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(start = cutoutStartPadding + DockSideMargin, end = cutoutEndPadding + DockSideMargin)
+                            .padding(bottom = safeBottomInset + DockBottomMargin)
+                            .offset { IntOffset(0, dockOffset.roundToPx()) },
+                    ) {
+                        AnimatedContent(
+                            targetState = showDetailActions,
+                            transitionSpec = {
+                                (fadeIn(tween(ChromeTransitionMillis)) + scaleIn(tween(ChromeTransitionMillis), initialScale = 0.92f))
+                                    .togetherWith(fadeOut(tween(ChromeTransitionMillis / 2)))
+                                    .using(SizeTransform(clip = false))
+                            },
+                            contentAlignment = Alignment.BottomCenter,
+                            label = "Dock or detail actions",
+                        ) { detailActionsVisible ->
+                            if (detailActionsVisible) {
+                                TankobunGlassFloat(
+                                    hazeState = chromeHazeState,
+                                    shape = RoundedCornerShape(percent = 50),
+                                ) {
+                                    MediaDetailFloatingActions(state = state, actions = detailActions)
                                 }
-                            }
-                            selectedMedia?.let { media ->
-                                MangaDetailScreen(
-                                    state = state,
-                                    viewModel = viewModel,
-                                    media = media,
-                                    onSelectMedia = onSelectMedia,
-                                    onBrowseTag = onBrowseTag,
-                                    onBrowseAuthor = onBrowseAuthor,
-                                    onOpenSourceRepository = { onOpenSettingsRoute(SettingsRoute.SOURCE_REPOSITORY) },
+                            } else {
+                                TankobunNavigationDock(
+                                    selected = selectedDestination,
+                                    badges = badges,
+                                    hazeState = chromeHazeState,
+                                    onSelect = { onSelectTab(it.tab) },
                                 )
                             }
                         }
                     }
                 }
-                if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = drawerScrimAlpha))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { closeQuickDrawerFromOverlay() },
-                            ),
-                    )
+            }
+            if (useRail && showDetailActions) {
+                TankobunGlassFloat(
+                    hazeState = chromeHazeState,
+                    shape = RoundedCornerShape(percent = 50),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(start = cutoutStartPadding + railInset, end = cutoutEndPadding)
+                        .padding(bottom = safeBottomInset + DockBottomMargin),
+                ) {
+                    MediaDetailFloatingActions(state = state, actions = detailActions)
                 }
-                if (quickDrawerMode == QuickDrawerMode.OVERLAY) {
-                    QuickDrawer(
-                        state = state,
-                        viewModel = viewModel,
-                        selectedMedia = selectedMedia,
-                        onOpenRecentProgress = onOpenRecentProgress,
-                        onClose = { closeQuickDrawerFromOverlay() },
-                        drawerWidth = QuickDrawerOverlayWidth,
-                        endPadding = cutoutEndPadding,
-                        showHandle = false,
-                        onHandleDragOffset = {
-                            overlayDrawerDragging = true
-                            overlayDrawerDragOffsetPx = quickDrawerClosingDragOffset(
-                                totalX = it,
-                                drawerTravelPx = drawerTravelPx,
-                                elasticLimitPx = drawerElasticLimitPx,
-                            )
-                        },
-                        onHandleDragEnd = { totalX ->
-                            overlayDrawerDragging = false
-                            if (totalX > drawerSnapThresholdPx) {
-                                closeQuickDrawerFromOverlay()
-                            } else {
-                                overlayDrawerDragOffsetPx = 0f
-                            }
-                        },
-                        handleDragLocally = false,
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .fillMaxHeight()
-                            .graphicsLayer { translationX = overlayDrawerTranslationPx },
-                    )
-                }
-                state.extensionTrustReview?.let { candidate ->
-                    ExtensionTrustDialog(
-                        candidate = candidate,
-                        onDismiss = viewModel::dismissExtensionTrustReview,
-                        onConfirm = { viewModel.trustExtension(candidate) },
-                    )
-                }
-                if (state.recommendationImportPreview != null) {
-                    RecommendationImportDialog(state = state, viewModel = viewModel)
-                }
-                state.recommendationImportError?.let { error ->
-                    AlertDialog(
-                        shape = LocalTankobunStyle.current.themeShapes.dialog,
-                        containerColor = LocalTankobunStyle.current.colors.panel,
-                        titleContentColor = LocalTankobunStyle.current.colors.panelContent,
-                        textContentColor = LocalTankobunStyle.current.colors.mutedContent,
-                        tonalElevation = 0.dp,
-                        onDismissRequest = viewModel::dismissRecommendationImportError,
-                        title = { Text(tankobunString(R.string.msg_recommendations_import_failed)) },
-                        text = { Text(error) },
-                        confirmButton = {
-                            TextButton(onClick = viewModel::dismissRecommendationImportError) {
-                                Text(tankobunString(R.string.common_close))
-                            }
-                        },
-                    )
-                }
-                if (state.busy && !(state.sourcePickerOpen && state.sourcePickerLoading)) {
-                    LinearProgressIndicator(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(top = chromeInsets.top),
-                    )
-                }
+            }
+
+            state.extensionTrustReview?.let { candidate ->
+                ExtensionTrustDialog(
+                    candidate = candidate,
+                    onDismiss = viewModel::dismissExtensionTrustReview,
+                    onConfirm = { viewModel.trustExtension(candidate) },
+                )
+            }
+            if (state.recommendationImportPreview != null) {
+                RecommendationImportDialog(state = state, viewModel = viewModel)
+            }
+            state.recommendationImportError?.let { error ->
+                AlertDialog(
+                    shape = LocalTankobunStyle.current.themeShapes.dialog,
+                    containerColor = LocalTankobunStyle.current.colors.panel,
+                    titleContentColor = LocalTankobunStyle.current.colors.panelContent,
+                    textContentColor = LocalTankobunStyle.current.colors.mutedContent,
+                    tonalElevation = 0.dp,
+                    onDismissRequest = viewModel::dismissRecommendationImportError,
+                    title = { Text(tankobunString(R.string.msg_recommendations_import_failed)) },
+                    text = { Text(error) },
+                    confirmButton = {
+                        TextButton(onClick = viewModel::dismissRecommendationImportError) {
+                            Text(tankobunString(R.string.common_close))
+                        }
+                    },
+                )
+            }
+            if (state.busy && !(state.sourcePickerOpen && state.sourcePickerLoading)) {
+                LinearProgressIndicator(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = chromeInsets.top),
+                )
             }
         }
     }
 }
-
-private suspend fun PointerInputScope.detectQuickDrawerHandleSwipe(
-    expanded: Boolean,
-    onSwipeIn: () -> Unit,
-    onSwipeOut: () -> Unit,
-    onDragOffset: (Float) -> Unit,
-    onDragEnd: (Float) -> Unit,
-) {
-    awaitEachGesture {
-        awaitFirstDown(requireUnconsumed = false)
-        var totalX = 0f
-        var totalY = 0f
-        var swipingHorizontally = false
-        do {
-            val event = awaitPointerEvent()
-            val change = event.changes.firstOrNull() ?: break
-            val delta = change.position - change.previousPosition
-            totalX += delta.x
-            totalY += delta.y
-            if (!swipingHorizontally && abs(totalX) > 16f && abs(totalX) > abs(totalY)) {
-                swipingHorizontally = true
-            }
-            if (swipingHorizontally) {
-                change.consume()
-                onDragOffset(totalX)
-            }
-        } while (event.changes.any { it.pressed })
-
-        if (swipingHorizontally) {
-            onDragEnd(totalX)
-        }
-    }
-}
-
-internal fun quickDrawerOpeningDragOffset(totalX: Float, drawerTravelPx: Float, elasticLimitPx: Float): Float {
-    val pullingOpenPx = totalX.coerceAtMost(0f)
-    return if (pullingOpenPx >= -drawerTravelPx) {
-        pullingOpenPx
-    } else {
-        -drawerTravelPx - quickDrawerElasticOvershoot(
-            overshootPx = (-drawerTravelPx - pullingOpenPx).coerceAtLeast(0f),
-            elasticLimitPx = elasticLimitPx,
-        )
-    }
-}
-
-internal fun quickDrawerClosingDragOffset(totalX: Float, drawerTravelPx: Float, elasticLimitPx: Float): Float {
-    val pushingClosedPx = totalX.coerceAtLeast(0f)
-    return if (pushingClosedPx <= drawerTravelPx) {
-        pushingClosedPx
-    } else {
-        drawerTravelPx + quickDrawerElasticOvershoot(
-            overshootPx = (pushingClosedPx - drawerTravelPx).coerceAtLeast(0f),
-            elasticLimitPx = elasticLimitPx,
-        )
-    }
-}
-
-internal fun quickDrawerElasticOvershoot(overshootPx: Float, elasticLimitPx: Float): Float =
-    if (elasticLimitPx <= 0f) {
-        0f
-    } else {
-        elasticLimitPx * overshootPx / (overshootPx + elasticLimitPx)
-    }
 
 @Composable
 internal fun hasTabletDisplayCutout(): Boolean {
@@ -1209,12 +1063,14 @@ internal fun displayCutoutEndPadding(ignoreDisplayCutout: Boolean): Dp {
 internal fun TankobunTopBar(
     title: String,
     pageIcon: ImageVector,
-    hazeState: HazeState,
+    hazeState: HazeState?,
     showBack: Boolean,
     ignoreDisplayCutout: Boolean,
     showStatusBar: Boolean,
     mediaDetailActive: Boolean = false,
+    startInsetExtra: Dp = 0.dp,
     onBack: () -> Unit,
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
     val configuration = LocalConfiguration.current
     val compact = configuration.smallestScreenWidthDp in 1 until 600
@@ -1226,44 +1082,42 @@ internal fun TankobunTopBar(
         0.dp
     }
     val barHeight = if (compact) 48.dp else 72.dp
-    val horizontalPadding = 18.dp
     val iconSize = if (compact) 18.dp else 24.dp
     val spacing = if (compact) 7.dp else 12.dp
+    val tokens = LocalTankobunTokens.current
     val contentColor = LocalTankobunStyle.current.colors.panelContent
-    TankobunGlassChrome(
-        contentColor = contentColor,
-        shape = FrostedTopBarShape,
-        hazeState = hazeState,
-        baseColor = LocalTankobunTokens.current.topBarSurface,
-        bleedColor = LocalTankobunTokens.current.topBarBleed,
-        tintAlpha = FrostedGlassTintAlpha,
-        blurLayerAlpha = FrostedGlassDimAlpha,
-        borderAlpha = 0f,
-        washAlpha = FrostedGlassWashAlpha,
-        shadowElevation = 0.dp,
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(barHeight + statusBarInset + TopBarFadeHeight)
+            .tankobunGlass(
+                hazeState = hazeState,
+                surface = tokens.topBarSurface,
+                bleed = tokens.topBarBleed,
+                backdrop = tokens.appBackdrop,
+                dark = tokens.dark,
+                fadeOut = true,
+            ),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(barHeight + statusBarInset),
-        ) {
+        CompositionLocalProvider(LocalContentColor provides contentColor) {
             Row(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .height(barHeight + statusBarInset)
                     .padding(
-                    start = horizontalPadding + startInset,
-                    top = statusBarInset,
-                    end = horizontalPadding + endInset,
+                        start = 18.dp + startInset + startInsetExtra,
+                        top = statusBarInset,
+                        end = 6.dp + endInset,
                     ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(spacing),
             ) {
                 if (showBack) {
-                    IconButton(onClick = onBack, modifier = Modifier.size(if (compact) 36.dp else 48.dp)) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(if (compact) 40.dp else 48.dp)) {
                         Icon(
                             TankobunIcons.ArrowBack,
                             contentDescription = tankobunString(R.string.common_back),
-                            modifier = Modifier.size(iconSize),
+                            modifier = Modifier.size(iconSize + 2.dp),
                         )
                     }
                 }
@@ -1284,783 +1138,8 @@ internal fun TankobunTopBar(
                         )
                     },
                 )
+                actions()
             }
         }
-    }
-}
-
-@OptIn(ExperimentalHazeApi::class)
-@Composable
-private fun TankobunGlassChrome(
-    modifier: Modifier = Modifier,
-    shape: Shape,
-    contentColor: Color = LocalTankobunStyle.current.colors.panelContent,
-    baseColor: Color = LocalTankobunStyle.current.colors.panel,
-    bleedColor: Color = LocalTankobunStyle.current.colors.accent,
-    tintAlpha: Float = 0.88f,
-    blurLayerAlpha: Float = 0.46f,
-    hazeState: HazeState? = null,
-    borderAlpha: Float = 0.22f,
-    washAlpha: Float = 0.18f,
-    blurRadius: Dp = FrostedGlassBlur,
-    shadowElevation: Dp = 0.dp,
-    content: @Composable () -> Unit,
-) {
-    val colors = LocalTankobunStyle.current.colors
-    val lightBackdrop = colors.backdrop.luminance() >= 0.5f
-    val surfaceTint = baseColor.copy(alpha = (tintAlpha * 2.2f).coerceIn(0.48f, 0.86f))
-    val colorBleedTint = bleedColor.copy(alpha = (tintAlpha * 0.62f).coerceIn(0f, 0.34f))
-    val dimTint = if (lightBackdrop) {
-        Color.White.copy(alpha = (blurLayerAlpha * 0.56f).coerceIn(0f, 0.28f))
-    } else {
-        Color.Black.copy(alpha = (blurLayerAlpha * 0.8f).coerceIn(0f, 0.36f))
-    }
-    val glassWash = baseColor.copy(alpha = if (hazeState != null) washAlpha.coerceIn(0f, 1f) else 0f)
-    val sheen = Color.White.copy(alpha = if (lightBackdrop) 0.08f else 0.05f)
-    val border = BorderStroke(1.dp, colors.outline.copy(alpha = borderAlpha.coerceIn(0f, 1f)))
-    val hazeStyle = HazeStyle(
-        backgroundColor = baseColor,
-        tints = listOf(
-            HazeTint(colorBleedTint),
-            HazeTint(dimTint),
-        ),
-        blurRadius = blurRadius,
-        noiseFactor = FrostedGlassNoiseFactor,
-        fallbackTint = HazeTint(surfaceTint),
-    )
-    val chromeModifier = if (hazeState != null) {
-        modifier
-            .clip(shape)
-            .hazeEffect(state = hazeState, style = hazeStyle) {
-                inputScale = HazeInputScale.Fixed(FrostedGlassInputScale)
-                forceInvalidateOnPreDraw = true
-            }
-    } else {
-        modifier.clip(shape)
-    }
-
-    Surface(
-        modifier = chromeModifier,
-        shape = shape,
-        color = if (hazeState != null) Color.Transparent else surfaceTint,
-        contentColor = contentColor,
-        tonalElevation = 0.dp,
-        shadowElevation = shadowElevation,
-        border = border.takeIf { borderAlpha > 0f },
-    ) {
-        Box(
-            modifier = Modifier.clip(shape),
-        ) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(glassWash),
-            )
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(sheen),
-            )
-            content()
-        }
-    }
-}
-
-private fun DockAlignment.dockContentAlignment(): Alignment =
-    when (this) {
-        DockAlignment.LEFT -> Alignment.CenterStart
-        DockAlignment.CENTER -> Alignment.Center
-        DockAlignment.RIGHT -> Alignment.CenterEnd
-    }
-
-@Composable
-internal fun AnimatedHamburgerCloseIcon(
-    close: Boolean,
-    contentDescription: String,
-    modifier: Modifier = Modifier,
-    iconColor: Color = MaterialTheme.colorScheme.onSurface,
-) {
-    Icon(
-        imageVector = if (close) TankobunIcons.Close else TankobunIcons.Menu,
-        contentDescription = contentDescription,
-        tint = iconColor,
-        modifier = modifier,
-    )
-}
-
-@Composable
-internal fun TankobunBottomNavigationBar(
-    selectedTab: Int,
-    onSelectTab: (Int) -> Unit,
-    quickActionsVisible: Boolean = false,
-    quickActionsOpen: Boolean = false,
-    onToggleQuickActions: (() -> Unit)? = null,
-    indicatorAnimation: DockIndicatorAnimation = DockIndicatorAnimation.POP,
-    modifier: Modifier = Modifier,
-) {
-    val styleColors = LocalTankobunStyle.current.colors
-    val items = listOf(
-        Triple(tankobunString(R.string.nav_home), TankobunIcons.Home, 0),
-        Triple(tankobunString(R.string.nav_library), TankobunIcons.LibraryBooks, 1),
-        Triple(tankobunString(R.string.nav_browse), TankobunIcons.Explore, 2),
-        Triple(tankobunString(R.string.nav_profile), TankobunIcons.AccountCircle, 3),
-        Triple(tankobunString(R.string.nav_settings), TankobunIcons.Settings, 4),
-    )
-    val selectedIndex = selectedTab.coerceIn(0, items.lastIndex)
-    val itemSize = 44.dp
-    val itemSpacing = 8.dp
-    val indicatorSize = 40.dp
-
-    Box(
-        modifier = modifier
-            .padding(horizontal = 10.dp, vertical = 6.dp)
-            .fillMaxWidth(),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        DockSelectionIndicator(
-            selectedIndex = selectedIndex,
-            animation = indicatorAnimation,
-            itemSize = itemSize,
-            itemSpacing = itemSpacing,
-            indicatorSize = indicatorSize,
-            shape = CircleShape,
-            color = styleColors.accent.copy(alpha = 0.88f),
-            modifier = Modifier.fillMaxSize(),
-        )
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(itemSpacing),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            items.forEach { (label, icon, index) ->
-                val selected = selectedTab == index
-                val iconColor by animateColorAsState(
-                    targetValue = if (selected) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        styleColors.panelContent.copy(alpha = 0.72f)
-                    },
-                    animationSpec = tween(durationMillis = 160),
-                    label = "Dock icon color",
-                )
-                Box(
-                    modifier = Modifier
-                        .size(itemSize)
-                        .clip(CircleShape)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { onSelectTab(index) },
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(icon, contentDescription = label, tint = iconColor, modifier = Modifier.size(24.dp))
-                }
-            }
-            if (quickActionsVisible && onToggleQuickActions != null) {
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(28.dp)
-                        .clip(RoundedCornerShape(percent = 50))
-                        .background(styleColors.panelContent.copy(alpha = 0.22f)),
-                )
-                val quickActionIconColor by animateColorAsState(
-                    targetValue = styleColors.panelContent.copy(alpha = if (quickActionsOpen) 0.96f else 0.72f),
-                    animationSpec = tween(durationMillis = 160),
-                    label = "Quick actions dock icon color",
-                )
-                Box(
-                    modifier = Modifier
-                        .size(itemSize)
-                        .clip(CircleShape)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = onToggleQuickActions,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AnimatedHamburgerCloseIcon(
-                        close = quickActionsOpen,
-                        contentDescription = if (quickActionsOpen) tankobunString(R.string.common_close) else tankobunString(R.string.common_options),
-                        iconColor = quickActionIconColor,
-                        modifier = Modifier.size(26.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DockSelectionIndicator(
-    selectedIndex: Int,
-    animation: DockIndicatorAnimation,
-    itemSize: Dp,
-    itemSpacing: Dp,
-    indicatorSize: Dp,
-    shape: Shape,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    val density = LocalDensity.current
-    val itemSizePx = with(density) { itemSize.toPx() }
-    val itemStridePx = with(density) { (itemSize + itemSpacing).toPx() }
-    val indicatorSizePx = with(density) { indicatorSize.toPx() }
-    val maxStretchPx = with(density) { 32.dp.toPx() }
-    val initialCenterPx = itemSizePx / 2f + itemStridePx * selectedIndex
-    val centerPx = remember { Animatable(initialCenterPx) }
-    val trailCenterPx = remember { Animatable(initialCenterPx) }
-    val stretchPx = remember { Animatable(0f) }
-    val scale = remember { Animatable(1f) }
-    val alpha = remember { Animatable(1f) }
-    val leftEdgePx = remember { Animatable(initialCenterPx - indicatorSizePx / 2f) }
-    val rightEdgePx = remember { Animatable(initialCenterPx + indicatorSizePx / 2f) }
-
-    LaunchedEffect(selectedIndex, itemStridePx, indicatorSizePx, animation) {
-        val targetCenterPx = itemSizePx / 2f + itemStridePx * selectedIndex
-        when (animation) {
-            DockIndicatorAnimation.BOUNCY -> {
-                alpha.snapTo(1f)
-                scale.snapTo(1f)
-                val travelPx = abs(targetCenterPx - centerPx.value)
-                val stretchTargetPx = (travelPx * 0.42f).coerceIn(0f, maxStretchPx * 0.82f)
-                val slide = launch {
-                    centerPx.animateTo(
-                        targetValue = targetCenterPx,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMediumLow,
-                        ),
-                    )
-                }
-                val stretch = launch {
-                    if (stretchTargetPx > 0f) {
-                        stretchPx.animateTo(stretchTargetPx, tween(durationMillis = 90))
-                    }
-                    stretchPx.animateTo(
-                        targetValue = 0f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium,
-                        ),
-                    )
-                }
-                joinAll(slide, stretch)
-                trailCenterPx.snapTo(targetCenterPx)
-                leftEdgePx.snapTo(targetCenterPx - indicatorSizePx / 2f)
-                rightEdgePx.snapTo(targetCenterPx + indicatorSizePx / 2f)
-            }
-
-            DockIndicatorAnimation.INCHWORM -> {
-                alpha.snapTo(1f)
-                scale.snapTo(1f)
-                stretchPx.snapTo(0f)
-                val currentCenterPx = (leftEdgePx.value + rightEdgePx.value) / 2f
-                if (abs(currentCenterPx - centerPx.value) > itemStridePx) {
-                    leftEdgePx.snapTo(centerPx.value - indicatorSizePx / 2f)
-                    rightEdgePx.snapTo(centerPx.value + indicatorSizePx / 2f)
-                }
-                val targetLeftPx = targetCenterPx - indicatorSizePx / 2f
-                val targetRightPx = targetCenterPx + indicatorSizePx / 2f
-                if (targetCenterPx >= (leftEdgePx.value + rightEdgePx.value) / 2f) {
-                    rightEdgePx.animateTo(targetRightPx, tween(durationMillis = 155))
-                    delay(35L)
-                    leftEdgePx.animateTo(
-                        targetValue = targetLeftPx,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMedium,
-                        ),
-                    )
-                } else {
-                    leftEdgePx.animateTo(targetLeftPx, tween(durationMillis = 155))
-                    delay(35L)
-                    rightEdgePx.animateTo(
-                        targetValue = targetRightPx,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMedium,
-                        ),
-                    )
-                }
-                centerPx.snapTo(targetCenterPx)
-                trailCenterPx.snapTo(targetCenterPx)
-            }
-
-            DockIndicatorAnimation.RUBBER_BAND -> {
-                alpha.snapTo(1f)
-                scale.snapTo(1f)
-                val travelPx = abs(targetCenterPx - centerPx.value)
-                val stretchTargetPx = (travelPx * 0.58f).coerceIn(0f, maxStretchPx)
-                val slide = launch {
-                    centerPx.animateTo(
-                        targetValue = targetCenterPx,
-                        animationSpec = spring(
-                            dampingRatio = 0.58f,
-                            stiffness = Spring.StiffnessMedium,
-                        ),
-                    )
-                }
-                val stretch = launch {
-                    if (stretchTargetPx > 0f) {
-                        stretchPx.animateTo(stretchTargetPx, tween(durationMillis = 105))
-                    }
-                    stretchPx.animateTo(-indicatorSizePx * 0.08f, tween(durationMillis = 80))
-                    stretchPx.animateTo(
-                        targetValue = 0f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium,
-                        ),
-                    )
-                }
-                joinAll(slide, stretch)
-                trailCenterPx.snapTo(targetCenterPx)
-                leftEdgePx.snapTo(targetCenterPx - indicatorSizePx / 2f)
-                rightEdgePx.snapTo(targetCenterPx + indicatorSizePx / 2f)
-            }
-
-            DockIndicatorAnimation.POP -> {
-                stretchPx.snapTo(0f)
-                val shrink = launch { scale.animateTo(0.56f, tween(durationMillis = 65)) }
-                val fade = launch { alpha.animateTo(0.48f, tween(durationMillis = 65)) }
-                joinAll(shrink, fade)
-                centerPx.snapTo(targetCenterPx)
-                trailCenterPx.snapTo(targetCenterPx)
-                leftEdgePx.snapTo(targetCenterPx - indicatorSizePx / 2f)
-                rightEdgePx.snapTo(targetCenterPx + indicatorSizePx / 2f)
-                val grow = launch { scale.animateTo(1.14f, tween(durationMillis = 115)) }
-                val appear = launch { alpha.animateTo(1f, tween(durationMillis = 90)) }
-                joinAll(grow, appear)
-                scale.animateTo(
-                    targetValue = 1f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium,
-                    ),
-                )
-            }
-
-            DockIndicatorAnimation.COMET -> {
-                alpha.snapTo(1f)
-                scale.snapTo(1f)
-                stretchPx.snapTo(0f)
-                val slide = launch {
-                    centerPx.animateTo(
-                        targetValue = targetCenterPx,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium,
-                        ),
-                    )
-                }
-                val tail = launch {
-                    delay(30L)
-                    trailCenterPx.animateTo(
-                        targetValue = targetCenterPx,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = 105f,
-                        ),
-                    )
-                }
-                joinAll(slide, tail)
-                leftEdgePx.snapTo(targetCenterPx - indicatorSizePx / 2f)
-                rightEdgePx.snapTo(targetCenterPx + indicatorSizePx / 2f)
-            }
-        }
-    }
-
-    Canvas(modifier = modifier) {
-        val centerY = size.height / 2f
-        val base = indicatorSizePx
-        fun drawThemedIndicator(
-            left: Float,
-            top: Float,
-            width: Float,
-            height: Float,
-            fill: Color = color,
-        ) {
-            val safeWidth = width.coerceAtLeast(1f)
-            val safeHeight = height.coerceAtLeast(1f)
-            val outline = shape.createOutline(Size(safeWidth, safeHeight), layoutDirection, this)
-            withTransform({ translate(left, top) }) {
-                when (outline) {
-                    is Outline.Rectangle -> drawRect(color = fill, size = Size(safeWidth, safeHeight))
-                    is Outline.Rounded -> drawPath(
-                        path = Path().apply { addRoundRect(outline.roundRect) },
-                        color = fill,
-                    )
-                    is Outline.Generic -> drawPath(path = outline.path, color = fill)
-                }
-            }
-        }
-        when (animation) {
-            DockIndicatorAnimation.BOUNCY -> {
-                val width = base + stretchPx.value.coerceAtLeast(0f)
-                drawThemedIndicator(centerPx.value - width / 2f, centerY - base / 2f, width, base)
-            }
-
-            DockIndicatorAnimation.INCHWORM -> {
-                val left = minOf(leftEdgePx.value, rightEdgePx.value)
-                val right = maxOf(leftEdgePx.value, rightEdgePx.value)
-                val height = base
-                drawThemedIndicator(
-                    left,
-                    centerY - height / 2f,
-                    (right - left).coerceAtLeast(base * 0.76f),
-                    height,
-                )
-            }
-
-            DockIndicatorAnimation.RUBBER_BAND -> {
-                val stretch = stretchPx.value.coerceAtLeast(0f)
-                val stretchRatio = (stretch / maxStretchPx).coerceIn(0f, 1f)
-                val width = base + stretch
-                val height = base * (1f - 0.16f * stretchRatio)
-                drawThemedIndicator(centerPx.value - width / 2f, centerY - height / 2f, width, height)
-            }
-
-            DockIndicatorAnimation.POP -> {
-                val scaledSize = base * scale.value
-                drawThemedIndicator(
-                    centerPx.value - scaledSize / 2f,
-                    centerY - scaledSize / 2f,
-                    scaledSize,
-                    scaledSize,
-                    color.copy(alpha = color.alpha * alpha.value),
-                )
-            }
-
-            DockIndicatorAnimation.COMET -> {
-                val start = trailCenterPx.value
-                val end = centerPx.value
-                val left = minOf(start, end)
-                val right = maxOf(start, end)
-                if (right - left > base * 0.22f) {
-                    drawRoundRect(
-                        color = color.copy(alpha = color.alpha * 0.16f),
-                        topLeft = Offset(left, centerY - base * 0.08f),
-                        size = Size(right - left, base * 0.16f),
-                        cornerRadius = CornerRadius(base * 0.08f, base * 0.08f),
-                    )
-                }
-                (5 downTo 1).forEach { index ->
-                    val amount = index / 6f
-                    val x = start + (end - start) * amount
-                    drawCircle(
-                        color = color.copy(alpha = color.alpha * (0.1f + 0.06f * index)),
-                        radius = base * (0.08f + 0.035f * index),
-                        center = Offset(x, centerY),
-                    )
-                }
-                drawThemedIndicator(end - base / 2f, centerY - base / 2f, base, base)
-            }
-        }
-    }
-}
-
-@Composable
-internal fun QuickDrawerHandle(
-    expanded: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    onSwipeIn: () -> Unit = onClick,
-    onSwipeOut: () -> Unit = onClick,
-    dragLocally: Boolean = true,
-    localDragOffset: (Float) -> Float = { totalX -> if (expanded) totalX.coerceAtLeast(0f) else totalX.coerceAtMost(0f) },
-    onDragOffset: (Float) -> Unit = {},
-    onDragEnd: (Float) -> Unit = { totalX ->
-        when {
-            expanded && totalX > 48f -> onSwipeOut()
-            !expanded && totalX < -48f -> onSwipeIn()
-        }
-    },
-) {
-    var dragOffsetPx by remember { mutableFloatStateOf(0f) }
-    var handleDragging by remember { mutableStateOf(false) }
-    val handleDragOffsetPx by animateFloatAsState(
-        targetValue = dragOffsetPx,
-        animationSpec = tween(durationMillis = if (handleDragging) 0 else QuickDrawerSnapMillis),
-        label = "Quick drawer handle drag",
-    )
-    val handleWidth by animateDpAsState(
-        targetValue = if (expanded) 40.dp else 36.dp,
-        animationSpec = tween(durationMillis = 220),
-        label = "Quick drawer handle width",
-    )
-    val handleHeight by animateDpAsState(
-        targetValue = if (expanded) 104.dp else 88.dp,
-        animationSpec = tween(durationMillis = 220),
-        label = "Quick drawer handle height",
-    )
-    Box(
-        modifier = modifier
-            .width(handleWidth)
-            .height(handleHeight)
-            .graphicsLayer { translationX = if (dragLocally) handleDragOffsetPx else 0f }
-            .pointerInput(expanded) {
-                detectQuickDrawerHandleSwipe(
-                    expanded = expanded,
-                    onSwipeIn = onSwipeIn,
-                    onSwipeOut = onSwipeOut,
-                    onDragOffset = {
-                        handleDragging = true
-                        if (dragLocally) {
-                            dragOffsetPx = localDragOffset(it)
-                        }
-                        onDragOffset(it)
-                    },
-                    onDragEnd = {
-                        handleDragging = false
-                        if (dragLocally) dragOffsetPx = 0f
-                        onDragEnd(it)
-                    },
-                )
-            }
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            modifier = Modifier
-                .width(4.dp)
-                .height(if (expanded) 42.dp else 36.dp),
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.52f),
-        ) {}
-    }
-}
-
-@Composable
-internal fun QuickDrawer(
-    state: TankobunUiState,
-    viewModel: MainViewModel,
-    selectedMedia: AnilistMedia?,
-    onOpenRecentProgress: (RecentReadingProgress) -> Unit,
-    onClose: () -> Unit,
-    drawerWidth: Dp,
-    endPadding: Dp,
-    showHandle: Boolean = true,
-    handleCenterOffset: Dp = 0.dp,
-    onHandleDragOffset: (Float) -> Unit = {},
-    onHandleDragEnd: (Float) -> Unit = {},
-    handleDragLocally: Boolean = true,
-    modifier: Modifier = Modifier,
-) {
-    val handleSlotWidth = if (showHandle) QuickDrawerHandleSlotWidth else 0.dp
-    val chromeInsets = LocalTankobunChromeInsets.current
-    LaunchedEffect(selectedMedia?.id, state.loggedIn, state.libraryMode) {
-        selectedMedia?.id?.let(viewModel::refreshQuickDrawerTracking)
-    }
-    Box(modifier = modifier.width(handleSlotWidth + drawerWidth + endPadding)) {
-        Surface(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .width(drawerWidth + endPadding)
-                .fillMaxHeight(),
-            shape = RoundedCornerShape(0.dp),
-            color = LocalTankobunStyle.current.colors.panel,
-            contentColor = LocalTankobunStyle.current.colors.panelContent,
-            tonalElevation = 0.dp,
-            shadowElevation = 10.dp,
-        ) {
-            Box(Modifier.fillMaxSize()) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .width(drawerWidth)
-                        .fillMaxHeight()
-                        .padding(
-                            top = chromeInsets.top,
-                        ),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(
-                                start = 18.dp,
-                                top = 18.dp,
-                                end = 18.dp,
-                                bottom = 18.dp + chromeInsets.bottom,
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(24.dp),
-                    ) {
-                        QuickDrawerSection(
-                            title = tankobunString(R.string.detail_track_manga),
-                            icon = TankobunIcons.Pencil,
-                        ) {
-                            if (selectedMedia != null) {
-                                AniListTrackingSection(state, viewModel, selectedMedia)
-                            } else {
-                                Text(
-                                    tankobunString(R.string.quick_open_manga_tracking),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-
-                        QuickDrawerSection(
-                            title = tankobunString(R.string.chapter_resume_reading),
-                            icon = TankobunIcons.MenuBook,
-                        ) {
-                            if (state.recentReadingProgress.isNotEmpty()) {
-                                state.recentReadingProgress.take(3).forEach { item ->
-                                    RecentReadingAction(item = item, onClick = { onOpenRecentProgress(item) })
-                                }
-                            } else {
-                                Text(
-                                    tankobunString(R.string.quick_start_reading_resume),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-
-                        QuickDrawerSection(
-                            title = tankobunString(R.string.common_downloads),
-                            icon = TankobunIcons.Download,
-                        ) {
-                            if (state.downloads.isEmpty()) {
-                                Text(tankobunString(R.string.downloads_no_queued), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            } else {
-                                state.downloads.take(4).forEach { job ->
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        Icon(TankobunIcons.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(job.chapterName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text(
-                                                job.state.statusLabel(),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if (showHandle) {
-            QuickDrawerHandle(
-                expanded = true,
-                onClick = onClose,
-                onSwipeOut = onClose,
-                dragLocally = handleDragLocally,
-                onDragOffset = onHandleDragOffset,
-                onDragEnd = onHandleDragEnd,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .offset(y = handleCenterOffset),
-            )
-        }
-    }
-}
-
-@Composable
-internal fun RecentReadingAction(item: RecentReadingProgress, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(LocalTankobunStyle.current.themeShapes.control)
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(LocalTankobunStyle.current.colors.accent.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                TankobunIcons.PlayArrow,
-                contentDescription = null,
-                modifier = Modifier.size(19.dp),
-                tint = LocalTankobunStyle.current.colors.accent,
-            )
-        }
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            Text(
-                item.media.title.userPreferred,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                listOf(
-                    item.chapter?.name
-                        ?: item.progress.chapterNumber.takeIf { it > 0 }?.let { tankobunString(R.string.reader_chapter_number, it.toString()) }
-                        ?: tankobunString(R.string.reader_saved_chapter),
-                    if (item.media.readingContentKind == com.tankobun.core.model.ReadingContentKind.NOVEL) tankobunString(R.string.novel_read_progress, (item.progress.pageIndex * 100 / (item.progress.totalPages - 1).coerceAtLeast(1)).coerceIn(0, 100))
-                    else tankobunString(R.string.reader_page_fraction, item.progress.pageIndex + 1, item.progress.totalPages),
-                ).joinToString(" / "),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Icon(
-            TankobunIcons.ChevronRight,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-internal fun QuickDrawerSection(
-    title: String,
-    icon: ImageVector,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier
-                    .offset(y = (-1).dp)
-                    .size(18.dp),
-                tint = LocalTankobunStyle.current.colors.accent,
-            )
-            Text(
-                text = title.uppercase(Locale.ROOT),
-                style = LocalTankobunStyle.current.typography.sectionLabel,
-                color = LocalTankobunStyle.current.colors.accent,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.24f)),
-            )
-        }
-        content()
     }
 }

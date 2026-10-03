@@ -167,8 +167,6 @@
     <string name="settings_theme_pure_black">Pure black</string>
     <string name="settings_theme_pure_black_desc">Black background in dark mode, for AMOLED screens</string>
     <string name="settings_theme_corners">Corners</string>
-    <string name="settings_dock_position">Dock position</string>
-    <string name="settings_dock_animation">Dock animation</string>
     <string name="settings_system_ui">System UI</string>
     <string name="settings_layout">Layout</string>
     <string name="settings_show_android_status_bar">Show Android status bar</string>
@@ -358,16 +356,6 @@
     <string name="language_zh_hans">Chinese (Simplified)</string>
     <string name="language_zh_hant">Chinese (Traditional)</string>
 
-    <string name="dock_left">Left</string>
-    <string name="dock_center">Center</string>
-    <string name="dock_right">Right</string>
-    <string name="dock_animation_bouncy">Bouncy</string>
-    <string name="dock_animation_inchworm">Inchworm</string>
-    <string name="dock_animation_rubber_band">Rubber band</string>
-    <string name="dock_animation_pop">Pop</string>
-    <string name="dock_animation_comet">Comet trail</string>
-    <string name="dock_summary">%1$s dock</string>
-
     <string name="media_view_cover_only">Cover only</string>
     <string name="media_view_cover_info">Cover + info</string>
     <string name="media_view_list">List</string>
@@ -554,8 +542,6 @@
     <string name="detail_recommendations">Recommendations</string>
     <string name="detail_shown_count">%1$d shown</string>
     <string name="detail_load_more">Load more</string>
-    <string name="quick_open_manga_tracking">Open a manga to track it here.</string>
-    <string name="quick_start_reading_resume">Start reading any manga to create resume points.</string>
 
     <string name="reader_paged">Paged</string>
     <string name="reader_webtoon">Webtoon</string>
@@ -850,11 +836,11 @@
     <string name="app_tour_browse_point_1">Search by title or narrow results with the filter chips.</string>
     <string name="app_tour_browse_point_2">Open a manga to see details, then add it to your library.</string>
     <string name="app_tour_profile_title">See your reading at a glance</string>
-    <string name="app_tour_profile_body">Profile brings your account, reading activity, and stats together.</string>
+    <string name="app_tour_profile_body">You brings your account, reading stats, downloads and settings together.</string>
     <string name="app_tour_profile_point_1">Connect AniList here whenever you want account sync.</string>
-    <string name="app_tour_profile_point_2">Review reading totals, recent activity, and tracking preferences.</string>
+    <string name="app_tour_profile_point_2">Review reading totals and recent activity, then open Settings below.</string>
     <string name="app_tour_settings_title">Make Tankobun yours</string>
-    <string name="app_tour_settings_body">Appearance, reader behavior, downloads, sources, and backups live here.</string>
+    <string name="app_tour_settings_body">Open Settings from You: appearance, reader, downloads, sources and backups.</string>
     <string name="app_tour_settings_point_1">Fine-tune the theme and reading experience at any time.</string>
     <string name="app_tour_settings_point_2">Manage source extensions and keep a portable backup of your setup.</string>
 
@@ -1149,6 +1135,14 @@
         <item quantity="other">%1$d sources</item>
     </plurals>
     <string name="nav_home">Home</string>
+    <string name="you_settings_header">Settings</string>
+    <string name="settings_navigation_rail">Side bar</string>
+    <string name="settings_navigation_dock">Dock</string>
+    <string name="settings_navigation_style_desc">The dock floats at the bottom of the screen. The side bar stays on the left edge in landscape; in portrait the dock is used.</string>
+    <string name="settings_navigation_style">Navigation on tablets</string>
+    <string name="nav_you_downloads_badge">%1$s, downloads in progress</string>
+    <string name="nav_library_updates_badge">%1$s, %2$d updates</string>
+    <string name="nav_you">You</string>
     <string name="home_trending">Trending</string>
     <string name="home_continue_reading">Continue reading</string>
     <string name="home_trending_by_genre">Trending by genre</string>
@@ -1341,4 +1335,11 @@
     <string name="chapter_groups_preferred">Preferred translation group</string>
     <string name="chapter_groups_automatic">Automatic</string>
     <string name="chapter_groups_missing">No chapters from this group in the current list</string>
+    <string name="detail_continue_chapter">Continue · Ch. %1$s</string>
+    <string name="detail_start_chapter">Start · Ch. %1$s</string>
+    <string name="detail_remove_from_library">Remove from library</string>
+    <string name="detail_remove_from_library_confirm">Remove from library?</string>
+    <string name="detail_remove_from_library_body">Reading progress and downloads stay on this device.</string>
+    <string name="msg_detail_removed_from_library">Removed from library.</string>
+    <string name="common_remove">Remove</string>
 </resources>

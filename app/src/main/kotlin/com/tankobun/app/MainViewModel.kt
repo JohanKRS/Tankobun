@@ -234,7 +234,7 @@ private val FALLBACK_HOME_GENRES = listOf(
 private const val READER_ADJACENT_SEGMENT_LOAD_TIMEOUT_MILLIS = 12_000L
 private const val READER_ADJACENT_SEGMENT_STALE_MILLIS = 20_000L
 private const val HOME_FEED_RETRY_DELAY_MILLIS = 30 * 60 * 1000L
-private const val QUICK_DRAWER_TRACKING_REFRESH_MILLIS = 5 * 60 * 1000L
+private const val TRACKING_ENTRY_REFRESH_MILLIS = 5 * 60 * 1000L
 
 class MainViewModel(
     private val container: AppContainer,
@@ -286,8 +286,8 @@ class MainViewModel(
     private var lastReaderProgressSavedAtEpochMillis: Long = 0L
     private var latestReaderPosition: ReaderPagePosition? = null
     private val readerPageCacheJobs = ConcurrentHashMap<String, Job>()
-    private val quickDrawerTrackingRefreshJobs = ConcurrentHashMap<Int, Job>()
-    private val quickDrawerTrackingRefreshedAt = ConcurrentHashMap<Int, Long>()
+    private val trackingEntryRefreshJobs = ConcurrentHashMap<Int, Job>()
+    private val trackingEntryRefreshedAt = ConcurrentHashMap<Int, Long>()
     private val initialAccessToken = container.tokenStore.accessToken()
     private val initialOnboardingVersion = container.settingsStore.onboardingVersion()
     private val initialLibraryMode = initialLibraryModeForStartup(
@@ -329,8 +329,7 @@ class MainViewModel(
             appLanguage = container.settingsStore.appLanguage(),
             ignoreDisplayCutout = container.settingsStore.ignoreDisplayCutout(),
             showAppStatusBar = container.settingsStore.showAppStatusBar(),
-            dockAlignment = container.settingsStore.dockAlignment(),
-            dockIndicatorAnimation = container.settingsStore.dockIndicatorAnimation(),
+            useNavigationRail = container.settingsStore.useNavigationRail(),
             onboardingVisible = shouldShowOnboarding(initialOnboardingVersion),
             readerTutorialVisible = !container.settingsStore.readerTutorialCompleted(),
             readerMode = container.settingsStore.readerMode(),
@@ -784,14 +783,9 @@ class MainViewModel(
         _state.update { it.copy(showAppStatusBar = enabled) }
     }
 
-    fun setDockAlignment(alignment: DockAlignment) {
-        container.settingsStore.saveDockAlignment(alignment)
-        _state.update { it.copy(dockAlignment = alignment) }
-    }
-
-    fun setDockIndicatorAnimation(animation: DockIndicatorAnimation) {
-        container.settingsStore.saveDockIndicatorAnimation(animation)
-        _state.update { it.copy(dockIndicatorAnimation = animation) }
+    fun setUseNavigationRail(enabled: Boolean) {
+        container.settingsStore.saveUseNavigationRail(enabled)
+        _state.update { it.copy(useNavigationRail = enabled) }
     }
 
     fun setLibraryViewMode(mode: MediaViewMode) {
@@ -1682,8 +1676,7 @@ class MainViewModel(
                 appLanguage = store.appLanguage(),
                 ignoreDisplayCutout = store.ignoreDisplayCutout(),
                 showAppStatusBar = store.showAppStatusBar(),
-                dockAlignment = store.dockAlignment(),
-                dockIndicatorAnimation = store.dockIndicatorAnimation(),
+                useNavigationRail = store.useNavigationRail(),
                 libraryMode = store.libraryMode(),
                 libraryViewMode = store.libraryViewMode(),
                 libraryCoverColumns = store.libraryCoverColumns(),
@@ -2759,16 +2752,16 @@ class MainViewModel(
         loadCachedSourceState(media.id)
     }
 
-    fun refreshQuickDrawerTracking(mediaId: Int) {
+    fun refreshTrackingEntry(mediaId: Int) {
         val snapshot = _state.value
         val token = container.tokenStore.accessToken()
         if (!snapshot.loggedIn || snapshot.libraryMode != LibraryMode.ANILIST || token.isNullOrBlank()) return
         if (snapshot.selectedMedia?.id != mediaId) return
 
         val now = System.currentTimeMillis()
-        val lastRefresh = quickDrawerTrackingRefreshedAt[mediaId] ?: 0L
-        if (now - lastRefresh < QUICK_DRAWER_TRACKING_REFRESH_MILLIS) return
-        if (quickDrawerTrackingRefreshJobs[mediaId]?.isActive == true) return
+        val lastRefresh = trackingEntryRefreshedAt[mediaId] ?: 0L
+        if (now - lastRefresh < TRACKING_ENTRY_REFRESH_MILLIS) return
+        if (trackingEntryRefreshJobs[mediaId]?.isActive == true) return
 
         val job = viewModelScope.launch {
             try {
@@ -2779,16 +2772,16 @@ class MainViewModel(
                         scoreFormat = _state.value.anilistScoreFormat,
                     )
                 }.onSuccess { entry ->
-                    quickDrawerTrackingRefreshedAt[mediaId] = System.currentTimeMillis()
+                    trackingEntryRefreshedAt[mediaId] = System.currentTimeMillis()
                     _state.update { it.withRefreshedTrackingEntry(mediaId, entry) }
                 }.onFailure { error ->
-                    Log.w(TAG, "AniList quick drawer tracking refresh failed for $mediaId", error)
+                    Log.w(TAG, "AniList tracking entry refresh failed for $mediaId", error)
                 }
             } finally {
-                quickDrawerTrackingRefreshJobs.remove(mediaId)
+                trackingEntryRefreshJobs.remove(mediaId)
             }
         }
-        quickDrawerTrackingRefreshJobs[mediaId] = job
+        trackingEntryRefreshJobs[mediaId] = job
     }
 
     fun selectSource(sourceId: Long) {
@@ -3715,6 +3708,54 @@ class MainViewModel(
                 }
             }.onFailure { error ->
                 Log.e(TAG, "Batch delete failed", error)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = error.userMessage(localizedContext(), string(R.string.msg_library_batch_failed)),
+                    )
+                }
+            }
+        }
+    }
+
+    fun removeSelectedMediaFromLibrary() {
+        val snapshot = _state.value
+        val media = snapshot.selectedMedia ?: return
+        val item = snapshot.libraryItems.firstOrNull { it.media.id == media.id } ?: return
+        trackingAutoSaveJob?.cancel()
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, message = null) }
+            runCatching {
+                aniListDataSource.deleteBatchEntries(
+                    token = container.tokenStore.accessToken(),
+                    syncRemote = snapshot.libraryMode == LibraryMode.ANILIST,
+                    items = listOf(item),
+                    deleteLocalData = false,
+                )
+            }.onSuccess { result ->
+                _state.update { current ->
+                    val next = current.withLibraryBatchMutationResult(
+                        result = result,
+                        successMessage = string(R.string.msg_detail_removed_from_library),
+                    )
+                    if (next.selectedMedia?.id != media.id) {
+                        next
+                    } else {
+                        next.copy(
+                            trackingStatus = MediaStatus.PLANNING,
+                            trackingProgress = "0",
+                            trackingScore = "",
+                            trackingNotes = "",
+                            trackingPrivate = false,
+                            trackingCustomLists = emptySet(),
+                            trackingDirty = false,
+                            trackingSaveInProgress = false,
+                            trackingSaveFailed = false,
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                Log.e(TAG, "Removing ${media.id} from library failed", error)
                 _state.update {
                     it.copy(
                         busy = false,

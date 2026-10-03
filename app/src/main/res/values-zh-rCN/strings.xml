@@ -167,8 +167,6 @@
     <string name="settings_theme_pure_black">纯黑</string>
     <string name="settings_theme_pure_black_desc">深色模式使用纯黑背景（适合 AMOLED 屏幕）</string>
     <string name="settings_theme_corners">圆角</string>
-    <string name="settings_dock_position">Dock 位置</string>
-    <string name="settings_dock_animation">Dock 动画</string>
     <string name="settings_system_ui">系统界面</string>
     <string name="settings_layout">布局</string>
     <string name="settings_show_android_status_bar">显示 Android 状态栏</string>
@@ -357,16 +355,6 @@
     <string name="language_zh_hans">中文（简体）</string>
     <string name="language_zh_hant">中文（繁体）</string>
 
-    <string name="dock_left">左侧</string>
-    <string name="dock_center">居中</string>
-    <string name="dock_right">右侧</string>
-    <string name="dock_animation_bouncy">弹跳</string>
-    <string name="dock_animation_inchworm">尺蠖</string>
-    <string name="dock_animation_rubber_band">橡皮筋</string>
-    <string name="dock_animation_pop">弹出</string>
-    <string name="dock_animation_comet">彗星尾迹</string>
-    <string name="dock_summary">%1$s Dock</string>
-
     <string name="media_view_cover_only">仅封面</string>
     <string name="media_view_cover_info">封面 + 信息</string>
     <string name="media_view_list">列表</string>
@@ -553,8 +541,6 @@
     <string name="detail_recommendations">推荐</string>
     <string name="detail_shown_count">已显示 %1$d 个</string>
     <string name="detail_load_more">加载更多</string>
-    <string name="quick_open_manga_tracking">打开一部漫画后，可在这里追踪它。</string>
-    <string name="quick_start_reading_resume">开始阅读任意漫画后，会生成继续阅读位置。</string>
 
     <string name="reader_paged">分页</string>
     <string name="reader_webtoon">Webtoon</string>
@@ -849,11 +835,11 @@
     <string name="app_tour_browse_point_1">按标题搜索，或使用筛选器缩小结果范围。</string>
     <string name="app_tour_browse_point_2">打开漫画查看详情，然后将它加入书架。</string>
     <string name="app_tour_profile_title">快速了解阅读情况</string>
-    <string name="app_tour_profile_body">“个人资料”集中显示账号、阅读活动和统计。</string>
+    <string name="app_tour_profile_body">“我的”汇集账号、阅读统计、下载和设置。</string>
     <string name="app_tour_profile_point_1">需要账号同步时，可在这里连接 AniList。</string>
-    <string name="app_tour_profile_point_2">查看阅读总量、最近活动和追踪偏好。</string>
+    <string name="app_tour_profile_point_2">查看阅读总量和最近活动，设置就在下方。</string>
     <string name="app_tour_settings_title">按需调整 Tankobun</string>
-    <string name="app_tour_settings_body">外观、阅读器、下载、来源和备份都在这里。</string>
+    <string name="app_tour_settings_body">在“我的”中打开设置：外观、阅读器、下载、来源和备份。</string>
     <string name="app_tour_settings_point_1">随时微调主题与阅读体验。</string>
     <string name="app_tour_settings_point_2">管理来源扩展，并保留一份可迁移的设置备份。</string>
 
@@ -1148,6 +1134,14 @@
         <item quantity="other">%1$d 个来源</item>
     </plurals>
     <string name="nav_home">主页</string>
+    <string name="you_settings_header">设置</string>
+    <string name="settings_navigation_rail">侧边栏</string>
+    <string name="settings_navigation_dock">底部栏</string>
+    <string name="settings_navigation_style_desc">底部栏悬浮在屏幕下方。横屏时侧边栏固定在左侧边缘，竖屏时使用底部栏。</string>
+    <string name="settings_navigation_style">平板导航</string>
+    <string name="nav_you_downloads_badge">%1$s，正在下载</string>
+    <string name="nav_library_updates_badge">%1$s，%2$d 条更新</string>
+    <string name="nav_you">我的</string>
     <string name="home_trending">热门趋势</string>
     <string name="home_continue_reading">继续阅读</string>
     <string name="home_trending_by_genre">分类热门</string>
@@ -1340,4 +1334,11 @@
     <string name="chapter_groups_preferred">首选翻译组</string>
     <string name="chapter_groups_automatic">自动</string>
     <string name="chapter_groups_missing">当前列表中没有此翻译组的章节</string>
+    <string name="detail_continue_chapter">继续 · 第 %1$s 话</string>
+    <string name="detail_start_chapter">开始 · 第 %1$s 话</string>
+    <string name="detail_remove_from_library">从书架移除</string>
+    <string name="detail_remove_from_library_confirm">从书架移除？</string>
+    <string name="detail_remove_from_library_body">阅读进度和下载内容会保留在此设备上。</string>
+    <string name="msg_detail_removed_from_library">已从书架移除。</string>
+    <string name="common_remove">移除</string>
 </resources>

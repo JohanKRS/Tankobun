@@ -166,8 +166,6 @@
     <string name="settings_theme_pure_black">Negro puro</string>
     <string name="settings_theme_pure_black_desc">Fondo negro en modo oscuro, para pantallas AMOLED</string>
     <string name="settings_theme_corners">Esquinas</string>
-    <string name="settings_dock_position">Posición del dock</string>
-    <string name="settings_dock_animation">Animación del dock</string>
     <string name="settings_system_ui">Interfaz del sistema</string>
     <string name="settings_layout">Diseño</string>
     <string name="settings_show_android_status_bar">Mostrar barra de estado de Android</string>
@@ -354,16 +352,6 @@
     <string name="language_zh_hans">Chino (simplificado)</string>
     <string name="language_zh_hant">Chino (tradicional)</string>
 
-    <string name="dock_left">Izquierda</string>
-    <string name="dock_center">Centro</string>
-    <string name="dock_right">Derecha</string>
-    <string name="dock_animation_bouncy">Rebote</string>
-    <string name="dock_animation_inchworm">Gusanito</string>
-    <string name="dock_animation_rubber_band">Elástico</string>
-    <string name="dock_animation_pop">Pop</string>
-    <string name="dock_animation_comet">Estela de cometa</string>
-    <string name="dock_summary">Dock %1$s</string>
-
     <string name="media_view_cover_only">Solo portada</string>
     <string name="media_view_cover_info">Portada + info</string>
     <string name="media_view_list">Lista</string>
@@ -549,8 +537,6 @@
     <string name="detail_recommendations">Recomendaciones</string>
     <string name="detail_shown_count">%1$d mostrados</string>
     <string name="detail_load_more">Cargar más</string>
-    <string name="quick_open_manga_tracking">Abre un manga para seguirlo aquí.</string>
-    <string name="quick_start_reading_resume">Empieza a leer cualquier manga para crear puntos de reanudación.</string>
 
     <string name="reader_paged">Paginado</string>
     <string name="reader_webtoon">Webtoon</string>
@@ -1047,11 +1033,11 @@
     <string name="app_tour_browse_point_1">Busca por título o refina los resultados con los filtros.</string>
     <string name="app_tour_browse_point_2">Abre un manga para ver los detalles y añadirlo a tu biblioteca.</string>
     <string name="app_tour_profile_title">Revisa tu lectura</string>
-    <string name="app_tour_profile_body">Perfil reúne tu cuenta, actividad de lectura y estadísticas.</string>
+    <string name="app_tour_profile_body">Tú reúne tu cuenta, estadísticas de lectura, descargas y ajustes.</string>
     <string name="app_tour_profile_point_1">Conecta AniList aquí cuando quieras sincronizar tu cuenta.</string>
-    <string name="app_tour_profile_point_2">Consulta totales, actividad reciente y preferencias de seguimiento.</string>
+    <string name="app_tour_profile_point_2">Consulta totales y actividad reciente; los ajustes están justo debajo.</string>
     <string name="app_tour_settings_title">Ajusta Tankobun</string>
-    <string name="app_tour_settings_body">Apariencia, lector, descargas, fuentes y copias viven aquí.</string>
+    <string name="app_tour_settings_body">Abre los ajustes desde Tú: apariencia, lector, descargas, fuentes y copias.</string>
     <string name="app_tour_settings_point_1">Refina el tema y la experiencia de lectura en cualquier momento.</string>
     <string name="app_tour_settings_point_2">Gestiona extensiones de fuentes y conserva una copia portátil de tus ajustes.</string>
     <string name="anilist_merge_title">¿Sincronizar esta biblioteca local?</string>
@@ -1150,6 +1136,14 @@
         <item quantity="other">%1$d fuentes</item>
     </plurals>
     <string name="nav_home">Inicio</string>
+    <string name="you_settings_header">Ajustes</string>
+    <string name="settings_navigation_rail">Barra lateral</string>
+    <string name="settings_navigation_dock">Dock</string>
+    <string name="settings_navigation_style_desc">El dock flota en la parte inferior de la pantalla. La barra lateral queda en el borde izquierdo en horizontal; en vertical se usa el dock.</string>
+    <string name="settings_navigation_style">Navegación en tablet</string>
+    <string name="nav_you_downloads_badge">%1$s, descargas en curso</string>
+    <string name="nav_library_updates_badge">%1$s, %2$d novedades</string>
+    <string name="nav_you">Tú</string>
     <string name="home_trending">Tendencias</string>
     <string name="home_continue_reading">Seguir leyendo</string>
     <string name="home_trending_by_genre">Tendencias por género</string>
@@ -1342,4 +1336,11 @@
     <string name="chapter_groups_preferred">Grupo de traducción preferido</string>
     <string name="chapter_groups_automatic">Automático</string>
     <string name="chapter_groups_missing">No hay capítulos de este grupo en la lista actual</string>
+    <string name="detail_continue_chapter">Continuar · Cap. %1$s</string>
+    <string name="detail_start_chapter">Empezar · Cap. %1$s</string>
+    <string name="detail_remove_from_library">Quitar de la biblioteca</string>
+    <string name="detail_remove_from_library_confirm">¿Quitar de la biblioteca?</string>
+    <string name="detail_remove_from_library_body">El progreso de lectura y las descargas se quedan en este dispositivo.</string>
+    <string name="msg_detail_removed_from_library">Quitado de la biblioteca.</string>
+    <string name="common_remove">Quitar</string>
 </resources>

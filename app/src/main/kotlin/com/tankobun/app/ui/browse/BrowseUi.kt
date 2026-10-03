@@ -379,7 +379,7 @@ internal fun BrowseScreen(
         AnimatedVisibility(
             visible = selectedCount > 0,
             modifier = Modifier
-                .align(state.dockAlignment.browseBatchBarAlignment())
+                .align(Alignment.BottomCenter)
                 .padding(horizontal = 14.dp)
                 .padding(bottom = chromeInsets.bottom + 8.dp),
             enter = fadeIn(),
@@ -733,12 +733,6 @@ private val BrowseHeaderTextGap = 24.dp
 private val BrowseShelfTitleHeight = 62.dp
 private val BrowseShelfItemGap = 12.dp
 
-private fun DockAlignment.browseBatchBarAlignment(): Alignment =
-    when (this) {
-        DockAlignment.LEFT -> Alignment.BottomStart
-        DockAlignment.RIGHT -> Alignment.BottomEnd
-        DockAlignment.CENTER -> Alignment.BottomCenter
-    }
 
 @Composable
 internal fun BrowseMangaShelf(

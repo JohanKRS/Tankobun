@@ -1,5 +1,8 @@
 package com.tankobun.app.ui.settings
 
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import com.tankobun.app.ui.icons.TankobunIcons
 
 import android.Manifest
@@ -353,7 +356,7 @@ internal fun SettingsRouteRow(
 
 @Composable
 internal fun SettingsRouteIcon(route: SettingsRoute, selected: Boolean = false) {
-    val routeColor = if (selected) Color.White else LocalTankobunStyle.current.colors.accent
+    val routeColor = if (selected) LocalTankobunStyle.current.colors.selectedChipContent else LocalTankobunStyle.current.colors.accent
     Surface(
         modifier = Modifier.size(36.dp),
         shape = LocalTankobunStyle.current.themeShapes.indicator,
@@ -391,16 +394,12 @@ internal fun SettingsDetailContent(
                 selected = state.themePreference,
                 onSelect = viewModel::setThemePreference,
             )
-            Text(tankobunString(R.string.settings_dock_position), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            DockAlignmentRow(
-                selected = state.dockAlignment,
-                onSelect = viewModel::setDockAlignment,
-            )
-            Text(tankobunString(R.string.settings_dock_animation), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            DockIndicatorAnimationRow(
-                selected = state.dockIndicatorAnimation,
-                onSelect = viewModel::setDockIndicatorAnimation,
-            )
+            if (LocalConfiguration.current.smallestScreenWidthDp >= 600) {
+                NavigationStyleSetting(
+                    useRail = state.useNavigationRail,
+                    onUseRailChange = viewModel::setUseNavigationRail,
+                )
+            }
             Text(tankobunString(R.string.settings_system_ui), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             SettingsToggleRow(
                 title = tankobunString(R.string.settings_show_android_status_bar),
@@ -1572,34 +1571,39 @@ internal fun LanguagesSettingsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DockAlignmentRow(
-    selected: DockAlignment,
-    onSelect: (DockAlignment) -> Unit,
+internal fun NavigationStyleSetting(
+    useRail: Boolean,
+    onUseRailChange: (Boolean) -> Unit,
 ) {
-    FlowRowCompat {
-        DockAlignment.entries.forEach { alignment ->
-            TankobunChip(
-                selected = selected == alignment,
-                onClick = { onSelect(alignment) },
-                label = { Text(alignment.settingsLabel()) },
-            )
-        }
-    }
-}
-
-@Composable
-internal fun DockIndicatorAnimationRow(
-    selected: DockIndicatorAnimation,
-    onSelect: (DockIndicatorAnimation) -> Unit,
-) {
-    FlowRowCompat {
-        DockIndicatorAnimation.entries.forEach { animation ->
-            TankobunChip(
-                selected = selected == animation,
-                onClick = { onSelect(animation) },
-                label = { Text(animation.settingsLabel()) },
-            )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(tankobunString(R.string.settings_navigation_style), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(
+            tankobunString(R.string.settings_navigation_style_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            listOf(false to R.string.settings_navigation_dock, true to R.string.settings_navigation_rail)
+                .forEachIndexed { index, (rail, label) ->
+                    SegmentedButton(
+                        selected = useRail == rail,
+                        onClick = { onUseRailChange(rail) },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = 2),
+                        icon = {
+                            SegmentedButtonDefaults.Icon(active = useRail == rail) {
+                                Icon(
+                                    if (rail) TankobunIcons.LayoutSidebar else TankobunIcons.LayoutBottombar,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        },
+                    ) {
+                        Text(tankobunString(label), maxLines = 1)
+                    }
+                }
         }
     }
 }

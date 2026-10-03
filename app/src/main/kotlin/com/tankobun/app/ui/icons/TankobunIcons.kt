@@ -92,6 +92,23 @@ internal object TankobunIcons {
     val ViewStream: ImageVector = TablerIcons.LayoutList
     val Whatshot: ImageVector = TablerIcons.Flame
     val Menu: ImageVector = TablerIcons.Menu2
+    val Bell: ImageVector = TablerIcons.Bell
+    val Downloaded: ImageVector = TablerIcons.ArrowDownCircle
+    val ReadMark: ImageVector = TablerIcons.EyeCheck
+    val MarkAllRead: ImageVector = TablerIcons.Checks
+    val MoreVertical: ImageVector = TablerIcons.DotsVertical
+    val LayoutSidebar: ImageVector = TablerIcons.LayoutSidebar
+    val LayoutBottombar: ImageVector = TablerIcons.LayoutBottombar
+    val ReadingLeftToRight: ImageVector = TablerIcons.TextDirectionLtr
+    val ReadingRightToLeft: ImageVector = TablerIcons.TextDirectionRtl
+    val FitWidth: ImageVector = TablerIcons.ArrowsHorizontal
+    val FitPage: ImageVector = TablerIcons.ArrowsMaximize
+    val DoublePage: ImageVector = TablerIcons.LayoutColumns
+    val Contrast: ImageVector = TablerIcons.Contrast
+    val Volume: ImageVector = TablerIcons.Volume
+    val ChapterNext: ImageVector = TablerIcons.PlayerTrackNext
+    val ChapterPrevious: ImageVector = TablerIcons.PlayerTrackPrev
+    val ArrowForward: ImageVector = TablerIcons.ArrowNarrowRight
     val Visibility: ImageVector = TablerIcons.Eye
     val VisibilityOff: ImageVector = TablerIcons.EyeOff
 

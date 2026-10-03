@@ -25,34 +25,6 @@ internal fun AppLanguage.settingsLabel(): String =
     tankobunString(labelRes())
 
 @StringRes
-internal fun DockAlignment.labelRes(): Int =
-    when (this) {
-        DockAlignment.LEFT -> R.string.dock_left
-        DockAlignment.CENTER -> R.string.dock_center
-        DockAlignment.RIGHT -> R.string.dock_right
-    }
-
-@Composable
-@ReadOnlyComposable
-internal fun DockAlignment.settingsLabel(): String =
-    tankobunString(labelRes())
-
-@StringRes
-internal fun DockIndicatorAnimation.labelRes(): Int =
-    when (this) {
-        DockIndicatorAnimation.BOUNCY -> R.string.dock_animation_bouncy
-        DockIndicatorAnimation.INCHWORM -> R.string.dock_animation_inchworm
-        DockIndicatorAnimation.RUBBER_BAND -> R.string.dock_animation_rubber_band
-        DockIndicatorAnimation.POP -> R.string.dock_animation_pop
-        DockIndicatorAnimation.COMET -> R.string.dock_animation_comet
-    }
-
-@Composable
-@ReadOnlyComposable
-internal fun DockIndicatorAnimation.settingsLabel(): String =
-    tankobunString(labelRes())
-
-@StringRes
 internal fun MediaViewMode.labelRes(): Int =
     when (supportedMediaViewMode()) {
         MediaViewMode.COVER_GRID -> R.string.media_view_cover_only

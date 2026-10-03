@@ -3,8 +3,6 @@ package com.tankobun.app.state
 import com.tankobun.app.BackupSchedule
 import com.tankobun.app.BackupContent
 import com.tankobun.app.DEFAULT_MEDIA_COVER_COLUMNS
-import com.tankobun.app.DockAlignment
-import com.tankobun.app.DockIndicatorAnimation
 import com.tankobun.app.LibraryMode
 import com.tankobun.app.MediaViewMode
 import com.tankobun.app.AppLanguage
@@ -56,8 +54,7 @@ data class TankobunUiState(
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val ignoreDisplayCutout: Boolean = true,
     val showAppStatusBar: Boolean = true,
-    val dockAlignment: DockAlignment = DockAlignment.CENTER,
-    val dockIndicatorAnimation: DockIndicatorAnimation = DockIndicatorAnimation.POP,
+    val useNavigationRail: Boolean = false,
     val catalogMode: CatalogMode = CatalogMode.ANILIST,
     val libraryMode: LibraryMode = LibraryMode.LOCAL,
     val onboardingVisible: Boolean = false,

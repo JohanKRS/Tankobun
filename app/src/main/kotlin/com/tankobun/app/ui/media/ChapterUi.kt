@@ -79,11 +79,8 @@ import kotlin.math.abs
 
 @Composable
 internal fun ChapterActionsBar(
-    readingActionChapter: SourceChapter?,
-    hasProgress: Boolean,
     hasChapters: Boolean,
     chapterListStartsAtFirst: Boolean,
-    onOpenChapter: (SourceChapter) -> Unit,
     onLoadChapters: () -> Unit,
     onToggleChapterListOrder: () -> Unit,
     onOpenDownloadActions: () -> Unit,
@@ -91,30 +88,6 @@ internal fun ChapterActionsBar(
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val tight = maxWidth < 380.dp
         val actionHeight = LocalTankobunStyle.current.sizes.iconAction
-        val startReadingButton: @Composable (Modifier) -> Unit = { modifier ->
-            if (readingActionChapter != null) {
-                if (tight) {
-                    TankobunIconActionButton(
-                        icon = TankobunIcons.PlayArrow,
-                        contentDescription = if (hasProgress) {
-                            tankobunString(R.string.chapter_resume_reading)
-                        } else {
-                            tankobunString(R.string.chapter_start_reading)
-                        },
-                        onClick = { onOpenChapter(readingActionChapter) },
-                        modifier = modifier,
-                        filled = true,
-                    )
-                } else {
-                    TankobunActionButton(
-                        label = if (hasProgress) tankobunString(R.string.chapter_resume) else tankobunString(R.string.common_start),
-                        icon = TankobunIcons.PlayArrow,
-                        onClick = { onOpenChapter(readingActionChapter) },
-                        modifier = modifier,
-                    )
-                }
-            }
-        }
         val refreshButton: @Composable (Modifier) -> Unit = { modifier ->
             TankobunIconActionButton(
                 icon = TankobunIcons.Refresh,
@@ -167,11 +140,6 @@ internal fun ChapterActionsBar(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (readingActionChapter != null) {
-                startReadingButton(
-                    if (tight) Modifier.width(actionHeight) else Modifier.widthIn(min = 122.dp),
-                )
-            }
             Spacer(Modifier.weight(1f))
             refreshButton(Modifier)
             orderButton(Modifier.width(actionHeight))
@@ -318,8 +286,12 @@ internal fun ChapterDownloadActionRow(
 internal fun TankobunUiState.primaryReadingActionChapter(): SourceChapter? =
     latestProgress?.let { progress ->
         val exactChapter = sourceChapters.firstOrNull { it.url == progress.chapterUrl }
-        if (exactChapter != null) exactChapter else {
-            readingChapters.chapterNearProgress(progress)
+        val progressChapter = exactChapter ?: readingChapters.chapterNearProgress(progress)
+        // A finished chapter is not where the reader wants to land again: offer the next one.
+        if (progress.completed && progressChapter != null) {
+            readingChapters.nextInReadingOrderAfter(progressChapter) ?: progressChapter
+        } else {
+            progressChapter
         }
     } ?: readingChapters.firstInReadingOrder()
 

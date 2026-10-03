@@ -351,7 +351,7 @@ internal fun LibraryScreen(
         AnimatedVisibility(
             visible = selectedCount > 0,
             modifier = Modifier
-                .align(state.dockAlignment.libraryBatchBarAlignment())
+                .align(Alignment.BottomCenter)
                 .padding(horizontal = 14.dp)
                 .padding(bottom = chromeInsets.bottom + 8.dp),
             enter = fadeIn(),
@@ -1033,12 +1033,6 @@ internal fun LibraryBatchIconAction(
     }
 }
 
-private fun DockAlignment.libraryBatchBarAlignment(): Alignment =
-    when (this) {
-        DockAlignment.LEFT -> Alignment.BottomStart
-        DockAlignment.CENTER -> Alignment.BottomCenter
-        DockAlignment.RIGHT -> Alignment.BottomEnd
-    }
 
 @Composable
 internal fun LibraryShareDialog(

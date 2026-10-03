@@ -63,6 +63,9 @@ import com.tankobun.app.ui.icons.TankobunIcons
 import com.tankobun.app.ui.icons.genreIcon
 import com.tankobun.app.ui.library.LibraryConnectPrompt
 import com.tankobun.app.ui.shell.LocalTankobunChromeInsets
+import com.tankobun.core.model.DownloadState
+import com.tankobun.app.ui.shell.SettingsDetailRoutes
+import com.tankobun.app.ui.shell.SettingsRoute
 import com.tankobun.core.model.AnilistMangaStats
 import com.tankobun.core.model.AnilistStatItem
 import com.tankobun.core.model.MediaStatus
@@ -73,6 +76,7 @@ import kotlin.math.roundToInt
 internal fun ProfileScreen(
     state: TankobunUiState,
     viewModel: MainViewModel,
+    onOpenSettingsRoute: (SettingsRoute) -> Unit = {},
 ) {
     val chromeInsets = LocalTankobunChromeInsets.current
     val context = LocalContext.current
@@ -118,6 +122,12 @@ internal fun ProfileScreen(
                     },
                 )
             }
+        }
+        item {
+            YouDownloadsEntry(state = state, onClick = { onOpenSettingsRoute(SettingsRoute.DOWNLOADS) })
+        }
+        item {
+            YouSettingsSection(state = state, onOpenSettingsRoute = onOpenSettingsRoute)
         }
         item {
             ProfileStatisticsDashboard(
@@ -1135,5 +1145,73 @@ private fun Double.formatProfileDecimal(): String {
         rounded.roundToInt().toString()
     } else {
         String.format(Locale.getDefault(), "%.1f", rounded)
+    }
+}
+
+@Composable
+internal fun YouDownloadsEntry(state: TankobunUiState, onClick: () -> Unit) {
+    val style = LocalTankobunStyle.current
+    val active = state.downloads.count { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = style.themeShapes.panel,
+        color = style.colors.selectedChip,
+        contentColor = style.colors.selectedChipContent,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(TankobunIcons.Download, contentDescription = null, modifier = Modifier.size(24.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    tankobunString(R.string.common_downloads),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    if (active > 0) {
+                        tankobunString(R.string.nav_you_downloads_badge, tankobunString(R.string.common_downloads))
+                    } else {
+                        SettingsRoute.DOWNLOADS.settingsSummary(state)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(TankobunIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+@Composable
+internal fun YouSettingsSection(state: TankobunUiState, onOpenSettingsRoute: (SettingsRoute) -> Unit) {
+    val style = LocalTankobunStyle.current
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            tankobunString(R.string.you_settings_header).uppercase(Locale.getDefault()),
+            style = style.typography.sectionLabel,
+            color = style.colors.accent,
+        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = style.themeShapes.panel,
+            color = style.colors.panel,
+            contentColor = style.colors.panelContent,
+        ) {
+            Column(modifier = Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                SettingsDetailRoutes.forEach { route ->
+                    SettingsRouteRow(
+                        route = route,
+                        summary = route.settingsSummary(state),
+                        selected = false,
+                        onClick = { onOpenSettingsRoute(route) },
+                    )
+                }
+            }
+        }
     }
 }
