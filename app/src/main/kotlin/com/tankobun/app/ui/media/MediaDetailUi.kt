@@ -294,6 +294,7 @@ internal fun MangaDetailScreen(
     LaunchedEffect(media.id) {
         listState.scrollToItem(0)
     }
+    val chapterRowActions = rememberChapterRowActions(viewModel)
     val actions = rememberMediaDetailUiActions(
         viewModel = viewModel,
         onOpenTracking = { chrome.trackingSheetOpen = true },
@@ -371,7 +372,8 @@ internal fun MangaDetailScreen(
                     bottom = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() +
                         MediaDetailBottomDockClearance,
                 ),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                // Chapters sit close together; sections add their own breathing room on top.
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 item {
                     Column(Modifier.padding(horizontal = MediaDetailContentPadding)) {
@@ -392,28 +394,30 @@ internal fun MangaDetailScreen(
 
                 if (state.selectedSourceAwaitingTrust != null) {
                     item(key = "source-review-required") {
-                        Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
+                        Box(Modifier.padding(start = MediaDetailContentPadding, end = MediaDetailContentPadding, top = MediaDetailSectionGap)) {
                             SourceSummarySection(state, viewModel, onSetupSources)
                         }
                     }
                 }
 
-                item {
-                    Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                        state.message?.let {
-                            Text(it, color = MaterialTheme.colorScheme.secondary)
+                state.message?.let { message ->
+                    item(key = "message") {
+                        Box(Modifier.padding(start = MediaDetailContentPadding, end = MediaDetailContentPadding, top = MediaDetailSectionGap)) {
+                            Text(message, color = MaterialTheme.colorScheme.secondary)
                         }
                     }
                 }
 
-                item {
-                    Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                        if (state.selectedSourceAwaitingTrust == null) SourceSummarySection(state, viewModel, onSetupSources)
+                if (state.selectedSourceAwaitingTrust == null) {
+                    item(key = "source-summary") {
+                        Box(Modifier.padding(start = MediaDetailContentPadding, end = MediaDetailContentPadding, top = MediaDetailSectionGap)) {
+                            SourceSummarySection(state, viewModel, onSetupSources)
+                        }
                     }
                 }
 
-                item {
-                    Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
+                item(key = "chapters-header") {
+                    Box(Modifier.padding(start = MediaDetailContentPadding, end = MediaDetailContentPadding, top = MediaDetailSectionGap, bottom = 4.dp)) {
                         var downloadActionsOpen by remember { mutableStateOf(false) }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
@@ -498,12 +502,13 @@ internal fun MangaDetailScreen(
                         Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
                             ChapterRow(
                                 chapter = chapter,
-                                viewModel = viewModel,
+                                actions = chapterRowActions,
                                 read = state.isChapterRead(chapter),
                                 download = state.downloadForChapter(chapter),
                                 selectingForDownload = state.selectingDownloadChapters,
                                 selectedForDownload = chapter.url in state.selectedDownloadChapterUrls,
                                 onToggleDownloadSelection = { viewModel.toggleDownloadChapterSelection(chapter) },
+                                progress = state.chapterProgress[chapter.url],
                             )
                         }
                     }
@@ -518,7 +523,7 @@ internal fun MangaDetailScreen(
                             onLoadMore = viewModel::loadMoreRecommendations,
                             onSelectMedia = onSelectMedia,
                             trackedStatuses = trackedStatuses,
-                            modifier = Modifier.padding(top = 10.dp),
+                            modifier = Modifier.padding(top = MediaDetailSectionGap + 10.dp),
                         )
                     }
                 }
@@ -618,6 +623,7 @@ internal fun mediaDetailAccentColor(): Color = MaterialTheme.colorScheme.primary
 internal fun mediaDetailActionColor(): Color = MaterialTheme.colorScheme.secondary
 
 private val MediaDetailContentPadding = 16.dp
+private val MediaDetailSectionGap = 12.dp
 private val MediaDetailTopOverlayPadding = 92.dp
 private val MediaDetailBottomDockClearance = 112.dp
 private const val CoverZoomScrimAlpha = 0.34f

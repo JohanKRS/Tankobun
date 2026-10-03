@@ -1344,4 +1344,15 @@
     <string name="common_remove">Remove</string>
     <string name="settings_navigation_badges">Navigation badges</string>
     <string name="settings_navigation_badges_desc">Show new chapters and active downloads on the dock icons.</string>
+    <string name="chapter_actions_menu">Chapter actions</string>
+    <string name="chapter_action_mark_read">Mark as read</string>
+    <string name="chapter_action_mark_unread">Mark as unread</string>
+    <string name="chapter_action_mark_previous_read">Mark previous as read</string>
+    <string name="chapter_action_cancel_download">Cancel download</string>
+    <string name="chapter_read_cd">Read</string>
+    <string name="msg_previous_already_read">Previous chapters are already read.</string>
+    <plurals name="msg_marked_previous_read">
+        <item quantity="one">%1$d chapter marked as read.</item>
+        <item quantity="other">%1$d chapters marked as read.</item>
+    </plurals>
 </resources>

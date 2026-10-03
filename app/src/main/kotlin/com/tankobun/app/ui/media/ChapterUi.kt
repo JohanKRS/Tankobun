@@ -27,10 +27,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -46,21 +44,36 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import java.util.Locale
+import java.util.Date
+import java.time.temporal.ChronoUnit
+import java.time.ZoneId
+import java.time.Instant
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import android.view.HapticFeedbackConstants
+import android.icu.util.ULocale
+import android.icu.text.RelativeDateTimeFormatter
+import android.icu.text.DisplayContext
+import android.icu.text.DateFormat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.MainViewModel
 import com.tankobun.app.R
-import com.tankobun.app.TankobunDisplayFontFamily
 import com.tankobun.app.tankobunString
 import com.tankobun.app.logic.chapterNearProgress
 import com.tankobun.app.logic.translationCredit
@@ -308,22 +321,50 @@ internal fun TankobunUiState.downloadForChapter(chapter: SourceChapter): Downloa
         .maxByOrNull { it.updatedAtEpochMillis }
 }
 
+/** Chapter row callbacks, created once per screen so rows stay stable while scrolling. */
+internal class ChapterRowActions(
+    val onOpen: (SourceChapter) -> Unit,
+    val onSetRead: (SourceChapter, Boolean) -> Unit,
+    val onMarkPreviousRead: (SourceChapter) -> Unit,
+    val onDownload: (SourceChapter) -> Unit,
+    val onResumeDownload: (String) -> Unit,
+    val onRetryDownload: (String) -> Unit,
+    val onRemoveDownload: (String) -> Unit,
+)
+
+@Composable
+internal fun rememberChapterRowActions(viewModel: MainViewModel): ChapterRowActions = remember(viewModel) {
+    ChapterRowActions(
+        onOpen = viewModel::openChapter,
+        onSetRead = { chapter, read -> viewModel.setChapterRead(chapter, read) },
+        onMarkPreviousRead = viewModel::markPreviousChaptersRead,
+        onDownload = viewModel::enqueueDownload,
+        onResumeDownload = viewModel::resumeDownload,
+        onRetryDownload = viewModel::retryDownload,
+        onRemoveDownload = viewModel::removeDownload,
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ChapterRow(
     chapter: SourceChapter,
-    viewModel: MainViewModel,
+    actions: ChapterRowActions,
     read: Boolean,
     download: DownloadJob?,
     selectingForDownload: Boolean,
     selectedForDownload: Boolean,
     onToggleDownloadSelection: () -> Unit,
+    progress: ReadingProgress? = null,
 ) {
     key(chapter.url, download?.state, download?.completedPages, download?.pageCount, selectingForDownload, selectedForDownload) {
-        val chapterShape = RoundedCornerShape(8.dp)
+        val chapterShape = LocalTankobunStyle.current.themeShapes.control
         val latestRead by rememberUpdatedState(read)
         var swipeActionRead by remember(chapter.url) { mutableStateOf(read) }
         var dragOffset by remember(chapter.url) { mutableFloatStateOf(0f) }
         var dragging by remember(chapter.url) { mutableStateOf(false) }
+        var menuOpen by remember(chapter.url) { mutableStateOf(false) }
+        val view = LocalView.current
         val swipeActionLabel = if (swipeActionRead) {
             tankobunString(R.string.chapter_mark_unread)
         } else {
@@ -362,57 +403,99 @@ internal fun ChapterRow(
                 swipeActionRead = read
             }
         }
+        val dateLabel = chapterDateLabel(chapter.uploadedAtEpochMillis)
+        val pageLabel = progress
+            ?.takeIf { !read && !it.completed && it.totalPages > 1 }
+            ?.let { tankobunString(R.string.reader_page_fraction, it.pageIndex + 1, it.totalPages) }
+        val meta = listOfNotNull(pageLabel, dateLabel, chapter.translationCredit()).joinToString(" · ")
+        val longClickLabel = tankobunString(R.string.chapter_actions_menu)
+
         @Composable
         fun ChapterCard() {
-            ElevatedCard(
-                shape = chapterShape,
-                onClick = {
-                    if (selectingForDownload) {
-                        onToggleDownloadSelection()
-                    } else {
-                        viewModel.openChapter(chapter)
-                    }
-                },
-            ) {
-                ListItem(
-                    leadingContent = if (selectingForDownload) {
-                        {
+            Box {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(chapterShape)
+                        .combinedClickable(
+                            onClick = {
+                                if (selectingForDownload) {
+                                    onToggleDownloadSelection()
+                                } else {
+                                    actions.onOpen(chapter)
+                                }
+                            },
+                            onLongClickLabel = longClickLabel,
+                            onLongClick = if (selectingForDownload) {
+                                null
+                            } else {
+                                {
+                                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                    menuOpen = true
+                                }
+                            },
+                        ),
+                    shape = chapterShape,
+                    color = mediaDetailPanelColor(),
+                    contentColor = mediaDetailForegroundColor(),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .heightIn(min = 60.dp)
+                            .padding(start = if (selectingForDownload) 4.dp else 14.dp, end = 2.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (selectingForDownload) {
                             Checkbox(
                                 checked = selectedForDownload,
                                 onCheckedChange = { onToggleDownloadSelection() },
                             )
                         }
-                    } else {
-                        null
-                    },
-                    headlineContent = {
-                        Text(
-                            chapter.name,
-                            style = bebasNeueChapterTitleStyle(),
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (read) 0.66f else 1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    supportingContent = chapter.translationCredit()?.let { credit ->
-                        {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
-                                credit,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                chapter.name,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = if (read) FontWeight.Medium else FontWeight.SemiBold,
+                                color = LocalContentColor.current.copy(alpha = if (read) 0.58f else 1f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                            if (meta.isNotEmpty()) {
+                                Text(
+                                    meta,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (read) 0.7f else 1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
-                    },
-                    trailingContent = {
+                        if (read) {
+                            Icon(
+                                TankobunIcons.ReadMark,
+                                contentDescription = tankobunString(R.string.chapter_read_cd),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
                         ChapterDownloadIndicator(
                             download = download,
-                            onDownload = { viewModel.enqueueDownload(chapter) },
-                            onResume = { download?.let { viewModel.resumeDownload(it.id) } },
-                            onRetry = { download?.let { viewModel.retryDownload(it.id) } },
+                            onDownload = { actions.onDownload(chapter) },
+                            onResume = { download?.let { actions.onResumeDownload(it.id) } },
+                            onRetry = { download?.let { actions.onRetryDownload(it.id) } },
                         )
-                    },
+                    }
+                }
+                ChapterActionsMenu(
+                    expanded = menuOpen,
+                    read = read,
+                    download = download,
+                    onDismiss = { menuOpen = false },
+                    onSetRead = { actions.onSetRead(chapter, it) },
+                    onMarkPreviousRead = { actions.onMarkPreviousRead(chapter) },
+                    onDownload = { actions.onDownload(chapter) },
+                    onRemoveDownload = { download?.let { actions.onRemoveDownload(it.id) } },
                 )
             }
         }
@@ -438,7 +521,7 @@ internal fun ChapterRow(
                             dragging = false
                             dragOffset = 0f
                             if (shouldToggle) {
-                                viewModel.setChapterRead(chapter, read = targetRead)
+                                actions.onSetRead(chapter, targetRead)
                             }
                         },
                     ),
@@ -471,14 +554,81 @@ internal fun ChapterRow(
 }
 
 @Composable
-private fun bebasNeueChapterTitleStyle(): TextStyle =
-    MaterialTheme.typography.titleMedium.copy(
-        fontFamily = TankobunDisplayFontFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 22.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.sp,
-    )
+private fun ChapterActionsMenu(
+    expanded: Boolean,
+    read: Boolean,
+    download: DownloadJob?,
+    onDismiss: () -> Unit,
+    onSetRead: (Boolean) -> Unit,
+    onMarkPreviousRead: () -> Unit,
+    onDownload: () -> Unit,
+    onRemoveDownload: () -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.widthIn(min = 220.dp)) {
+        @Composable
+        fun item(label: String, icon: ImageVector, onClick: () -> Unit) {
+            DropdownMenuItem(
+                text = { Text(label) },
+                leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                onClick = {
+                    onDismiss()
+                    onClick()
+                },
+            )
+        }
+        if (read) {
+            item(tankobunString(R.string.chapter_action_mark_unread), TankobunIcons.Replay) { onSetRead(false) }
+        } else {
+            item(tankobunString(R.string.chapter_action_mark_read), TankobunIcons.ReadMark) { onSetRead(true) }
+        }
+        item(tankobunString(R.string.chapter_action_mark_previous_read), TankobunIcons.MarkAllRead, onMarkPreviousRead)
+        when (download?.state) {
+            null -> item(tankobunString(R.string.common_download), TankobunIcons.Download, onDownload)
+            DownloadState.COMPLETE -> item(tankobunString(R.string.downloads_remove_download), TankobunIcons.Delete, onRemoveDownload)
+            DownloadState.FAILED,
+            DownloadState.PAUSED,
+            DownloadState.QUEUED,
+            DownloadState.RUNNING -> item(tankobunString(R.string.chapter_action_cancel_download), TankobunIcons.Close, onRemoveDownload)
+        }
+    }
+}
+
+/** Upload dates: relative for the past week ("2 days ago"), then a short localized date. */
+@Composable
+internal fun chapterDateLabel(epochMillis: Long?): String? {
+    if (epochMillis == null || epochMillis <= 0L) return null
+    val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
+    return remember(epochMillis, locale) {
+        runCatching { formatChapterDate(epochMillis, locale, System.currentTimeMillis()) }.getOrNull()
+    }
+}
+
+internal fun formatChapterDate(
+    epochMillis: Long,
+    locale: Locale,
+    nowMillis: Long,
+    zone: ZoneId = ZoneId.systemDefault(),
+): String {
+    val date = Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate()
+    val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+    val days = ChronoUnit.DAYS.between(date, today)
+    val uLocale = ULocale.forLocale(locale)
+    if (days in 0L..6L) {
+        val formatter = RelativeDateTimeFormatter.getInstance(
+            uLocale,
+            null,
+            RelativeDateTimeFormatter.Style.LONG,
+            DisplayContext.CAPITALIZATION_FOR_BEGINNING_OF_SENTENCE,
+        )
+        return when (days) {
+            0L -> formatter.format(RelativeDateTimeFormatter.Direction.THIS, RelativeDateTimeFormatter.AbsoluteUnit.DAY)
+            1L -> formatter.format(RelativeDateTimeFormatter.Direction.LAST, RelativeDateTimeFormatter.AbsoluteUnit.DAY)
+            else -> formatter.format(days.toDouble(), RelativeDateTimeFormatter.Direction.LAST, RelativeDateTimeFormatter.RelativeUnit.DAYS)
+        }
+    }
+    val skeleton = if (date.year == today.year) "MMMd" else "yMMMd"
+    return DateFormat.getInstanceForSkeleton(skeleton, uLocale).format(Date(epochMillis))
+}
 
 @Composable
 internal fun ChapterSwipeAction(
@@ -523,20 +673,12 @@ internal fun ChapterDownloadIndicator(
             modifier = Modifier.size(actionSize),
             contentAlignment = Alignment.Center,
         ) {
-            Surface(
-                modifier = Modifier.size(40.dp),
-                shape = RoundedCornerShape(999.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-                contentColor = MaterialTheme.colorScheme.primary,
-            ) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(
-                        TankobunIcons.Check,
-                        contentDescription = tankobunString(R.string.common_downloaded),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
+            Icon(
+                TankobunIcons.Downloaded,
+                contentDescription = tankobunString(R.string.common_downloaded),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
         }
 
         download.state == DownloadState.QUEUED || download.state == DownloadState.RUNNING -> {

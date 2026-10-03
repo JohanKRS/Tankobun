@@ -1343,4 +1343,14 @@
     <string name="common_remove">移除</string>
     <string name="settings_navigation_badges">导航提示标记</string>
     <string name="settings_navigation_badges_desc">在底部栏图标上显示新章节和进行中的下载。</string>
+    <string name="chapter_actions_menu">章节操作</string>
+    <string name="chapter_action_mark_read">标记为已读</string>
+    <string name="chapter_action_mark_unread">标记为未读</string>
+    <string name="chapter_action_mark_previous_read">将之前的章节标记为已读</string>
+    <string name="chapter_action_cancel_download">取消下载</string>
+    <string name="chapter_read_cd">已读</string>
+    <string name="msg_previous_already_read">之前的章节都已读。</string>
+    <plurals name="msg_marked_previous_read">
+        <item quantity="other">已将 %1$d 话标记为已读。</item>
+    </plurals>
 </resources>

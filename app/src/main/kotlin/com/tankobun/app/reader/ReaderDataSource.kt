@@ -196,6 +196,42 @@ internal class ReaderDataSource(
         )
     }
 
+    /**
+     * Marks [chapters] (in reading order) as finished. Timestamps step forward one millisecond per
+     * chapter so the last one becomes the latest progress and "Continue" lands right after it.
+     */
+    suspend fun markChaptersRead(
+        mediaId: Int,
+        chapters: List<SourceChapter>,
+        readerMode: ReaderMode,
+        nowMillis: Long,
+    ): ChapterReadUpdate {
+        val progressDao = container.database.progressDao()
+        chapters.forEachIndexed { index, chapter ->
+            val existing = progressDao.progressForChapter(mediaId, chapter.url)?.toModel()
+            if (existing?.completed == true) return@forEachIndexed
+            val totalPages = existing?.totalPages?.takeIf { it > 0 } ?: 1
+            progressDao.upsertProgress(
+                ReadingProgress(
+                    mediaId = mediaId,
+                    chapterUrl = chapter.url,
+                    chapterNumber = chapter.chapterNumber,
+                    pageIndex = totalPages - 1,
+                    pageScrollOffset = 0,
+                    totalPages = totalPages,
+                    readerMode = existing?.readerMode ?: readerMode,
+                    completed = true,
+                    updatedAtEpochMillis = nowMillis - (chapters.lastIndex - index),
+                ).toEntity(),
+            )
+        }
+        return ChapterReadUpdate(
+            latestProgress = progressDao.latestProgress(mediaId)?.toModel(),
+            chapterProgress = progressByChapter(mediaId),
+            syncProgress = chapters.maxOfOrNull { it.chapterNumber.toInt() }?.takeIf { it > 0 },
+        )
+    }
+
     suspend fun saveProgress(
         mediaId: Int,
         chapter: SourceChapter,

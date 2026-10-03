@@ -1,6 +1,8 @@
 package com.tankobun.app
 
 import com.tankobun.app.logic.isChapterRead
+import com.tankobun.app.logic.readingOrder
+import com.tankobun.app.reader.ChapterReadUpdate
 
 import com.tankobun.core.model.supports
 
@@ -5001,42 +5003,86 @@ class MainViewModel(
             )
             val syncProgress = result.syncProgress
                 ?: chapter.takeIf { read }?.let { _state.value.readingChapters.trackerProgressForChapter(it) }
-            if (syncProgress != null) {
-                val trackedProgress = _state.value.trackedProgressFor(media.id)
-                if (syncProgress > trackedProgress) {
-                    syncAniListProgressFromChapter(
-                        media = media,
-                        chapterProgress = syncProgress,
-                        triggeredByManualRead = true,
-                    )
-                }
-            }
-
-            _state.update {
-                if (it.selectedMedia?.id == media.id) {
-                    it.copy(
-                        latestProgress = result.latestProgress,
-                        chapterProgress = result.chapterProgress,
-                        trackingProgress = if (syncProgress != null && syncProgress > (it.trackingProgress.toIntOrNull() ?: 0)) {
-                            syncProgress.toString()
-                        } else {
-                            it.trackingProgress
-                        },
-                        message = if (read) {
-                            string(R.string.msg_marked_read, chapter.name)
-                        } else {
-                            string(R.string.msg_marked_unread, chapter.name)
-                        },
-                    )
+            applyChapterReadUpdate(
+                media = media,
+                result = result,
+                syncProgress = syncProgress,
+                message = if (read) {
+                    string(R.string.msg_marked_read, chapter.name)
                 } else {
-                    it
-                }
+                    string(R.string.msg_marked_unread, chapter.name)
+                },
+            )
+        }
+    }
+
+    /** Marks every unread chapter before [chapter] in reading order as read. */
+    fun markPreviousChaptersRead(chapter: SourceChapter) {
+        val snapshot = _state.value
+        val media = snapshot.selectedMedia ?: return
+        val ordered = snapshot.readingChapters.readingOrder()
+        val index = ordered.indexOfFirst { it.sourceId == chapter.sourceId && it.url == chapter.url }
+        if (index <= 0) return
+        val previous = ordered.subList(0, index).filterNot { snapshot.isChapterRead(it) }
+        if (previous.isEmpty()) {
+            _state.update { it.copy(message = string(R.string.msg_previous_already_read)) }
+            return
+        }
+        viewModelScope.launch {
+            val result = readerDataSource.markChaptersRead(
+                mediaId = media.id,
+                chapters = previous,
+                readerMode = _state.value.readerMode,
+                nowMillis = System.currentTimeMillis(),
+            )
+            val syncProgress = result.syncProgress
+                ?: _state.value.readingChapters.trackerProgressForChapter(previous.last())
+            applyChapterReadUpdate(
+                media = media,
+                result = result,
+                syncProgress = syncProgress,
+                message = quantityString(R.plurals.msg_marked_previous_read, previous.size, previous.size),
+            )
+        }
+    }
+
+    private suspend fun applyChapterReadUpdate(
+        media: AnilistMedia,
+        result: ChapterReadUpdate,
+        syncProgress: Int?,
+        message: String,
+    ) {
+        if (syncProgress != null) {
+            val trackedProgress = _state.value.trackedProgressFor(media.id)
+            if (syncProgress > trackedProgress) {
+                syncAniListProgressFromChapter(
+                    media = media,
+                    chapterProgress = syncProgress,
+                    triggeredByManualRead = true,
+                )
             }
-            loadRecentReadingProgress()
-            refreshLocalReadingActivity()
-            if (_state.value.keepNextTenDownloads) {
-                ensureNextTenDownloads()
+        }
+
+        _state.update {
+            if (it.selectedMedia?.id == media.id) {
+                it.copy(
+                    latestProgress = result.latestProgress,
+                    chapterProgress = result.chapterProgress,
+                    trackingProgress = if (syncProgress != null && syncProgress > (it.trackingProgress.toIntOrNull() ?: 0)) {
+                        syncProgress.toString()
+                    } else {
+                        it.trackingProgress
+                    },
+                    message = message,
+                )
+            } else {
+                it
             }
+        }
+        loadRecentReadingProgress()
+        refreshLocalReadingActivity()
+        if (_state.value.keepNextTenDownloads) {
+            ensureNextTenDownloads()
         }
     }
 

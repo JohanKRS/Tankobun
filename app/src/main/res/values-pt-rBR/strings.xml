@@ -1345,4 +1345,15 @@
     <string name="common_remove">Remover</string>
     <string name="settings_navigation_badges">Indicadores na navegação</string>
     <string name="settings_navigation_badges_desc">Mostra capítulos novos e downloads em andamento nos ícones do dock.</string>
+    <string name="chapter_actions_menu">Ações do capítulo</string>
+    <string name="chapter_action_mark_read">Marcar como lido</string>
+    <string name="chapter_action_mark_unread">Marcar como não lido</string>
+    <string name="chapter_action_mark_previous_read">Marcar anteriores como lidos</string>
+    <string name="chapter_action_cancel_download">Cancelar download</string>
+    <string name="chapter_read_cd">Lido</string>
+    <string name="msg_previous_already_read">Os capítulos anteriores já estão lidos.</string>
+    <plurals name="msg_marked_previous_read">
+        <item quantity="one">%1$d capítulo marcado como lido.</item>
+        <item quantity="other">%1$d capítulos marcados como lidos.</item>
+    </plurals>
 </resources>
