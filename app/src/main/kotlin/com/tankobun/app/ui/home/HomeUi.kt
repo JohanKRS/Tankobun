@@ -1,5 +1,6 @@
 package com.tankobun.app.ui.home
 
+import com.tankobun.app.ui.components.FocusedCoverImage
 import com.tankobun.app.ui.components.TankobunPullToRefresh
 import com.tankobun.app.progressLabel
 import com.tankobun.app.ui.icons.TankobunIcons
@@ -577,13 +578,23 @@ private fun TrendingHero(
                             .heroLeadingEdgeFade(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        AsyncImage(
-                            model = url,
-                            contentDescription = media.title.userPreferred,
-                            contentScale = if (expanded) ContentScale.Crop else ContentScale.FillHeight,
-                            alignment = if (expanded) Alignment.Center else Alignment.CenterEnd,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        if (expanded) {
+                            // Tablets crop covers and portraits hard; follow faces rather than the middle.
+                            FocusedCoverImage(
+                                url = url,
+                                contentDescription = media.title.userPreferred,
+                                focus = url != media.bannerImage,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            AsyncImage(
+                                model = url,
+                                contentDescription = media.title.userPreferred,
+                                contentScale = ContentScale.FillHeight,
+                                alignment = Alignment.CenterEnd,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
             }
@@ -913,10 +924,11 @@ private fun GenreHighlightCard(
                     .width(if (expanded) 148.dp else 170.dp)
                     .fillMaxHeight(),
             ) {
-                AsyncImage(
-                    model = imageCandidates.getOrNull(imageIndex),
+                val imageUrl = imageCandidates.getOrNull(imageIndex)
+                FocusedCoverImage(
+                    url = imageUrl,
                     contentDescription = media.title.userPreferred,
-                    contentScale = ContentScale.Crop,
+                    focus = imageUrl != null && imageUrl != media.bannerImage,
                     modifier = Modifier.fillMaxSize(),
                     onError = {
                         if (imageIndex < imageCandidates.lastIndex) {
