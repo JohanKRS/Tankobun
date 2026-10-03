@@ -234,7 +234,9 @@ internal fun TankobunNavigationDock(
     }
 }
 
-private val DockPadding = 6.dp
+/** Inset between the dock's glass edge and its items; floating bars reuse it so curves stay concentric. */
+internal val DockPadding = 6.dp
+internal val DockItemHeight = GlassDockHeight - DockPadding * 2
 private val DockItemSpacing = 2.dp
 private val DockIconSize = 24.dp
 private val DockLabelGap = 8.dp
@@ -274,7 +276,7 @@ private fun DockDestinationItem(
     )
     Row(
         modifier = Modifier
-            .height(52.dp)
+            .height(DockItemHeight)
             .widthIn(min = DockIconSize + itemPadding * 2)
             .clip(RoundedCornerShape(percent = 50))
             .background(container)

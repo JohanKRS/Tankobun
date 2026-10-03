@@ -52,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -303,9 +304,10 @@ internal fun TankobunActionButton(
     contentColor: Color? = null,
     disabledContainerColor: Color? = null,
     disabledContentColor: Color? = null,
+    shape: Shape? = null,
 ) {
     val style = LocalTankobunStyle.current
-    val shape = style.themeShapes.control
+    val resolvedShape = shape ?: style.themeShapes.control
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -332,7 +334,7 @@ internal fun TankobunActionButton(
             onClick = onClick,
             enabled = enabled,
             modifier = animatedModifier,
-            shape = shape,
+            shape = resolvedShape,
             interactionSource = interactionSource,
             contentPadding = PaddingValues(horizontal = 14.dp),
             colors = ButtonDefaults.buttonColors(
@@ -348,7 +350,7 @@ internal fun TankobunActionButton(
             onClick = onClick,
             enabled = enabled,
             modifier = animatedModifier,
-            shape = shape,
+            shape = resolvedShape,
             interactionSource = interactionSource,
             contentPadding = PaddingValues(horizontal = 14.dp),
             content = { content() },

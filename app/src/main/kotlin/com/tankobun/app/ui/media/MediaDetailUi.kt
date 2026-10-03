@@ -154,6 +154,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
@@ -855,12 +856,14 @@ private fun MediaReadingActionButton(
     action: MediaReadingAction,
     actions: MediaDetailUiActions,
     modifier: Modifier = Modifier,
+    shape: Shape? = null,
 ) {
     TankobunActionButton(
         label = action.label(),
         icon = action.icon(),
         onClick = { actions.perform(action) },
         modifier = modifier,
+        shape = shape,
     )
 }
 
@@ -1008,10 +1011,11 @@ internal fun MediaDetailFloatingActions(
     val control = state.trackingControlState()
     val style = LocalTankobunStyle.current
     Row(
+        // Same inset and item height as the dock it replaces, so the pills sit concentric in the glass.
         modifier = modifier
             .height(GlassDockHeight)
-            .padding(horizontal = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = DockPadding),
+        horizontalArrangement = Arrangement.spacedBy(DockPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val trackingLabel = control.label()
@@ -1020,7 +1024,7 @@ internal fun MediaDetailFloatingActions(
             onClick = { control.onClick(actions) },
             enabled = !control.saving,
             modifier = Modifier
-                .size(style.sizes.iconAction)
+                .size(DockItemHeight)
                 .semantics { role = Role.Button },
             shape = CircleShape,
             color = if (tracked) style.colors.selectedChip else MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -1035,7 +1039,12 @@ internal fun MediaDetailFloatingActions(
             }
         }
         if (readingAction != null) {
-            MediaReadingActionButton(readingAction, actions, Modifier.widthIn(min = 168.dp, max = 260.dp))
+            MediaReadingActionButton(
+                action = readingAction,
+                actions = actions,
+                modifier = Modifier.height(DockItemHeight).widthIn(min = 168.dp, max = 260.dp),
+                shape = CircleShape,
+            )
         }
     }
 }
