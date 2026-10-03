@@ -95,6 +95,7 @@ import com.tankobun.app.logic.CONTINUE_READING_LIMIT
 import com.tankobun.app.logic.isInReadingCategory
 import com.tankobun.app.logic.mobileHeroCharacterImages
 import com.tankobun.app.logic.tabletHeroCharacterImages
+import com.tankobun.app.logic.plainMediaDescription
 import com.tankobun.app.state.RecentReadingProgress
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.app.tankobunString
@@ -1002,15 +1003,7 @@ private fun HomeEmptyPanel(message: String) {
     }
 }
 
-private fun AnilistMedia.cleanDescription(): String? = description
-    ?.replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), " ")
-    ?.replace(Regex("<[^>]*>"), "")
-    ?.replace("&quot;", "\"")
-    ?.replace("&#039;", "'")
-    ?.replace("&amp;", "&")
-    ?.replace(Regex("\\s+"), " ")
-    ?.trim()
-    ?.takeIf { it.isNotBlank() }
+private fun AnilistMedia.cleanDescription(): String? = description.plainMediaDescription().takeIf { it.isNotBlank() }
 
 private data class HomeMediaVisualKey(
     val id: Int,

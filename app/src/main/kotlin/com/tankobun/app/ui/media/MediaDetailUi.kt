@@ -1614,17 +1614,6 @@ internal fun mangaTagPill(tag: String, compact: Boolean, onClick: () -> Unit) {
     TankobunTag(label = tag, compact = compact, onClick = onClick)
 }
 
-internal fun String?.plainMediaDescription(): String =
-    this
-        ?.replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), " ")
-        ?.replace(Regex("<[^>]*>"), "")
-        ?.replace("&quot;", "\"")
-        ?.replace("&#039;", "'")
-        ?.replace("&amp;", "&")
-        ?.replace(Regex("\\s+"), " ")
-        ?.trim()
-        .orEmpty()
-
 @Composable
 internal fun AnilistMedia.publishingYearLabel(compact: Boolean): String {
     val startYear = startDateYear
