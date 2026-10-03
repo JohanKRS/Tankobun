@@ -465,45 +465,7 @@ internal fun SettingsDetailContent(
             subtitle = tankobunString(R.string.settings_reader_subtitle),
             modifier = modifier,
         ) {
-            Text(tankobunString(R.string.settings_reading_mode), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            FlowRowCompat {
-                TankobunChip(
-                    selected = state.readerMode == ReaderMode.PAGED,
-                    onClick = { viewModel.setReaderMode(ReaderMode.PAGED) },
-                    label = { Text(tankobunString(R.string.reader_paged)) },
-                )
-                TankobunChip(
-                    selected = state.readerMode == ReaderMode.WEBTOON,
-                    onClick = { viewModel.setReaderMode(ReaderMode.WEBTOON) },
-                    label = { Text(tankobunString(R.string.reader_webtoon)) },
-                )
-            }
-            Text(tankobunString(R.string.settings_page_gaps), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            FlowRowCompat {
-                (0..3).forEach { level ->
-                    TankobunChip(
-                        selected = state.readerPageGapLevel == level,
-                        onClick = { viewModel.setReaderPageGapLevel(level) },
-                        label = { Text(readerGapLabel(level)) },
-                    )
-                }
-            }
-            Text(tankobunString(R.string.settings_screen_orientation), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            FlowRowCompat {
-                ReaderScreenOrientation.entries.forEach { orientation ->
-                    TankobunChip(
-                        selected = state.readerScreenOrientation == orientation,
-                        onClick = { viewModel.setReaderScreenOrientation(orientation) },
-                        label = { Text(orientation.readerOrientationLabel()) },
-                    )
-                }
-            }
-            SettingsToggleRow(
-                title = tankobunString(R.string.settings_webtoon_chapter_dividers),
-                subtitle = tankobunString(R.string.settings_webtoon_chapter_dividers_desc),
-                checked = state.showWebtoonChapterDividers,
-                onCheckedChange = viewModel::setShowWebtoonChapterDividers,
-            )
+            ReaderSettingsControls(state = state, actions = rememberReaderSettingsActions(viewModel), showAllModes = true)
         }
         SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(state, viewModel, modifier)
         SettingsRoute.CUSTOM_LISTS -> CustomListsSettingsScreen(state, viewModel, modifier)

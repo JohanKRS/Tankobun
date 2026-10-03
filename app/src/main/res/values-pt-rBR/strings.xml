@@ -72,7 +72,6 @@
     <string name="common_update">Atualizar</string>
     <string name="common_view">Visualização</string>
     <string name="common_year">Ano</string>
-    <string name="common_zoom_percent">zoom: %1$d%%</string>
 
     <string name="nav_library">Biblioteca</string>
     <string name="nav_browse">Explorar</string>
@@ -541,12 +540,10 @@
     <string name="reader_paged">Paginado</string>
     <string name="reader_webtoon">Webtoon</string>
     <string name="reader_close">Fechar leitor</string>
-    <string name="reader_progress_format">%1$s / Página %2$d de %3$d</string>
     <string name="reader_previous_chapter">Capítulo anterior</string>
     <string name="reader_previous_page">Página anterior</string>
     <string name="reader_next_chapter">Próximo capítulo</string>
     <string name="reader_next_page">Próxima página</string>
-    <string name="reader_page_number">Página %1$d</string>
     <string name="reader_page_fraction">Página %1$d/%2$d</string>
     <string name="reader_chapter_number">Capítulo %1$s</string>
     <string name="reader_saved_chapter">Capítulo salvo</string>
@@ -1356,4 +1353,28 @@
         <item quantity="one">%1$d capítulo marcado como lido.</item>
         <item quantity="other">%1$d capítulos marcados como lidos.</item>
     </plurals>
+    <string name="reader_settings">Ajustes do leitor</string>
+    <string name="reader_direction">Direção de leitura</string>
+    <string name="reader_direction_ltr">Esquerda para direita</string>
+    <string name="reader_direction_rtl">Direita para esquerda (mangá)</string>
+    <string name="reader_fit">Ajuste da página</string>
+    <string name="reader_fit_width">Largura da tela</string>
+    <string name="reader_fit_screen">Tela inteira</string>
+    <string name="reader_background">Fundo</string>
+    <string name="reader_background_black">Preto</string>
+    <string name="reader_background_gray">Cinza</string>
+    <string name="reader_background_white">Branco</string>
+    <string name="reader_keep_screen_on">Manter tela ligada</string>
+    <string name="reader_keep_screen_on_desc">A tela não apaga enquanto um capítulo está aberto.</string>
+    <string name="reader_volume_keys">Virar páginas com o volume</string>
+    <string name="reader_volume_keys_desc">Volume para baixo avança, volume para cima volta.</string>
+    <string name="reader_chapter_end_page">Página de fim de capítulo</string>
+    <string name="reader_chapter_end_page_desc">No modo paginado, mostra um resumo antes de abrir o próximo capítulo.</string>
+    <string name="reader_chapter_end_title">Fim de %1$s</string>
+    <string name="reader_chapter_end_next">Próximo: %1$s</string>
+    <string name="reader_chapter_end_caught_up">Você está em dia</string>
+    <string name="reader_chapter_end_caught_up_desc">Esta fonte ainda não tem capítulos mais novos.</string>
+    <string name="reader_back_to_details">Voltar aos detalhes</string>
+    <string name="reader_current_chapter">Lendo agora</string>
+    <string name="reader_chapter_list">Lista de capítulos</string>
 </resources>

@@ -124,6 +124,12 @@ internal class AppSettingsBackupDataSource(
             .put("novelReaderPreferences", kotlinx.serialization.json.Json.encodeToString(com.tankobun.core.model.NovelReaderPreferences.serializer(), snapshot.novelReaderPreferences))
             .put("readerPageGapLevel", snapshot.readerPageGapLevel)
             .put("showWebtoonChapterDividers", snapshot.showWebtoonChapterDividers)
+            .put("readerDirection", snapshot.readerPreferences.direction.name)
+            .put("readerFit", snapshot.readerPreferences.fit.name)
+            .put("readerBackground", snapshot.readerPreferences.background.name)
+            .put("readerKeepScreenOn", snapshot.readerPreferences.keepScreenOn)
+            .put("readerVolumeKeys", snapshot.readerPreferences.volumeKeys)
+            .put("readerChapterEndPage", snapshot.readerPreferences.chapterEndPage)
             .put("readerScreenOrientation", snapshot.readerScreenOrientation.name)
             .put("chapterListStartsAtFirst", snapshot.chapterListStartsAtFirst)
             .put("chapterGroupPreferences", kotlinx.serialization.json.Json.encodeToString(snapshot.chapterGroupPreferences))
@@ -258,6 +264,18 @@ internal class AppSettingsBackupDataSource(
         }
         settings.optIntOrNull("readerPageGapLevel")?.let(store::saveReaderPageGapLevel)
         settings.optBooleanOrNull("showWebtoonChapterDividers")?.let(store::saveShowWebtoonChapterDividers)
+        store.readerPreferences().let { current ->
+            store.saveReaderPreferences(
+                current.copy(
+                    direction = settings.enumOrNull<com.tankobun.app.ReaderDirection>("readerDirection") ?: current.direction,
+                    fit = settings.enumOrNull<com.tankobun.app.ReaderFit>("readerFit") ?: current.fit,
+                    background = settings.enumOrNull<com.tankobun.app.ReaderBackground>("readerBackground") ?: current.background,
+                    keepScreenOn = settings.optBooleanOrNull("readerKeepScreenOn") ?: current.keepScreenOn,
+                    volumeKeys = settings.optBooleanOrNull("readerVolumeKeys") ?: current.volumeKeys,
+                    chapterEndPage = settings.optBooleanOrNull("readerChapterEndPage") ?: current.chapterEndPage,
+                ),
+            )
+        }
         settings.enumOrNull<ReaderScreenOrientation>("readerScreenOrientation")?.let(store::saveReaderScreenOrientation)
         (settings.opt("chapterGroupPreferences") as? String)?.let { encoded ->
             runCatching { kotlinx.serialization.json.Json.decodeFromString<Map<String, com.tankobun.core.model.ChapterGroupPreference>>(encoded) }
@@ -325,6 +343,7 @@ internal class AppSettingsBackupDataSource(
             hiddenExtensionRepositories = store.hiddenExtensionRepositories(),
             readerPageGapLevel = store.readerPageGapLevel(),
             showWebtoonChapterDividers = store.showWebtoonChapterDividers(),
+            readerPreferences = store.readerPreferences(),
             readerScreenOrientation = store.readerScreenOrientation(),
             chapterListStartsAtFirst = store.chapterListStartsAtFirst(),
             chapterGroupPreferences = store.chapterGroupPreferences(),

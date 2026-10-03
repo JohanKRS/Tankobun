@@ -342,6 +342,7 @@ class MainViewModel(
             hiddenExtensionRepositories = container.settingsStore.hiddenExtensionRepositories(),
             readerPageGapLevel = container.settingsStore.readerPageGapLevel(),
             showWebtoonChapterDividers = container.settingsStore.showWebtoonChapterDividers(),
+            readerPreferences = container.settingsStore.readerPreferences(),
             readerScreenOrientation = container.settingsStore.readerScreenOrientation(),
             chapterListStartsAtFirst = container.settingsStore.chapterListStartsAtFirst(),
             chapterGroupPreferences = container.settingsStore.chapterGroupPreferences(),
@@ -1700,6 +1701,7 @@ class MainViewModel(
                 hiddenExtensionRepositories = store.hiddenExtensionRepositories(),
                 readerPageGapLevel = store.readerPageGapLevel(),
                 showWebtoonChapterDividers = store.showWebtoonChapterDividers(),
+                readerPreferences = store.readerPreferences(),
                 readerScreenOrientation = store.readerScreenOrientation(),
                 chapterListStartsAtFirst = store.chapterListStartsAtFirst(),
                 chapterGroupPreferences = store.chapterGroupPreferences(),
@@ -2824,6 +2826,13 @@ class MainViewModel(
     fun setShowWebtoonChapterDividers(enabled: Boolean) {
         container.settingsStore.saveShowWebtoonChapterDividers(enabled)
         _state.update { it.copy(showWebtoonChapterDividers = enabled) }
+    }
+
+    fun updateReaderPreferences(transform: (ReaderPreferences) -> ReaderPreferences) {
+        val next = transform(_state.value.readerPreferences)
+        if (next == _state.value.readerPreferences) return
+        container.settingsStore.saveReaderPreferences(next)
+        _state.update { it.copy(readerPreferences = next) }
     }
 
     fun setReaderScreenOrientation(orientation: ReaderScreenOrientation) {
@@ -4704,24 +4713,6 @@ class MainViewModel(
 
     fun persistReaderProgress() {
         saveReaderProgress()
-    }
-
-    fun moveReaderPage(delta: Int) {
-        val snapshot = _state.value
-        val pages = snapshot.readerPages
-        if (pages.isEmpty() || delta == 0) return
-        val targetIndex = snapshot.currentPageIndex + delta
-        if (delta < 0 && targetIndex < 0) {
-            openPreviousChapter()
-            return
-        }
-        if (delta > 0 && targetIndex > pages.lastIndex) {
-            openNextChapter()
-            return
-        }
-        val nextIndex = targetIndex.coerceIn(0, pages.lastIndex)
-        if (nextIndex == snapshot.currentPageIndex) return
-        setReaderPage(nextIndex)
     }
 
     fun setReaderPage(index: Int, pageScrollOffset: Int = 0) {

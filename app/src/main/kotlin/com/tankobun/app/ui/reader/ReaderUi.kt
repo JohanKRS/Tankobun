@@ -125,6 +125,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import kotlin.math.sign
+import com.tankobun.app.logic.readingOrder
+import com.tankobun.app.ReaderFit
+import com.tankobun.app.ReaderBackground
+import com.tankobun.app.ReaderDirection
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.focusable
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -226,6 +251,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
             onRetry = viewModel::retryReaderChapter,
             onClose = viewModel::closeReader,
             ignoreDisplayCutout = ignoreDisplayCutout,
+            background = state.readerPreferences.background,
         )
         return
     }
@@ -234,6 +260,20 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         return
     }
     var controlsVisible by remember { mutableStateOf(false) }
+    val readerPreferences = state.readerPreferences
+    val rightToLeft = readerPreferences.direction == ReaderDirection.RIGHT_TO_LEFT && state.readerMode == ReaderMode.PAGED
+    val fitScreen = readerPreferences.fit == ReaderFit.SCREEN
+    val chapterEndEnabled = readerPreferences.chapterEndPage && state.readerMode == ReaderMode.PAGED
+    var chapterListOpen by remember { mutableStateOf(false) }
+    var settingsOpen by remember { mutableStateOf(false) }
+    var chapterEndVisible by remember(chapter.url) { mutableStateOf(false) }
+    // +1 forward, -1 back, 0 for jumps (scrubber, restores) that should not slide.
+    var pageTurnDirection by remember { mutableIntStateOf(0) }
+    val view = LocalView.current
+    DisposableEffect(view, readerPreferences.keepScreenOn) {
+        view.keepScreenOn = readerPreferences.keepScreenOn
+        onDispose { view.keepScreenOn = false }
+    }
     val transformKey = if (state.readerMode == ReaderMode.WEBTOON) {
         "${state.selectedMedia?.id}:${state.selectedSourceId}:webtoon"
     } else {
@@ -253,12 +293,16 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         ?.readerPageAspectRatio()
     val currentPagedPageAspectRatio = currentPagedPageMetadataAspectRatio ?: loadedPagedPageAspectRatio
     fun pagedFrameHeight(width: Float, height: Float): Float =
-        pagedFitWidthFrameHeight(
-            pageAspectRatio = currentPagedPageAspectRatio,
-            viewportWidth = width,
-            viewportHeight = height,
-            paddingPx = pagedPagePaddingPx,
-        )
+        if (fitScreen) {
+            height
+        } else {
+            pagedFitWidthFrameHeight(
+                pageAspectRatio = currentPagedPageAspectRatio,
+                viewportWidth = width,
+                viewportHeight = height,
+                paddingPx = pagedPagePaddingPx,
+            )
+        }
     val webtoonListState = rememberLazyListState(
         cacheWindow = LazyLayoutCacheWindow(
             ahead = WEBTOON_READER_CACHE_AHEAD_DP.dp,
@@ -300,8 +344,10 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     fun resetZoom() {
         readerMotion.resetZoom(coroutineScope)
     }
-    fun goToReaderPage(index: Int) {
+    fun goToReaderPage(index: Int, direction: Int = 0) {
         val targetIndex = index.coerceIn(0, lastPageIndex)
+        pageTurnDirection = direction
+        chapterEndVisible = false
         scrubberValue = targetIndex.toFloat()
         resetZoom()
         viewModel.setReaderPage(targetIndex)
@@ -319,14 +365,43 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         when {
             delta < 0 && targetIndex < 0 && previousChapter != null -> {
                 resetZoom()
+                pageTurnDirection = -1
                 viewModel.openPreviousChapter()
             }
             delta > 0 && targetIndex > lastPageIndex && nextChapter != null -> {
                 resetZoom()
+                pageTurnDirection = 1
                 viewModel.openNextChapter()
             }
-            else -> goToReaderPage(targetIndex)
+            else -> goToReaderPage(targetIndex, direction = delta.sign)
         }
+    }
+    fun turnPage(delta: Int) {
+        if (delta == 0) return
+        when {
+            chapterEndVisible && delta > 0 -> if (nextChapter != null) {
+                resetZoom()
+                pageTurnDirection = 1
+                viewModel.openNextChapter()
+            }
+            chapterEndVisible -> {
+                pageTurnDirection = -1
+                chapterEndVisible = false
+            }
+            delta > 0 && chapterEndEnabled && state.currentPageIndex >= lastPageIndex -> {
+                resetZoom()
+                pageTurnDirection = 1
+                chapterEndVisible = true
+            }
+            else -> moveReaderPageFromControls(delta)
+        }
+    }
+    // In right-to-left reading the left side of the screen is "forward".
+    fun turnTowardScreenSide(left: Boolean) = turnPage(if (left != rightToLeft) -1 else 1)
+    val latestTurnTowardScreenSide by rememberUpdatedState<(Boolean) -> Unit> { left -> turnTowardScreenSide(left) }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(readerPreferences.volumeKeys) {
+        if (readerPreferences.volumeKeys) runCatching { focusRequester.requestFocus() }
     }
 
     LaunchedEffect(chapter.url, state.currentPageIndex, pageCount, scrubberSeeking) {
@@ -475,12 +550,32 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         }
     }
 
+    CompositionLocalProvider(LocalReaderInk provides readerPreferences.background.ink()) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(readerPreferences.background.color())
             .padding(start = cutoutStartPadding, end = cutoutEndPadding)
-            .pointerInput(transformKey, controlsVisible, readerScale, currentPagedPageAspectRatio, pagedPagePaddingPx) {
+            .focusRequester(focusRequester)
+            .focusable()
+            .onPreviewKeyEvent { event ->
+                if (!readerPreferences.volumeKeys) return@onPreviewKeyEvent false
+                val forward = when (event.key) {
+                    Key.VolumeDown -> true
+                    Key.VolumeUp -> false
+                    else -> return@onPreviewKeyEvent false
+                }
+                if (event.type == KeyEventType.KeyDown) {
+                    if (state.readerMode == ReaderMode.WEBTOON) {
+                        val step = webtoonListState.layoutInfo.viewportSize.height * 0.8f
+                        coroutineScope.launch { webtoonListState.animateScrollBy(if (forward) step else -step) }
+                    } else {
+                        turnPage(if (forward) 1 else -1)
+                    }
+                }
+                true
+            }
+            .pointerInput(transformKey, controlsVisible, readerScale, currentPagedPageAspectRatio, pagedPagePaddingPx, fitScreen) {
                 detectTapGestures(
                     onDoubleTap = { tapOffset ->
                         val nextScale = if (readerScale > 1.05f) 1f else 2.5f
@@ -513,11 +608,11 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                             !controlsVisible &&
                                 readerScale <= 1.05f &&
                                 state.readerMode == ReaderMode.PAGED &&
-                                offset.x < previousZoneEndX -> viewModel.moveReaderPage(-1)
+                                offset.x < previousZoneEndX -> latestTurnTowardScreenSide(true)
                             !controlsVisible &&
                                 readerScale <= 1.05f &&
                                 state.readerMode == ReaderMode.PAGED &&
-                                offset.x > nextZoneStartX -> viewModel.moveReaderPage(1)
+                                offset.x > nextZoneStartX -> latestTurnTowardScreenSide(false)
                         }
                     },
                 )
@@ -600,7 +695,10 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         if (showChapterDivider) {
-                            WebtoonChapterDivider(chapterName = item.chapter.name)
+                            WebtoonChapterTransitionCard(
+                                previousChapterName = previousItem.chapter.name,
+                                nextChapterName = item.chapter.name,
+                            )
                         }
                         ReaderPageImage(
                             model = { retryAttempt -> readerImageRequest(state, item.chapter, item.page, retryAttempt) },
@@ -633,11 +731,17 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 }
             }
         } else {
-            val page = state.readerPages[state.currentPageIndex]
+            val pagedTarget = ReaderPagedTarget(
+                chapter = chapter,
+                pageIndex = state.currentPageIndex.coerceIn(0, lastPageIndex),
+                page = state.readerPages.getOrNull(state.currentPageIndex),
+                chapterEnd = chapterEndVisible,
+                nextChapter = nextChapter.takeIf { chapterEndVisible },
+            )
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(transformKey, currentPagedPageAspectRatio, pagedPagePaddingPx) {
+                    .pointerInput(transformKey, currentPagedPageAspectRatio, pagedPagePaddingPx, fitScreen) {
                         detectReaderTransformGestures(
                             scaleProvider = { readerMotion.scale },
                             panAxis = ReaderPanAxis.BOTH,
@@ -670,7 +774,8 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                     abs(velocity.x) > abs(velocity.y) * PAGED_READER_SWIPE_AXIS_RATIO
                                 if (horizontalDrag || horizontalFling) {
                                     val directionSignal = if (horizontalFling) velocity.x else drag.x
-                                    moveReaderPageFromControls(if (directionSignal < 0f) 1 else -1)
+                                    // A finger moving right reveals what sits on the left.
+                                    latestTurnTowardScreenSide(directionSignal > 0f)
                                 }
                             },
                         ) { centroid, pan, zoom ->
@@ -692,290 +797,183 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                BoxWithConstraints(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    val pageFrameHeight = pagedFitWidthFrameHeight(
-                        pageAspectRatio = currentPagedPageAspectRatio,
-                        viewportWidth = maxWidth,
-                        viewportHeight = maxHeight,
-                        padding = pagedPagePadding,
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .requiredHeight(pageFrameHeight)
-                            .graphicsLayer {
-                                scaleX = readerScale
-                                scaleY = readerScale
-                                translationX = readerOffset.x
-                                translationY = readerOffset.y
-                            },
-                    ) {
-                        ReaderPageImage(
-                            model = { retryAttempt -> readerImageRequest(state, chapter, page, retryAttempt) },
-                            contentDescription = chapter.name,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(pagedPagePadding),
-                            contentScale = ContentScale.FillWidth,
-                            fillViewportWhileLoading = currentPagedPageAspectRatio == null,
-                            onImageAspectRatio = { aspectRatio ->
-                                if (currentPagedPageMetadataAspectRatio == null) {
-                                    loadedPagedPageAspectRatio = aspectRatio
-                                }
-                            },
+                AnimatedContent(
+                    targetState = pagedTarget,
+                    transitionSpec = {
+                        val direction = pageTurnDirection
+                        if (direction == 0) {
+                            fadeIn(tween(ReaderPageFadeMillis)).togetherWith(fadeOut(tween(ReaderPageFadeMillis)))
+                        } else {
+                            // Forward slides in from the reading side: right in LTR, left in RTL.
+                            val sign = if (rightToLeft) -direction else direction
+                            val spec = tween<IntOffset>(ReaderPageTurnMillis, easing = FastOutSlowInEasing)
+                            slideInHorizontally(spec) { width -> sign * width }
+                                .togetherWith(
+                                    slideOutHorizontally(spec) { width -> -sign * width / 4 } +
+                                        fadeOut(tween(ReaderPageTurnMillis)),
+                                )
+                        }
+                    },
+                    label = "Reader page turn",
+                ) { target ->
+                    val page = target.page
+                    when {
+                        target.chapterEnd -> ReaderChapterEndPage(
+                            chapter = target.chapter,
+                            nextChapter = target.nextChapter,
+                            onNextChapter = { turnPage(1) },
+                            onOpenChapters = { chapterListOpen = true },
+                            onClose = viewModel::closeReader,
                         )
+                        page != null -> {
+                            val isCurrent = target == pagedTarget
+                            val metadataAspectRatio = page.readerPageAspectRatio()
+                            val aspectRatio = metadataAspectRatio ?: loadedPagedPageAspectRatio.takeIf { isCurrent }
+                            BoxWithConstraints(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                val frameModifier = if (fitScreen) {
+                                    Modifier.fillMaxSize()
+                                } else {
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .requiredHeight(
+                                            pagedFitWidthFrameHeight(
+                                                pageAspectRatio = aspectRatio,
+                                                viewportWidth = maxWidth,
+                                                viewportHeight = maxHeight,
+                                                padding = pagedPagePadding,
+                                            ),
+                                        )
+                                }
+                                Box(
+                                    modifier = frameModifier.graphicsLayer {
+                                        if (isCurrent) {
+                                            scaleX = readerScale
+                                            scaleY = readerScale
+                                            translationX = readerOffset.x
+                                            translationY = readerOffset.y
+                                        }
+                                    },
+                                ) {
+                                    ReaderPageImage(
+                                        model = { retryAttempt -> readerImageRequest(state, target.chapter, page, retryAttempt) },
+                                        contentDescription = target.chapter.name,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(pagedPagePadding),
+                                        contentScale = if (fitScreen) ContentScale.Fit else ContentScale.FillWidth,
+                                        fillViewportWhileLoading = fitScreen || aspectRatio == null,
+                                        onImageAspectRatio = { loaded ->
+                                            if (isCurrent && metadataAspectRatio == null) {
+                                                loadedPagedPageAspectRatio = loaded
+                                            }
+                                        },
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
 
-        if (controlsVisible) {
-            Column(
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = fadeIn(tween(ReaderChromeMillis)) + slideInVertically(tween(ReaderChromeMillis)) { -it / 2 },
+            exit = fadeOut(tween(ReaderChromeMillis)) + slideOutVertically(tween(ReaderChromeMillis)) { -it / 2 },
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            ReaderTopBar(
+                chapterName = chapter.name,
+                mediaTitle = state.selectedMedia?.title?.userPreferred,
+                onClose = viewModel::closeReader,
+                onOpenChapters = { chapterListOpen = true },
+                onOpenSettings = { settingsOpen = true },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .readerSafeDrawingPadding(ignoreDisplayCutout = ignoreDisplayCutout),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
-                    color = LocalTankobunTokens.current.readerOverlay,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(start = 4.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconButton(onClick = viewModel::closeReader) {
-                            Icon(
-                                TankobunIcons.ArrowBack,
-                                contentDescription = tankobunString(R.string.reader_close),
-                                tint = Color.White,
-                            )
-                        }
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            Text(
-                                chapter.name,
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                tankobunString(
-                                    R.string.reader_progress_format,
-                                    state.readerMode.readerModeLabel(),
-                                    displayedPageIndex + 1,
-                                    pageCount,
-                                ),
-                                color = Color.White.copy(alpha = 0.74f),
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                    .readerSafeDrawingPadding(ignoreDisplayCutout = ignoreDisplayCutout)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = fadeIn(tween(ReaderChromeMillis)) + slideInVertically(tween(ReaderChromeMillis)) { it / 2 },
+            exit = fadeOut(tween(ReaderChromeMillis)) + slideOutVertically(tween(ReaderChromeMillis)) { it / 2 },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            ReaderBottomBar(
+                pageIndex = displayedPageIndex,
+                pageCount = pageCount,
+                rightToLeft = rightToLeft,
+                hasPreviousChapter = previousChapter != null,
+                hasNextChapter = nextChapter != null,
+                zoomed = readerScale > 1.05f,
+                scrubValue = scrubberValue,
+                onScrub = {
+                    val nextValue = it.coerceIn(0f, lastPageIndex.toFloat())
+                    val nextIndex = nextValue.roundToInt().coerceIn(0, lastPageIndex)
+                    scrubberSeeking = true
+                    scrubberValue = nextValue
+                    pageTurnDirection = 0
+                    chapterEndVisible = false
+                    if (nextIndex != state.currentPageIndex) {
+                        resetZoom()
+                        viewModel.setReaderPage(nextIndex)
+                        if (state.readerMode == ReaderMode.WEBTOON) {
+                            coroutineScope.launch {
+                                webtoonListState.scrollToItem(currentWebtoonStartIndex + nextIndex)
+                            }
                         }
                     }
-                }
-                Spacer(Modifier.weight(1f))
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    shape = RoundedCornerShape(LocalTankobunStyle.current.radii.panel),
-                    color = LocalTankobunTokens.current.readerOverlay,
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            IconButton(
-                                enabled = canGoBack,
-                                onClick = { moveReaderPageFromControls(-1) },
-                            ) {
-                                Icon(
-                                    TankobunIcons.SkipPrevious,
-                                    contentDescription = if (state.currentPageIndex <= 0 && previousChapter != null) {
-                                        tankobunString(R.string.reader_previous_chapter)
-                                    } else {
-                                        tankobunString(R.string.reader_previous_page)
-                                    },
-                                    tint = Color.White.copy(alpha = if (canGoBack) 1f else 0.34f),
-                                )
-                            }
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(2.dp),
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        tankobunString(R.string.reader_page_number, displayedPageIndex + 1),
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.labelLarge,
-                                    )
-                                    Text(
-                                        tankobunQuantityString(R.plurals.page_count, pageCount, pageCount),
-                                        color = Color.White.copy(alpha = 0.68f),
-                                        style = MaterialTheme.typography.labelMedium,
-                                    )
-                                }
-                                if (pageCount > 1) {
-                                    Slider(
-                                        value = scrubberValue.coerceIn(0f, lastPageIndex.toFloat()),
-                                        onValueChange = {
-                                            val nextValue = it.coerceIn(0f, lastPageIndex.toFloat())
-                                            val nextIndex = nextValue.roundToInt().coerceIn(0, lastPageIndex)
-                                            scrubberSeeking = true
-                                            scrubberValue = nextValue
-                                            if (nextIndex != state.currentPageIndex) {
-                                                resetZoom()
-                                                viewModel.setReaderPage(nextIndex)
-                                                if (state.readerMode == ReaderMode.WEBTOON) {
-                                                    coroutineScope.launch {
-                                                        webtoonListState.scrollToItem(currentWebtoonStartIndex + nextIndex)
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        onValueChangeFinished = {
-                                            val targetIndex = scrubberValue.roundToInt().coerceIn(0, lastPageIndex)
-                                            scrubberSeeking = false
-                                            goToReaderPage(targetIndex)
-                                        },
-                                        valueRange = 0f..lastPageIndex.toFloat(),
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                } else {
-                                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                                }
-                            }
-                            IconButton(
-                                enabled = canGoForward,
-                                onClick = { moveReaderPageFromControls(1) },
-                            ) {
-                                Icon(
-                                    TankobunIcons.SkipNext,
-                                    contentDescription = if (state.currentPageIndex >= lastPageIndex && nextChapter != null) {
-                                        tankobunString(R.string.reader_next_chapter)
-                                    } else {
-                                        tankobunString(R.string.reader_next_page)
-                                    },
-                                    tint = Color.White.copy(alpha = if (canGoForward) 1f else 0.34f),
-                                )
-                            }
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                val pagedReaderLabel = ReaderMode.PAGED.readerModeLabel()
-                                val webtoonReaderLabel = ReaderMode.WEBTOON.readerModeLabel()
-                                val readerGapChipLabel = readerGapLabel(state.readerPageGapLevel)
-                                val readerOrientationChipLabel = state.readerScreenOrientation.readerOrientationLabel()
-                                val chapterDividersChipLabel =
-                                    tankobunString(R.string.settings_webtoon_chapter_dividers_short)
-                                val resetZoomLabel = tankobunString(R.string.reader_reset_zoom)
+                },
+                onScrubFinished = {
+                    val targetIndex = scrubberValue.roundToInt().coerceIn(0, lastPageIndex)
+                    scrubberSeeking = false
+                    goToReaderPage(targetIndex)
+                },
+                onPreviousChapter = {
+                    resetZoom()
+                    pageTurnDirection = -1
+                    viewModel.openPreviousChapter()
+                },
+                onNextChapter = {
+                    resetZoom()
+                    pageTurnDirection = 1
+                    viewModel.openNextChapter()
+                },
+                onResetZoom = ::resetZoom,
+                modifier = Modifier
+                    .readerSafeDrawingPadding(ignoreDisplayCutout = ignoreDisplayCutout)
+                    .padding(12.dp),
+            )
+        }
 
-                                TankobunChip(
-                                    selected = state.readerMode == ReaderMode.PAGED,
-                                    onClick = {
-                                        resetZoom()
-                                        viewModel.setReaderMode(ReaderMode.PAGED)
-                                    },
-                                    label = { Text(pagedReaderLabel) },
-                                    leadingIcon = {
-                                        ReaderChipIcon(TankobunIcons.MenuBook, pagedReaderLabel)
-                                    },
-                                )
-                                TankobunChip(
-                                    selected = state.readerMode == ReaderMode.WEBTOON,
-                                    onClick = {
-                                        resetZoom()
-                                        viewModel.setReaderMode(ReaderMode.WEBTOON)
-                                    },
-                                    label = { Text(webtoonReaderLabel) },
-                                    leadingIcon = {
-                                        ReaderChipIcon(TankobunIcons.ViewStream, webtoonReaderLabel)
-                                    },
-                                )
-                                TankobunChip(
-                                    selected = state.readerPageGapLevel > 0,
-                                    onClick = { viewModel.setReaderPageGapLevel((state.readerPageGapLevel + 1) % 4) },
-                                    label = { Text(readerGapChipLabel) },
-                                    leadingIcon = {
-                                        ReaderChipIcon(TankobunIcons.FormatLineSpacing, readerGapChipLabel)
-                                    },
-                                )
-                                TankobunChip(
-                                    selected = state.readerScreenOrientation != ReaderScreenOrientation.SYSTEM,
-                                    onClick = {
-                                        viewModel.setReaderScreenOrientation(
-                                            state.readerScreenOrientation.nextReaderOrientation(),
-                                        )
-                                    },
-                                    label = { Text(readerOrientationChipLabel) },
-                                    leadingIcon = {
-                                        ReaderChipIcon(
-                                            state.readerScreenOrientation.readerOrientationIcon(),
-                                            readerOrientationChipLabel,
-                                        )
-                                    },
-                                )
-                                if (state.readerMode == ReaderMode.WEBTOON) {
-                                    TankobunChip(
-                                        selected = state.showWebtoonChapterDividers,
-                                        onClick = {
-                                            viewModel.setShowWebtoonChapterDividers(!state.showWebtoonChapterDividers)
-                                        },
-                                        label = { Text(chapterDividersChipLabel) },
-                                        leadingIcon = {
-                                            ReaderChipIcon(TankobunIcons.Splitscreen, chapterDividersChipLabel)
-                                        },
-                                    )
-                                }
-                                TankobunChip(
-                                    selected = readerScale > 1.05f,
-                                    onClick = { resetZoom() },
-                                    label = { Text(resetZoomLabel) },
-                                    leadingIcon = {
-                                        ReaderChipIcon(TankobunIcons.Replay, resetZoomLabel)
-                                    },
-                                )
-                            }
-                            Text(
-                                tankobunString(R.string.common_zoom_percent, zoomPercent),
-                                color = Color.White.copy(alpha = 0.78f),
-                                style = MaterialTheme.typography.labelLarge,
-                                maxLines = 1,
-                            )
-                        }
-                    }
-                }
-            }
+        if (chapterListOpen) {
+            ReaderChapterListSheet(
+                state = state,
+                chapters = state.readingChapters.readingOrder(),
+                currentChapter = chapter,
+                onOpenChapter = { target ->
+                    chapterListOpen = false
+                    resetZoom()
+                    pageTurnDirection = 0
+                    viewModel.openChapter(target)
+                },
+                onDismiss = { chapterListOpen = false },
+            )
+        }
+
+        if (settingsOpen) {
+            ReaderSettingsSheet(
+                state = state,
+                viewModel = viewModel,
+                onReaderModeChange = { mode ->
+                    resetZoom()
+                    viewModel.setReaderMode(mode)
+                },
+                onDismiss = { settingsOpen = false },
+            )
         }
 
         if (state.readerTutorialVisible) {
@@ -984,16 +982,32 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 readerMode = state.readerMode,
                 ignoreDisplayCutout = ignoreDisplayCutout,
                 onDismiss = viewModel::dismissReaderTutorial,
+                rightToLeft = rightToLeft,
             )
         }
     }
+    }
 }
+
+/** What the paged reader shows; carrying the page itself keeps the outgoing page intact mid-turn. */
+private data class ReaderPagedTarget(
+    val chapter: SourceChapter,
+    val pageIndex: Int,
+    val page: ReaderPage?,
+    val chapterEnd: Boolean,
+    val nextChapter: SourceChapter?,
+)
+
+private const val ReaderPageTurnMillis = 260
+private const val ReaderPageFadeMillis = 140
+private const val ReaderChromeMillis = 180
 
 @Composable
 internal fun ReaderTutorialOverlay(
     readerMode: ReaderMode,
     ignoreDisplayCutout: Boolean,
     onDismiss: () -> Unit,
+    rightToLeft: Boolean = false,
 ) {
     Box(
         modifier = Modifier
@@ -1017,7 +1031,7 @@ internal fun ReaderTutorialOverlay(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ReaderTapZoneHint(
-                label = tankobunString(R.string.common_previous),
+                label = tankobunString(if (rightToLeft) R.string.common_next else R.string.common_previous),
                 detail = tankobunString(R.string.reader_tutorial_previous),
                 modifier = Modifier.weight(ReaderSideTapZoneWeight),
             )
@@ -1027,7 +1041,7 @@ internal fun ReaderTutorialOverlay(
                 modifier = Modifier.weight(ReaderCenterTapZoneWeight),
             )
             ReaderTapZoneHint(
-                label = tankobunString(R.string.common_next),
+                label = tankobunString(if (rightToLeft) R.string.common_previous else R.string.common_next),
                 detail = tankobunString(R.string.reader_tutorial_previous),
                 modifier = Modifier.weight(ReaderSideTapZoneWeight),
             )
@@ -1118,11 +1132,13 @@ internal fun ReaderLoadingScreen(
     onRetry: () -> Unit,
     onClose: () -> Unit,
     ignoreDisplayCutout: Boolean,
+    background: ReaderBackground = ReaderBackground.BLACK,
 ) {
+    val ink = background.ink()
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(background.color())
             .readerSafeDrawingPadding(ignoreDisplayCutout = ignoreDisplayCutout),
     ) {
         IconButton(
@@ -1134,7 +1150,7 @@ internal fun ReaderLoadingScreen(
             Icon(
                 TankobunIcons.ArrowBack,
                 contentDescription = tankobunString(R.string.reader_close),
-                tint = Color.White,
+                tint = ink,
             )
         }
         Column(
@@ -1145,10 +1161,10 @@ internal fun ReaderLoadingScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             if (error == null) {
-                CircularProgressIndicator(color = Color.White.copy(alpha = 0.86f))
+                CircularProgressIndicator(color = ink.copy(alpha = 0.86f))
                 Text(
                     tankobunString(R.string.reader_loading_chapter, chapter.name),
-                    color = Color.White.copy(alpha = 0.72f),
+                    color = ink.copy(alpha = 0.72f),
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -1157,14 +1173,14 @@ internal fun ReaderLoadingScreen(
             } else {
                 Text(
                     error.title,
-                    color = Color.White,
+                    color = ink,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                 )
                 Text(
                     error.message,
-                    color = Color.White.copy(alpha = 0.78f),
+                    color = ink.copy(alpha = 0.78f),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                 )
@@ -1290,25 +1306,25 @@ internal fun ReaderImagePlaceholder(
             CircularProgressIndicator(
                 modifier = Modifier.size(28.dp),
                 strokeWidth = 2.dp,
-                color = Color.White.copy(alpha = 0.86f),
+                color = LocalReaderInk.current.copy(alpha = 0.86f),
             )
         } else {
             Text(
                 label,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.72f),
+                color = LocalReaderInk.current.copy(alpha = 0.72f),
             )
             if (onRetry != null) {
                 TextButton(onClick = onRetry) {
                     Icon(
                         TankobunIcons.Replay,
                         contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.88f),
+                        tint = LocalReaderInk.current.copy(alpha = 0.88f),
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         tankobunString(R.string.common_retry),
-                        color = Color.White.copy(alpha = 0.88f),
+                        color = LocalReaderInk.current.copy(alpha = 0.88f),
                     )
                 }
             }
@@ -1332,7 +1348,7 @@ internal fun WebtoonPreviousChapterHeader(
         Text(
             previousChapter.name,
             style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.72f),
+            color = LocalReaderInk.current.copy(alpha = 0.72f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -1340,12 +1356,12 @@ internal fun WebtoonPreviousChapterHeader(
             Icon(
                 TankobunIcons.PlayArrow,
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.88f),
+                tint = LocalReaderInk.current.copy(alpha = 0.88f),
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 tankobunString(R.string.reader_open_previous_chapter),
-                color = Color.White.copy(alpha = 0.88f),
+                color = LocalReaderInk.current.copy(alpha = 0.88f),
             )
         }
     }
@@ -1367,12 +1383,12 @@ internal fun WebtoonNextChapterFooter(
         CircularProgressIndicator(
             modifier = Modifier.size(22.dp),
             strokeWidth = 2.dp,
-            color = Color.White.copy(alpha = 0.86f),
+            color = LocalReaderInk.current.copy(alpha = 0.86f),
         )
         Text(
             tankobunString(R.string.reader_loading_chapter, nextChapter.name),
             style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.72f),
+            color = LocalReaderInk.current.copy(alpha = 0.72f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -1380,46 +1396,14 @@ internal fun WebtoonNextChapterFooter(
             Icon(
                 TankobunIcons.PlayArrow,
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.88f),
+                tint = LocalReaderInk.current.copy(alpha = 0.88f),
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 tankobunString(R.string.reader_open_now),
-                color = Color.White.copy(alpha = 0.88f),
+                color = LocalReaderInk.current.copy(alpha = 0.88f),
             )
         }
-    }
-}
-
-@Composable
-internal fun WebtoonChapterDivider(chapterName: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 22.dp, vertical = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(1.dp)
-                .background(Color.White.copy(alpha = 0.18f)),
-        )
-        Text(
-            chapterName,
-            modifier = Modifier.widthIn(max = 260.dp),
-            color = Color.White.copy(alpha = 0.58f),
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(1.dp)
-                .background(Color.White.copy(alpha = 0.18f)),
-        )
     }
 }
 
@@ -1429,32 +1413,6 @@ internal fun readerPageGap(level: Int): Dp = when (level) {
     3 -> 24.dp
     else -> 0.dp
 }
-
-private fun ReaderScreenOrientation.nextReaderOrientation(): ReaderScreenOrientation =
-    when (this) {
-        ReaderScreenOrientation.SYSTEM -> ReaderScreenOrientation.PORTRAIT
-        ReaderScreenOrientation.PORTRAIT -> ReaderScreenOrientation.LANDSCAPE
-        ReaderScreenOrientation.LANDSCAPE -> ReaderScreenOrientation.SYSTEM
-    }
-
-@Composable
-private fun ReaderChipIcon(
-    icon: ImageVector,
-    contentDescription: String,
-) {
-    Icon(
-        icon,
-        contentDescription = contentDescription,
-        modifier = Modifier.size(16.dp),
-    )
-}
-
-private fun ReaderScreenOrientation.readerOrientationIcon(): ImageVector =
-    when (this) {
-        ReaderScreenOrientation.SYSTEM -> TankobunIcons.ScreenRotation
-        ReaderScreenOrientation.PORTRAIT -> TankobunIcons.StayCurrentPortrait
-        ReaderScreenOrientation.LANDSCAPE -> TankobunIcons.StayCurrentLandscape
-    }
 
 @Composable
 private fun Modifier.readerSafeDrawingPadding(ignoreDisplayCutout: Boolean): Modifier {

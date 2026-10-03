@@ -268,6 +268,32 @@ class SettingsStore(context: Context) {
         preferences.edit().putBoolean(KEY_READER_WEBTOON_CHAPTER_DIVIDERS, enabled).apply()
     }
 
+    fun readerPreferences(): ReaderPreferences = ReaderPreferences(
+        direction = preferences.getString(KEY_READER_DIRECTION, null)
+            ?.let { stored -> runCatching { ReaderDirection.valueOf(stored) }.getOrNull() }
+            ?: ReaderDirection.LEFT_TO_RIGHT,
+        fit = preferences.getString(KEY_READER_FIT, null)
+            ?.let { stored -> runCatching { ReaderFit.valueOf(stored) }.getOrNull() }
+            ?: ReaderFit.WIDTH,
+        background = preferences.getString(KEY_READER_BACKGROUND, null)
+            ?.let { stored -> runCatching { ReaderBackground.valueOf(stored) }.getOrNull() }
+            ?: ReaderBackground.BLACK,
+        keepScreenOn = preferences.getBoolean(KEY_READER_KEEP_SCREEN_ON, true),
+        volumeKeys = preferences.getBoolean(KEY_READER_VOLUME_KEYS, false),
+        chapterEndPage = preferences.getBoolean(KEY_READER_CHAPTER_END_PAGE, true),
+    )
+
+    fun saveReaderPreferences(value: ReaderPreferences) {
+        preferences.edit()
+            .putString(KEY_READER_DIRECTION, value.direction.name)
+            .putString(KEY_READER_FIT, value.fit.name)
+            .putString(KEY_READER_BACKGROUND, value.background.name)
+            .putBoolean(KEY_READER_KEEP_SCREEN_ON, value.keepScreenOn)
+            .putBoolean(KEY_READER_VOLUME_KEYS, value.volumeKeys)
+            .putBoolean(KEY_READER_CHAPTER_END_PAGE, value.chapterEndPage)
+            .apply()
+    }
+
     fun readerScreenOrientation(): ReaderScreenOrientation =
         preferences.getString(KEY_READER_SCREEN_ORIENTATION, null)
             ?.let { stored -> runCatching { ReaderScreenOrientation.valueOf(stored) }.getOrNull() }
@@ -743,6 +769,12 @@ class SettingsStore(context: Context) {
         const val KEY_READER_PAGE_GAP_LEVEL = "reader.page.gap.level"
         const val KEY_READER_WEBTOON_CHAPTER_DIVIDERS = "reader.webtoon.chapter.dividers"
         const val KEY_READER_SCREEN_ORIENTATION = "reader.screen.orientation"
+        const val KEY_READER_DIRECTION = "reader.direction"
+        const val KEY_READER_FIT = "reader.fit"
+        const val KEY_READER_BACKGROUND = "reader.background"
+        const val KEY_READER_KEEP_SCREEN_ON = "reader.keep.screen.on"
+        const val KEY_READER_VOLUME_KEYS = "reader.volume.keys"
+        const val KEY_READER_CHAPTER_END_PAGE = "reader.chapter.end.page"
         const val KEY_CHAPTER_LIST_STARTS_AT_FIRST = "chapters.list.starts.at.first"
         const val KEY_KEEP_NEXT_TEN_DOWNLOADS = "downloads.keep.next.ten"
         const val KEY_NEW_CHAPTER_CHECKS_ENABLED = "library.new.chapter.checks.enabled"
@@ -836,6 +868,33 @@ enum class MediaViewMode {
     JUSTIFIED,
     LIST,
 }
+
+/** Paged reading direction. Webtoon always scrolls top to bottom. */
+enum class ReaderDirection {
+    LEFT_TO_RIGHT,
+    RIGHT_TO_LEFT,
+}
+
+/** How a paged page fills the screen. */
+enum class ReaderFit {
+    WIDTH,
+    SCREEN,
+}
+
+enum class ReaderBackground {
+    BLACK,
+    GRAY,
+    WHITE,
+}
+
+data class ReaderPreferences(
+    val direction: ReaderDirection = ReaderDirection.LEFT_TO_RIGHT,
+    val fit: ReaderFit = ReaderFit.WIDTH,
+    val background: ReaderBackground = ReaderBackground.BLACK,
+    val keepScreenOn: Boolean = true,
+    val volumeKeys: Boolean = false,
+    val chapterEndPage: Boolean = true,
+)
 
 enum class ReaderScreenOrientation {
     SYSTEM,

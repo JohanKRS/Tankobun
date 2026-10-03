@@ -209,6 +209,7 @@ data class TankobunUiState(
     val readerPageGapLevel: Int = 0,
     val showWebtoonChapterDividers: Boolean = false,
     val readerScreenOrientation: ReaderScreenOrientation = ReaderScreenOrientation.SYSTEM,
+    val readerPreferences: com.tankobun.app.ReaderPreferences = com.tankobun.app.ReaderPreferences(),
     val busy: Boolean = false,
     val message: String? = null,
 ) {

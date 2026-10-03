@@ -73,7 +73,6 @@
     <string name="common_update">Update</string>
     <string name="common_view">View</string>
     <string name="common_year">Year</string>
-    <string name="common_zoom_percent">zoom: %1$d%%</string>
 
     <string name="nav_library">Library</string>
     <string name="nav_browse">Browse</string>
@@ -546,12 +545,10 @@
     <string name="reader_paged">Paged</string>
     <string name="reader_webtoon">Webtoon</string>
     <string name="reader_close">Close reader</string>
-    <string name="reader_progress_format">%1$s / Page %2$d of %3$d</string>
     <string name="reader_previous_chapter">Previous chapter</string>
     <string name="reader_previous_page">Previous page</string>
     <string name="reader_next_chapter">Next chapter</string>
     <string name="reader_next_page">Next page</string>
-    <string name="reader_page_number">Page %1$d</string>
     <string name="reader_page_fraction">Page %1$d/%2$d</string>
     <string name="reader_chapter_number">Chapter %1$s</string>
     <string name="reader_saved_chapter">Saved chapter</string>
@@ -1355,4 +1352,28 @@
         <item quantity="one">%1$d chapter marked as read.</item>
         <item quantity="other">%1$d chapters marked as read.</item>
     </plurals>
+    <string name="reader_settings">Reader settings</string>
+    <string name="reader_direction">Reading direction</string>
+    <string name="reader_direction_ltr">Left to right</string>
+    <string name="reader_direction_rtl">Right to left (manga)</string>
+    <string name="reader_fit">Page fit</string>
+    <string name="reader_fit_width">Fit width</string>
+    <string name="reader_fit_screen">Fit screen</string>
+    <string name="reader_background">Background</string>
+    <string name="reader_background_black">Black</string>
+    <string name="reader_background_gray">Gray</string>
+    <string name="reader_background_white">White</string>
+    <string name="reader_keep_screen_on">Keep screen on</string>
+    <string name="reader_keep_screen_on_desc">The screen stays awake while a chapter is open.</string>
+    <string name="reader_volume_keys">Volume keys turn pages</string>
+    <string name="reader_volume_keys_desc">Volume down goes forward, volume up goes back.</string>
+    <string name="reader_chapter_end_page">Chapter end page</string>
+    <string name="reader_chapter_end_page_desc">In paged mode, show a summary before the next chapter opens.</string>
+    <string name="reader_chapter_end_title">End of %1$s</string>
+    <string name="reader_chapter_end_next">Next: %1$s</string>
+    <string name="reader_chapter_end_caught_up">You’re caught up</string>
+    <string name="reader_chapter_end_caught_up_desc">This source has no newer chapters yet.</string>
+    <string name="reader_back_to_details">Back to details</string>
+    <string name="reader_current_chapter">Reading now</string>
+    <string name="reader_chapter_list">Chapter list</string>
 </resources>
