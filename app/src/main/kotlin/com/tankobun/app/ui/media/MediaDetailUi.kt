@@ -2232,7 +2232,7 @@ internal fun CoverZoomOverlay(media: AnilistMedia, onDismiss: () -> Unit) {
 }
 
 internal fun trackingStatusIcon(status: MediaStatus): ImageVector = when (status) {
-    MediaStatus.CURRENT -> TankobunIcons.PlayArrow
+    MediaStatus.CURRENT -> TankobunIcons.ReadingStatus
     MediaStatus.PLANNING -> TankobunIcons.StarBorder
     MediaStatus.COMPLETED -> TankobunIcons.Check
     MediaStatus.PAUSED -> TankobunIcons.Pause

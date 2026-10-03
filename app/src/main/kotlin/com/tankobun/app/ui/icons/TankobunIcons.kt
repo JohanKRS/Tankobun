@@ -37,6 +37,8 @@ internal object TankobunIcons {
     val ChevronRight: ImageVector = TablerIcons.ChevronRight
     val Close: ImageVector = TablerIcons.X
     val CollectionsBookmark: ImageVector = TablerIcons.Bookmarks
+    /** A status, not an action: play glyphs stay reserved for actually opening a chapter. */
+    val ReadingStatus: ImageVector = TablerIcons.Bookmark
     val Crop: ImageVector = TablerIcons.Crop
     val Delete: ImageVector = TablerIcons.Trash
     val Download: ImageVector = TablerIcons.Download

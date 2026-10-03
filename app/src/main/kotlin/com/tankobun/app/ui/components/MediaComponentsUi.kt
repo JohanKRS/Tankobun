@@ -793,7 +793,7 @@ internal fun TrackedMediaStatusBadge(
         MediaStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     val icon = when (status) {
-        MediaStatus.CURRENT -> TankobunIcons.PlayArrow
+        MediaStatus.CURRENT -> TankobunIcons.ReadingStatus
         MediaStatus.PLANNING -> TankobunIcons.StarBorder
         MediaStatus.COMPLETED -> TankobunIcons.Check
         MediaStatus.PAUSED -> TankobunIcons.Pause
