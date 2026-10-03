@@ -11,6 +11,7 @@ import com.tankobun.app.ui.icons.TankobunIcons
 
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.contentColorFor
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -159,6 +160,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -832,7 +834,12 @@ internal fun TankobunScaffold(
         label = "Dock scroll offset",
     )
 
-    CompositionLocalProvider(LocalTankobunChromeInsets provides chromeInsets) {
+    // The Material Scaffold this shell replaced used to provide the content color; without it, unstyled text is black.
+    CompositionLocalProvider(
+        LocalTankobunChromeInsets provides chromeInsets,
+        LocalContentColor provides MaterialTheme.colorScheme.contentColorFor(routeBackdropColor)
+            .takeOrElse { MaterialTheme.colorScheme.onBackground },
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
