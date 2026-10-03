@@ -1,5 +1,6 @@
 package com.tankobun.app.ui.home
 
+import com.tankobun.core.model.sharpestMangaBakaCover
 import com.tankobun.app.ui.components.FocusedCoverImage
 import com.tankobun.app.ui.components.TankobunPullToRefresh
 import com.tankobun.app.progressLabel
@@ -537,10 +538,12 @@ private fun TrendingHero(
         media.mobileHeroCharacterImages()
     }
     val showCharacterMosaic = mosaicImages.isNotEmpty()
+    // The hero is the biggest place a cover appears; never show a list thumbnail there.
+    val heroCover = media.coverImage.sharpestMangaBakaCover()
     val image = if (expanded) {
-        media.bannerImage ?: if (showCharacterMosaic) null else media.coverImage ?: media.mainCharacterImage
+        media.bannerImage ?: if (showCharacterMosaic) null else heroCover ?: media.mainCharacterImage
     } else {
-        if (showCharacterMosaic) null else media.mainCharacterImage ?: media.coverImage ?: media.bannerImage
+        if (showCharacterMosaic) null else media.mainCharacterImage ?: heroCover ?: media.bannerImage
     }
     val singleImageWidthFraction = when {
         expanded -> 0.72f
@@ -899,10 +902,11 @@ private fun GenreHighlightCard(
 ) {
     val media = highlight.media
     val imageCandidates = remember(media.bannerImage, media.coverImage, media.mainCharacterImage) {
+        // Cards crop covers to a wide strip, so the 1× MangaBaka thumbnail would look soft.
         listOfNotNull(
             media.bannerImage?.takeIf(String::isNotBlank),
             media.mainCharacterImage?.takeIf(String::isNotBlank),
-            media.coverImage?.takeIf(String::isNotBlank),
+            media.coverImage.sharpestMangaBakaCover()?.takeIf(String::isNotBlank),
         ).distinct()
     }
     var imageIndex by remember(imageCandidates) { mutableIntStateOf(0) }

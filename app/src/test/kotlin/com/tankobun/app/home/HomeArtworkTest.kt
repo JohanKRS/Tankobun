@@ -1,5 +1,6 @@
 package com.tankobun.app.home
 
+import com.tankobun.core.model.sharpestMangaBakaCover
 import com.tankobun.core.model.withCoverFallback
 import org.junit.Assert.*
 import org.junit.Test
@@ -12,6 +13,19 @@ class HomeArtworkTest {
         assertEquals(large, large.withCoverFallback(thumbnail))
         assertEquals(thumbnail, thumbnail.withCoverFallback("https://cdn.mangabaka.dev/imgproxy/plain/x350@3/different-asset"))
         assertEquals("https://anilist.test/new.jpg", "https://anilist.test/new.jpg".withCoverFallback(large))
+    }
+
+    @Test fun largeCoversUseTheSharpestRenditionOfTheSameMangaBakaAsset() {
+        assertEquals(
+            "https://cdn.mangabaka.dev/imgproxy/plain/x350@3/asset",
+            "https://cdn.mangabaka.dev/imgproxy/plain/x350@1/asset".sharpestMangaBakaCover(),
+        )
+        assertEquals(
+            "https://cdn.mangabaka.dev/imgproxy/plain/x350@3/asset",
+            "https://cdn.mangabaka.dev/imgproxy/plain/x350@2/asset".sharpestMangaBakaCover(),
+        )
+        assertEquals("https://s4.anilist.co/cover.jpg", "https://s4.anilist.co/cover.jpg".sharpestMangaBakaCover())
+        assertNull((null as String?).sharpestMangaBakaCover())
     }
 
     @Test fun successfulChecksIncludingNoBannerAreCachedForAWeek() {

@@ -232,6 +232,7 @@ import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import com.tankobun.core.model.AnilistListEntry
+import com.tankobun.core.model.sharpestMangaBakaCover
 
 
 import com.tankobun.app.*
@@ -1158,7 +1159,7 @@ internal fun MangaCoverFrame(media: AnilistMedia, modifier: Modifier = Modifier,
         shadowElevation = 8.dp,
     ) {
         CoverImage(
-            url = media.coverImage,
+            url = media.coverImage.sharpestMangaBakaCover(),
             title = media.title.userPreferred,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
@@ -2214,7 +2215,7 @@ internal fun CoverZoomOverlay(media: AnilistMedia, onDismiss: () -> Unit) {
                 shadowElevation = 18.dp,
             ) {
                 CoverImage(
-                    url = media.coverImage,
+                    url = media.coverImage.sharpestMangaBakaCover(),
                     title = media.title.userPreferred,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
