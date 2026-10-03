@@ -1,0 +1,12 @@
+{
+  "name": "tankobun-theme-palettes",
+  "private": true,
+  "type": "module",
+  "description": "Generates Tankobun's Material color schemes from theme seeds.",
+  "scripts": {
+    "generate": "node generate.mjs"
+  },
+  "dependencies": {
+    "@material/material-color-utilities": "0.3.0"
+  }
+}

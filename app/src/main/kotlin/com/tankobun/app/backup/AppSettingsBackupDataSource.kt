@@ -14,6 +14,8 @@ import com.tankobun.app.TankobunThemeMode
 import com.tankobun.app.TankobunArtDirection
 import com.tankobun.app.TankobunPaletteId
 import com.tankobun.app.TankobunThemePreference
+import com.tankobun.app.TankobunColorMode
+import com.tankobun.app.migratedThemePreference
 import com.tankobun.app.toLegacyThemeMode
 import com.tankobun.app.defaultSourceLanguages
 import com.tankobun.app.logic.sourceSettingsKey
@@ -102,7 +104,9 @@ internal class AppSettingsBackupDataSource(
             .put("readerPrefetchPages", snapshot.cachePreferences.prefetchPages)
             .put("readerPrefetchUnmeteredOnly", snapshot.cachePreferences.prefetchUnmeteredOnly)
             .put("themeMode", snapshot.themePreference.toLegacyThemeMode().name)
-            .put("themeAutomatic", snapshot.themePreference.automatic)
+            .put("themeAutomatic", snapshot.themePreference.mode == TankobunColorMode.SYSTEM)
+            .put("themeColorMode", snapshot.themePreference.mode.name)
+            .put("themePureBlack", snapshot.themePreference.pureBlack)
             .put("themeArtDirection", snapshot.themePreference.direction.name)
             .put("themePalette", snapshot.themePreference.palette.name)
             .put("appLanguage", snapshot.appLanguage.storageValue)
@@ -214,13 +218,23 @@ internal class AppSettingsBackupDataSource(
         ))
         val direction = settings.enumOrNull<TankobunArtDirection>("themeArtDirection")
         val palette = settings.enumOrNull<TankobunPaletteId>("themePalette")
+        val colorMode = settings.enumOrNull<TankobunColorMode>("themeColorMode")
         if (direction != null && palette != null) {
             store.saveThemePreference(
-                TankobunThemePreference(
-                    automatic = settings.optBooleanOrNull("themeAutomatic") ?: false,
-                    direction = direction,
-                    palette = palette,
-                ),
+                if (colorMode != null) {
+                    TankobunThemePreference(
+                        mode = colorMode,
+                        direction = direction,
+                        palette = palette,
+                        pureBlack = settings.optBooleanOrNull("themePureBlack") ?: false,
+                    )
+                } else {
+                    migratedThemePreference(
+                        automatic = settings.optBooleanOrNull("themeAutomatic") ?: false,
+                        direction = direction,
+                        palette = palette,
+                    )
+                },
             )
         } else {
             settings.enumOrNull<TankobunThemeMode>("themeMode")?.let(store::saveThemeMode)

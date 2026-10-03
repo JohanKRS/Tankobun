@@ -40,7 +40,9 @@ class SourcePreferencesActivity : AppCompatActivity(), PreferenceFragmentCompat.
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
         container.sourceHost.clearCache(sourcePackage)
     }
-    internal val sourceColors get() = tankobunColorScheme(SettingsStore(this).themePreference().resolve(systemDark()).palette)
+    internal val sourceColors get() = SettingsStore(this).themePreference().let { preference ->
+        tankobunColorScheme(preference, preference.isDark(systemDark()), this)
+    }
     private fun systemDark() = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
     override fun attachBaseContext(newBase: Context) {

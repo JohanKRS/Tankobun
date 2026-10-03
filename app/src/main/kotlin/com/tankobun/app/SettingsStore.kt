@@ -92,12 +92,22 @@ class SettingsStore(context: Context) {
             ?.let { runCatching { TankobunArtDirection.valueOf(it) }.getOrNull() }
         val storedPalette = preferences.getString(KEY_THEME_PALETTE, null)
             ?.let { runCatching { TankobunPaletteId.valueOf(it) }.getOrNull() }
+        val storedColorMode = preferences.getString(KEY_THEME_COLOR_MODE, null)
+            ?.let { runCatching { TankobunColorMode.valueOf(it) }.getOrNull() }
         if (storedDirection != null && storedPalette != null) {
-            return TankobunThemePreference(
+            if (storedColorMode != null) {
+                return TankobunThemePreference(
+                    mode = storedColorMode,
+                    direction = storedDirection,
+                    palette = storedPalette,
+                    pureBlack = preferences.getBoolean(KEY_THEME_PURE_BLACK, false),
+                ).normalized()
+            }
+            return migratedThemePreference(
                 automatic = preferences.getBoolean(KEY_THEME_AUTOMATIC, false),
                 direction = storedDirection,
                 palette = storedPalette,
-            ).normalized()
+            )
         }
         return legacyThemePreference(themeMode())
     }
@@ -105,7 +115,9 @@ class SettingsStore(context: Context) {
     fun saveThemePreference(preference: TankobunThemePreference) {
         val normalized = preference.normalized()
         preferences.edit()
-            .putBoolean(KEY_THEME_AUTOMATIC, normalized.automatic)
+            .putString(KEY_THEME_COLOR_MODE, normalized.mode.name)
+            .putBoolean(KEY_THEME_PURE_BLACK, normalized.pureBlack)
+            .putBoolean(KEY_THEME_AUTOMATIC, normalized.mode == TankobunColorMode.SYSTEM)
             .putString(KEY_THEME_ART_DIRECTION, normalized.direction.name)
             .putString(KEY_THEME_PALETTE, normalized.palette.name)
             .putString(KEY_THEME_MODE, normalized.toLegacyThemeMode().name)
@@ -719,6 +731,8 @@ class SettingsStore(context: Context) {
         const val KEY_THEME_AUTOMATIC = "theme.automatic"
         const val KEY_THEME_ART_DIRECTION = "theme.art.direction"
         const val KEY_THEME_PALETTE = "theme.palette"
+        const val KEY_THEME_COLOR_MODE = "theme.color.mode"
+        const val KEY_THEME_PURE_BLACK = "theme.pure.black"
         const val KEY_IGNORE_DISPLAY_CUTOUT = "layout.ignore.display.cutout"
         const val KEY_SHOW_APP_STATUS_BAR = "layout.show.app.status.bar"
         const val KEY_DOCK_ALIGNMENT = "layout.dock.alignment"

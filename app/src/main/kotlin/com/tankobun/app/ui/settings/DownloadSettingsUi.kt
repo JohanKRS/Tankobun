@@ -819,16 +819,9 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
         }.joinToString(" / ")
         SettingsRoute.APPEARANCE -> buildList {
             val preference = state.themePreference.normalized()
-            add(
-                if (preference.automatic) {
-                    tankobunString(R.string.settings_theme_automatic)
-                } else {
-                    val direction = tankobunString(preference.direction.themeNameRes())
-                    "$direction · ${tankobunString(preference.palette.themeNameRes())}"
-                },
-            )
-            add(tankobunString(R.string.dock_summary, state.dockAlignment.settingsLabel()))
-            add(state.dockIndicatorAnimation.settingsLabel())
+            add(tankobunString(preference.palette.themeNameRes()))
+            add(tankobunString(preference.mode.themeNameRes()))
+            add(tankobunString(preference.direction.themeNameRes()))
         }.joinToString(" / ")
         SettingsRoute.LANGUAGES -> state.sourceLanguages.count { it != UNIVERSAL_SOURCE_LANGUAGE }.let { count ->
             tankobunQuantityString(R.plurals.source_language_count, count, count)

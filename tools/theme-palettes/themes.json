@@ -1,0 +1,11 @@
+[
+  {"id": "SUMI", "name": "Sumi", "seed": "#C8372D", "primaryChroma": 60, "secondary": "#6B5B4E", "secondaryChroma": 10, "tertiary": "#B8862B", "tertiaryChroma": 42, "neutral": "#8A7350", "neutralChroma": 7, "darkPrimaryTone": 64},
+  {"id": "SAKURA", "name": "Sakura", "seed": "#D14D8B", "primaryChroma": 56, "secondary": "#A0647E", "secondaryChroma": 18, "tertiary": "#4F8A5B", "tertiaryChroma": 30, "neutral": "#B07A8E", "neutralChroma": 8, "darkPrimaryTone": 72},
+  {"id": "MATCHA", "name": "Matcha", "seed": "#4F7A3F", "primaryChroma": 42, "secondary": "#6E7D5B", "secondaryChroma": 14, "tertiary": "#A2673C", "tertiaryChroma": 38, "neutral": "#7F8462", "neutralChroma": 8},
+  {"id": "AIZOME", "name": "Aizome", "seed": "#2F4F9E", "primaryChroma": 52, "secondary": "#55627E", "secondaryChroma": 16, "tertiary": "#D9663A", "tertiaryChroma": 48, "neutral": "#5C6577", "neutralChroma": 6, "darkPrimaryTone": 76},
+  {"id": "YUZU", "name": "Yuzu", "seed": "#00796B", "primaryChroma": 44, "secondary": "#E5B800", "secondaryChroma": 60, "tertiary": "#E06A2C", "tertiaryChroma": 50, "neutral": "#C8B24A", "neutralChroma": 12},
+  {"id": "AMBAR", "name": "Âmbar", "seed": "#E0A33A", "primaryChroma": 52, "secondary": "#8C7A5E", "secondaryChroma": 12, "tertiary": "#C26A3D", "tertiaryChroma": 40, "neutral": "#7A6A55", "neutralChroma": 4},
+  {"id": "AMEIXA", "name": "Ameixa", "seed": "#B04BA8", "primaryChroma": 50, "secondary": "#8E6B8A", "secondaryChroma": 16, "tertiary": "#4FB083", "tertiaryChroma": 36, "neutral": "#7E6582", "neutralChroma": 10, "darkPrimaryTone": 76},
+  {"id": "NEON", "name": "Neon", "seed": "#FF2E93", "primaryChroma": 90, "secondary": "#00C8FF", "secondaryChroma": 48, "tertiary": "#B8F23A", "tertiaryChroma": 60, "neutral": "#4B3F8F", "neutralChroma": 14, "darkPrimaryTone": 64, "darkSecondaryTone": 76},
+  {"id": "RETICULA", "name": "Retícula", "seed": "#555555", "monochrome": true}
+]

@@ -2,6 +2,7 @@ package com.tankobun.app
 
 import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.max
@@ -10,75 +11,93 @@ import kotlin.math.pow
 
 class TankobunThemeCatalogTest {
     @Test
-    fun catalogHasTwoShapesAndFourteenIndependentPalettes() {
+    fun catalogHasTwoShapesAndNineThemesWithLightAndDarkSchemes() {
         assertEquals(2, tankobunArtDirectionChoices().size)
-        assertEquals(14, tankobunPaletteChoices().size)
-        assertEquals(15, TankobunPaletteId.entries.size)
-    }
-
-    @Test
-    fun everyLegacyModeMigratesToAValidPreference() {
-        TankobunThemeMode.entries.forEach { legacy ->
-            val preference = legacyThemePreference(legacy).normalized()
-            assertTrue(preference.direction in tankobunArtDirectionChoices().map { it.id })
-            assertTrue(preference.palette in tankobunPaletteChoices().map { it.id })
+        assertEquals(9, tankobunPaletteChoices().size)
+        TankobunVisiblePalettes.forEach { palette ->
+            assertNotNull(generatedColorScheme(palette, dark = false))
+            assertNotNull(generatedColorScheme(palette, dark = true))
         }
     }
 
     @Test
-    fun everyVisibleShapeCanUseEveryVisiblePaletteWithoutNormalizationChangingIt() {
+    fun everyLegacyModeMigratesToAVisibleTheme() {
+        TankobunThemeMode.entries.forEach { legacy ->
+            val preference = legacyThemePreference(legacy).normalized()
+            assertTrue(preference.direction in tankobunArtDirectionChoices().map { it.id })
+            assertTrue("$legacy -> ${preference.palette}", preference.palette in TankobunVisiblePalettes)
+        }
+    }
+
+    @Test
+    fun retiredPalettesKeepTheirLightOrDarkLook() {
+        val plum = migratedThemePreference(automatic = false, TankobunArtDirection.ORIGINAL, TankobunPaletteId.VELVET_PLUM)
+        assertEquals(TankobunPaletteId.AMEIXA, plum.palette)
+        assertEquals(TankobunColorMode.DARK, plum.mode)
+
+        val peach = migratedThemePreference(automatic = false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.PEACH_COUNTRYSIDE)
+        assertEquals(TankobunPaletteId.SUMI, peach.palette)
+        assertEquals(TankobunColorMode.LIGHT, peach.mode)
+        assertEquals(TankobunArtDirection.MOCHI_POP, peach.direction)
+
+        val citrus = TankobunThemePreference(palette = TankobunPaletteId.CITRUS_CLASH).normalized()
+        assertEquals(TankobunPaletteId.YUZU, citrus.palette)
+    }
+
+    @Test
+    fun automaticPreferencesFollowTheSystemWithTheDefaultTheme() {
+        val migrated = migratedThemePreference(automatic = true, TankobunArtDirection.NEON_CURRENT, TankobunPaletteId.NEON_KOI)
+        assertEquals(TankobunColorMode.SYSTEM, migrated.mode)
+        assertEquals(TankobunPaletteId.SUMI, migrated.palette)
+        assertEquals(TankobunArtDirection.ORIGINAL, migrated.direction)
+        assertTrue(migrated.isDark(systemDark = true))
+        assertTrue(!migrated.isDark(systemDark = false))
+    }
+
+    @Test
+    fun visibleOptionsSurviveNormalization() {
         tankobunArtDirectionChoices().forEach { direction ->
-            tankobunPaletteChoices().forEach { palette ->
-                val preference = TankobunThemePreference(false, direction.id, palette.id)
-                assertEquals(preference, preference.normalized())
+            (TankobunVisiblePalettes + TankobunPaletteId.DYNAMIC).forEach { palette ->
+                TankobunColorMode.entries.forEach { mode ->
+                    val preference = TankobunThemePreference(mode, direction.id, palette, pureBlack = true)
+                    assertEquals(preference, preference.normalized())
+                }
             }
         }
     }
 
     @Test
-    fun retiredOptionsNormalizeWithoutLosingTheColorChoice() {
-        val retiredShape = TankobunThemePreference(false, TankobunArtDirection.NEON_CURRENT, TankobunPaletteId.VELVET_PLUM)
-        assertEquals(TankobunArtDirection.ORIGINAL, retiredShape.normalized().direction)
-        assertEquals(TankobunPaletteId.VELVET_PLUM, retiredShape.normalized().palette)
-
-        val retiredPalette = TankobunThemePreference(false, TankobunArtDirection.MOCHI_POP, TankobunPaletteId.CITRUS_CLASH)
-        assertEquals(TankobunArtDirection.MOCHI_POP, retiredPalette.normalized().direction)
-        assertEquals(TankobunPaletteId.YUZU_GARDEN, retiredPalette.normalized().palette)
-    }
-
-    @Test
-    fun automaticModeResolvesToTheDocumentedDefaults() {
-        val automatic = TankobunThemePreference()
-        assertEquals(TankobunPaletteId.PEACH_COUNTRYSIDE, automatic.resolve(systemDark = false).palette)
-        assertEquals(TankobunPaletteId.VELVET_PLUM, automatic.resolve(systemDark = true).palette)
-        assertEquals(TankobunArtDirection.MOCHI_POP, automatic.resolve(systemDark = false).direction)
-        assertEquals(TankobunArtDirection.ORIGINAL, automatic.resolve(systemDark = true).direction)
+    fun pureBlackOnlyChangesDarkSurfaces() {
+        val preference = TankobunThemePreference(palette = TankobunPaletteId.NEON, pureBlack = true)
+        assertEquals(Color.Black, tankobunColorScheme(preference, dark = true).background)
+        assertEquals(
+            tankobunColorScheme(preference.copy(pureBlack = false), dark = false).background,
+            tankobunColorScheme(preference, dark = false).background,
+        )
     }
 
     @Test
     fun textAndControlPairsMeetWcagContrast() {
-        TankobunPaletteId.entries.forEach { palette ->
-            val colors = tankobunColorScheme(palette)
-            val pairs = listOf(
-                "background" to (colors.onBackground to colors.background),
-                "surface" to (colors.onSurface to colors.surface),
-                "primary" to (colors.onPrimary to colors.primary),
-                "secondary" to (colors.onSecondary to colors.secondary),
-                "primaryContainer" to (colors.onPrimaryContainer to colors.primaryContainer),
-                "secondaryContainer" to (colors.onSecondaryContainer to colors.secondaryContainer),
-            )
-            pairs.forEach { (role, pair) ->
-                val contrast = contrastRatio(pair.first, pair.second)
-                assertTrue("${palette.name} $role contrast was $contrast", contrast >= 4.5)
+        TankobunVisiblePalettes.forEach { palette ->
+            listOf(false, true).forEach { dark ->
+                listOf(false, true).forEach { pureBlack ->
+                    val colors = tankobunColorScheme(TankobunThemePreference(palette = palette, pureBlack = pureBlack), dark)
+                    val pairs = listOf(
+                        "background" to (colors.onBackground to colors.background),
+                        "surfaceContainer" to (colors.onSurface to colors.surfaceContainer),
+                        "surfaceContainerHigh" to (colors.onSurface to colors.surfaceContainerHigh),
+                        "mutedText" to (colors.onSurfaceVariant to colors.surfaceContainerLow),
+                        "accentText" to (colors.primary to colors.background),
+                        "primary" to (colors.onPrimary to colors.primary),
+                        "primaryContainer" to (colors.onPrimaryContainer to colors.primaryContainer),
+                        "secondaryContainer" to (colors.onSecondaryContainer to colors.secondaryContainer),
+                    )
+                    pairs.forEach { (role, pair) ->
+                        val contrast = contrastRatio(pair.first, pair.second)
+                        assertTrue("$palette dark=$dark black=$pureBlack $role contrast was $contrast", contrast >= 4.5)
+                    }
+                }
             }
-        }
-    }
-
-    @Test
-    fun highlightedActionsSupportWhiteTextInEveryPalette() {
-        TankobunPaletteId.entries.forEach { palette ->
-            val contrast = contrastRatio(Color.White, tankobunActionContainer(palette))
-            assertTrue("${palette.name} action contrast was $contrast", contrast >= 4.5)
         }
     }
 
