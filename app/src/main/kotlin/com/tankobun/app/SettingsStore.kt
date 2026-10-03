@@ -213,6 +213,29 @@ class SettingsStore(context: Context) {
         preferences.edit().putInt(KEY_LIBRARY_COVER_COLUMNS, count.supportedCoverColumns()).apply()
     }
 
+    fun libraryCoverCaption(): LibraryCoverCaption =
+        preferences.getString(KEY_LIBRARY_COVER_CAPTION, null)
+            ?.let { stored -> runCatching { LibraryCoverCaption.valueOf(stored) }.getOrNull() }
+            ?: LibraryCoverCaption.PUBLICATION
+
+    fun saveLibraryCoverCaption(caption: LibraryCoverCaption) {
+        preferences.edit().putString(KEY_LIBRARY_COVER_CAPTION, caption.name).apply()
+    }
+
+    fun libraryProgressBadges(): Boolean =
+        preferences.getBoolean(KEY_LIBRARY_PROGRESS_BADGES, true)
+
+    fun saveLibraryProgressBadges(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_LIBRARY_PROGRESS_BADGES, enabled).apply()
+    }
+
+    fun libraryUpdatesSeenAtEpochMillis(): Long =
+        preferences.getLong(KEY_LIBRARY_UPDATES_SEEN_AT, 0L)
+
+    fun saveLibraryUpdatesSeenAtEpochMillis(value: Long) {
+        preferences.edit().putLong(KEY_LIBRARY_UPDATES_SEEN_AT, value).apply()
+    }
+
     fun libraryShowWholeCovers(): Boolean =
         preferences.getBoolean(KEY_LIBRARY_SHOW_WHOLE_COVERS, false)
 
@@ -762,6 +785,9 @@ class SettingsStore(context: Context) {
         const val KEY_LIBRARY_VIEW_MODE = "library.view.mode"
         const val KEY_LIBRARY_COVER_COLUMNS = "library.cover.columns"
         const val KEY_LIBRARY_SHOW_WHOLE_COVERS = "library.show.whole.covers"
+        const val KEY_LIBRARY_COVER_CAPTION = "library.cover.caption"
+        const val KEY_LIBRARY_PROGRESS_BADGES = "library.progress.badges"
+        const val KEY_LIBRARY_UPDATES_SEEN_AT = "library.updates.seen.at"
         const val KEY_BROWSE_VIEW_MODE = "browse.view.mode"
         const val KEY_BROWSE_COVER_COLUMNS = "browse.cover.columns"
         const val KEY_BROWSE_SHOW_WHOLE_COVERS = "browse.show.whole.covers"
@@ -867,6 +893,13 @@ enum class MediaViewMode {
     MASONRY,
     JUSTIFIED,
     LIST,
+}
+
+/** What the line under a library cover says. */
+enum class LibraryCoverCaption {
+    PUBLICATION,
+    PROGRESS,
+    NONE,
 }
 
 /** Paged reading direction. Webtoon always scrolls top to bottom. */

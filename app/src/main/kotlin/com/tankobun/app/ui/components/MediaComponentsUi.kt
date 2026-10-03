@@ -130,6 +130,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -274,6 +277,10 @@ internal fun MediaCollection(
     selectionMode: Boolean = false,
     onToggleMediaSelection: ((AnilistMedia) -> Unit)? = null,
     onLongPressMedia: ((AnilistMedia) -> Unit)? = null,
+    /** Overrides the publication caption; an empty string hides it. */
+    captionFor: ((AnilistMedia) -> String?)? = null,
+    /** A count drawn on the cover, such as chapters left. */
+    badgeFor: ((AnilistMedia) -> Int?)? = null,
 ) {
     val configuration = LocalConfiguration.current
     val supportedCoverColumns = coverColumns
@@ -412,6 +419,8 @@ internal fun MediaCollection(
                 ) { item ->
                     MediaRow(
                         media = item,
+                        caption = captionFor?.invoke(item),
+                        badgeCount = badgeFor?.invoke(item),
                         trackedStatus = trackedStatuses[item.id],
                         selected = item.id in selectedMediaIds,
                         selectionMode = selectionMode,
@@ -509,6 +518,8 @@ internal fun MediaCollection(
                 ) { item ->
                     MediaCoverTile(
                         media = item,
+                        caption = captionFor?.invoke(item),
+                        badgeCount = badgeFor?.invoke(item),
                         viewMode = supportedViewMode,
                         showWholeCover = showWholeCovers,
                         trackedStatus = trackedStatuses[item.id],
@@ -565,6 +576,8 @@ internal fun MediaCoverTile(
     selected: Boolean = false,
     selectionMode: Boolean = false,
     onLongClick: (() -> Unit)? = null,
+    caption: String? = null,
+    badgeCount: Int? = null,
 ) {
     val supportedViewMode = viewMode.supportedMediaViewMode()
     val coverModifier = Modifier
@@ -605,6 +618,14 @@ internal fun MediaCoverTile(
                     cornerRadius = coverCornerRadius,
                 )
             }
+            badgeCount?.takeIf { it > 0 }?.let { count ->
+                CoverCountBadge(
+                    count = count,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp),
+                )
+            }
             if (selectionMode) {
                 Checkbox(
                     checked = selected,
@@ -625,7 +646,8 @@ internal fun MediaCoverTile(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (supportedViewMode == MediaViewMode.COVER_WITH_INFO) {
-                    TankobunMediaStatusLabel(text = media.status.statusLabel())
+                    val captionText = caption ?: media.status.statusLabel()
+                    if (captionText.isNotEmpty()) TankobunMediaStatusLabel(text = captionText)
                 }
             }
         }
@@ -636,6 +658,8 @@ internal fun MediaCoverTile(
 @Composable
 internal fun MediaRow(
     media: AnilistMedia,
+    caption: String? = null,
+    badgeCount: Int? = null,
     trackedStatus: MediaStatus? = null,
     selected: Boolean = false,
     selectionMode: Boolean = false,
@@ -662,7 +686,10 @@ internal fun MediaRow(
             supportingContent = {
                 Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
-                        "${media.mediaTypeLabel()} / ${media.status.statusLabel()}".uppercase(Locale.ROOT),
+                        listOf(media.mediaTypeLabel(), caption ?: media.status.statusLabel())
+                            .filter { it.isNotEmpty() }
+                            .joinToString(" / ")
+                            .uppercase(Locale.ROOT),
                         style = LocalTankobunStyle.current.typography.compactStatus,
                         color = LocalTankobunStyle.current.colors.accent,
                         maxLines = 1,
@@ -687,6 +714,14 @@ internal fun MediaRow(
                         trackedStatus = trackedStatus,
                         modifier = Modifier.size(width = 56.dp, height = 78.dp),
                     )
+                    badgeCount?.takeIf { it > 0 }?.let { count ->
+                        CoverCountBadge(
+                            count = count,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(3.dp),
+                        )
+                    }
                     if (selectionMode) {
                         Checkbox(
                             checked = selected,
@@ -789,3 +824,26 @@ internal fun TrackedMediaStatusBadge(
 
 internal fun List<LibraryItem>.trackedMediaStatuses(): Map<Int, MediaStatus> =
     associate { item -> item.media.id to item.entry.status }
+
+/** Chapters left to read, drawn over a cover corner. */
+@Composable
+internal fun CoverCountBadge(count: Int, modifier: Modifier = Modifier) {
+    val description = tankobunQuantityString(R.plurals.library_remaining_cd, count, count)
+    Surface(
+        modifier = modifier.clearAndSetSemantics { contentDescription = description },
+        shape = RoundedCornerShape(percent = 50),
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        shadowElevation = 2.dp,
+    ) {
+        Text(
+            if (count > 99) "99+" else count.toString(),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .widthIn(min = 22.dp)
+                .padding(horizontal = 7.dp, vertical = 2.dp),
+            textAlign = TextAlign.Center,
+        )
+    }
+}

@@ -1,5 +1,6 @@
 package com.tankobun.app.anilist
 
+import com.tankobun.app.logic.chapterStanding
 import com.tankobun.core.sync.belongsToSyncSession
 import com.tankobun.core.sync.syncSessionKey
 import kotlinx.coroutines.CancellationException
@@ -908,6 +909,7 @@ internal class AniListDataSource(
                         currentChapterNumber = metrics.currentChapterNumber,
                         lastAvailableChapterNumber = metrics.lastAvailableChapterNumber,
                         overallProgress = metrics.overallProgress,
+                        standing = chapterStanding(progress, recentItem.chapter, availableChapters),
                     ),
                 )
                 if (size >= limit) break

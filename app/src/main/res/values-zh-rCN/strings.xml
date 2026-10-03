@@ -1374,4 +1374,34 @@
     <string name="reader_back_to_details">返回详情</string>
     <string name="reader_current_chapter">正在阅读</string>
     <string name="reader_chapter_list">章节列表</string>
+    <string name="msg_checking_new_chapters">正在检查新章节…</string>
+    <string name="library_updates_title">更新</string>
+    <string name="library_updates_empty_title">暂时没有更新</string>
+    <string name="library_updates_empty_body">书架中漫画的新章节会显示在这里。</string>
+    <string name="library_updates_checks_off">自动检查已关闭。开启后每天会为你正在阅读的漫画查找一次新章节。</string>
+    <string name="library_updates_turn_on">开启</string>
+    <string name="library_updates_check_now">立即检查</string>
+    <string name="library_updates_clear">清除</string>
+    <string name="settings_library_caption">封面说明</string>
+    <string name="library_caption_publication">连载状态</string>
+    <string name="library_caption_progress">阅读进度</string>
+    <string name="library_caption_none">无</string>
+    <string name="library_caption_not_started">未开始</string>
+    <string name="settings_library_badges">封面显示剩余章节</string>
+    <string name="settings_library_badges_desc">在已开始阅读的漫画封面上显示剩余章节数。</string>
+    <string name="filter_publication">连载</string>
+    <string name="home_chapter_caught_up">第 %1$s 话 · 已追平</string>
+    <plurals name="home_chapter_remaining">
+        <item quantity="other">第 %1$s 话 · 剩 %2$d 话</item>
+    </plurals>
+    <plurals name="library_updates_new_chapters">
+        <item quantity="other">%1$d 话新章节</item>
+    </plurals>
+    <plurals name="library_remaining_cd">
+        <item quantity="other">剩 %1$d 话</item>
+    </plurals>
+    <plurals name="library_updates_more">
+        <item quantity="other">还有 %1$d 话</item>
+    </plurals>
+    <string name="library_caption_caught_up">已追平</string>
 </resources>

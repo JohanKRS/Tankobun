@@ -149,6 +149,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import com.tankobun.app.updates.unseenChapterCount
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.SizeTransform
@@ -792,11 +793,17 @@ internal fun TankobunScaffold(
     val selectedDestination = TankobunDestination.forTab(selectedTab)
     val downloadsActive = state.downloads.any { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }
     // Dock and rail badges are optional; the Library top bar keeps its own indicators.
+    val unseenLibraryUpdates = remember(state.libraryUpdates, state.libraryUpdatesSeenAtEpochMillis) {
+        state.libraryUpdates.unseenChapterCount(state.libraryUpdatesSeenAtEpochMillis)
+    }
     val badges = if (state.showNavigationBadges) {
-        TankobunDestinationBadges(downloadsActive = downloadsActive)
+        TankobunDestinationBadges(libraryUpdates = unseenLibraryUpdates, downloadsActive = downloadsActive)
     } else {
         TankobunDestinationBadges()
     }
+    var libraryUpdatesOpen by rememberSaveable { mutableStateOf(false) }
+    // Highlights what was new when the sheet opened, even though opening marks everything seen.
+    var libraryUpdatesSeenBefore by rememberSaveable { mutableLongStateOf(0L) }
 
     // The dock steps aside while content scrolls down and returns as soon as it scrolls back.
     var dockHidden by remember { mutableStateOf(false) }
@@ -908,6 +915,21 @@ internal fun TankobunScaffold(
                 onBack = onNavigateBack,
                 actions = {
                     if (selectedMedia == null && selectedTab == 1) {
+                        val updatesLabel = tankobunString(R.string.library_updates_title)
+                        TopBarActionButton(
+                            icon = TankobunIcons.Bell,
+                            contentDescription = if (unseenLibraryUpdates > 0) {
+                                tankobunString(R.string.nav_library_updates_badge, updatesLabel, unseenLibraryUpdates)
+                            } else {
+                                updatesLabel
+                            },
+                            onClick = {
+                                libraryUpdatesSeenBefore = state.libraryUpdatesSeenAtEpochMillis
+                                libraryUpdatesOpen = true
+                                viewModel.markLibraryUpdatesSeen()
+                            },
+                            badgeCount = unseenLibraryUpdates,
+                        )
                         TopBarActionButton(
                             icon = TankobunIcons.Download,
                             contentDescription = if (downloadsActive) {
@@ -981,6 +1003,25 @@ internal fun TankobunScaffold(
                 ) {
                     MediaDetailFloatingActions(state = state, actions = detailActions)
                 }
+            }
+
+            if (libraryUpdatesOpen) {
+                LibraryUpdatesSheet(
+                    groups = state.libraryUpdates,
+                    seenAtEpochMillis = libraryUpdatesSeenBefore,
+                    checksEnabled = state.newChapterChecksEnabled,
+                    onOpenMedia = { media ->
+                        libraryUpdatesOpen = false
+                        onSelectMedia(media)
+                    },
+                    onCheckNow = viewModel::checkForNewChaptersNow,
+                    onTurnOnChecks = {
+                        libraryUpdatesOpen = false
+                        onOpenSettingsRoute(SettingsRoute.LIBRARY)
+                    },
+                    onClear = viewModel::clearLibraryUpdates,
+                    onDismiss = { libraryUpdatesOpen = false },
+                )
             }
 
             state.extensionTrustReview?.let { candidate ->

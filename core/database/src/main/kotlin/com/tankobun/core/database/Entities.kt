@@ -150,6 +150,26 @@ data class SourceChapterEntity(
     @androidx.room.ColumnInfo(defaultValue = "''") val scanlators: List<String> = emptyList(),
 )
 
+/** A chapter that appeared for a library manga after its chapter list was already known. */
+@Entity(
+    tableName = "chapter_updates",
+    primaryKeys = ["mediaId", "chapterUrl"],
+    indices = [Index("foundAtEpochMillis")],
+)
+data class ChapterUpdateEntity(
+    val mediaId: Int,
+    val sourceId: Long,
+    val mangaUrl: String,
+    val chapterUrl: String,
+    val name: String,
+    val chapterNumber: Float,
+    val chapterNumberText: String?,
+    val volume: String?,
+    val scanlator: String?,
+    val uploadedAtEpochMillis: Long?,
+    val foundAtEpochMillis: Long,
+)
+
 @Entity(
     tableName = "reader_progress",
     primaryKeys = ["mediaId", "chapterUrl"],

@@ -1377,4 +1377,38 @@
     <string name="reader_back_to_details">Voltar aos detalhes</string>
     <string name="reader_current_chapter">Lendo agora</string>
     <string name="reader_chapter_list">Lista de capítulos</string>
+    <string name="msg_checking_new_chapters">Procurando capítulos novos…</string>
+    <string name="library_updates_title">Novidades</string>
+    <string name="library_updates_empty_title">Nada novo por enquanto</string>
+    <string name="library_updates_empty_body">Capítulos novos dos mangás da sua biblioteca aparecem aqui.</string>
+    <string name="library_updates_checks_off">A verificação automática está desligada. Ative para procurar uma vez por dia capítulos novos dos mangás que você está lendo.</string>
+    <string name="library_updates_turn_on">Ativar</string>
+    <string name="library_updates_check_now">Verificar agora</string>
+    <string name="library_updates_clear">Limpar</string>
+    <string name="settings_library_caption">Legenda das capas</string>
+    <string name="library_caption_publication">Status de publicação</string>
+    <string name="library_caption_progress">Progresso de leitura</string>
+    <string name="library_caption_none">Nenhuma</string>
+    <string name="library_caption_not_started">Não iniciado</string>
+    <string name="settings_library_badges">Capítulos restantes nas capas</string>
+    <string name="settings_library_badges_desc">Mostra quantos capítulos faltam nos mangás que você começou.</string>
+    <string name="filter_publication">Publicação</string>
+    <string name="home_chapter_caught_up">Cap. %1$s · Em dia</string>
+    <plurals name="home_chapter_remaining">
+        <item quantity="one">Cap. %1$s · Falta %2$d</item>
+        <item quantity="other">Cap. %1$s · Faltam %2$d</item>
+    </plurals>
+    <plurals name="library_updates_new_chapters">
+        <item quantity="one">%1$d capítulo novo</item>
+        <item quantity="other">%1$d capítulos novos</item>
+    </plurals>
+    <plurals name="library_remaining_cd">
+        <item quantity="one">Falta %1$d capítulo</item>
+        <item quantity="other">Faltam %1$d capítulos</item>
+    </plurals>
+    <plurals name="library_updates_more">
+        <item quantity="one">+%1$d outro</item>
+        <item quantity="other">+%1$d outros</item>
+    </plurals>
+    <string name="library_caption_caught_up">Em dia</string>
 </resources>

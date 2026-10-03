@@ -1377,4 +1377,38 @@
     <string name="reader_back_to_details">Volver a los detalles</string>
     <string name="reader_current_chapter">Leyendo ahora</string>
     <string name="reader_chapter_list">Lista de capítulos</string>
+    <string name="msg_checking_new_chapters">Buscando capítulos nuevos…</string>
+    <string name="library_updates_title">Novedades</string>
+    <string name="library_updates_empty_title">Nada nuevo por ahora</string>
+    <string name="library_updates_empty_body">Los capítulos nuevos de los mangas de tu biblioteca aparecen aquí.</string>
+    <string name="library_updates_checks_off">La comprobación automática está desactivada. Actívala para buscar una vez al día capítulos nuevos de los mangas que estás leyendo.</string>
+    <string name="library_updates_turn_on">Activar</string>
+    <string name="library_updates_check_now">Comprobar ahora</string>
+    <string name="library_updates_clear">Borrar</string>
+    <string name="settings_library_caption">Leyenda de las portadas</string>
+    <string name="library_caption_publication">Estado de publicación</string>
+    <string name="library_caption_progress">Progreso de lectura</string>
+    <string name="library_caption_none">Ninguna</string>
+    <string name="library_caption_not_started">Sin empezar</string>
+    <string name="settings_library_badges">Capítulos restantes en las portadas</string>
+    <string name="settings_library_badges_desc">Muestra cuántos capítulos quedan en los mangas que empezaste.</string>
+    <string name="filter_publication">Publicación</string>
+    <string name="home_chapter_caught_up">Cap. %1$s · Al día</string>
+    <plurals name="home_chapter_remaining">
+        <item quantity="one">Cap. %1$s · Queda %2$d</item>
+        <item quantity="other">Cap. %1$s · Quedan %2$d</item>
+    </plurals>
+    <plurals name="library_updates_new_chapters">
+        <item quantity="one">%1$d capítulo nuevo</item>
+        <item quantity="other">%1$d capítulos nuevos</item>
+    </plurals>
+    <plurals name="library_remaining_cd">
+        <item quantity="one">Queda %1$d capítulo</item>
+        <item quantity="other">Quedan %1$d capítulos</item>
+    </plurals>
+    <plurals name="library_updates_more">
+        <item quantity="one">+%1$d más</item>
+        <item quantity="other">+%1$d más</item>
+    </plurals>
+    <string name="library_caption_caught_up">Al día</string>
 </resources>

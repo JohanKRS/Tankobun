@@ -1,5 +1,6 @@
 package com.tankobun.app
 
+import com.tankobun.app.logic.chapterNumberLabel
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -187,3 +188,23 @@ internal fun DownloadState.labelRes(): Int =
 @ReadOnlyComposable
 internal fun DownloadState.statusLabel(): String =
     tankobunString(labelRes())
+
+/** "Ch. 4 · 3 left" / "Ch. 12 · Up to date", shared by Continue Reading and library captions. */
+@Composable
+internal fun com.tankobun.app.logic.ChapterStanding.progressLabel(): String {
+    val number = currentNumber.chapterNumberLabel()
+    return when {
+        caughtUp -> tankobunString(R.string.home_chapter_caught_up, number)
+        remaining > 0 -> tankobunQuantityString(R.plurals.home_chapter_remaining, remaining, number, remaining)
+        else -> tankobunString(R.string.home_chapter, number)
+    }
+}
+
+/** Narrow-cover form: the chapter alone, since the cover badge already shows what is left. */
+@Composable
+internal fun com.tankobun.app.logic.ChapterStanding.compactProgressLabel(): String =
+    if (caughtUp) {
+        tankobunString(R.string.library_caption_caught_up)
+    } else {
+        tankobunString(R.string.home_chapter, currentNumber.chapterNumberLabel())
+    }

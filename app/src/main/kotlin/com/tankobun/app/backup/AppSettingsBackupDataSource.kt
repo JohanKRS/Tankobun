@@ -117,6 +117,8 @@ internal class AppSettingsBackupDataSource(
             .put("libraryViewMode", snapshot.libraryViewMode.name)
             .put("libraryCoverColumns", snapshot.libraryCoverColumns)
             .put("libraryShowWholeCovers", snapshot.libraryShowWholeCovers)
+            .put("libraryCoverCaption", snapshot.libraryCoverCaption.name)
+            .put("libraryProgressBadges", snapshot.libraryProgressBadges)
             .put("browseViewMode", snapshot.browseViewMode.name)
             .put("browseCoverColumns", snapshot.browseCoverColumns)
             .put("browseShowWholeCovers", snapshot.browseShowWholeCovers)
@@ -255,6 +257,8 @@ internal class AppSettingsBackupDataSource(
         settings.enumOrNull<MediaViewMode>("libraryViewMode")?.let(store::saveLibraryViewMode)
         settings.optIntOrNull("libraryCoverColumns")?.let(store::saveLibraryCoverColumns)
         settings.optBooleanOrNull("libraryShowWholeCovers")?.let(store::saveLibraryShowWholeCovers)
+        settings.enumOrNull<com.tankobun.app.LibraryCoverCaption>("libraryCoverCaption")?.let(store::saveLibraryCoverCaption)
+        settings.optBooleanOrNull("libraryProgressBadges")?.let(store::saveLibraryProgressBadges)
         settings.enumOrNull<MediaViewMode>("browseViewMode")?.let(store::saveBrowseViewMode)
         settings.optIntOrNull("browseCoverColumns")?.let(store::saveBrowseCoverColumns)
         settings.optBooleanOrNull("browseShowWholeCovers")?.let(store::saveBrowseShowWholeCovers)
@@ -333,6 +337,8 @@ internal class AppSettingsBackupDataSource(
             libraryViewMode = store.libraryViewMode(),
             libraryCoverColumns = store.libraryCoverColumns(),
             libraryShowWholeCovers = store.libraryShowWholeCovers(),
+            libraryCoverCaption = store.libraryCoverCaption(),
+            libraryProgressBadges = store.libraryProgressBadges(),
             browseViewMode = store.browseViewMode(),
             browseCoverColumns = store.browseCoverColumns(),
             browseShowWholeCovers = store.browseShowWholeCovers(),

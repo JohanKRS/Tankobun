@@ -167,6 +167,15 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import com.tankobun.core.database.ChapterUpdateEntity
+import com.tankobun.app.updates.toSourceChapter
+import com.tankobun.app.updates.libraryChapterStandings
+import com.tankobun.app.updates.buildLibraryUpdateGroups
+import com.tankobun.app.updates.FoundChapter
+import com.tankobun.app.updates.ChapterUpdateStore
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -261,6 +270,9 @@ class MainViewModel(
     private val appUpdateDataSource = AppUpdateDataSource(container)
     private val readerDataSource = ReaderDataSource(container)
     private var trackingAutoSaveJob: Job? = null
+    private val chapterUpdateStore = ChapterUpdateStore(container)
+    private var latestChapterUpdates: List<ChapterUpdateEntity> = emptyList()
+    private var libraryProgressJob: Job? = null
     private var pendingAniListSyncJob: Job? = null
     private var libraryRefreshJob: Job? = null
     private var cachedLibraryJob: Job? = null
@@ -316,6 +328,9 @@ class MainViewModel(
             libraryViewMode = container.settingsStore.libraryViewMode(),
             libraryCoverColumns = container.settingsStore.libraryCoverColumns(),
             libraryShowWholeCovers = container.settingsStore.libraryShowWholeCovers(),
+            libraryCoverCaption = container.settingsStore.libraryCoverCaption(),
+            libraryProgressBadges = container.settingsStore.libraryProgressBadges(),
+            libraryUpdatesSeenAtEpochMillis = container.settingsStore.libraryUpdatesSeenAtEpochMillis(),
             browseViewMode = container.settingsStore.browseViewMode(),
             browseCoverColumns = container.settingsStore.browseCoverColumns(),
             browseShowWholeCovers = container.settingsStore.browseShowWholeCovers(),
@@ -380,6 +395,7 @@ class MainViewModel(
     val state: StateFlow<TankobunUiState> = _state
 
     init {
+        observeLibraryUpdates()
         viewModelScope.launch {
             downloadDataSource.observeDownloads().collect { downloads ->
                 val storageSummary = downloadDataSource.storageSummary(downloads)
@@ -1392,7 +1408,72 @@ class MainViewModel(
         }
     }
 
+    private fun observeLibraryUpdates() {
+        viewModelScope.launch {
+            combine(
+                chapterUpdateStore.observe(),
+                _state.map { state -> state.libraryItems.mapTo(hashSetOf()) { item -> item.media.id } }.distinctUntilChanged(),
+            ) { updates, _ -> updates }
+                .collect { updates ->
+                    latestChapterUpdates = updates
+                    refreshLibraryProgressViews()
+                }
+        }
+    }
+
+    /** Rebuilds the Updates sheet groups and the per-cover chapter standings from the database. */
+    private fun refreshLibraryProgressViews() {
+        libraryProgressJob?.cancel()
+        libraryProgressJob = viewModelScope.launch {
+            val mediaById = _state.value.libraryItems.associate { item -> item.media.id to item.media }
+            val updates = latestChapterUpdates.filter { it.mediaId in mediaById }
+            val updateMediaIds = updates.map { it.mediaId }.distinct()
+            val readUrls = if (updateMediaIds.isEmpty()) {
+                emptyMap()
+            } else {
+                container.database.progressDao().completedChapters(updateMediaIds)
+                    .groupBy({ it.mediaId }, { it.chapterUrl })
+                    .mapValues { (_, urls) -> urls.toSet() }
+            }
+            // Chapter-number parsing over every cached chapter list stays off the main thread.
+            val (groups, standings) = withContext(Dispatchers.Default) {
+                buildLibraryUpdateGroups(
+                    found = updates.map { FoundChapter(it.mediaId, it.toSourceChapter(), it.foundAtEpochMillis) },
+                    mediaById = mediaById,
+                    readUrlsByMedia = readUrls,
+                ) to container.libraryChapterStandings(mediaById.keys)
+            }
+            _state.update { it.copy(libraryUpdates = groups, libraryStandings = standings) }
+        }
+    }
+
+    fun markLibraryUpdatesSeen() {
+        val now = System.currentTimeMillis()
+        container.settingsStore.saveLibraryUpdatesSeenAtEpochMillis(now)
+        _state.update { it.copy(libraryUpdatesSeenAtEpochMillis = now) }
+    }
+
+    fun clearLibraryUpdates() {
+        viewModelScope.launch { chapterUpdateStore.clear() }
+    }
+
+    fun checkForNewChaptersNow() {
+        NewChapterCheckWork.runOnce(container.application)
+        _state.update { it.copy(message = string(R.string.msg_checking_new_chapters)) }
+    }
+
+    fun setLibraryCoverCaption(caption: LibraryCoverCaption) {
+        container.settingsStore.saveLibraryCoverCaption(caption)
+        _state.update { it.copy(libraryCoverCaption = caption) }
+    }
+
+    fun setLibraryProgressBadges(enabled: Boolean) {
+        container.settingsStore.saveLibraryProgressBadges(enabled)
+        _state.update { it.copy(libraryProgressBadges = enabled) }
+    }
+
     private fun loadRecentReadingProgress() {
+        refreshLibraryProgressViews()
         viewModelScope.launch {
             val items = aniListDataSource.recentReadingProgressItems(
                 titleLanguage = _state.value.anilistTitleLanguage,
@@ -1691,6 +1772,8 @@ class MainViewModel(
                 libraryViewMode = store.libraryViewMode(),
                 libraryCoverColumns = store.libraryCoverColumns(),
                 libraryShowWholeCovers = store.libraryShowWholeCovers(),
+                libraryCoverCaption = store.libraryCoverCaption(),
+                libraryProgressBadges = store.libraryProgressBadges(),
                 browseViewMode = store.browseViewMode(),
                 browseCoverColumns = store.browseCoverColumns(),
                 browseShowWholeCovers = store.browseShowWholeCovers(),
@@ -4385,6 +4468,9 @@ class MainViewModel(
                 )
                 if (!isCurrentSelection(_state.value)) return@launch
                 val newCount = if (previousUrls.isEmpty()) 0 else chapters.count { it.url !in previousUrls }
+                if (newCount > 0 && _state.value.libraryItems.any { it.media.id == mediaId }) {
+                    chapterUpdateStore.record(mediaId, chapters.filter { it.url !in previousUrls }, now)
+                }
                 val updateMessage = if (newCount > 0) quantityString(R.plurals.new_chapter_count, newCount, newCount) else null
                 _state.update {
                     if (!isCurrentSelection(it)) it

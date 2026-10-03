@@ -439,6 +439,22 @@ internal fun SettingsDetailContent(
                 showWholeCover = state.libraryShowWholeCovers,
                 onShowWholeCoverChange = viewModel::setLibraryShowWholeCovers,
             )
+            Text(tankobunString(R.string.settings_library_caption), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            FlowRowCompat {
+                LibraryCoverCaption.entries.forEach { caption ->
+                    TankobunChip(
+                        selected = state.libraryCoverCaption == caption,
+                        onClick = { viewModel.setLibraryCoverCaption(caption) },
+                        label = { Text(caption.label()) },
+                    )
+                }
+            }
+            SettingsToggleRow(
+                title = tankobunString(R.string.settings_library_badges),
+                subtitle = tankobunString(R.string.settings_library_badges_desc),
+                checked = state.libraryProgressBadges,
+                onCheckedChange = viewModel::setLibraryProgressBadges,
+            )
             Text(tankobunString(R.string.settings_library_updates), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             LibraryNewChapterChecksToggle(state = state, viewModel = viewModel)
         }
@@ -1579,3 +1595,10 @@ internal fun NavigationStyleSetting(
 private fun Context.needsPostNotificationPermission(): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+
+@Composable
+private fun LibraryCoverCaption.label(): String = when (this) {
+    LibraryCoverCaption.PUBLICATION -> tankobunString(R.string.library_caption_publication)
+    LibraryCoverCaption.PROGRESS -> tankobunString(R.string.library_caption_progress)
+    LibraryCoverCaption.NONE -> tankobunString(R.string.library_caption_none)
+}

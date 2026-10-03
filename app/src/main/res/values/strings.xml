@@ -1376,4 +1376,38 @@
     <string name="reader_back_to_details">Back to details</string>
     <string name="reader_current_chapter">Reading now</string>
     <string name="reader_chapter_list">Chapter list</string>
+    <string name="msg_checking_new_chapters">Checking for new chapters…</string>
+    <string name="library_updates_title">Updates</string>
+    <string name="library_updates_empty_title">Nothing new yet</string>
+    <string name="library_updates_empty_body">New chapters for manga in your library show up here.</string>
+    <string name="library_updates_checks_off">Automatic checks are off. Turn them on to look for new chapters of the manga you’re reading once a day.</string>
+    <string name="library_updates_turn_on">Turn on</string>
+    <string name="library_updates_check_now">Check now</string>
+    <string name="library_updates_clear">Clear</string>
+    <string name="settings_library_caption">Cover caption</string>
+    <string name="library_caption_publication">Publication status</string>
+    <string name="library_caption_progress">Reading progress</string>
+    <string name="library_caption_none">None</string>
+    <string name="library_caption_not_started">Not started</string>
+    <string name="settings_library_badges">Chapters left on covers</string>
+    <string name="settings_library_badges_desc">Shows how many chapters remain in manga you have started.</string>
+    <string name="filter_publication">Publication</string>
+    <string name="home_chapter_caught_up">Ch. %1$s · Up to date</string>
+    <plurals name="home_chapter_remaining">
+        <item quantity="one">Ch. %1$s · %2$d left</item>
+        <item quantity="other">Ch. %1$s · %2$d left</item>
+    </plurals>
+    <plurals name="library_updates_new_chapters">
+        <item quantity="one">%1$d new chapter</item>
+        <item quantity="other">%1$d new chapters</item>
+    </plurals>
+    <plurals name="library_remaining_cd">
+        <item quantity="one">%1$d chapter left</item>
+        <item quantity="other">%1$d chapters left</item>
+    </plurals>
+    <plurals name="library_updates_more">
+        <item quantity="one">+%1$d more</item>
+        <item quantity="other">+%1$d more</item>
+    </plurals>
+    <string name="library_caption_caught_up">Up to date</string>
 </resources>

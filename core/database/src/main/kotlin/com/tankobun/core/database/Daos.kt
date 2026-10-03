@@ -2,6 +2,8 @@ package com.tankobun.core.database
 
 import androidx.room.Dao
 import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
@@ -278,6 +280,9 @@ interface ProgressDao {
     )
     suspend fun latestReadingProgress(): List<ReadingProgressEntity>
 
+    @Query("SELECT mediaId, chapterUrl FROM reader_progress WHERE completed = 1 AND mediaId IN (:mediaIds)")
+    suspend fun completedChapters(mediaIds: List<Int>): List<CompletedChapterRow>
+
     @Query("SELECT * FROM reader_progress WHERE mediaId = :mediaId AND chapterUrl = :chapterUrl")
     suspend fun progressForChapter(mediaId: Int, chapterUrl: String): ReadingProgressEntity?
 
@@ -292,6 +297,27 @@ interface ProgressDao {
 
     @Query("DELETE FROM reader_progress WHERE mediaId IN (:mediaIds)")
     suspend fun deleteProgressForMedia(mediaIds: List<Int>)
+}
+
+data class CompletedChapterRow(val mediaId: Int, val chapterUrl: String)
+
+@Dao
+interface ChapterUpdateDao {
+    @Query("SELECT * FROM chapter_updates ORDER BY foundAtEpochMillis DESC, chapterNumber DESC")
+    fun observeUpdates(): Flow<List<ChapterUpdateEntity>>
+
+    /** Keeps the first time a chapter was seen; a later sighting of the same chapter is ignored. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertUpdates(updates: List<ChapterUpdateEntity>)
+
+    @Query("DELETE FROM chapter_updates WHERE foundAtEpochMillis < :cutoffEpochMillis")
+    suspend fun deleteOlderThan(cutoffEpochMillis: Long)
+
+    @Query("DELETE FROM chapter_updates WHERE mediaId IN (:mediaIds)")
+    suspend fun deleteForMedia(mediaIds: List<Int>)
+
+    @Query("DELETE FROM chapter_updates")
+    suspend fun clear()
 }
 
 @Dao

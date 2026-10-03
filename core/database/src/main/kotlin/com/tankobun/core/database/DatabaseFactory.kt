@@ -28,8 +28,21 @@ object DatabaseFactory {
                 MIGRATION_13_14,
                 MIGRATION_14_15,
                 MIGRATION_15_16,
+                MIGRATION_16_17,
             )
             .build()
+    }
+
+    internal val MIGRATION_16_17 = object : Migration(16, 17) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS chapter_updates (mediaId INTEGER NOT NULL, sourceId INTEGER NOT NULL, " +
+                    "mangaUrl TEXT NOT NULL, chapterUrl TEXT NOT NULL, name TEXT NOT NULL, chapterNumber REAL NOT NULL, " +
+                    "chapterNumberText TEXT, volume TEXT, scanlator TEXT, uploadedAtEpochMillis INTEGER, " +
+                    "foundAtEpochMillis INTEGER NOT NULL, PRIMARY KEY(mediaId, chapterUrl))",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_chapter_updates_foundAtEpochMillis ON chapter_updates(foundAtEpochMillis)")
+        }
     }
 
     internal val MIGRATION_15_16 = object : Migration(15, 16) {

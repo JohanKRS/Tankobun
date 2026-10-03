@@ -1,5 +1,6 @@
 package com.tankobun.app
 
+import com.tankobun.app.updates.ChapterUpdateStore
 import com.tankobun.core.extensions.readingContentKind
 import android.Manifest
 import android.app.NotificationChannel
@@ -187,6 +188,7 @@ internal class NewChapterChecker(
 
             val newChapters = fetched.newSince(cachedRows)
             if (newChapters.isNotEmpty()) {
+                ChapterUpdateStore(container).record(candidate.media.id, newChapters, checkedAt)
                 updates += NewChapterUpdate(
                     mediaTitle = candidate.media.title.userPreferred,
                     sourceName = source.name,

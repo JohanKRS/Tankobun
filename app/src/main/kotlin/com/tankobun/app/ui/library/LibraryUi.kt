@@ -347,6 +347,12 @@ internal fun LibraryScreen(
             selectionMode = selectedCount > 0,
             onToggleMediaSelection = viewModel::toggleLibraryBatchSelection,
             onLongPressMedia = viewModel::startLibraryBatchSelection,
+            captionFor = libraryCaptionFor(state),
+            badgeFor = if (state.libraryProgressBadges) {
+                { media -> state.libraryStandings[media.id]?.remaining }
+            } else {
+                null
+            },
         )
         AnimatedVisibility(
             visible = selectedCount > 0,
@@ -522,6 +528,17 @@ internal fun LibraryFilterBar(
         TankobunHorizontalFilterRow(contentPadding = PaddingValues(horizontal = LibraryContentPadding)) {
             item {
                 BrowseFilterPill(
+                    label = tankobunString(R.string.browse_sort),
+                    value = tankobunString(
+                        LibrarySortOptions.firstOrNull { it.value == sort }?.labelRes ?: R.string.library_sort_list_order,
+                    ),
+                    selected = sort != LIBRARY_SORT_LIST_ORDER,
+                    icon = TankobunIcons.Sort,
+                    onClick = onOpenOptions,
+                )
+            }
+            item {
+                BrowseFilterPill(
                     label = tankobunString(R.string.common_genres),
                     value = if (genres.isEmpty()) tankobunString(R.string.common_any) else genres.size.toString(),
                     selected = genres.isNotEmpty(),
@@ -549,7 +566,7 @@ internal fun LibraryFilterBar(
             }
             item {
                 BrowseFilterPill(
-                    label = tankobunString(R.string.common_status),
+                    label = tankobunString(R.string.filter_publication),
                     value = statusOptions.selectionLabel(selection.statuses),
                     selected = selection.statuses.isNotEmpty(),
                     icon = TankobunIcons.Flag,
@@ -572,12 +589,6 @@ internal fun LibraryFilterBar(
                     selected = selection.years != null,
                     icon = TankobunIcons.CalendarMonth,
                     onClick = { onOpenPicker(LibraryPicker.YEAR) },
-                )
-            }
-            item {
-                BrowseIconFilterPill(
-                    contentDescription = tankobunString(R.string.library_options),
-                    onClick = onOpenOptions,
                 )
             }
             if (filtersOrSortActive) {
@@ -653,6 +664,8 @@ internal fun LibraryPager(
     selectionMode: Boolean = false,
     onToggleMediaSelection: (AnilistMedia) -> Unit = {},
     onLongPressMedia: (AnilistMedia) -> Unit = {},
+    captionFor: ((AnilistMedia) -> String?)? = null,
+    badgeFor: ((AnilistMedia) -> Int?)? = null,
 ) {
     val chromeInsets = LocalTankobunChromeInsets.current
     if (sections.isEmpty()) {
@@ -861,6 +874,8 @@ internal fun LibraryPager(
                 selectionMode = selectionMode,
                 onToggleMediaSelection = onToggleMediaSelection,
                 onLongPressMedia = onLongPressMedia,
+                captionFor = captionFor,
+                badgeFor = badgeFor,
             )
         }
         Column(
@@ -1648,3 +1663,20 @@ internal fun AnilistMedia.librarySearchText(): String =
         countryOfOrigin?.let(::add)
         synonyms.forEach(::add)
     }.joinToString(" ").lowercase()
+
+/** The cover caption the user picked in Settings › Library; null keeps the publication status. */
+@Composable
+private fun libraryCaptionFor(state: TankobunUiState): ((AnilistMedia) -> String?)? {
+    val notStarted = tankobunString(R.string.library_caption_not_started)
+    return when (state.libraryCoverCaption) {
+        LibraryCoverCaption.PUBLICATION -> null
+        LibraryCoverCaption.NONE -> { _ -> "" }
+        LibraryCoverCaption.PROGRESS -> {
+            val labels: Map<Int, String> = state.libraryStandings.mapValues { (_, standing) ->
+                if (state.libraryProgressBadges) standing.compactProgressLabel() else standing.progressLabel()
+            }
+            val caption: (AnilistMedia) -> String? = { media -> labels[media.id] ?: notStarted }
+            caption
+        }
+    }
+}

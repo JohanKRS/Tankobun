@@ -1,5 +1,6 @@
 package com.tankobun.app.ui.home
 
+import com.tankobun.app.progressLabel
 import com.tankobun.app.ui.icons.TankobunIcons
 
 import android.content.res.Configuration
@@ -861,7 +862,8 @@ private fun ContinueReadingCard(
                 overflow = TextOverflow.Ellipsis,
             )
             TankobunMediaStatusLabel(
-                text = item.currentChapterNumber
+                text = item.standing?.progressLabel()
+                    ?: item.currentChapterNumber
                     ?.let { chapterNumber -> tankobunString(R.string.home_chapter, chapterNumber.compactNumber()) }
                     ?: item.chapter?.name
                     ?: tankobunString(R.string.reader_saved_chapter),

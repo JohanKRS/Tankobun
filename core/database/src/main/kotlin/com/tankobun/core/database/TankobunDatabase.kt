@@ -20,8 +20,9 @@ import androidx.room.TypeConverters
         CatalogIdentityEntity::class,
         CatalogPageEntity::class,
         MangaBakaMutationEntity::class,
+        ChapterUpdateEntity::class,
     ],
-    version = 16,
+    version = 17,
     exportSchema = true,
 )
 @TypeConverters(TankobunTypeConverters::class)
@@ -36,6 +37,7 @@ abstract class TankobunDatabase : RoomDatabase() {
     abstract fun sourceSearchDao(): SourceSearchDao
     abstract fun chapterDao(): ChapterDao
     abstract fun progressDao(): ProgressDao
+    abstract fun chapterUpdateDao(): ChapterUpdateDao
     abstract fun downloadDao(): DownloadDao
     abstract fun downloadPageDao(): DownloadPageDao
     abstract fun syncMutationDao(): SyncMutationDao

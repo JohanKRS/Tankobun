@@ -35,6 +35,22 @@ data class RecentReadingProgress(
     val currentChapterNumber: Float? = null,
     val lastAvailableChapterNumber: Float? = null,
     val overallProgress: Float? = null,
+    val standing: com.tankobun.app.logic.ChapterStanding? = null,
+)
+
+/** New chapters for one library manga, newest first. */
+data class LibraryUpdateGroup(
+    val media: AnilistMedia,
+    val chapters: List<LibraryUpdateChapter>,
+    val newestFoundAtEpochMillis: Long,
+    /** Distinct chapter numbers, the same rule the library badges use. */
+    val newChapterCount: Int,
+)
+
+data class LibraryUpdateChapter(
+    val chapter: SourceChapter,
+    val foundAtEpochMillis: Long,
+    val read: Boolean,
 )
 
 data class ReaderChapterSegment(
