@@ -14,6 +14,8 @@ private val MarkdownLink = Regex("""\[([^\]]*)]\((?:https?://|www\.)[^)\s]*\)"""
 private val MarkdownEmphasis = Regex("""(\*\*|__|\*|~~)(?=\S)(.+?)(?<=\S)\1""")
 private val MarkdownLinePrefix = Regex("""^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+)""")
 private val MarkdownRule = Regex("""^\s*([-*_]\s*){3,}$""")
+private val BareUrl = Regex("""(?:https?://|www\.)\S+""")
+private val LeadingLabel = Regex("""^[^:]{1,40}:""")
 private val Whitespace = Regex("\\s+")
 
 /**
@@ -29,7 +31,7 @@ internal fun String?.plainMediaDescription(): String {
         .replace("&amp;", "&")
         .lines()
         .filterNot { MarkdownRule.matches(it) }
-        .filterNot { line -> MarkdownLink.containsMatchIn(line) && line.replace(MarkdownLink, "").none { it.isLetterOrDigit() } }
+        .filterNot { it.isOnlyLinks() }
         .map { line ->
             line.replace(MarkdownLinePrefix, "")
                 .replace(MarkdownLink) { it.groupValues[1] }
@@ -40,4 +42,15 @@ internal fun String?.plainMediaDescription(): String {
         // A label left without the links it introduced ("Original Webtoon:") says nothing on its own.
         .dropLastWhile { it.endsWith(':') }
     return lines.joinToString(" ").replace(Whitespace, " ").trim()
+}
+
+/** "[Comic Gardo](…)", a bare URL or "Official English: [INKR](…)": where to read it, not what it is about. */
+private fun String.isOnlyLinks(): Boolean {
+    if (!MarkdownLink.containsMatchIn(this) && !BareUrl.containsMatchIn(this)) return false
+    val rest = replace(MarkdownLink, "")
+        .replace(BareUrl, "")
+        .replace(MarkdownEmphasis) { it.groupValues[2] }
+        .trim()
+        .replaceFirst(LeadingLabel, "")
+    return rest.none { it.isLetterOrDigit() }
 }

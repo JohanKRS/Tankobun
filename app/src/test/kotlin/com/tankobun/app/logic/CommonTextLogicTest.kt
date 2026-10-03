@@ -40,6 +40,16 @@ class CommonTextLogicTest {
     }
 
     @Test
+    fun dropsBareUrlsAndLabelledLinkLists() {
+        assertEquals("", "[Comic Gardo](https://comic-gardo.com/episode/1)\nhttps://www.cmoa.jp/title/368098".plainMediaDescription())
+        assertEquals(
+            "From INKR: From the creator of Yu-Gi-Oh R.",
+            "Official English: [Comikey](https://comikey.com/comics/1/), [INKR](https://inkr.com/title/669)\n\nFrom INKR:  \nFrom the creator of Yu-Gi-Oh R."
+                .plainMediaDescription(),
+        )
+    }
+
+    @Test
     fun handlesMissingDescriptions() {
         assertEquals("", null.plainMediaDescription())
     }
