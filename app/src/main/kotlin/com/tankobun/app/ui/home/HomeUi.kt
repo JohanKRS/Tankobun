@@ -314,6 +314,7 @@ private fun HomeSection(
                     letterSpacing = 1.2.sp,
                 ),
                 modifier = Modifier.weight(1f),
+                shrinkToFit = true,
             )
             AnimatedVisibility(
                 visible = isRefreshing,

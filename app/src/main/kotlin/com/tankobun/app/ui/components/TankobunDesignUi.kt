@@ -52,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
@@ -141,6 +142,8 @@ internal fun TankobunHeadingLead(
     modifier: Modifier = Modifier,
     iconTint: Color = MaterialTheme.colorScheme.primary,
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
+    // Shrinks up to 20% before ellipsizing, for headings that share a row with an action.
+    shrinkToFit: Boolean = false,
 ) {
     val iconBaselineInset = with(LocalDensity.current) {
         (2.dp + headingIconOpticalBaselineAdjustment(icon)).roundToPx()
@@ -166,6 +169,11 @@ internal fun TankobunHeadingLead(
             overflow = TextOverflow.Ellipsis,
             style = textStyle,
             color = titleColor,
+            autoSize = if (shrinkToFit && textStyle.fontSize.isSp) {
+                TextAutoSize.StepBased(minFontSize = textStyle.fontSize * 0.8f, maxFontSize = textStyle.fontSize, stepSize = 0.5.sp)
+            } else {
+                null
+            },
         )
     }
 }
