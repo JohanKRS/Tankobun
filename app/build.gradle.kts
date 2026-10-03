@@ -98,6 +98,12 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
     packaging {
         jniLibs {
             useLegacyPackaging = true
@@ -171,5 +177,18 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("org.robolectric:robolectric:4.17")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("org.json:json:20240303")
+}
+
+tasks.withType<Test>().configureEach {
+    // Opt-in layout screenshots for every app language (see LayoutQaScreens).
+    if (providers.gradleProperty("tankobun.qaScreens").isPresent) {
+        systemProperty("tankobun.qaScreens", "true")
+        systemProperty("tankobun.qaScreensDir", layout.buildDirectory.dir("qa-screens").get().asFile.absolutePath)
+    }
+    providers.gradleProperty("robolectricRepoUrl").orNull?.let { systemProperty("robolectric.dependency.repo.url", it) }
 }

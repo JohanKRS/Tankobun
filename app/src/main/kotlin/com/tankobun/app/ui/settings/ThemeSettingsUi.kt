@@ -45,6 +45,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -281,34 +282,43 @@ internal fun ThemePicker(
         }
 
         ThemeOptionLabel(tankobunString(R.string.settings_theme_palette))
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            palettes.forEach { choice ->
-                PaletteSwatchButton(
-                    name = tankobunString(choice.id.themeNameRes()),
-                    description = tankobunString(choice.id.themeDescriptionRes()),
-                    light = choice.lightSwatches,
-                    dark = choice.darkSwatches,
-                    showDark = normalized.isDark(systemDark),
-                    selected = normalized.palette == choice.id,
-                    onClick = { onSelect(normalized.copy(palette = choice.id)) },
-                )
-            }
-            if (dynamicAvailable) {
-                val dynamicLight = remember(context) { tankobunColorScheme(TankobunThemePreference(palette = TankobunPaletteId.DYNAMIC), false, context) }
-                val dynamicDark = remember(context) { tankobunColorScheme(TankobunThemePreference(palette = TankobunPaletteId.DYNAMIC), true, context) }
-                PaletteSwatchButton(
-                    name = tankobunString(TankobunPaletteId.DYNAMIC.themeNameRes()),
-                    description = tankobunString(TankobunPaletteId.DYNAMIC.themeDescriptionRes()),
-                    light = listOf(dynamicLight.background, dynamicLight.primary),
-                    dark = listOf(dynamicDark.background, dynamicDark.primary),
-                    showDark = normalized.isDark(systemDark),
-                    selected = normalized.palette == TankobunPaletteId.DYNAMIC,
-                    onClick = { onSelect(normalized.copy(palette = TankobunPaletteId.DYNAMIC)) },
-                )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val columns = if (maxWidth >= 560.dp) 6 else 4
+            val spacing = 6.dp
+            // Leave a pixel of slack so rounding never pushes the last column to a new row.
+            val itemWidth = (maxWidth - spacing * (columns - 1)) / columns - 1.dp
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                maxItemsInEachRow = columns,
+            ) {
+                palettes.forEach { choice ->
+                    PaletteSwatchButton(
+                        name = tankobunString(choice.id.themeNameRes()),
+                        description = tankobunString(choice.id.themeDescriptionRes()),
+                        light = choice.lightSwatches,
+                        dark = choice.darkSwatches,
+                        showDark = normalized.isDark(systemDark),
+                        selected = normalized.palette == choice.id,
+                        onClick = { onSelect(normalized.copy(palette = choice.id)) },
+                        modifier = Modifier.width(itemWidth),
+                    )
+                }
+                if (dynamicAvailable) {
+                    val dynamicLight = remember(context) { tankobunColorScheme(TankobunThemePreference(palette = TankobunPaletteId.DYNAMIC), false, context) }
+                    val dynamicDark = remember(context) { tankobunColorScheme(TankobunThemePreference(palette = TankobunPaletteId.DYNAMIC), true, context) }
+                    PaletteSwatchButton(
+                        name = tankobunString(TankobunPaletteId.DYNAMIC.themeNameRes()),
+                        description = tankobunString(TankobunPaletteId.DYNAMIC.themeDescriptionRes()),
+                        light = listOf(dynamicLight.background, dynamicLight.primary),
+                        dark = listOf(dynamicDark.background, dynamicDark.primary),
+                        showDark = normalized.isDark(systemDark),
+                        selected = normalized.palette == TankobunPaletteId.DYNAMIC,
+                        onClick = { onSelect(normalized.copy(palette = TankobunPaletteId.DYNAMIC)) },
+                        modifier = Modifier.width(itemWidth),
+                    )
+                }
             }
         }
         Text(
@@ -438,12 +448,12 @@ private fun PaletteSwatchButton(
     showDark: Boolean,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val ringColor = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
     val dotColor = (if (showDark) dark else light).getOrElse(1) { MaterialTheme.colorScheme.primary }
     Column(
-        modifier = Modifier
-            .width(64.dp)
+        modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .semantics { contentDescription = "$name. $description" }
@@ -457,6 +467,7 @@ private fun PaletteSwatchButton(
                 .border(2.dp, ringColor, CircleShape)
                 .padding(4.dp)
                 .clip(CircleShape)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
                 .drawBehind {
                     drawRect(light.firstOrNull() ?: Color.White)
                     val half = androidx.compose.ui.graphics.Path().apply {
@@ -488,7 +499,9 @@ private fun PaletteSwatchButton(
             name,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            maxLines = 1,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            minLines = 2,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
     }
