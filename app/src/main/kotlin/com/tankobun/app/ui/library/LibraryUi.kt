@@ -729,7 +729,6 @@ internal fun LibraryPager(
     )
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
     var searchHeaderHeightPx by remember { mutableIntStateOf(0) }
     var tabHeaderHeightPx by remember { mutableIntStateOf(0) }
     var headerCollapsePx by remember { mutableFloatStateOf(0f) }
@@ -791,14 +790,17 @@ internal fun LibraryPager(
             .nestedScroll(headerScrollConnection),
     ) {
         val supportedViewMode = viewMode.supportedMediaViewMode()
-        val supportedCoverColumns = coverColumns
-            .supportedCoverColumns()
-            .coerceAtMost(if (configuration.smallestScreenWidthDp in 1 until 600) 4 else 8)
         val contentPaddingPx = with(density) { LibraryContentPadding.roundToPx() }
         val topChromeInsetPx = with(density) { chromeInsets.top.roundToPx() }
         val bottomChromeInsetPx = with(density) { chromeInsets.bottom.roundToPx() }
-        val gridGapPx = with(density) { 16.dp.roundToPx() }
+        val gridGapPx = with(density) { MediaGridSpacing.roundToPx() }
         val listGapPx = with(density) { 8.dp.roundToPx() }
+        // Matches the columns MediaCollection picks for the same width so page heights can be estimated.
+        val supportedCoverColumns = adaptiveCoverColumns(
+            preferredColumns = preferredCoverColumns(coverColumns),
+            availableWidthDp = with(density) { (constraints.maxWidth - contentPaddingPx * 2).toDp().value },
+            spacingDp = with(density) { gridGapPx.toDp().value },
+        )
         val availableGridWidthPx = (constraints.maxWidth - (contentPaddingPx * 2) -
             (gridGapPx * (supportedCoverColumns - 1))).coerceAtLeast(0)
         val gridCellWidthPx = if (supportedCoverColumns > 0) {

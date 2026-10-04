@@ -159,6 +159,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -282,10 +283,7 @@ internal fun MediaCollection(
     /** A count drawn on the cover, such as chapters left. */
     badgeFor: ((AnilistMedia) -> Int?)? = null,
 ) {
-    val configuration = LocalConfiguration.current
-    val supportedCoverColumns = coverColumns
-        .supportedCoverColumns()
-        .coerceAtMost(if (configuration.smallestScreenWidthDp in 1 until 600) 4 else 8)
+    val preferredCoverColumns = preferredCoverColumns(coverColumns)
 
     if (media.isEmpty()) {
         val listState = providedListState ?: rememberLazyListState()
@@ -497,11 +495,11 @@ internal fun MediaCollection(
             }
             LazyVerticalGrid(
                 state = gridState,
-                columns = GridCells.Fixed(supportedCoverColumns),
+                columns = remember(preferredCoverColumns) { AdaptiveCoverCells(preferredCoverColumns) },
                 modifier = modifier,
                 contentPadding = contentPadding,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(MediaGridSpacing),
+                horizontalArrangement = Arrangement.spacedBy(MediaGridSpacing),
             ) {
                 header?.let { headerContent ->
                     item(
@@ -546,6 +544,30 @@ internal fun MediaCollection(
             }
         }
     }
+}
+
+/** Gap between covers, across and down, in cover grids. */
+internal val MediaGridSpacing = 16.dp
+
+/** The user's covers per row, capped to what a phone or a tablet can show. */
+@Composable
+internal fun preferredCoverColumns(coverColumns: Int): Int {
+    val configuration = LocalConfiguration.current
+    return coverColumns
+        .supportedCoverColumns()
+        .coerceAtMost(if (configuration.smallestScreenWidthDp in 1 until 600) 4 else 8)
+}
+
+/** Equal columns for the phone count the user chose, with more on wider grids (see [adaptiveCoverColumns]). */
+private class AdaptiveCoverCells(private val preferredColumns: Int) : GridCells {
+    override fun Density.calculateCrossAxisCellSizes(availableSize: Int, spacing: Int): List<Int> {
+        val columns = adaptiveCoverColumns(preferredColumns, availableSize.toDp().value, spacing.toDp().value)
+        return with(GridCells.Fixed(columns)) { calculateCrossAxisCellSizes(availableSize, spacing) }
+    }
+
+    override fun equals(other: Any?): Boolean = other is AdaptiveCoverCells && other.preferredColumns == preferredColumns
+
+    override fun hashCode(): Int = preferredColumns
 }
 
 @Composable
