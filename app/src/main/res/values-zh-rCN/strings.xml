@@ -105,7 +105,6 @@
     <string name="settings_sources_subtitle">管理已安装的来源扩展和仓库条目。</string>
     <string name="settings_about_subtitle">说明 Tankobun 是什么，以及不是什么。</string>
     <string name="settings_downloads_subtitle">查看本地章节存储并移除已下载漫画。</string>
-    <string name="settings_theme_section">主题</string>
     <string name="settings_theme_custom">自定义</string>
     <string name="settings_theme_palette">调色板</string>
     <string name="settings_theme_sample_tag">标签</string>

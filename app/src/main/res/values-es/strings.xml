@@ -104,7 +104,6 @@
     <string name="settings_sources_subtitle">Gestiona extensiones de fuentes instaladas y entradas del repositorio.</string>
     <string name="settings_about_subtitle">Un poco de contexto sobre qué es y qué no es Tankobun.</string>
     <string name="settings_downloads_subtitle">Revisa el almacenamiento local de capítulos y elimina manga descargado.</string>
-    <string name="settings_theme_section">Tema</string>
     <string name="settings_theme_custom">Personalizado</string>
     <string name="settings_theme_palette">Paleta de colores</string>
     <string name="settings_theme_sample_tag">Etiqueta</string>

@@ -697,6 +697,8 @@ internal fun SettingsDetailPanel(
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
+    /** False when the top bar above already names the page, so the content starts right under it. */
+    showHeader: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val chromeInsets = LocalTankobunChromeInsets.current
@@ -707,17 +709,19 @@ internal fun SettingsDetailPanel(
             .padding(top = chromeInsets.top + 20.dp, bottom = chromeInsets.bottom + 20.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                title,
-                style = LocalTankobunStyle.current.typography.sectionLabel,
-                color = LocalTankobunStyle.current.colors.accent,
-            )
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        if (showHeader) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    title,
+                    style = LocalTankobunStyle.current.typography.sectionLabel,
+                    color = LocalTankobunStyle.current.colors.accent,
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         content()
     }

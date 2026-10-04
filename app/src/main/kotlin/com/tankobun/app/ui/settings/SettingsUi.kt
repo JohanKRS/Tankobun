@@ -272,6 +272,7 @@ internal fun SettingsScreen(
                 viewModel = viewModel,
                 route = detailRoute,
                 modifier = Modifier.fillMaxSize(),
+                fullPage = true,
             )
         }
     }
@@ -380,16 +381,20 @@ internal fun SettingsDetailContent(
     viewModel: MainViewModel,
     route: SettingsRoute,
     modifier: Modifier = Modifier,
+    /** True when the page fills the screen under a top bar that already shows its title, as on phones. */
+    fullPage: Boolean = false,
 ) {
     val deviceHasDisplayCutout = hasTabletDisplayCutout()
     when (route) {
         SettingsRoute.PROFILE -> FullProfileScreen(state, viewModel, modifier)
         SettingsRoute.MAIN,
         SettingsRoute.ANILIST -> AniListSettingsScreen(state, viewModel, modifier)
+        // The theme previews start right under the top bar instead of after a repeated title.
         SettingsRoute.APPEARANCE -> SettingsDetailPanel(
             title = tankobunString(R.string.settings_appearance),
             subtitle = tankobunString(R.string.settings_appearance_subtitle),
             modifier = modifier,
+            showHeader = !fullPage,
         ) {
             ThemePicker(
                 selected = state.themePreference,

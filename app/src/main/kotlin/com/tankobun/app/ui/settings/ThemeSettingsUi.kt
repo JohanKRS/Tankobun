@@ -226,7 +226,6 @@ internal fun ThemePicker(
     val palettes = remember { tankobunPaletteChoices() }
     val dynamicAvailable = remember { dynamicColorAvailable() }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(tankobunString(R.string.settings_theme_section), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Row(
             modifier = Modifier.fillMaxWidth().height(156.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
