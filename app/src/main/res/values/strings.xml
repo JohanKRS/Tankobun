@@ -1201,6 +1201,17 @@
     <string name="filters_refresh">Refresh genres and tags</string>
     <string name="filters_option_count">Options: %1$d</string>
     <string name="filters_selected_count">Selected (%1$d)</string>
+    <string name="filters_search_genres">Search genres</string>
+    <string name="filters_search_tags">Search tags</string>
+    <string name="filters_tags_hint">Pick tags from the categories below</string>
+    <plurals name="filters_options_plural">
+        <item quantity="one">%d option</item>
+        <item quantity="other">%d options</item>
+    </plurals>
+    <plurals name="filters_selected_plural">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
     <string name="filters_loading">Loading options…</string>
     <string name="filters_no_matches">No matching options.</string>
     <string name="filters_category_activities">Activities</string>

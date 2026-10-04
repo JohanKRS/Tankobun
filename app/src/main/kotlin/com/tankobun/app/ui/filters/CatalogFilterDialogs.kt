@@ -23,6 +23,11 @@ import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.R
 import com.tankobun.app.tankobunString
 import com.tankobun.app.tankobunLocale
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Dp
+import com.tankobun.app.TankobunDisplayFontFamily
+import com.tankobun.app.tankobunQuantityString
 import com.tankobun.app.ui.browse.*
 import com.tankobun.app.ui.components.*
 import com.tankobun.app.ui.icons.TankobunIcons
@@ -46,6 +51,8 @@ internal fun FilterDialogFrame(
     fitContent: Boolean = false,
     sheetOnPhone: Boolean = true,
     footer: (@Composable () -> Unit)? = null,
+    // "2 selecionados" or "412 opções", set beside the title.
+    count: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val configuration = LocalConfiguration.current
@@ -65,13 +72,24 @@ internal fun FilterDialogFrame(
                     .padding(start = 18.dp, end = 18.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        title,
+                        modifier = Modifier.weight(1f),
+                        style = TextStyle(fontFamily = TankobunDisplayFontFamily, fontSize = 30.sp, lineHeight = 30.sp, letterSpacing = 1.sp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    count?.let {
+                        Text(
+                            it,
+                            modifier = Modifier.padding(bottom = 3.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                }
                 Column(Modifier.weight(1f, fill = expanded), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
                 if (footer != null) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
@@ -207,7 +225,12 @@ internal fun CatalogFilterDialog(
     val groups = remember(visible, collator) { visible.groupBy { it.group }.toSortedMap(collator) }
     fun toggle(key: String) { draft = if (key in draft) draft - key else draft + key }
 
-    FilterDialogFrame(title, onDismiss, expanded = true, footer = {
+    val count = if (draft.isNotEmpty()) {
+        tankobunQuantityString(R.plurals.filters_selected_plural, draft.size, draft.size)
+    } else {
+        tankobunQuantityString(R.plurals.filters_options_plural, visible.size, visible.size)
+    }
+    FilterDialogFrame(title, onDismiss, expanded = true, count = count, footer = {
         FilterDialogActions(draft.size, onClear = { draft = emptySet(); selectedOnly = false }, onApply = {
             onApply(draft)
             onDismiss()
@@ -215,7 +238,13 @@ internal fun CatalogFilterDialog(
     }) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.weight(1f)) {
-                TankobunSearchField(query, { query = it }, placeholder = tankobunString(R.string.filters_find_option), showSearchAction = false)
+                TankobunSearchField(
+                    query,
+                    { query = it },
+                    placeholder = tankobunString(if (genresOnly) R.string.filters_search_genres else R.string.filters_search_tags),
+                    showSearchAction = false,
+                    filled = true,
+                )
             }
             if (onRefresh != null) {
                 IconButton(onClick = onRefresh, enabled = !loading) {
@@ -224,35 +253,36 @@ internal fun CatalogFilterDialog(
                 }
             }
         }
-        // A fixed-height row: the first selection must not push the options away from the finger.
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (!genresOnly && draft.isNotEmpty()) {
-                val labelByKey = remember(labels) { labels.associate { it.tag.key to it.label } }
-                // Selected tags stay visible and removable while browsing collapsed categories.
-                LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(draft.toList(), key = { it }) { key ->
-                        InputChip(
-                            selected = true,
-                            onClick = { toggle(key) },
-                            label = { Text(labelByKey[key] ?: key, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            trailingIcon = {
-                                Icon(TankobunIcons.Close, contentDescription = tankobunString(R.string.common_remove), modifier = Modifier.size(16.dp))
-                            },
-                            modifier = Modifier.widthIn(max = 220.dp),
-                        )
+        // Tags keep a fixed-height row for their selection, so the first pick never pushes the list
+        // away from the finger. Genres show every choice in the grid and need no such row.
+        if (!genresOnly) {
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (draft.isNotEmpty()) {
+                    val labelByKey = remember(labels) { labels.associate { it.tag.key to it.label } }
+                    LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(draft.toList(), key = { it }) { key ->
+                            InputChip(
+                                selected = true,
+                                onClick = { toggle(key) },
+                                label = { Text(labelByKey[key] ?: key, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                trailingIcon = {
+                                    Icon(TankobunIcons.Close, contentDescription = tankobunString(R.string.common_remove), modifier = Modifier.size(16.dp))
+                                },
+                                modifier = Modifier.widthIn(max = 220.dp),
+                            )
+                        }
                     }
+                    FilterChip(selected = selectedOnly, onClick = { selectedOnly = !selectedOnly },
+                        label = { Text(tankobunString(R.string.filters_selected_count, draft.size)) })
+                } else {
+                    Text(tankobunString(R.string.filters_tags_hint), Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-            } else {
-                Text(tankobunString(R.string.filters_option_count, visible.size), Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (draft.isNotEmpty()) {
-                FilterChip(selected = selectedOnly, onClick = { selectedOnly = !selectedOnly },
-                    label = { Text(tankobunString(R.string.filters_selected_count, draft.size)) })
             }
         }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -271,7 +301,14 @@ internal fun CatalogFilterDialog(
                                 selected = selectedGenre,
                                 onClick = { toggle(item.tag.key) },
                                 label = { Text(item.label, maxLines = 1) },
-                                leadingIcon = { Icon(genreIcon(item.tag.name), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                                // A picked genre trades its icon for a check, as in the design.
+                                leadingIcon = {
+                                    Icon(
+                                        if (selectedGenre) TankobunIcons.Check else genreIcon(item.tag.name),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                },
                             )
                         }
                     }
@@ -282,8 +319,9 @@ internal fun CatalogFilterDialog(
                 for ((group, children) in groups) {
                     item(key = "group:$group") {
                         val expanded = group in expandedGroups
+                        // A step darker than the sheet, so categories read as rows to open.
                         Surface(shape = LocalTankobunStyle.current.themeShapes.control,
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            color = MaterialTheme.colorScheme.surfaceContainer,
                             modifier = Modifier.fillMaxWidth().clickable {
                                 expandedGroups = if (expanded) expandedGroups - group else expandedGroups + group
                             }) {
@@ -293,12 +331,17 @@ internal fun CatalogFilterDialog(
                                 Text(group, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                                 val count = children.count { it.tag.key in draft }
                                 Text(if (count == 0) children.size.toString() else "$count / ${children.size}",
-                                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (count == 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                                    fontWeight = if (count == 0) FontWeight.Normal else FontWeight.Bold)
                             }
                         }
                     }
                     if (group in expandedGroups) {
-                        items(children, key = { it.tag.key }) { item -> FilterTagRow(item, item.tag.key in draft, false) { toggle(item.tag.key) } }
+                        // Inside a category the group is already named: no subtitle, and an indent under the arrow.
+                        items(children, key = { it.tag.key }) { item ->
+                            FilterTagRow(item, item.tag.key in draft, compact = true, indent = 30.dp) { toggle(item.tag.key) }
+                        }
                     }
                 }
             }
@@ -307,11 +350,11 @@ internal fun CatalogFilterDialog(
 }
 
 @Composable
-private fun FilterTagRow(item: FilterTagLabel, selected: Boolean, compact: Boolean, onClick: () -> Unit) {
+private fun FilterTagRow(item: FilterTagLabel, selected: Boolean, compact: Boolean, indent: Dp = 0.dp, onClick: () -> Unit) {
     Surface(shape = LocalTankobunStyle.current.themeShapes.control,
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0f),
         modifier = Modifier.fillMaxWidth().toggleable(selected, role = Role.Checkbox, onValueChange = { onClick() })) {
-        Row(Modifier.padding(start = 12.dp, end = 4.dp).heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = 12.dp + indent, end = 4.dp).heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
             if (item.tag.isGenre) {
                 Icon(genreIcon(item.tag.name), null, Modifier.size(22.dp),
                     tint = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)

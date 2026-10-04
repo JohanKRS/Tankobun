@@ -1200,6 +1200,15 @@
     <string name="filters_refresh">刷新类型与标签</string>
     <string name="filters_option_count">%1$d 个选项</string>
     <string name="filters_selected_count">已选（%1$d）</string>
+    <string name="filters_search_genres">搜索类型</string>
+    <string name="filters_search_tags">搜索标签</string>
+    <string name="filters_tags_hint">在下方分类中选择标签</string>
+    <plurals name="filters_options_plural">
+        <item quantity="other">%d 个选项</item>
+    </plurals>
+    <plurals name="filters_selected_plural">
+        <item quantity="other">已选 %d 个</item>
+    </plurals>
     <string name="filters_loading">正在加载选项…</string>
     <string name="filters_no_matches">未找到匹配的选项。</string>
     <string name="filters_category_activities">活动</string>

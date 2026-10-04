@@ -43,6 +43,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -428,6 +429,8 @@ internal fun TankobunSearchField(
     modifier: Modifier = Modifier,
     onSearch: () -> Unit = {},
     showSearchAction: Boolean = true,
+    // A borderless pill on a tonal fill, as filter sheets use it; the outlined field elsewhere.
+    filled: Boolean = false,
 ) {
     OutlinedTextField(
         value = value,
@@ -452,7 +455,17 @@ internal fun TankobunSearchField(
         placeholder = { Text(placeholder) },
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-        shape = LocalTankobunStyle.current.themeShapes.control,
+        shape = if (filled) RoundedCornerShape(percent = 50) else LocalTankobunStyle.current.themeShapes.control,
+        colors = if (filled) {
+            OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            )
+        } else {
+            OutlinedTextFieldDefaults.colors()
+        },
     )
 }
 

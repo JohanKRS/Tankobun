@@ -1202,6 +1202,17 @@
     <string name="filters_refresh">Atualizar gêneros e tags</string>
     <string name="filters_option_count">Opções: %1$d</string>
     <string name="filters_selected_count">Selecionadas (%1$d)</string>
+    <string name="filters_search_genres">Buscar gênero</string>
+    <string name="filters_search_tags">Buscar tag</string>
+    <string name="filters_tags_hint">Escolha tags nas categorias abaixo</string>
+    <plurals name="filters_options_plural">
+        <item quantity="one">%d opção</item>
+        <item quantity="other">%d opções</item>
+    </plurals>
+    <plurals name="filters_selected_plural">
+        <item quantity="one">%d selecionado</item>
+        <item quantity="other">%d selecionados</item>
+    </plurals>
     <string name="filters_loading">Carregando opções…</string>
     <string name="filters_no_matches">Nenhuma opção encontrada.</string>
     <string name="filters_category_activities">Atividades</string>
