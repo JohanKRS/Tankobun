@@ -14,6 +14,7 @@ import com.tankobun.app.AppLanguage
 import com.tankobun.app.ReaderBackground
 import com.tankobun.app.ReaderDirection
 import com.tankobun.app.ReaderPreferences
+import com.tankobun.app.ReaderScreenOrientation
 import com.tankobun.app.qa.LayoutQaScreens
 import com.tankobun.app.state.TankobunUiState
 import com.tankobun.core.model.ReaderMode
@@ -25,7 +26,11 @@ class ReaderQaScreens(language: AppLanguage) : LayoutQaScreens(language) {
     private fun chapter(number: Float, name: String) =
         SourceChapter(1L, "/manga", "/ch/$number", name, number, null, now - 3 * 24 * 60 * 60 * 1000L)
 
-    private val noActions = ReaderSettingsActions({}, {}, {}, {}, {})
+    private val noActions = ReaderSettingsActions({}, {}, {}, {})
+    private fun quickActions(paged: Boolean, rtl: Boolean) =
+        ReaderQuickActions(paged, rtl, fitScreen = false, orientation = ReaderScreenOrientation.SYSTEM, {}, {}, {}, {})
+    private fun next(chapter: SourceChapter, downloaded: Boolean) =
+        ReaderNextChapterInfo(chapter, coverUrl = null, group = "Paper Lantern Scans", downloaded = downloaded)
 
     @Test
     fun readerChrome() = capture("reader-chrome") {
@@ -54,6 +59,7 @@ class ReaderQaScreens(language: AppLanguage) : LayoutQaScreens(language) {
                     onPreviousChapter = {},
                     onNextChapter = {},
                     onResetZoom = {},
+                    quickActions = quickActions(paged = true, rtl = rtl),
                 )
             }
             ReaderBottomBar(
@@ -69,6 +75,7 @@ class ReaderQaScreens(language: AppLanguage) : LayoutQaScreens(language) {
                 onPreviousChapter = {},
                 onNextChapter = {},
                 onResetZoom = {},
+                quickActions = quickActions(paged = false, rtl = false),
             )
         }
     }
@@ -81,16 +88,19 @@ class ReaderQaScreens(language: AppLanguage) : LayoutQaScreens(language) {
                     Box(Modifier.height(420.dp).background(background.color())) {
                         ReaderChapterEndPage(
                             chapter = chapter(12f, "Chapter 12"),
-                            nextChapter = chapter(13f, "Chapter 13 - A Very Long Chapter Title That Wraps").takeIf { index == 0 },
+                            next = next(chapter(13f, "Chapter 13 - A Very Long Chapter Title That Wraps"), downloaded = true)
+                                .takeIf { index == 0 },
                             onNextChapter = {},
-                            onOpenChapters = {},
                             onClose = {},
                         )
                     }
                 }
             }
             Box(Modifier.background(Color.Black)) {
-                WebtoonChapterTransitionCard("Chapter 12", "Chapter 13 - A Very Long Chapter Title That Wraps")
+                WebtoonChapterTransitionCard(
+                    previousChapter = chapter(12f, "Chapter 12"),
+                    next = next(chapter(13f, "Chapter 13 - A Very Long Chapter Title That Wraps"), downloaded = true),
+                )
             }
         }
     }

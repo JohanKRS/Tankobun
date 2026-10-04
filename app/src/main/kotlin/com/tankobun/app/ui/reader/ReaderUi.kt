@@ -687,7 +687,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 ) { index, item ->
                     val aspectKey = "${item.chapter.url}:${item.page.index}:${item.page.imageUrl}"
                     val previousItem = webtoonPageItems.getOrNull(index - 1)
-                    val showChapterDivider = state.showWebtoonChapterDividers &&
+                    val showChapterDivider = readerPreferences.chapterEndPage &&
                         previousItem != null &&
                         previousItem.chapter.url != item.chapter.url
                     Column(
@@ -696,8 +696,8 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     ) {
                         if (showChapterDivider) {
                             WebtoonChapterTransitionCard(
-                                previousChapterName = previousItem.chapter.name,
-                                nextChapterName = item.chapter.name,
+                                previousChapter = previousItem.chapter,
+                                next = state.readerNextChapterInfo(item.chapter),
                             )
                         }
                         ReaderPageImage(
@@ -820,9 +820,8 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     when {
                         target.chapterEnd -> ReaderChapterEndPage(
                             chapter = target.chapter,
-                            nextChapter = target.nextChapter,
+                            next = target.nextChapter?.let { state.readerNextChapterInfo(it) },
                             onNextChapter = { turnPage(1) },
-                            onOpenChapters = { chapterListOpen = true },
                             onClose = viewModel::closeReader,
                         )
                         page != null -> {
@@ -891,9 +890,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 onClose = viewModel::closeReader,
                 onOpenChapters = { chapterListOpen = true },
                 onOpenSettings = { settingsOpen = true },
-                modifier = Modifier
-                    .readerSafeDrawingPadding(ignoreDisplayCutout = ignoreDisplayCutout)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                contentModifier = Modifier.readerSafeDrawingPadding(ignoreDisplayCutout = ignoreDisplayCutout),
             )
         }
         AnimatedVisibility(
@@ -943,9 +940,42 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     viewModel.openNextChapter()
                 },
                 onResetZoom = ::resetZoom,
-                modifier = Modifier
-                    .readerSafeDrawingPadding(ignoreDisplayCutout = ignoreDisplayCutout)
-                    .padding(12.dp),
+                quickActions = ReaderQuickActions(
+                    paged = state.readerMode == ReaderMode.PAGED,
+                    rightToLeft = readerPreferences.direction == ReaderDirection.RIGHT_TO_LEFT,
+                    fitScreen = fitScreen,
+                    orientation = state.readerScreenOrientation,
+                    onToggleMode = {
+                        resetZoom()
+                        viewModel.setReaderMode(
+                            if (state.readerMode == ReaderMode.PAGED) ReaderMode.WEBTOON else ReaderMode.PAGED,
+                        )
+                    },
+                    onToggleDirection = {
+                        viewModel.updateReaderPreferences {
+                            it.copy(
+                                direction = if (it.direction == ReaderDirection.RIGHT_TO_LEFT) {
+                                    ReaderDirection.LEFT_TO_RIGHT
+                                } else {
+                                    ReaderDirection.RIGHT_TO_LEFT
+                                },
+                            )
+                        }
+                    },
+                    onToggleFit = {
+                        resetZoom()
+                        viewModel.updateReaderPreferences {
+                            it.copy(fit = if (it.fit == ReaderFit.SCREEN) ReaderFit.WIDTH else ReaderFit.SCREEN)
+                        }
+                    },
+                    onCycleOrientation = {
+                        val orientations = ReaderScreenOrientation.entries
+                        viewModel.setReaderScreenOrientation(
+                            orientations[(orientations.indexOf(state.readerScreenOrientation) + 1) % orientations.size],
+                        )
+                    },
+                ),
+                contentModifier = Modifier.readerSafeDrawingPadding(ignoreDisplayCutout = ignoreDisplayCutout),
             )
         }
 
@@ -1464,6 +1494,24 @@ internal fun readerGapLabel(level: Int): String = when (level) {
     2 -> tankobunString(R.string.reader_medium_gaps)
     3 -> tankobunString(R.string.reader_large_gaps)
     else -> tankobunString(R.string.reader_no_gaps)
+}
+
+/** The next chapter as the end page and webtoon card present it. */
+internal fun TankobunUiState.readerNextChapterInfo(chapter: SourceChapter): ReaderNextChapterInfo =
+    ReaderNextChapterInfo(
+        chapter = chapter,
+        coverUrl = selectedMedia?.coverImage,
+        group = chapter.translationCredit(),
+        downloaded = downloadForChapter(chapter)?.state == DownloadState.COMPLETE,
+    )
+
+/** One-letter sizes for the segmented control; [readerGapLabel] stays the spoken name. */
+@Composable
+internal fun readerGapShortLabel(level: Int): String = when (level) {
+    1 -> tankobunString(R.string.reader_gap_small_short)
+    2 -> tankobunString(R.string.reader_gap_medium_short)
+    3 -> tankobunString(R.string.reader_gap_large_short)
+    else -> tankobunString(R.string.reader_gap_none_short)
 }
 
 internal fun ReaderPage.readerPageAspectRatio(): Float? {

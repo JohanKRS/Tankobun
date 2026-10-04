@@ -845,9 +845,6 @@ internal fun SettingsRoute.settingsSummary(state: TankobunUiState): String =
             if (state.readerScreenOrientation != ReaderScreenOrientation.SYSTEM) {
                 add(state.readerScreenOrientation.readerOrientationLabel())
             }
-            if (state.showWebtoonChapterDividers) {
-                add(tankobunString(R.string.settings_webtoon_chapter_dividers_short))
-            }
         }.joinToString(" / ")
         SettingsRoute.DOWNLOADS -> state.downloadStorageSummary.totalBytes.formatFileSize()
         SettingsRoute.ANILIST -> buildList {
