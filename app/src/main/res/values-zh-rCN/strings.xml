@@ -1114,6 +1114,14 @@
     </plurals>
     <string name="nav_home">主页</string>
     <string name="you_settings_header">设置</string>
+    <string name="you_profile_open">查看完整资料</string>
+    <string name="you_profile_synced">AniList 已同步</string>
+    <string name="you_profile_not_connected">未连接 AniList</string>
+    <string name="you_stat_chapters_read">已读章节</string>
+    <string name="you_stat_active_titles">在读作品</string>
+    <string name="you_stat_day_streak">连续天数</string>
+    <string name="you_downloads_active_saved">%1$d 个进行中 · 已保存 %2$s</string>
+    <string name="you_downloads_saved">已保存 %1$s</string>
     <string name="settings_navigation_rail">侧边栏</string>
     <string name="settings_navigation_dock">底部栏</string>
     <string name="settings_navigation_style_desc">底部栏悬浮在屏幕下方。横屏时侧边栏固定在左侧边缘，竖屏时使用底部栏。</string>

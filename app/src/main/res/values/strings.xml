@@ -1115,6 +1115,14 @@
     </plurals>
     <string name="nav_home">Home</string>
     <string name="you_settings_header">Settings</string>
+    <string name="you_profile_open">View full profile</string>
+    <string name="you_profile_synced">AniList synced</string>
+    <string name="you_profile_not_connected">AniList not connected</string>
+    <string name="you_stat_chapters_read">chapters read</string>
+    <string name="you_stat_active_titles">active titles</string>
+    <string name="you_stat_day_streak">day streak</string>
+    <string name="you_downloads_active_saved">%1$d in progress · %2$s saved</string>
+    <string name="you_downloads_saved">%1$s saved</string>
     <string name="settings_navigation_rail">Side bar</string>
     <string name="settings_navigation_dock">Dock</string>
     <string name="settings_navigation_style_desc">The dock floats at the bottom of the screen. The side bar stays on the left edge in landscape; in portrait the dock is used.</string>

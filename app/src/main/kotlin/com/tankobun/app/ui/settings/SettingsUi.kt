@@ -225,7 +225,8 @@ internal fun SettingsScreen(
         val tabletLayout = maxWidth >= 720.dp
         val detailRoute = if (route == SettingsRoute.MAIN) SettingsRoute.ANILIST else route
 
-        if (tabletLayout) {
+        // The full profile is opened from the You card, so it fills the page instead of a settings pane.
+        if (tabletLayout && route != SettingsRoute.PROFILE) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -382,8 +383,8 @@ internal fun SettingsDetailContent(
 ) {
     val deviceHasDisplayCutout = hasTabletDisplayCutout()
     when (route) {
+        SettingsRoute.PROFILE -> FullProfileScreen(state, viewModel, modifier)
         SettingsRoute.MAIN,
-        SettingsRoute.PROFILE,
         SettingsRoute.ANILIST -> AniListSettingsScreen(state, viewModel, modifier)
         SettingsRoute.APPEARANCE -> SettingsDetailPanel(
             title = tankobunString(R.string.settings_appearance),

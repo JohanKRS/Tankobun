@@ -1116,6 +1116,14 @@
     </plurals>
     <string name="nav_home">Inicio</string>
     <string name="you_settings_header">Ajustes</string>
+    <string name="you_profile_open">Ver perfil completo</string>
+    <string name="you_profile_synced">AniList sincronizado</string>
+    <string name="you_profile_not_connected">AniList no conectado</string>
+    <string name="you_stat_chapters_read">capítulos leídos</string>
+    <string name="you_stat_active_titles">títulos activos</string>
+    <string name="you_stat_day_streak">días seguidos</string>
+    <string name="you_downloads_active_saved">%1$d en curso · %2$s guardados</string>
+    <string name="you_downloads_saved">%1$s guardados</string>
     <string name="settings_navigation_rail">Barra lateral</string>
     <string name="settings_navigation_dock">Dock</string>
     <string name="settings_navigation_style_desc">El dock flota en la parte inferior de la pantalla. La barra lateral queda en el borde izquierdo en horizontal; en vertical se usa el dock.</string>

@@ -6,14 +6,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas as ComposeCanvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +31,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,13 +48,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.tankobun.app.LocalTankobunStyle
 import com.tankobun.app.MainViewModel
 import com.tankobun.app.R
+import com.tankobun.app.TankobunDisplayFontFamily
 import com.tankobun.app.statusLabel
 import com.tankobun.app.tankobunQuantityString
 import com.tankobun.app.tankobunString
@@ -59,6 +74,7 @@ import com.tankobun.app.state.LocalReadingActivity
 import com.tankobun.app.state.LibraryItem
 import com.tankobun.app.LibraryMode
 import com.tankobun.app.ui.components.TankobunPanel
+import com.tankobun.app.ui.components.shrinkToFit
 import com.tankobun.app.ui.icons.TankobunIcons
 import com.tankobun.app.ui.icons.genreIcon
 import com.tankobun.app.ui.library.LibraryConnectPrompt
@@ -80,18 +96,7 @@ internal fun ProfileScreen(
 ) {
     val chromeInsets = LocalTankobunChromeInsets.current
     val context = LocalContext.current
-    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { viewModel.setCustomProfileAvatarUri(it.toString()) }
-    }
-    val bannerPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { viewModel.setCustomProfileBannerUri(it.toString()) }
-    }
     LaunchedEffect(Unit) { viewModel.refreshLocalReadingActivity() }
-    val stats = if (state.libraryMode == LibraryMode.ANILIST && state.anilistMangaStats != null) {
-        state.anilistMangaStats
-    } else {
-        state.localMangaStats()
-    }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -100,15 +105,16 @@ internal fun ProfileScreen(
             top = chromeInsets.top + 16.dp,
             bottom = chromeInsets.bottom + 20.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            ProfileHeaderCard(
-                state = state,
-                onEditAvatar = { avatarPicker.launch(arrayOf("image/*")) },
-                onEditBanner = { bannerPicker.launch(arrayOf("image/*")) },
-                onClearAvatar = { viewModel.setCustomProfileAvatarUri(null) },
-                onClearBanner = { viewModel.setCustomProfileBannerUri(null) },
+            YouProfileCard(state = state, onOpenProfile = { onOpenSettingsRoute(SettingsRoute.PROFILE) })
+        }
+        item {
+            YouQuickStats(
+                stats = state.profileStats(),
+                activity = state.localReadingActivity,
+                libraryItems = state.libraryItems,
             )
         }
         if (!state.loggedIn) {
@@ -129,11 +135,249 @@ internal fun ProfileScreen(
         item {
             YouSettingsSection(state = state, onOpenSettingsRoute = onOpenSettingsRoute)
         }
+    }
+}
+
+/** The page behind the You profile card: banner and avatar editing plus the full statistics dashboard. */
+@Composable
+internal fun FullProfileScreen(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val chromeInsets = LocalTankobunChromeInsets.current
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.setCustomProfileAvatarUri(it.toString()) }
+    }
+    val bannerPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.setCustomProfileBannerUri(it.toString()) }
+    }
+    LaunchedEffect(Unit) { viewModel.refreshLocalReadingActivity() }
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(
+            top = chromeInsets.top + 16.dp,
+            bottom = chromeInsets.bottom + 20.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        item {
+            ProfileHeaderCard(
+                state = state,
+                onEditAvatar = { avatarPicker.launch(arrayOf("image/*")) },
+                onEditBanner = { bannerPicker.launch(arrayOf("image/*")) },
+                onClearAvatar = { viewModel.setCustomProfileAvatarUri(null) },
+                onClearBanner = { viewModel.setCustomProfileBannerUri(null) },
+            )
+        }
         item {
             ProfileStatisticsDashboard(
-                stats = stats,
+                stats = state.profileStats(),
                 activity = state.localReadingActivity,
                 libraryItems = state.libraryItems,
+            )
+        }
+    }
+}
+
+private fun TankobunUiState.profileStats(): AnilistMangaStats =
+    if (libraryMode == LibraryMode.ANILIST && anilistMangaStats != null) {
+        anilistMangaStats
+    } else {
+        localMangaStats()
+    }
+
+/** Compact identity row at the top of You; the whole card opens the full profile. */
+@Composable
+internal fun YouProfileCard(state: TankobunUiState, onOpenProfile: () -> Unit) {
+    val style = LocalTankobunStyle.current
+    val profileName = state.viewerName ?: tankobunString(R.string.settings_profile_local_name)
+    val avatarUrl = state.customProfileAvatarUri?.takeIf { it.isNotBlank() }
+        ?: state.viewerAvatarUrl?.takeIf { it.isNotBlank() }
+    val synced = state.loggedIn && state.libraryMode == LibraryMode.ANILIST
+    val status = when {
+        synced -> tankobunString(R.string.you_profile_synced)
+        state.libraryMode == LibraryMode.LOCAL -> tankobunString(R.string.library_mode_local)
+        else -> tankobunString(R.string.you_profile_not_connected)
+    }
+    val nameStyle = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp)
+    val statusStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp)
+    // Centers the dot on the first status line when a long status wraps.
+    val dotTopInset = with(LocalDensity.current) { (statusStyle.lineHeight.toDp() - 8.dp) / 2 }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = style.themeShapes.panel,
+        color = style.colors.panel,
+        contentColor = style.colors.panelContent,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(
+            modifier = Modifier
+                .clickable(
+                    onClickLabel = tankobunString(R.string.you_profile_open),
+                    role = Role.Button,
+                    onClick = onOpenProfile,
+                )
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            YouProfileAvatar(name = profileName, avatarUrl = avatarUrl)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    profileName,
+                    style = nameStyle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    autoSize = nameStyle.shrinkToFit(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .padding(top = dotTopInset)
+                            .size(8.dp)
+                            .background(
+                                color = if (synced) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline,
+                                shape = RoundedCornerShape(style.radii.pill),
+                            ),
+                    )
+                    Text(
+                        status,
+                        style = statusStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            // Same 48dp footprint as the design's chevron button; the whole card is the click target.
+            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                Icon(
+                    TankobunIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun YouProfileAvatar(name: String, avatarUrl: String?) {
+    val context = LocalContext.current
+    Surface(
+        modifier = Modifier.size(60.dp),
+        shape = RoundedCornerShape(LocalTankobunStyle.current.radii.pill),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    ) {
+        if (avatarUrl != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(avatarUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    name.profileMonogram(),
+                    style = TextStyle(
+                        fontFamily = TankobunDisplayFontFamily,
+                        fontSize = 30.sp,
+                        lineHeight = 30.sp,
+                        lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
+                    ),
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+/** First character of the profile name, kept whole when it lies outside the BMP. */
+private fun String.profileMonogram(): String {
+    val name = trim()
+    if (name.isEmpty()) return ""
+    return String(Character.toChars(name.codePointAt(0))).uppercase(Locale.getDefault())
+}
+
+@Composable
+internal fun YouQuickStats(
+    stats: AnilistMangaStats,
+    activity: LocalReadingActivity,
+    libraryItems: List<LibraryItem>,
+) {
+    val overview = profileReadingOverview(stats = stats, libraryItems = libraryItems)
+    // Equal-height tiles even when a label wraps to a second line in longer languages.
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        YouStatTile(
+            value = overview.chaptersRead.formatProfileNumber(),
+            label = tankobunString(R.string.you_stat_chapters_read),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+        )
+        YouStatTile(
+            value = overview.mangaActive.formatProfileNumber(),
+            label = tankobunString(R.string.you_stat_active_titles),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+        )
+        YouStatTile(
+            value = activity.currentStreakDays.coerceAtLeast(0).formatProfileNumber(),
+            label = tankobunString(R.string.you_stat_day_streak),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+        )
+    }
+}
+
+@Composable
+private fun YouStatTile(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    val style = LocalTankobunStyle.current
+    val numberStyle = style.typography.statNumber.copy(fontSize = 32.sp, lineHeight = 32.sp)
+    Surface(
+        modifier = modifier.semantics(mergeDescendants = true) {},
+        shape = style.themeShapes.panel,
+        color = style.colors.panel,
+        contentColor = style.colors.panelContent,
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                value,
+                style = numberStyle,
+                color = style.colors.accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                autoSize = numberStyle.shrinkToFit(),
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -151,6 +395,7 @@ private data class ProfileReadingOverview(
     val mangaRead: Int,
     val mangaTotal: Int,
     val mangaRemaining: Int,
+    val mangaActive: Int,
     val chaptersRead: Int,
     val chaptersKnownTotal: Int?,
     val chaptersKnownRemaining: Int?,
@@ -1096,6 +1341,15 @@ private fun profileReadingOverview(
             .filter { item -> item.name.equals(MediaStatus.COMPLETED.name, ignoreCase = true) }
             .sumOf { it.count }
     }
+    // Titles being read right now, rereads included.
+    val activeStatuses = setOf(MediaStatus.CURRENT, MediaStatus.REPEATING)
+    val mangaActive = if (libraryItems.isNotEmpty()) {
+        libraryItems.count { item -> item.entry.status in activeStatuses }
+    } else {
+        stats.statuses
+            .filter { item -> activeStatuses.any { status -> item.name.equals(status.name, ignoreCase = true) } }
+            .sumOf { it.count }
+    }
     val chaptersWithKnownTotal = libraryItems.filter { item -> item.media.chapters != null }
     val chaptersKnownTotal = chaptersWithKnownTotal
         .sumOf { item -> item.media.chapters?.coerceAtLeast(0) ?: 0 }
@@ -1116,6 +1370,7 @@ private fun profileReadingOverview(
         mangaRead = mangaRead,
         mangaTotal = mangaTotal,
         mangaRemaining = (mangaTotal - mangaRead).coerceAtLeast(0),
+        mangaActive = mangaActive,
         chaptersRead = stats.chaptersRead.coerceAtLeast(0),
         chaptersKnownTotal = chaptersKnownTotal,
         chaptersKnownRemaining = chaptersKnownRemaining,
@@ -1152,6 +1407,7 @@ private fun Double.formatProfileDecimal(): String {
 internal fun YouDownloadsEntry(state: TankobunUiState, onClick: () -> Unit) {
     val style = LocalTankobunStyle.current
     val active = state.downloads.count { it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING }
+    val saved = state.downloadStorageSummary.totalBytes.formatFileSize()
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -1168,16 +1424,18 @@ internal fun YouDownloadsEntry(state: TankobunUiState, onClick: () -> Unit) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     tankobunString(R.string.common_downloads),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleSmall.copy(fontSize = 15.sp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     if (active > 0) {
-                        tankobunString(R.string.nav_you_downloads_badge, tankobunString(R.string.common_downloads))
+                        tankobunString(R.string.you_downloads_active_saved, active, saved)
                     } else {
-                        SettingsRoute.DOWNLOADS.settingsSummary(state)
+                        tankobunString(R.string.you_downloads_saved, saved)
                     },
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                    color = LocalContentColor.current.copy(alpha = 0.8f),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
