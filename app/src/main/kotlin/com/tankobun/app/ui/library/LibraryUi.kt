@@ -217,6 +217,8 @@ import com.tankobun.app.logic.*
 import com.tankobun.app.state.*
 import com.tankobun.app.ui.browse.*
 import com.tankobun.app.ui.components.*
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.tankobun.app.ui.downloads.*
 import com.tankobun.app.ui.library.*
 import com.tankobun.app.ui.media.*
@@ -533,14 +535,22 @@ internal fun LibraryFilterBar(
         }
         TankobunHorizontalFilterRow(contentPadding = PaddingValues(horizontal = LibraryContentPadding)) {
             item {
-                BrowseFilterPill(
-                    label = tankobunString(R.string.browse_sort),
-                    value = tankobunString(
-                        LibrarySortOptions.firstOrNull { it.value == sort }?.labelRes ?: R.string.library_sort_list_order,
-                    ),
-                    selected = sort != LIBRARY_SORT_LIST_ORDER,
-                    icon = TankobunIcons.Sort,
+                // A dropdown rather than a filter: it always names the current order ("Atualizados ⌄").
+                val sortLabel = tankobunString(R.string.browse_sort)
+                val sortValue = tankobunString(
+                    LibrarySortOptions.firstOrNull { it.value == sort }?.labelRes ?: R.string.library_sort_list_order,
+                )
+                TankobunChip(
+                    selected = true,
                     onClick = onOpenOptions,
+                    modifier = Modifier.semantics { contentDescription = "$sortLabel: $sortValue" },
+                    leadingIcon = { TankobunChipIcon(TankobunIcons.Sort) },
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(sortValue, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Icon(TankobunIcons.ExpandMore, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    },
                 )
             }
             item {

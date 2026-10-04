@@ -131,6 +131,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -291,6 +293,8 @@ internal fun BrowseScreen(
     state: TankobunUiState,
     viewModel: MainViewModel,
     onSelectMedia: (AnilistMedia) -> Unit,
+    // Bumped by Home's search button: Browse opens with the keyboard on its search field.
+    searchFocusRequest: Int = 0,
 ) {
     val context = LocalContext.current
     LaunchedEffect(Unit) {
@@ -317,6 +321,7 @@ internal fun BrowseScreen(
     val browseHeader: @Composable (Dp) -> Unit = { horizontalPadding ->
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             BrowseFilterBar(
+                searchFocusRequest = searchFocusRequest,
                 state = state,
                 viewModel = viewModel,
                 horizontalPadding = horizontalPadding,
@@ -508,7 +513,12 @@ internal fun BrowseFilterBar(
     onOpenTags: () -> Unit,
     onOpenPicker: (BrowsePicker) -> Unit,
     onOpenAdvanced: () -> Unit,
+    searchFocusRequest: Int = 0,
 ) {
+    val searchFocus = remember { FocusRequester() }
+    LaunchedEffect(searchFocusRequest) {
+        if (searchFocusRequest > 0) searchFocus.requestFocus()
+    }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -520,6 +530,7 @@ internal fun BrowseFilterBar(
                 placeholder = tankobunString(R.string.browse_search_placeholder),
                 onSearch = viewModel::searchAniList,
                 showSearchAction = false,
+                modifier = Modifier.focusRequester(searchFocus),
             )
         }
         TankobunHorizontalFilterRow(contentPadding = PaddingValues(horizontal = horizontalPadding)) {

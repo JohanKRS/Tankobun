@@ -804,6 +804,7 @@ internal fun TankobunScaffold(
         TankobunDestinationBadges()
     }
     var libraryUpdatesOpen by rememberSaveable { mutableStateOf(false) }
+    var browseSearchFocusRequest by remember { mutableIntStateOf(0) }
     // Highlights what was new when the sheet opened, even though opening marks everything seen.
     var libraryUpdatesSeenBefore by rememberSaveable { mutableLongStateOf(0L) }
 
@@ -869,7 +870,7 @@ internal fun TankobunScaffold(
                             onRefresh = { viewModel.loadHomeFeed(force = true) },
                         )
                         1 -> LibraryScreen(state, viewModel, onOpenBrowse = { onSelectTab(2) }, onSelectMedia = onSelectMedia)
-                        2 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia)
+                        2 -> BrowseScreen(state, viewModel, onSelectMedia = onSelectMedia, searchFocusRequest = browseSearchFocusRequest)
                         3 -> ProfileScreen(
                             state = state,
                             viewModel = viewModel,
@@ -925,6 +926,16 @@ internal fun TankobunScaffold(
                 actions = {
                     if (selectedMedia != null) {
                         MediaDetailOverflowMenu(state, viewModel, detailChrome, detailActions)
+                    }
+                    if (selectedMedia == null && selectedTab == 0) {
+                        TopBarActionButton(
+                            icon = TankobunIcons.Search,
+                            contentDescription = tankobunString(R.string.common_search),
+                            onClick = {
+                                browseSearchFocusRequest++
+                                onSelectTab(2)
+                            },
+                        )
                     }
                     if (selectedMedia == null && selectedTab == 1) {
                         val updatesLabel = tankobunString(R.string.library_updates_title)
