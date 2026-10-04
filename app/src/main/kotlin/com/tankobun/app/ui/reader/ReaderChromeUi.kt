@@ -915,6 +915,14 @@ internal fun ColumnScope.ReaderSettingsControls(
         checked = preferences.chapterEndPage,
         onCheckedChange = { enabled -> actions.onUpdatePreferences { it.copy(chapterEndPage = enabled) } },
     )
+    if (paged || showAllModes) {
+        SettingsToggleRow(
+            title = tankobunString(R.string.reader_landscape_spreads),
+            subtitle = tankobunString(R.string.reader_landscape_spreads_desc),
+            checked = preferences.landscapeSpreads,
+            onCheckedChange = { enabled -> actions.onUpdatePreferences { it.copy(landscapeSpreads = enabled) } },
+        )
+    }
 }
 
 internal class ReaderSettingsActions(

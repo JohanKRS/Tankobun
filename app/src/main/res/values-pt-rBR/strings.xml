@@ -1356,6 +1356,8 @@
     <string name="reader_read_chapter_number">Ler capítulo %1$s</string>
     <string name="reader_read_next_chapter">Ler próximo capítulo</string>
     <string name="reader_end_continue_hint">Deslize ou toque na lateral para continuar</string>
+    <string name="reader_landscape_spreads">Página dupla em paisagem</string>
+    <string name="reader_landscape_spreads_desc">Mostra duas páginas lado a lado.</string>
     <string name="reader_webtoon_after_chapter">Fim do cap. %1$s · A seguir</string>
     <string name="reader_webtoon_up_next">A seguir</string>
     <string name="reader_direction_ltr_short">Esq. → Dir.</string>

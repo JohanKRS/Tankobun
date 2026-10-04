@@ -304,6 +304,7 @@ class SettingsStore(context: Context) {
         keepScreenOn = preferences.getBoolean(KEY_READER_KEEP_SCREEN_ON, true),
         volumeKeys = preferences.getBoolean(KEY_READER_VOLUME_KEYS, false),
         chapterEndPage = preferences.getBoolean(KEY_READER_CHAPTER_END_PAGE, true),
+        landscapeSpreads = preferences.getBoolean(KEY_READER_LANDSCAPE_SPREADS, true),
     )
 
     fun saveReaderPreferences(value: ReaderPreferences) {
@@ -314,6 +315,7 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_READER_KEEP_SCREEN_ON, value.keepScreenOn)
             .putBoolean(KEY_READER_VOLUME_KEYS, value.volumeKeys)
             .putBoolean(KEY_READER_CHAPTER_END_PAGE, value.chapterEndPage)
+            .putBoolean(KEY_READER_LANDSCAPE_SPREADS, value.landscapeSpreads)
             .apply()
     }
 
@@ -801,6 +803,7 @@ class SettingsStore(context: Context) {
         const val KEY_READER_KEEP_SCREEN_ON = "reader.keep.screen.on"
         const val KEY_READER_VOLUME_KEYS = "reader.volume.keys"
         const val KEY_READER_CHAPTER_END_PAGE = "reader.chapter.end.page"
+        const val KEY_READER_LANDSCAPE_SPREADS = "reader.landscape.spreads"
         const val KEY_CHAPTER_LIST_STARTS_AT_FIRST = "chapters.list.starts.at.first"
         const val KEY_KEEP_NEXT_TEN_DOWNLOADS = "downloads.keep.next.ten"
         const val KEY_NEW_CHAPTER_CHECKS_ENABLED = "library.new.chapter.checks.enabled"
@@ -927,6 +930,8 @@ data class ReaderPreferences(
     val keepScreenOn: Boolean = true,
     val volumeKeys: Boolean = false,
     val chapterEndPage: Boolean = true,
+    /** Two pages side by side; only takes effect in paged reading on a landscape window. */
+    val landscapeSpreads: Boolean = true,
 )
 
 enum class ReaderScreenOrientation {

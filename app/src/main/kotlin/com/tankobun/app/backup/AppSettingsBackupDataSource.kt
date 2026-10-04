@@ -132,6 +132,7 @@ internal class AppSettingsBackupDataSource(
             .put("readerKeepScreenOn", snapshot.readerPreferences.keepScreenOn)
             .put("readerVolumeKeys", snapshot.readerPreferences.volumeKeys)
             .put("readerChapterEndPage", snapshot.readerPreferences.chapterEndPage)
+            .put("readerLandscapeSpreads", snapshot.readerPreferences.landscapeSpreads)
             .put("readerScreenOrientation", snapshot.readerScreenOrientation.name)
             .put("chapterListStartsAtFirst", snapshot.chapterListStartsAtFirst)
             .put("chapterGroupPreferences", kotlinx.serialization.json.Json.encodeToString(snapshot.chapterGroupPreferences))
@@ -277,6 +278,7 @@ internal class AppSettingsBackupDataSource(
                     keepScreenOn = settings.optBooleanOrNull("readerKeepScreenOn") ?: current.keepScreenOn,
                     volumeKeys = settings.optBooleanOrNull("readerVolumeKeys") ?: current.volumeKeys,
                     chapterEndPage = settings.optBooleanOrNull("readerChapterEndPage") ?: current.chapterEndPage,
+                    landscapeSpreads = settings.optBooleanOrNull("readerLandscapeSpreads") ?: current.landscapeSpreads,
                 ),
             )
         }

@@ -113,6 +113,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -274,10 +275,30 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         view.keepScreenOn = readerPreferences.keepScreenOn
         onDispose { view.keepScreenOn = false }
     }
+    val pageCount = state.readerPages.size
+    val lastPageIndex = (pageCount - 1).coerceAtLeast(0)
+    val configuration = LocalConfiguration.current
+    val spreadsActive = readerShowsSpreads(
+        enabled = readerPreferences.landscapeSpreads,
+        readerMode = state.readerMode,
+        windowWidth = configuration.screenWidthDp,
+        windowHeight = configuration.screenHeightDp,
+    )
+    // Sizes of pages whose metadata had none, learned as they load; they decide spreads and fit-width frames.
+    val loadedPagedPageAspectRatios = remember(chapter.url) { mutableStateMapOf<Int, Float>() }
+    fun pagedPageAspectRatio(pageIndex: Int): Float? =
+        state.readerPages.getOrNull(pageIndex)?.readerPageAspectRatio() ?: loadedPagedPageAspectRatios[pageIndex]
+    val readerSpreads by remember(chapter.url, state.readerPages, spreadsActive) {
+        derivedStateOf {
+            readerPageSpreads(pageCount = pageCount, pairPages = spreadsActive, aspectRatioAt = ::pagedPageAspectRatio)
+        }
+    }
+    val currentSpread = readerSpreads.getOrNull(readerSpreads.indexOfSpreadContaining(state.currentPageIndex))
+        ?: ReaderSpread(state.currentPageIndex, state.currentPageIndex)
     val transformKey = if (state.readerMode == ReaderMode.WEBTOON) {
         "${state.selectedMedia?.id}:${state.selectedSourceId}:webtoon"
     } else {
-        "${chapter.url}:${state.readerMode}:${state.currentPageIndex}"
+        "${chapter.url}:${state.readerMode}:${currentSpread.first}:$spreadsActive"
     }
     val readerMotion = rememberReaderMotionState(transformKey)
     val readerScale = readerMotion.scale
@@ -287,11 +308,8 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     val pagedPagePadding = if (state.readerPageGapLevel == 0) 8.dp else pageGap
     val density = LocalDensity.current
     val pagedPagePaddingPx = with(density) { pagedPagePadding.toPx() }
-    var loadedPagedPageAspectRatio by remember(transformKey) { mutableStateOf<Float?>(null) }
-    val currentPagedPageMetadataAspectRatio = state.readerPages
-        .getOrNull(state.currentPageIndex)
-        ?.readerPageAspectRatio()
-    val currentPagedPageAspectRatio = currentPagedPageMetadataAspectRatio ?: loadedPagedPageAspectRatio
+    // A spread frames like one wide page, so zoom, pan and fit-width treat both pages as a single image.
+    val currentPagedPageAspectRatio = currentSpread.combinedAspectRatio(::pagedPageAspectRatio)
     fun pagedFrameHeight(width: Float, height: Float): Float =
         if (fitScreen) {
             height
@@ -310,8 +328,6 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         ),
     )
     val zoomPercent = (readerScale * 100).toInt()
-    val pageCount = state.readerPages.size
-    val lastPageIndex = (pageCount - 1).coerceAtLeast(0)
     val nextChapter = state.nextReaderChapter()
     val previousChapter = state.readingChapters.previousInReadingOrderBefore(chapter)
     val webtoonPageItems = remember(state.readerPreviousSegment, chapter, state.readerPages, state.readerNextSegment) {
@@ -330,7 +346,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     val canGoBack = state.currentPageIndex > 0 || previousChapter != null
     val canGoForward = state.currentPageIndex < lastPageIndex || nextChapter != null
     var scrubberValue by remember(chapter.url, pageCount) {
-        mutableStateOf(state.currentPageIndex.coerceIn(0, lastPageIndex).toFloat())
+        mutableStateOf(currentSpread.first.coerceIn(0, lastPageIndex).toFloat())
     }
     var scrubberSeeking by remember(chapter.url) { mutableStateOf(false) }
     var webtoonInitialScrollDoneFor by remember { mutableStateOf<String?>(null) }
@@ -345,12 +361,14 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         readerMotion.resetZoom(coroutineScope)
     }
     fun goToReaderPage(index: Int, direction: Int = 0) {
-        val targetIndex = index.coerceIn(0, lastPageIndex)
+        // Any page lands on the spread showing it, and the reader keeps pointing at that spread's first page.
+        val targetSpread = readerSpreads.getOrNull(readerSpreads.indexOfSpreadContaining(index))
+        val targetIndex = (targetSpread?.first ?: index).coerceIn(0, lastPageIndex)
         pageTurnDirection = direction
         chapterEndVisible = false
         scrubberValue = targetIndex.toFloat()
         resetZoom()
-        viewModel.setReaderPage(targetIndex)
+        viewModel.setReaderPage(targetIndex, lastVisibleIndex = targetSpread?.last ?: targetIndex)
         if (state.readerMode == ReaderMode.WEBTOON) {
             coroutineScope.launch {
                 webtoonListState.scrollToItem(currentWebtoonStartIndex + targetIndex)
@@ -361,19 +379,24 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         goToReaderPage(scrubberValue.roundToInt())
     }
     fun moveReaderPageFromControls(delta: Int) {
-        val targetIndex = state.currentPageIndex + delta
+        // Turns move spread by spread; without spreads every page is its own spread.
+        val targetSpreadIndex = readerSpreads.indexOfSpreadContaining(state.currentPageIndex) + delta
         when {
-            delta < 0 && targetIndex < 0 && previousChapter != null -> {
+            delta < 0 && targetSpreadIndex < 0 && previousChapter != null -> {
                 resetZoom()
                 pageTurnDirection = -1
                 viewModel.openPreviousChapter()
             }
-            delta > 0 && targetIndex > lastPageIndex && nextChapter != null -> {
+            delta > 0 && targetSpreadIndex > readerSpreads.lastIndex && nextChapter != null -> {
                 resetZoom()
                 pageTurnDirection = 1
                 viewModel.openNextChapter()
             }
-            else -> goToReaderPage(targetIndex, direction = delta.sign)
+            else -> goToReaderPage(
+                readerSpreads.getOrNull(targetSpreadIndex.coerceIn(0, readerSpreads.lastIndex))?.first
+                    ?: (state.currentPageIndex + delta),
+                direction = delta.sign,
+            )
         }
     }
     fun turnPage(delta: Int) {
@@ -388,7 +411,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                 pageTurnDirection = -1
                 chapterEndVisible = false
             }
-            delta > 0 && chapterEndEnabled && state.currentPageIndex >= lastPageIndex -> {
+            delta > 0 && chapterEndEnabled && currentSpread.last >= lastPageIndex -> {
                 resetZoom()
                 pageTurnDirection = 1
                 chapterEndVisible = true
@@ -404,9 +427,21 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         if (readerPreferences.volumeKeys) runCatching { focusRequester.requestFocus() }
     }
 
-    LaunchedEffect(chapter.url, state.currentPageIndex, pageCount, scrubberSeeking) {
+    LaunchedEffect(chapter.url, currentSpread.first, pageCount, scrubberSeeking) {
         if (!scrubberSeeking) {
-            scrubberValue = state.currentPageIndex.coerceIn(0, lastPageIndex).toFloat()
+            scrubberValue = currentSpread.first.coerceIn(0, lastPageIndex).toFloat()
+        }
+    }
+
+    // Rotating into landscape or a page turning out wide can bring the last page on screen without a page
+    // turn; the chapter still counts as read once it shows.
+    LaunchedEffect(chapter.url, currentSpread, lastPageIndex) {
+        if (currentSpread.isDouble && currentSpread.last >= lastPageIndex && state.currentPageIndex < lastPageIndex) {
+            viewModel.setReaderPage(
+                index = state.currentPageIndex,
+                pageScrollOffset = state.currentPageScrollOffset,
+                lastVisibleIndex = currentSpread.last,
+            )
         }
     }
 
@@ -733,8 +768,8 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
         } else {
             val pagedTarget = ReaderPagedTarget(
                 chapter = chapter,
-                pageIndex = state.currentPageIndex.coerceIn(0, lastPageIndex),
-                page = state.readerPages.getOrNull(state.currentPageIndex),
+                spread = currentSpread,
+                pages = (currentSpread.first..currentSpread.last).mapNotNull { state.readerPages.getOrNull(it) },
                 chapterEnd = chapterEndVisible,
                 nextChapter = nextChapter.takeIf { chapterEndVisible },
             )
@@ -801,7 +836,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     targetState = pagedTarget,
                     transitionSpec = {
                         val direction = pageTurnDirection
-                        if (direction == 0) {
+                        if (direction == 0 || initialState.sharesPagesWith(targetState)) {
                             fadeIn(tween(ReaderPageFadeMillis)).togetherWith(fadeOut(tween(ReaderPageFadeMillis)))
                         } else {
                             // Forward slides in from the reading side: right in LTR, left in RTL.
@@ -816,7 +851,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     },
                     label = "Reader page turn",
                 ) { target ->
-                    val page = target.page
+                    val page = target.pages.firstOrNull()
                     when {
                         target.chapterEnd -> ReaderChapterEndPage(
                             chapter = target.chapter,
@@ -826,8 +861,7 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                         )
                         page != null -> {
                             val isCurrent = target == pagedTarget
-                            val metadataAspectRatio = page.readerPageAspectRatio()
-                            val aspectRatio = metadataAspectRatio ?: loadedPagedPageAspectRatio.takeIf { isCurrent }
+                            val aspectRatio = target.spread.combinedAspectRatio(::pagedPageAspectRatio)
                             BoxWithConstraints(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center,
@@ -856,20 +890,38 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                                         }
                                     },
                                 ) {
-                                    ReaderPageImage(
-                                        model = { retryAttempt -> readerImageRequest(state, target.chapter, page, retryAttempt) },
-                                        contentDescription = target.chapter.name,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(pagedPagePadding),
-                                        contentScale = if (fitScreen) ContentScale.Fit else ContentScale.FillWidth,
-                                        fillViewportWhileLoading = fitScreen || aspectRatio == null,
-                                        onImageAspectRatio = { loaded ->
-                                            if (isCurrent && metadataAspectRatio == null) {
-                                                loadedPagedPageAspectRatio = loaded
-                                            }
-                                        },
-                                    )
+                                    if (target.spread.isDouble) {
+                                        ReaderSpreadPages(
+                                            state = state,
+                                            chapter = target.chapter,
+                                            pages = target.spread.screenOrder(rightToLeft).mapNotNull { pageIndex ->
+                                                target.pages.getOrNull(pageIndex - target.spread.first)?.let { pageIndex to it }
+                                            },
+                                            aspectRatioAt = ::pagedPageAspectRatio,
+                                            gap = pageGap,
+                                            onPageAspectRatio = { pageIndex, loaded ->
+                                                loadedPagedPageAspectRatios[pageIndex] = loaded
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(pagedPagePadding),
+                                        )
+                                    } else {
+                                        ReaderPageImage(
+                                            model = { retryAttempt -> readerImageRequest(state, target.chapter, page, retryAttempt) },
+                                            contentDescription = target.chapter.name,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(pagedPagePadding),
+                                            contentScale = if (fitScreen) ContentScale.Fit else ContentScale.FillWidth,
+                                            fillViewportWhileLoading = fitScreen || aspectRatio == null,
+                                            onImageAspectRatio = { loaded ->
+                                                if (page.readerPageAspectRatio() == null) {
+                                                    loadedPagedPageAspectRatios[target.spread.first] = loaded
+                                                }
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -916,7 +968,12 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
                     chapterEndVisible = false
                     if (nextIndex != state.currentPageIndex) {
                         resetZoom()
-                        viewModel.setReaderPage(nextIndex)
+                        viewModel.setReaderPage(
+                            nextIndex,
+                            lastVisibleIndex = readerSpreads.getOrNull(readerSpreads.indexOfSpreadContaining(nextIndex))
+                                ?.last
+                                ?: nextIndex,
+                        )
                         if (state.readerMode == ReaderMode.WEBTOON) {
                             coroutineScope.launch {
                                 webtoonListState.scrollToItem(currentWebtoonStartIndex + nextIndex)
@@ -1019,14 +1076,23 @@ internal fun FullScreenReader(state: TankobunUiState, viewModel: MainViewModel) 
     }
 }
 
-/** What the paged reader shows; carrying the page itself keeps the outgoing page intact mid-turn. */
+/** What the paged reader shows; carrying the pages themselves keeps the outgoing spread intact mid-turn. */
 private data class ReaderPagedTarget(
     val chapter: SourceChapter,
-    val pageIndex: Int,
-    val page: ReaderPage?,
+    val spread: ReaderSpread,
+    /** The spread's pages in reading order. */
+    val pages: List<ReaderPage>,
     val chapterEnd: Boolean,
     val nextChapter: SourceChapter?,
-)
+) {
+    /** A spread re-forming around the same pages (after rotating, or a page turning out wide) is not a page turn. */
+    fun sharesPagesWith(other: ReaderPagedTarget): Boolean =
+        !chapterEnd &&
+            !other.chapterEnd &&
+            chapter == other.chapter &&
+            spread.first <= other.spread.last &&
+            other.spread.first <= spread.last
+}
 
 private const val ReaderPageTurnMillis = 260
 private const val ReaderPageFadeMillis = 140
@@ -1241,6 +1307,7 @@ internal fun ReaderPageImage(
     contentDescription: String,
     modifier: Modifier = Modifier,
     contentScale: ContentScale,
+    alignment: Alignment = Alignment.Center,
     fillViewportWhileLoading: Boolean = false,
     placeholderAspectRatio: Float? = null,
     stabilizeAspectRatio: Boolean = false,
@@ -1285,6 +1352,7 @@ internal fun ReaderPageImage(
             } else {
                 Modifier.fillMaxWidth()
             },
+            alignment = alignment,
             contentScale = contentScale,
             onLoading = {
                 loading = true
@@ -1317,6 +1385,54 @@ internal fun ReaderPageImage(
                     null
                 },
             )
+        }
+    }
+}
+
+/**
+ * The two pages of a landscape spread, given in screen order with their page index. Once both sizes are
+ * known the pages share one height and meet at the middle like an open book; until then each takes half.
+ */
+@Composable
+internal fun ReaderSpreadPages(
+    state: TankobunUiState,
+    chapter: SourceChapter,
+    pages: List<Pair<Int, ReaderPage>>,
+    aspectRatioAt: (pageIndex: Int) -> Float?,
+    gap: Dp,
+    onPageAspectRatio: (pageIndex: Int, aspectRatio: Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val aspectRatios = pages.map { (pageIndex, _) -> aspectRatioAt(pageIndex) }
+    val knownAspectRatios = aspectRatios.filterNotNull().takeIf { it.size == aspectRatios.size }
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = if (knownAspectRatios != null) {
+                Modifier.aspectRatio(knownAspectRatios.sum())
+            } else {
+                Modifier.fillMaxSize()
+            },
+            horizontalArrangement = Arrangement.spacedBy(gap),
+        ) {
+            pages.forEachIndexed { slot, (pageIndex, page) ->
+                ReaderPageImage(
+                    model = { retryAttempt -> readerImageRequest(state, chapter, page, retryAttempt) },
+                    contentDescription = chapter.name,
+                    modifier = Modifier
+                        .weight(knownAspectRatios?.get(slot) ?: 1f)
+                        .fillMaxHeight(),
+                    contentScale = ContentScale.Fit,
+                    // Each page leans toward the gutter so a size still loading never opens a gap in the middle.
+                    alignment = if (slot == 0) Alignment.CenterEnd else Alignment.CenterStart,
+                    fillViewportWhileLoading = true,
+                    onImageAspectRatio = { loaded ->
+                        if (page.readerPageAspectRatio() == null) onPageAspectRatio(pageIndex, loaded)
+                    },
+                )
+            }
         }
     }
 }

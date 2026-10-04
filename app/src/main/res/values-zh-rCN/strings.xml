@@ -1353,6 +1353,8 @@
     <string name="reader_read_chapter_number">阅读第 %1$s 章</string>
     <string name="reader_read_next_chapter">阅读下一章</string>
     <string name="reader_end_continue_hint">滑动或点按屏幕侧边继续</string>
+    <string name="reader_landscape_spreads">横屏双页</string>
+    <string name="reader_landscape_spreads_desc">左右并排显示两页。</string>
     <string name="reader_webtoon_after_chapter">第 %1$s 章完 · 下一章</string>
     <string name="reader_webtoon_up_next">下一章</string>
     <string name="reader_direction_ltr_short">从左到右</string>

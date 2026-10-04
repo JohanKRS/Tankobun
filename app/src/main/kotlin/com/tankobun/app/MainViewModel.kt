@@ -4821,16 +4821,30 @@ class MainViewModel(
         saveReaderProgress()
     }
 
-    fun setReaderPage(index: Int, pageScrollOffset: Int = 0) {
+    /**
+     * Moves the reader to [index]. [lastVisibleIndex] is the last page on screen with it, which runs past
+     * [index] when a landscape spread shows two pages.
+     */
+    fun setReaderPage(index: Int, pageScrollOffset: Int = 0, lastVisibleIndex: Int = index) {
         val snapshot = _state.value
         val pages = snapshot.readerPages
         if (pages.isEmpty()) return
         val nextIndex = index.coerceIn(0, pages.lastIndex)
         val nextOffset = pageScrollOffset.coerceAtLeast(0)
-        if (nextIndex == snapshot.currentPageIndex && nextOffset == snapshot.currentPageScrollOffset) return
+        // A spread that reaches the last page finishes the chapter even though it starts a page earlier.
+        val progressIndex = if (lastVisibleIndex >= pages.lastIndex) pages.lastIndex else nextIndex
         val chapter = snapshot.activeChapter
+        val progressRecorded = progressIndex == nextIndex ||
+            latestReaderPosition?.let { it.chapterUrl == chapter?.url && it.pageIndex == progressIndex } == true
+        if (
+            nextIndex == snapshot.currentPageIndex &&
+            nextOffset == snapshot.currentPageScrollOffset &&
+            progressRecorded
+        ) {
+            return
+        }
         if (chapter != null) {
-            recordReaderPosition(chapter.url, nextIndex, nextOffset)
+            recordReaderPosition(chapter.url, progressIndex, nextOffset)
         }
         _state.update { it.withReaderPagePosition(nextIndex, nextOffset) }
         val media = snapshot.selectedMedia
@@ -4843,12 +4857,12 @@ class MainViewModel(
                 source = snapshot.readerSourceForChapter(chapter),
                 preferredDirection = nextIndex.compareTo(snapshot.currentPageIndex),
             )
-            if (nextIndex >= pages.lastIndex) {
+            if (progressIndex >= pages.lastIndex) {
                 saveReaderProgressFor(
                     media = media,
                     chapter = chapter,
                     pages = pages,
-                    pageIndex = nextIndex,
+                    pageIndex = progressIndex,
                     pageScrollOffset = nextOffset,
                 )
             } else {
