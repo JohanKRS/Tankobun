@@ -89,77 +89,10 @@ import com.tankobun.core.model.DownloadState
 import com.tankobun.core.model.ReadingProgress
 import com.tankobun.core.model.SourceChapter
 import kotlin.math.abs
-
-@Composable
-internal fun ChapterActionsBar(
-    hasChapters: Boolean,
-    chapterListStartsAtFirst: Boolean,
-    onLoadChapters: () -> Unit,
-    onToggleChapterListOrder: () -> Unit,
-    onOpenDownloadActions: () -> Unit,
-) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val tight = maxWidth < 380.dp
-        val actionHeight = LocalTankobunStyle.current.sizes.iconAction
-        val refreshButton: @Composable (Modifier) -> Unit = { modifier ->
-            TankobunIconActionButton(
-                icon = TankobunIcons.Refresh,
-                contentDescription = if (hasChapters) {
-                    tankobunString(R.string.chapter_refresh_chapters)
-                } else {
-                    tankobunString(R.string.chapter_load_chapters)
-                },
-                onClick = onLoadChapters,
-                modifier = modifier,
-            )
-        }
-        val orderButtonDescription = if (chapterListStartsAtFirst) {
-            tankobunString(R.string.chapter_show_latest_first)
-        } else {
-            tankobunString(R.string.chapter_show_first_first)
-        }
-        val orderButton: @Composable (Modifier) -> Unit = { modifier ->
-            TankobunIconActionButton(
-                icon = TankobunIcons.SwapVert,
-                contentDescription = orderButtonDescription,
-                onClick = onToggleChapterListOrder,
-                enabled = hasChapters,
-                modifier = modifier,
-            )
-        }
-        val downloadButton: @Composable (Modifier) -> Unit = { modifier ->
-            if (tight) {
-                TankobunIconActionButton(
-                    icon = TankobunIcons.Download,
-                    contentDescription = tankobunString(R.string.chapter_download_chapters),
-                    onClick = onOpenDownloadActions,
-                    enabled = hasChapters,
-                    modifier = modifier,
-                )
-            } else {
-                TankobunActionButton(
-                    label = tankobunString(R.string.common_download),
-                    icon = TankobunIcons.Download,
-                    onClick = onOpenDownloadActions,
-                    enabled = hasChapters,
-                    filled = false,
-                    modifier = modifier,
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Spacer(Modifier.weight(1f))
-            refreshButton(Modifier)
-            orderButton(Modifier.width(actionHeight))
-            downloadButton(if (tight) Modifier.width(actionHeight) else Modifier.widthIn(min = 116.dp))
-        }
-    }
-}
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.RectangleShape
 
 @Composable
 internal fun ChapterManualDownloadBar(
@@ -356,9 +289,11 @@ internal fun ChapterRow(
     selectedForDownload: Boolean,
     onToggleDownloadSelection: () -> Unit,
     progress: ReadingProgress? = null,
+    isNew: Boolean = false,
 ) {
     key(chapter.url, download?.state, download?.completedPages, download?.pageCount, selectingForDownload, selectedForDownload) {
-        val chapterShape = LocalTankobunStyle.current.themeShapes.control
+        // Flat list rows, edge to edge, as in the design; the swipe action shows only while dragging.
+        val chapterShape = RectangleShape
         val latestRead by rememberUpdatedState(read)
         var swipeActionRead by remember(chapter.url) { mutableStateOf(read) }
         var dragOffset by remember(chapter.url) { mutableFloatStateOf(0f) }
@@ -406,8 +341,8 @@ internal fun ChapterRow(
         val dateLabel = chapterDateLabel(chapter.uploadedAtEpochMillis)
         val pageLabel = progress
             ?.takeIf { !read && !it.completed && it.totalPages > 1 }
-            ?.let { tankobunString(R.string.reader_page_fraction, it.pageIndex + 1, it.totalPages) }
-        val meta = listOfNotNull(pageLabel, dateLabel, chapter.translationCredit()).joinToString(" · ")
+            ?.let { tankobunString(R.string.chapter_page_of, it.pageIndex + 1, it.totalPages) }
+        val meta = listOfNotNull(pageLabel, chapter.translationCredit(), dateLabel).joinToString(" · ")
         val longClickLabel = tankobunString(R.string.chapter_actions_menu)
 
         @Composable
@@ -436,13 +371,13 @@ internal fun ChapterRow(
                             },
                         ),
                     shape = chapterShape,
-                    color = mediaDetailPanelColor(),
+                    color = Color.Transparent,
                     contentColor = mediaDetailForegroundColor(),
                 ) {
                     Row(
                         modifier = Modifier
-                            .heightIn(min = 60.dp)
-                            .padding(start = if (selectingForDownload) 4.dp else 14.dp, end = 2.dp, top = 6.dp, bottom = 6.dp),
+                            .heightIn(min = 64.dp)
+                            .padding(start = if (selectingForDownload) 4.dp else 18.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
@@ -453,14 +388,28 @@ internal fun ChapterRow(
                             )
                         }
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                chapter.name,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = if (read) FontWeight.Medium else FontWeight.SemiBold,
-                                color = LocalContentColor.current.copy(alpha = if (read) 0.58f else 1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                if (isNew) {
+                                    val newLabel = tankobunString(R.string.chapter_new_cd)
+                                    Box(
+                                        Modifier
+                                            .size(8.dp)
+                                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                            .semantics { contentDescription = newLabel },
+                                    )
+                                }
+                                Text(
+                                    chapter.name,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = if (read) FontWeight.Medium else FontWeight.SemiBold,
+                                    color = LocalContentColor.current.copy(alpha = if (read) 0.58f else 1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                             if (meta.isNotEmpty()) {
                                 Text(
                                     meta,
@@ -529,7 +478,7 @@ internal fun ChapterRow(
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .background(swipeActionColor.copy(alpha = 0.18f))
+                        .background(swipeActionColor.copy(alpha = 0.18f * actionAlpha))
                         .padding(horizontal = 18.dp),
                 ) {
                     ChapterSwipeAction(

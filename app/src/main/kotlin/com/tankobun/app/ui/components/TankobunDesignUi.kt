@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -316,6 +317,8 @@ internal fun TankobunActionButton(
     disabledContainerColor: Color? = null,
     disabledContentColor: Color? = null,
     shape: Shape? = null,
+    // A quieter detail after the label, e.g. the page in "Continuar · Cap. 4  pág. 12".
+    supportingLabel: String? = null,
 ) {
     val style = LocalTankobunStyle.current
     val resolvedShape = shape ?: style.themeShapes.control
@@ -331,14 +334,24 @@ internal fun TankobunActionButton(
         .graphicsLayer { scaleX = scale; scaleY = scale }
     val resolvedContainerColor = containerColor ?: LocalTankobunStyle.current.colors.action
     val resolvedContentColor = contentColor ?: LocalTankobunStyle.current.colors.actionContent
-    val content: @Composable () -> Unit = {
+    val content: @Composable RowScope.() -> Unit = {
         when {
             icon != null -> {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(7.dp))
             }
         }
-        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        supportingLabel?.let {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                it,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Normal,
+                maxLines = 1,
+                modifier = Modifier.graphicsLayer { alpha = 0.8f },
+            )
+        }
     }
     if (filled) {
         Button(

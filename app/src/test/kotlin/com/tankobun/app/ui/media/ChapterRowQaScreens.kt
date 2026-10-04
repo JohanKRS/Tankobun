@@ -50,7 +50,7 @@ class ChapterRowQaScreens(language: AppLanguage) : LayoutQaScreens(language) {
         val month = chapter(128f, "Chapter 128", 40 * day, scanlator = null)
         val old = chapter(12f, "Vol. 2 Chapter 12", 400 * day)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            ChapterRow(today, actions, read = false, download = null, selectingForDownload = false, selectedForDownload = false, onToggleDownloadSelection = {})
+            ChapterRow(today, actions, read = false, download = null, selectingForDownload = false, selectedForDownload = false, onToggleDownloadSelection = {}, isNew = true)
             ChapterRow(
                 yesterday, actions, read = false, download = download(yesterday, DownloadState.RUNNING),
                 selectingForDownload = false, selectedForDownload = false, onToggleDownloadSelection = {},

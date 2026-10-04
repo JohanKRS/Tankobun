@@ -155,6 +155,16 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.PathEffect
+import com.tankobun.app.TankobunDisplayFontFamily
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
@@ -175,6 +185,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
@@ -261,8 +272,9 @@ internal fun MangaDetailScreen(
 ) {
     val backdrop = mediaDetailBackdropColor()
     val context = LocalContext.current
-    var bannerFailed by remember(media.id, media.bannerImage) { mutableStateOf(false) }
-    val heroBackdropImage = media.bannerImage?.takeUnless { bannerFailed } ?: media.coverImage
+    var coverBackdropFailed by remember(media.id, media.coverImage) { mutableStateOf(false) }
+    // The page is tinted with the cover's own colors; the banner is only a fallback.
+    val heroBackdropImage = media.coverImage?.takeUnless { coverBackdropFailed } ?: media.bannerImage
     val heroBackdropRequest = remember(context, heroBackdropImage) {
         ImageRequest.Builder(context)
             .data(heroBackdropImage)
@@ -271,6 +283,13 @@ internal fun MangaDetailScreen(
     }
     val listState = rememberLazyListState()
     val orderedChapters = remember(state.readingChapters) { state.readingChapters.readingOrder() }
+    // Chapters the update check found and that are still unread get the "new" dot.
+    val newChapterUrls = remember(state.libraryUpdates, media.id) {
+        state.libraryUpdates.firstOrNull { it.media.id == media.id }
+            ?.chapters.orEmpty()
+            .filterNot { it.read }
+            .mapTo(hashSetOf()) { it.chapter.url }
+    }
     val trackedStatuses = remember(state.libraryItems) { state.libraryItems.trackedMediaStatuses() }
     var coverZoomOpen by remember(media.id) { mutableStateOf(false) }
     var detailShareOpen by remember(media.id) { mutableStateOf(false) }
@@ -331,7 +350,7 @@ internal fun MangaDetailScreen(
         ) {
             AsyncImage(
                 model = heroBackdropRequest,
-                onError = { bannerFailed = true },
+                onError = { coverBackdropFailed = true },
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -421,11 +440,34 @@ internal fun MangaDetailScreen(
                 item(key = "chapters-header") {
                     Box(Modifier.padding(start = MediaDetailContentPadding, end = MediaDetailContentPadding, top = MediaDetailSectionGap, bottom = 4.dp)) {
                         var downloadActionsOpen by remember { mutableStateOf(false) }
+                        val chaptersReady = state.selectedSourceManga != null &&
+                            !(state.selectedSourceAwaitingTrust != null && state.sourceChapters.isEmpty())
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween) {
+                            // Title, order and download share one row; refresh and groups live in the ⋮ menu.
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
                                 DetailSectionTitle(tankobunString(R.string.common_chapters), Modifier.weight(1f))
-                                ChapterGroupsButton(state, viewModel::setChapterGroupPreference)
+                                if (chaptersReady) {
+                                    val hasChapters = state.sourceChapters.isNotEmpty()
+                                    IconButton(onClick = viewModel::toggleChapterListOrder, enabled = hasChapters) {
+                                        Icon(
+                                            TankobunIcons.Sort,
+                                            contentDescription = tankobunString(
+                                                if (state.chapterListStartsAtFirst) {
+                                                    R.string.chapter_show_latest_first
+                                                } else {
+                                                    R.string.chapter_show_first_first
+                                                },
+                                            ),
+                                        )
+                                    }
+                                    IconButton(onClick = { downloadActionsOpen = true }, enabled = hasChapters) {
+                                        Icon(TankobunIcons.Download, contentDescription = tankobunString(R.string.chapter_download_chapters))
+                                    }
+                                }
                             }
                             if (state.selectedSourceManga == null) {
                                 DetailPlaceholderCard(
@@ -439,23 +481,12 @@ internal fun MangaDetailScreen(
                                     title = tankobunString(R.string.sources_trust_status),
                                     subtitle = tankobunString(R.string.source_trust_chapters_pending),
                                 )
-                            } else {
-                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    ChapterActionsBar(
-                                        hasChapters = state.sourceChapters.isNotEmpty(),
-                                        chapterListStartsAtFirst = state.chapterListStartsAtFirst,
-                                        onLoadChapters = viewModel::loadChaptersForCurrentMatch,
-                                        onToggleChapterListOrder = viewModel::toggleChapterListOrder,
-                                        onOpenDownloadActions = { downloadActionsOpen = true },
-                                    )
-                                    if (state.selectingDownloadChapters) {
-                                        ChapterManualDownloadBar(
-                                            selectedCount = state.selectedDownloadChapterUrls.size,
-                                            onDownloadSelected = viewModel::downloadSelectedChapters,
-                                            onCancel = viewModel::cancelManualDownloadSelection,
-                                        )
-                                    }
-                                }
+                            } else if (state.selectingDownloadChapters) {
+                                ChapterManualDownloadBar(
+                                    selectedCount = state.selectedDownloadChapterUrls.size,
+                                    onDownloadSelected = viewModel::downloadSelectedChapters,
+                                    onCancel = viewModel::cancelManualDownloadSelection,
+                                )
                             }
                         }
                         if (downloadActionsOpen) {
@@ -501,18 +532,17 @@ internal fun MangaDetailScreen(
                         orderedChapters.asReversed()
                     }
                     items(visibleChapters, key = { "${it.sourceId}:${it.url}" }) { chapter ->
-                        Box(Modifier.padding(horizontal = MediaDetailContentPadding)) {
-                            ChapterRow(
-                                chapter = chapter,
-                                actions = chapterRowActions,
-                                read = state.isChapterRead(chapter),
-                                download = state.downloadForChapter(chapter),
-                                selectingForDownload = state.selectingDownloadChapters,
-                                selectedForDownload = chapter.url in state.selectedDownloadChapterUrls,
-                                onToggleDownloadSelection = { viewModel.toggleDownloadChapterSelection(chapter) },
-                                progress = state.chapterProgress[chapter.url],
-                            )
-                        }
+                        ChapterRow(
+                            chapter = chapter,
+                            actions = chapterRowActions,
+                            read = state.isChapterRead(chapter),
+                            download = state.downloadForChapter(chapter),
+                            selectingForDownload = state.selectingDownloadChapters,
+                            selectedForDownload = chapter.url in state.selectedDownloadChapterUrls,
+                            onToggleDownloadSelection = { viewModel.toggleDownloadChapterSelection(chapter) },
+                            progress = state.chapterProgress[chapter.url],
+                            isNew = chapter.url in newChapterUrls,
+                        )
                     }
                 }
 
@@ -566,6 +596,15 @@ internal fun MangaDetailScreen(
                     sourceSetupOpen = false
                     onOpenSourceRepository()
                 },
+            )
+        }
+
+        if (chrome.chapterGroupsOpen) {
+            ChapterGroupsDialog(
+                groups = state.chapterGroupSelection.groups,
+                preference = state.chapterGroupPreference,
+                onChange = viewModel::setChapterGroupPreference,
+                onDismiss = { chrome.chapterGroupsOpen = false },
             )
         }
 
@@ -770,10 +809,11 @@ internal fun MangaHeroSection(
 internal class MediaDetailChromeState {
     var heroActionsVisible by mutableStateOf(true)
     var trackingSheetOpen by mutableStateOf(false)
+    var chapterGroupsOpen by mutableStateOf(false)
 }
 
 internal sealed interface MediaReadingAction {
-    data class Read(val chapter: SourceChapter, val resume: Boolean) : MediaReadingAction
+    data class Read(val chapter: SourceChapter, val resume: Boolean, val page: Int? = null) : MediaReadingAction
     data object ChooseSource : MediaReadingAction
     data object LoadChapters : MediaReadingAction
 }
@@ -782,7 +822,16 @@ internal fun TankobunUiState.mediaReadingAction(): MediaReadingAction? = when {
     selectedSourceManga == null -> MediaReadingAction.ChooseSource
     selectedSourceAwaitingTrust != null -> null
     else -> primaryReadingActionChapter()
-        ?.let { chapter -> MediaReadingAction.Read(chapter, resume = latestProgress != null) }
+        ?.let { chapter ->
+            MediaReadingAction.Read(
+                chapter = chapter,
+                resume = latestProgress != null,
+                // Resuming mid-chapter also says where: "Continuar · Cap. 4  pág. 12".
+                page = latestProgress
+                    ?.takeIf { it.chapterUrl == chapter.url && !it.completed && it.pageIndex > 0 }
+                    ?.let { it.pageIndex + 1 },
+            )
+        }
         ?: MediaReadingAction.LoadChapters
 }
 
@@ -857,6 +906,8 @@ private fun MediaReadingActionButton(
     actions: MediaDetailUiActions,
     modifier: Modifier = Modifier,
     shape: Shape? = null,
+    // The floating bar has no room for the page; the chapter number matters more there.
+    showPage: Boolean = true,
 ) {
     TankobunActionButton(
         label = action.label(),
@@ -864,6 +915,9 @@ private fun MediaReadingActionButton(
         onClick = { actions.perform(action) },
         modifier = modifier,
         shape = shape,
+        supportingLabel = (action as? MediaReadingAction.Read)?.page
+            ?.takeIf { showPage }
+            ?.let { tankobunString(R.string.detail_continue_page, it) },
     )
 }
 
@@ -874,6 +928,9 @@ private data class TrackingControlState(
     val saving: Boolean,
     val failed: Boolean,
     val status: MediaStatus?,
+    val progress: Int? = null,
+    val totalChapters: Int? = null,
+    val score: String? = null,
 )
 
 private fun TankobunUiState.trackingControlState(): TrackingControlState {
@@ -885,6 +942,9 @@ private fun TankobunUiState.trackingControlState(): TrackingControlState {
         saving = trackingSaveInProgress,
         failed = trackingSaveFailed,
         status = if (fixedStatusSelected && selectedListEntry != null) trackingStatus else null,
+        progress = selectedListEntry?.progress?.takeIf { it > 0 },
+        totalChapters = selectedMedia?.chapters?.takeIf { it > 0 },
+        score = selectedListEntry?.score?.takeIf { it > 0.0 }?.formatTrackingScore(anilistScoreFormat),
     )
 }
 
@@ -902,6 +962,17 @@ private fun TrackingControlState.label(): String = when {
     else -> status.displayName()
 }
 
+/** "5/214", or just "5" while the total is unknown. */
+private fun TrackingControlState.progressLabel(): String? =
+    progress?.let { read -> totalChapters?.let { "$read/$it" } ?: read.toString() }
+
+/** The hero button's full line: "Lendo · 5/214 · ★ 80". */
+@Composable
+private fun TrackingControlState.summary(): String {
+    if (saving || failed || !inLibrary || status == null) return label()
+    return listOfNotNull(label(), progressLabel(), score?.let { "★ $it" }).joinToString(" · ")
+}
+
 private fun TrackingControlState.icon(): ImageVector = when {
     saving || failed -> TankobunIcons.Refresh
     !inLibrary -> TankobunIcons.Add
@@ -916,7 +987,7 @@ private fun MediaTrackingButton(
     modifier: Modifier = Modifier,
 ) {
     val style = LocalTankobunStyle.current
-    val label = control.label()
+    val label = control.summary()
     val tracked = control.inLibrary && control.status != null
     Surface(
         onClick = { control.onClick(actions) },
@@ -1018,23 +1089,48 @@ internal fun MediaDetailFloatingActions(
         horizontalArrangement = Arrangement.spacedBy(DockPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val trackingLabel = control.label()
+        val trackingLabel = control.summary()
         val tracked = control.inLibrary && control.status != null
+        // Tracked: a pill that edits it ("✎ 5/214 ⌃"); otherwise a one-tap add button.
+        val pillText = control.progressLabel() ?: control.label()
         Surface(
             onClick = { control.onClick(actions) },
             enabled = !control.saving,
             modifier = Modifier
-                .size(DockItemHeight)
-                .semantics { role = Role.Button },
+                .height(DockItemHeight)
+                .then(if (tracked) Modifier.widthIn(min = DockItemHeight, max = 148.dp) else Modifier.width(DockItemHeight))
+                .semantics {
+                    role = Role.Button
+                    contentDescription = trackingLabel
+                },
             shape = CircleShape,
             color = if (tracked) style.colors.selectedChip else MaterialTheme.colorScheme.surfaceContainerHighest,
             contentColor = if (tracked) style.colors.selectedChipContent else MaterialTheme.colorScheme.onSurface,
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                if (control.saving) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(control.icon(), contentDescription = trackingLabel, modifier = Modifier.size(20.dp))
+            Row(
+                modifier = Modifier.padding(horizontal = if (tracked) 14.dp else 0.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                when {
+                    control.saving -> CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    tracked -> {
+                        Icon(TankobunIcons.Pencil, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text(
+                            pillText,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Icon(
+                            TankobunIcons.ExpandMore,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = 180f },
+                        )
+                    }
+                    else -> Icon(control.icon(), contentDescription = null, modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -1044,6 +1140,7 @@ internal fun MediaDetailFloatingActions(
                 actions = actions,
                 modifier = Modifier.height(DockItemHeight).widthIn(min = 168.dp, max = 260.dp),
                 shape = CircleShape,
+                showPage = false,
             )
         }
     }
@@ -1075,46 +1172,31 @@ internal fun MediaTrackingSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(start = 22.dp, end = 22.dp, bottom = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                CoverImage(
-                    url = media.coverImage,
-                    title = media.title.userPreferred,
-                    modifier = Modifier.size(width = 44.dp, height = 64.dp),
-                    cornerRadius = 8.dp,
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    tankobunString(R.string.detail_track_manga),
+                    style = TextStyle(fontFamily = TankobunDisplayFontFamily, fontSize = 30.sp, lineHeight = 30.sp, letterSpacing = 1.sp),
                 )
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        tankobunString(R.string.detail_track_manga),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
+                Text(
+                    tankobunString(
+                        if (state.libraryMode == LibraryMode.ANILIST) R.string.tracking_syncs_anilist else R.string.tracking_saved_locally,
                         media.title.userPreferred,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            AniListTrackingSection(state, viewModel, media)
-            if (state.selectedListEntry != null) {
-                TextButton(
-                    onClick = { confirmRemove = true },
-                    enabled = !state.busy && !state.trackingSaveInProgress,
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) {
-                    Icon(TankobunIcons.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(tankobunString(R.string.detail_remove_from_library))
-                }
-            }
+            AniListTrackingSection(
+                state = state,
+                viewModel = viewModel,
+                media = media,
+                onRemove = { confirmRemove = true },
+            )
         }
     }
     if (confirmRemove) {
@@ -1425,7 +1507,7 @@ internal fun MangaHeroMetaLine(media: AnilistMedia, compact: Boolean) {
         listOfNotNull(
             media.mediaTypeLabel(),
             media.status.statusLabel(),
-        ).joinToString("  /  ").uppercase(Locale.ROOT),
+        ).joinToString(" · ").uppercase(Locale.ROOT),
         style = style,
         color = mediaDetailAccentColor(),
         fontWeight = FontWeight.Bold,
@@ -1641,53 +1723,92 @@ internal fun AnilistMedia.publishingYearLabel(compact: Boolean): String {
 }
 
 @Composable
-internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewModel, media: AnilistMedia) {
+internal fun AniListTrackingSection(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    media: AnilistMedia,
+    onRemove: () -> Unit,
+) {
     val fixedStatusSelected = state.selectedListEntry?.hiddenFromStatusLists != true ||
         state.trackingStatus != MediaStatus.UNKNOWN
     val selectedFixedStatus = if (fixedStatusSelected) state.trackingStatus else null
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        AniListStatusSelector(
-            selected = selectedFixedStatus,
-            onSelected = viewModel::setTrackingStatus,
-        )
+    val anilistMode = state.libraryMode == LibraryMode.ANILIST
+    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        TrackingStatusChips(selected = selectedFixedStatus, onSelected = viewModel::setTrackingStatus)
 
-        AniListCustomListSelector(
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
+            TrackingProgressCard(
+                value = state.trackingProgress,
+                total = media.chapters,
+                onValueChange = viewModel::setTrackingProgress,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            )
+            TrackingScoreCard(
+                scoreFormat = state.anilistScoreFormat,
+                value = state.trackingScore,
+                onValueChange = viewModel::setTrackingScore,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            )
+        }
+
+        TrackingCustomLists(
             availableLists = (state.anilistCustomLists + state.trackingCustomLists).distinctBy { it.lowercase() },
             selectedLists = state.trackingCustomLists,
             onListSelected = viewModel::setTrackingCustomListSelected,
             onAddList = viewModel::addTrackingCustomList,
         )
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            TrackingFieldLabel(tankobunString(R.string.common_notes))
             OutlinedTextField(
-                value = state.trackingProgress,
-                onValueChange = viewModel::setTrackingProgress,
+                value = state.trackingNotes,
+                onValueChange = viewModel::setTrackingNotes,
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(tankobunString(R.string.common_progress)) },
-                suffix = { Text("/ ${media.chapters ?: "?"}") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            )
-            AniListScoreInput(
-                scoreFormat = state.anilistScoreFormat,
-                value = state.trackingScore,
-                onValueChange = viewModel::setTrackingScore,
-                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                maxLines = 4,
+                shape = RoundedCornerShape(16.dp),
+                // AniList can show notes elsewhere; only the local library can promise they stay private.
+                placeholder = if (anilistMode) null else ({ Text(tankobunString(R.string.tracking_notes_local_hint)) }),
             )
         }
 
-        OutlinedTextField(
-            value = state.trackingNotes,
-            onValueChange = viewModel::setTrackingNotes,
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 2,
-            maxLines = 4,
-            label = { Text(tankobunString(R.string.common_notes)) },
-        )
-
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(tankobunString(R.string.common_private), style = MaterialTheme.typography.bodyMedium)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(tankobunString(R.string.common_private), style = MaterialTheme.typography.bodyLarge)
+                if (anilistMode) {
+                    Text(
+                        tankobunString(R.string.tracking_private_anilist_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             Switch(checked = state.trackingPrivate, onCheckedChange = viewModel::setTrackingPrivate)
+        }
+
+        if (anilistMode && !state.loggedIn) {
+            Text(
+                tankobunString(R.string.detail_connect_anilist_tracking),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (state.selectedListEntry != null) {
+                TextButton(
+                    onClick = onRemove,
+                    enabled = !state.busy && !state.trackingSaveInProgress,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.weight(1f, fill = false),
+                ) {
+                    Text(
+                        tankobunString(R.string.detail_remove_from_library),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             Spacer(Modifier.weight(1f))
             val canSaveTracking = (state.libraryMode == LibraryMode.LOCAL || state.loggedIn) &&
                 !state.trackingSaveInProgress &&
@@ -1701,15 +1822,13 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
                 state.trackingDirty -> tankobunString(R.string.detail_save_tracking)
                 else -> tankobunString(R.string.common_saved)
             }
-            val actionIcon = when {
-                state.trackingSaveInProgress || state.trackingSaveFailed -> TankobunIcons.Refresh
-                else -> TankobunIcons.Check
-            }
             TankobunActionButton(
                 label = actionLabel,
-                icon = actionIcon,
+                icon = if (state.trackingSaveInProgress || state.trackingSaveFailed) TankobunIcons.Refresh else null,
                 onClick = viewModel::saveTracking,
                 enabled = canSaveTracking,
+                shape = CircleShape,
+                modifier = Modifier.heightIn(min = 48.dp),
                 disabledContainerColor = if (state.trackingSaveInProgress) {
                     LocalTankobunStyle.current.colors.selectedChip
                 } else {
@@ -1722,284 +1841,273 @@ internal fun AniListTrackingSection(state: TankobunUiState, viewModel: MainViewM
                 },
             )
         }
-        if (state.libraryMode == LibraryMode.ANILIST && !state.loggedIn) {
-            Text(
-                tankobunString(R.string.detail_connect_anilist_tracking),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    }
+}
+
+@Composable
+private fun TrackingFieldLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TrackingStatusChips(selected: MediaStatus?, onSelected: (MediaStatus) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        trackingStatuses().forEach { status ->
+            val active = status == selected
+            TankobunChip(
+                selected = active,
+                onClick = { onSelected(status) },
+                label = { Text(status.displayName(), maxLines = 1) },
+                leadingIcon = if (active) ({ TankobunChipIcon(trackingStatusIcon(status)) }) else null,
             )
         }
     }
 }
 
+/** Chapters read as a stepper; the number itself stays editable for big jumps. */
 @Composable
-internal fun AniListStatusSelector(selected: MediaStatus?, onSelected: (MediaStatus) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(
-            onClick = { expanded = !expanded },
-            modifier = Modifier.fillMaxWidth(),
-            shape = LocalTankobunStyle.current.themeShapes.control,
-        ) {
-            if (selected != null) {
-                Icon(
-                    trackingStatusIcon(selected),
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(
-                selected?.displayName() ?: tankobunString(R.string.detail_choose_status),
+private fun TrackingProgressCard(
+    value: String,
+    total: Int?,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val current = value.toIntOrNull() ?: 0
+    TrackingCard(tankobunString(R.string.tracking_chapters_read), modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TrackingStepButton(
+                icon = TankobunIcons.Remove,
+                label = tankobunString(R.string.tracking_decrease),
+                enabled = current > 0,
+                emphasized = false,
+                onClick = { onValueChange((current - 1).coerceAtLeast(0).toString()) },
+            )
+            TrackingNumberField(
+                value = value,
+                total = total?.toString(),
+                onValueChange = onValueChange,
+                keyboardType = KeyboardType.Number,
                 modifier = Modifier.weight(1f),
             )
-            Icon(TankobunIcons.ExpandMore, contentDescription = null)
-        }
-        AnimatedVisibility(visible = expanded) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp),
-                shape = LocalTankobunStyle.current.themeShapes.panel,
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 3.dp,
-                shadowElevation = 2.dp,
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp),
-                ) {
-                    trackingStatuses().forEach { status ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(LocalTankobunStyle.current.themeShapes.control)
-                                .clickable {
-                                    onSelected(status)
-                                    expanded = false
-                                }
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Icon(
-                                trackingStatusIcon(status),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                                tint = if (status == selected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                            Text(
-                                status.displayName(),
-                                modifier = Modifier.weight(1f),
-                                fontWeight = if (status == selected) FontWeight.Bold else FontWeight.Normal,
-                            )
-                            if (status == selected) {
-                                Icon(
-                                    TankobunIcons.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            TrackingStepButton(
+                icon = TankobunIcons.Add,
+                label = tankobunString(R.string.tracking_increase),
+                enabled = total == null || current < total,
+                emphasized = true,
+                onClick = { onValueChange((current + 1).let { next -> total?.let { next.coerceAtMost(it) } ?: next }.toString()) },
+            )
         }
     }
 }
 
 @Composable
-internal fun AniListCustomListSelector(
-    availableLists: List<String>,
-    selectedLists: Set<String>,
-    onListSelected: (String, Boolean) -> Unit,
-    onAddList: (String) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    var newListName by remember { mutableStateOf("") }
-    val selectedLabel = selectedLists
-        .sortedWith(String.CASE_INSENSITIVE_ORDER)
-        .takeIf { it.isNotEmpty() }
-        ?.joinToString(", ")
-        ?: tankobunString(R.string.detail_custom_lists)
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(
-            onClick = { expanded = !expanded },
-            modifier = Modifier.fillMaxWidth(),
-            shape = LocalTankobunStyle.current.themeShapes.control,
-        ) {
-            Text(selectedLabel, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Icon(TankobunIcons.ExpandMore, contentDescription = null)
-        }
-        AnimatedVisibility(visible = expanded) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp),
-                shape = LocalTankobunStyle.current.themeShapes.panel,
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 3.dp,
-                shadowElevation = 2.dp,
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                ) {
-                    if (availableLists.isEmpty()) {
-                        Text(
-                            tankobunString(R.string.detail_no_custom_lists),
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 220.dp)
-                            .verticalScroll(rememberScrollState()),
-                    ) {
-                        availableLists.forEach { listName ->
-                            val selected = selectedLists.any { it.equals(listName, ignoreCase = true) }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(LocalTankobunStyle.current.themeShapes.control)
-                                    .clickable { onListSelected(listName, !selected) }
-                                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Checkbox(checked = selected, onCheckedChange = { onListSelected(listName, it) })
-                                Text(
-                                    listName,
-                                    modifier = Modifier.weight(1f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        OutlinedTextField(
-                            value = newListName,
-                            onValueChange = { newListName = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            label = { Text(tankobunString(R.string.detail_new_list)) },
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Spacer(Modifier.weight(1f))
-                            TextButton(
-                                onClick = {
-                                    onAddList(newListName)
-                                    newListName = ""
-                                },
-                                enabled = newListName.isNotBlank(),
-                            ) {
-                                Text(tankobunString(R.string.common_add))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun AniListScoreInput(
+private fun TrackingScoreCard(
     scoreFormat: AnilistScoreFormat,
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    when (scoreFormat) {
-        AnilistScoreFormat.POINT_5 -> StarScoreInput(value, onValueChange, modifier)
-        AnilistScoreFormat.POINT_3 -> MoodScoreInput(value, onValueChange, modifier)
-        else -> OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = modifier,
-            singleLine = true,
-            label = { Text(scoreFormat.scoreLabel()) },
-            suffix = { Text(scoreFormat.scoreSuffix()) },
-            keyboardOptions = KeyboardOptions(
-                keyboardType = if (scoreFormat == AnilistScoreFormat.POINT_10_DECIMAL) {
-                    KeyboardType.Decimal
-                } else {
-                    KeyboardType.Number
-                },
-            ),
-        )
+    TrackingCard(scoreFormat.scoreLabel(), modifier) {
+        when (scoreFormat) {
+            AnilistScoreFormat.POINT_3 -> MoodScoreInput(value, onValueChange)
+            AnilistScoreFormat.POINT_5 -> TrackingStars(
+                filled = value.toDoubleOrNull()?.roundToInt()?.coerceIn(0, 5) ?: 0,
+                onSelect = { star -> onValueChange(if (value.toDoubleOrNull()?.roundToInt() == star) "" else star.toString()) },
+            )
+            else -> Row(verticalAlignment = Alignment.CenterVertically) {
+                TrackingNumberField(
+                    value = value,
+                    total = scoreFormat.scoreSuffix().removePrefix("/").trim(),
+                    onValueChange = onValueChange,
+                    keyboardType = if (scoreFormat == AnilistScoreFormat.POINT_10_DECIMAL) KeyboardType.Decimal else KeyboardType.Number,
+                    modifier = Modifier.weight(1f),
+                )
+                // Stars mirror the number at a glance; typing stays the way to set it.
+                val max = when (scoreFormat) {
+                    AnilistScoreFormat.POINT_100 -> 100.0
+                    else -> 10.0
+                }
+                TrackingStars(filled = ((value.toDoubleOrNull() ?: 0.0) / max * 5).roundToInt().coerceIn(0, 5), size = 13.dp)
+            }
+        }
     }
 }
 
 @Composable
-internal fun StarScoreInput(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    val selectedScore = value.toDoubleOrNull()?.roundToInt()?.coerceIn(0, 5) ?: 0
-    val accent = LocalTankobunStyle.current.colors.accent
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+private fun TrackingCard(label: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            TrackingFieldLabel(label)
+            content()
+        }
+    }
+}
+
+@Composable
+private fun TrackingStepButton(icon: ImageVector, label: String, enabled: Boolean, emphasized: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .size(40.dp)
+            .semantics { contentDescription = label },
+        shape = CircleShape,
+        color = if (emphasized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+        contentColor = if (emphasized) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.graphicsLayer { alpha = if (enabled) 1f else 0.38f }) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+/** A large display number the reader can tap and type over, with its maximum in small print below. */
+@Composable
+private fun TrackingNumberField(
+    value: String,
+    total: String?,
+    onValueChange: (String) -> Unit,
+    keyboardType: KeyboardType,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(
+                fontFamily = TankobunDisplayFontFamily,
+                fontSize = 30.sp,
+                lineHeight = 30.sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (!total.isNullOrBlank()) {
             Text(
-                tankobunString(R.string.common_score),
+                "/ $total",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = if (selectedScore > 0) "$selectedScore / 5" else "— / 5",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (selectedScore > 0) accent else MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
             )
         }
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            (1..5).forEach { star ->
-                val starSelected = star <= selectedScore
-                Surface(
-                    onClick = { onValueChange(if (selectedScore == star) "" else star.toString()) },
-                    modifier = Modifier
-                        .size(36.dp)
-                        .semantics { selected = starSelected },
-                    shape = RoundedCornerShape(99.dp),
-                    color = if (starSelected) accent else Color.Transparent,
-                    contentColor = if (starSelected) {
-                        LocalTankobunStyle.current.colors.selectedChipContent
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    border = if (starSelected) null else BorderStroke(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
-                    ),
+    }
+}
+
+@Composable
+private fun TrackingStars(filled: Int, size: Dp = 22.dp, onSelect: ((Int) -> Unit)? = null) {
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+        (1..5).forEach { star ->
+            val on = star <= filled
+            val starModifier = if (onSelect != null) {
+                Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .clickable { onSelect(star) }
+                    .semantics { selected = on }
+            } else {
+                Modifier
+            }
+            Box(starModifier, contentAlignment = Alignment.Center) {
+                Icon(
+                    TankobunIcons.Star,
+                    contentDescription = if (onSelect != null) tankobunString(R.string.detail_star_score_cd, star) else null,
+                    tint = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                    modifier = Modifier.size(size),
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TrackingCustomLists(
+    availableLists: List<String>,
+    selectedLists: Collection<String>,
+    onListSelected: (String, Boolean) -> Unit,
+    onAddList: (String) -> Unit,
+) {
+    var adding by remember { mutableStateOf(false) }
+    var newListName by remember { mutableStateOf("") }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        TrackingFieldLabel(tankobunString(R.string.detail_custom_lists))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            availableLists.forEach { listName ->
+                val active = selectedLists.any { it.equals(listName, ignoreCase = true) }
+                TankobunChip(
+                    selected = active,
+                    onClick = { onListSelected(listName, !active) },
+                    label = { Text(listName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingIcon = if (active) ({ TankobunChipIcon(TankobunIcons.Check) }) else null,
+                )
+            }
+            // Dashed, like the design's "+ Adicionar lista": it adds rather than selects.
+            Surface(
+                onClick = { adding = true },
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .height(32.dp)
+                    .dashedBorder(MaterialTheme.colorScheme.outline, 16.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            TankobunIcons.Star,
-                            contentDescription = tankobunString(R.string.detail_star_score_cd, star),
-                            modifier = Modifier.size(19.dp),
-                        )
-                    }
+                    Icon(TankobunIcons.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Text(tankobunString(R.string.tracking_add_list), style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+        if (adding) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = newListName,
+                    onValueChange = { newListName = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    label = { Text(tankobunString(R.string.detail_new_list)) },
+                )
+                TextButton(
+                    onClick = {
+                        onAddList(newListName)
+                        newListName = ""
+                        adding = false
+                    },
+                    enabled = newListName.isNotBlank(),
+                ) {
+                    Text(tankobunString(R.string.common_add))
                 }
             }
         }
     }
+}
+
+/** A rounded dashed outline, which Material borders cannot draw. */
+private fun Modifier.dashedBorder(color: Color, radius: Dp): Modifier = drawBehind {
+    val stroke = 1.dp.toPx()
+    drawRoundRect(
+        color = color,
+        topLeft = Offset(stroke / 2, stroke / 2),
+        size = Size(size.width - stroke, size.height - stroke),
+        cornerRadius = CornerRadius(radius.toPx()),
+        style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))),
+    )
 }
 
 @Composable
@@ -2287,6 +2395,45 @@ internal fun CoverImage(
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/** The detail top bar's ⋮: the less frequent chapter and source actions the header no longer shows. */
+@Composable
+internal fun MediaDetailOverflowMenu(
+    state: TankobunUiState,
+    viewModel: MainViewModel,
+    chrome: MediaDetailChromeState,
+    actions: MediaDetailUiActions,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TopBarActionButton(
+            icon = TankobunIcons.MoreVertical,
+            contentDescription = tankobunString(R.string.detail_more_options),
+            onClick = { open = true },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.widthIn(min = 220.dp)) {
+            @Composable
+            fun item(label: String, icon: ImageVector, onClick: () -> Unit) {
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    onClick = {
+                        open = false
+                        onClick()
+                    },
+                )
+            }
+            if (state.selectedSourceManga != null) {
+                item(tankobunString(R.string.chapter_refresh_chapters), TankobunIcons.Refresh, viewModel::loadChaptersForCurrentMatch)
+            }
+            val groupPreference = state.chapterGroupPreference
+            if (state.chapterGroupSelection.groups.size >= 2 || groupPreference.oneVersionPerChapter || groupPreference.preferredGroup != null) {
+                item(tankobunString(R.string.chapter_groups_title), TankobunIcons.Tune) { chrome.chapterGroupsOpen = true }
+            }
+            item(tankobunString(R.string.source_change_source), TankobunIcons.SwapHoriz, actions.onChooseSource)
         }
     }
 }

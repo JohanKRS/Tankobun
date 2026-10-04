@@ -22,6 +22,7 @@ internal object TankobunIcons {
     val ViewList: ImageVector = TablerIcons.LayoutList
     val AccountCircle: ImageVector = TablerIcons.User
     val Add: ImageVector = TablerIcons.Plus
+    val Remove: ImageVector = TablerIcons.Minus
     val Activity: ImageVector = TablerIcons.Activity
     val Award: ImageVector = TablerIcons.Award
     val AutoAwesome: ImageVector = TablerIcons.Stars

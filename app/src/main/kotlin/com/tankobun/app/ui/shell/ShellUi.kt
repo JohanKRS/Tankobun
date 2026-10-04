@@ -921,7 +921,11 @@ internal fun TankobunScaffold(
                 mediaDetailActive = selectedMedia != null,
                 startInsetExtra = railInset,
                 onBack = onNavigateBack,
+                titleVisible = selectedMedia == null || !detailChrome.heroActionsVisible,
                 actions = {
+                    if (selectedMedia != null) {
+                        MediaDetailOverflowMenu(state, viewModel, detailChrome, detailActions)
+                    }
                     if (selectedMedia == null && selectedTab == 1) {
                         val updatesLabel = tankobunString(R.string.library_updates_title)
                         TopBarActionButton(
@@ -1123,6 +1127,8 @@ internal fun TankobunTopBar(
     mediaDetailActive: Boolean = false,
     startInsetExtra: Dp = 0.dp,
     onBack: () -> Unit,
+    // Manga details keep the bar clear over the hero and bring the title in once it scrolls away.
+    titleVisible: Boolean = true,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val configuration = LocalConfiguration.current
@@ -1174,23 +1180,33 @@ internal fun TankobunTopBar(
                         )
                     }
                 }
-                TankobunHeadingLead(
-                    title = if (mediaDetailActive) title else title.uppercase(Locale.ROOT),
-                    icon = pageIcon,
-                    modifier = Modifier.weight(1f),
-                    titleColor = contentColor,
-                    textStyle = when {
-                        mediaDetailActive && compact -> MaterialTheme.typography.titleMedium
-                        mediaDetailActive -> MaterialTheme.typography.titleLarge
-                        else -> MaterialTheme.typography.headlineSmall.copy(
+                if (mediaDetailActive) {
+                    val titleAlpha by animateFloatAsState(if (titleVisible) 1f else 0f, label = "Detail title")
+                    Text(
+                        title,
+                        modifier = Modifier
+                            .weight(1f)
+                            .graphicsLayer { alpha = titleAlpha },
+                        style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                        color = contentColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    TankobunHeadingLead(
+                        title = title.uppercase(Locale.ROOT),
+                        icon = pageIcon,
+                        modifier = Modifier.weight(1f),
+                        titleColor = contentColor,
+                        textStyle = MaterialTheme.typography.headlineSmall.copy(
                             fontFamily = TankobunDisplayFontFamily,
                             fontSize = 25.sp,
                             lineHeight = 26.sp,
                             fontWeight = FontWeight.Normal,
                             letterSpacing = 1.2.sp,
-                        )
-                    },
-                )
+                        ),
+                    )
+                }
                 actions()
             }
         }

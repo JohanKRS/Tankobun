@@ -37,26 +37,7 @@ import com.tankobun.app.ui.components.TankobunDialogHeader
 import com.tankobun.app.ui.icons.TankobunIcons
 
 @Composable
-internal fun ChapterGroupsButton(state: TankobunUiState, onChange: (ChapterGroupPreference) -> Unit) {
-    val groups = state.chapterGroupSelection.groups
-    val preference = state.chapterGroupPreference
-    if (groups.size < 2 && !preference.oneVersionPerChapter && preference.preferredGroup == null) return
-    var open by remember(state.chapterGroupPreferenceKey) { mutableStateOf(false) }
-    TextButton(onClick = { open = true }, modifier = Modifier.widthIn(max = 200.dp)) {
-        Icon(TankobunIcons.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
-        Text(
-            tankobunString(if (preference.oneVersionPerChapter) R.string.chapter_groups_filtered else R.string.chapter_groups_title),
-            modifier = Modifier.padding(start = 6.dp),
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-    if (open) ChapterGroupsDialog(groups, preference, onChange, onDismiss = { open = false })
-}
-
-@Composable
-private fun ChapterGroupsDialog(
+internal fun ChapterGroupsDialog(
     groups: List<ChapterTranslationGroup>,
     preference: ChapterGroupPreference,
     onChange: (ChapterGroupPreference) -> Unit,
